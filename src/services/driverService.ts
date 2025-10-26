@@ -1,5 +1,5 @@
 import { NeonService } from './neon-service';
-import { createVehicle } from './vehicleService';
+import { createVehicle, getVehicle, getVehicles } from './vehicleService';
 import type { Driver, CreateDriver, CreateDriverWithVehicle, CreateVehicle, Vehicle, Trip } from '../types/types';
 
 const neonService = new NeonService();
@@ -15,6 +15,12 @@ export const getDriver = async (id: number): Promise<Driver> => {
   return results[0] as unknown as Driver;
 };
 
+export const getDriverByIdentification = async (identificationNumber: string): Promise<Driver | null> => {
+  const sql = 'SELECT * FROM drivers WHERE identification_number = $1';
+  const results = await neonService.executeSelectAsObjects(sql, [identificationNumber]);
+  return results.length > 0 ? results[0] as unknown as Driver : null;
+};
+
 export const getDriverWithDetails = async (id: number): Promise<{
   driver: Driver;
   vehicle?: Vehicle;
@@ -22,16 +28,24 @@ export const getDriverWithDetails = async (id: number): Promise<{
 }> => {
   // Get driver
   const driver = await getDriver(id);
-  
-  // Get vehicle associated with driver
-  const vehicleSql = 'SELECT * FROM vehicles WHERE driver_id = $1';
-  const vehicleResults = await neonService.executeSelectAsObjects(vehicleSql, [id]);
-  const vehicle = vehicleResults.length > 0 ? vehicleResults[0] as unknown as Vehicle : undefined;
-  
+
+  // Get vehicle associated with driver using the updated getVehicle function
+  let vehicle: Vehicle | undefined;
+  try {
+    // First, find if there's a vehicle assigned to this driver
+    const allVehicles = await getVehicles();
+    const driverVehicle = allVehicles.find((v: Vehicle) => v.driver_id === id);
+    if (driverVehicle) {
+      vehicle = await getVehicle(driverVehicle.vehicle_id);
+    }
+  } catch (error) {
+    console.warn('Could not fetch vehicle for driver:', error);
+  }
+
   // Get trips for this driver
   const tripsSql = 'SELECT * FROM trips WHERE driver_id = $1 ORDER BY load_date DESC, load_time DESC';
   const trips = (await neonService.executeSelectAsObjects(tripsSql, [id])) as unknown as Trip[];
-  
+
   return {
     driver,
     vehicle,
@@ -40,6 +54,25 @@ export const getDriverWithDetails = async (id: number): Promise<{
 };
 
 export const createDriver = async (data: CreateDriver | CreateDriverWithVehicle): Promise<Driver> => {
+  // First, check if a driver with this identification_number already exists
+  const existingDriver = await getDriverByIdentification(data.identification_number);
+
+  if (existingDriver) {
+    console.log(`Driver with identification number ${data.identification_number} already exists. Using existing driver.`);
+
+    // If createVehicle is true, associate the vehicle with the existing driver
+    if ('createVehicle' in data && data.createVehicle && data.vehicleData) {
+      const vehicleData: CreateVehicle = {
+        ...data.vehicleData,
+        driver_id: existingDriver.driver_id,
+      };
+      await createVehicle(vehicleData);
+    }
+
+    return existingDriver;
+  }
+
+  // If no existing driver, proceed with creation
   const fields = ['full_name', 'identification_number', 'phone_number'];
   const values: unknown[] = [data.full_name, data.identification_number, data.phone_number];
   const placeholders = ['$1', '$2', '$3'];
@@ -84,8 +117,10 @@ export const updateDriver = async (id: number, data: Partial<Driver>): Promise<D
 
   values.push(id); // Add id as the last parameter
   const sql = `UPDATE drivers SET ${updates.join(', ')} WHERE driver_id = $${paramIndex} RETURNING *`;
-  const result = await neonService.executeSelectAsObjects(sql, values);
-  return result[0] as unknown as Driver;
+  await neonService.executeSelectAsObjects(sql, values);
+
+  // Return the updated driver
+  return await getDriver(id);
 };
 
 export const deleteDriver = async (id: number): Promise<void> => {

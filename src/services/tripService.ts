@@ -1,5 +1,6 @@
 import { NeonService } from './neon-service';
-import type { Trip, CreateTrip } from '../types/types';
+import { getDriver } from './driverService';
+import type { Trip, CreateTrip, Driver, Vehicle } from '../types/types';
 
 const neonService = new NeonService();
 
@@ -12,6 +13,44 @@ export const getTrip = async (id: number): Promise<Trip> => {
   const sql = 'SELECT * FROM trips WHERE trip_id = $1';
   const results = await neonService.executeSelectAsObjects(sql, [id]);
   return results[0] as unknown as Trip;
+};
+
+export const getTripWithDetails = async (id: number): Promise<{
+  trip: Trip;
+  driver?: Driver;
+  vehicle?: Vehicle;
+}> => {
+  // Get trip
+  const trip = await getTrip(id);
+
+  // Get driver associated with the trip
+  let driver: Driver | undefined;
+  if (trip.driver_id) {
+    try {
+      driver = await getDriver(trip.driver_id);
+    } catch (error) {
+      console.warn('Could not fetch driver for trip:', error);
+    }
+  }
+
+  // Get vehicle associated with the driver
+  let vehicle: Vehicle | undefined;
+  if (trip.driver_id) {
+    try {
+      // Find vehicle assigned to this driver
+      const { getVehicles } = await import('./vehicleService');
+      const vehicles = await getVehicles();
+      vehicle = vehicles.find(v => v.driver_id === trip.driver_id);
+    } catch (error) {
+      console.warn('Could not fetch vehicle for trip:', error);
+    }
+  }
+
+  return {
+    trip,
+    driver,
+    vehicle,
+  };
 };
 
 export const createTrip = async (data: CreateTrip): Promise<Trip> => {
@@ -68,8 +107,10 @@ export const updateTrip = async (id: number, data: Partial<Trip>): Promise<Trip>
 
   values.push(id); // Add id as the last parameter
   const sql = `UPDATE trips SET ${updates.join(', ')} WHERE trip_id = $${paramIndex} RETURNING *`;
-  const result = await neonService.executeSelectAsObjects(sql, values);
-  return result[0] as unknown as Trip;
+  await neonService.executeSelectAsObjects(sql, values);
+
+  // Return the updated trip
+  return await getTrip(id);
 };
 
 export const deleteTrip = async (id: number): Promise<void> => {

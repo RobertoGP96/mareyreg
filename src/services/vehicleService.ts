@@ -5,14 +5,84 @@ import { createDriver } from './driverService';
 const neonService = new NeonService();
 
 export const getVehicles = async (): Promise<Vehicle[]> => {
-  const sql = 'SELECT * FROM vehicles';
-  return (await neonService.executeSelectAsObjects(sql)) as unknown as Vehicle[];
+  const sql = `
+    SELECT v.*,
+           d.driver_id as d_driver_id,
+           d.full_name,
+           d.identification_number,
+           d.phone_number,
+           d.operative_license
+    FROM vehicles v
+    LEFT JOIN drivers d ON v.driver_id = d.driver_id
+  `;
+  const results = await neonService.executeSelectAsObjects(sql);
+
+  // Map results to include driver object
+  return results.map((row: Record<string, unknown>) => {
+    const vehicle: Vehicle = {
+      vehicle_id: row.vehicle_id as number,
+      cuña_circulation_number: row.cuña_circulation_number as string | undefined,
+      plancha_circulation_number: row.plancha_circulation_number as string | undefined,
+      cuña_plate_number: row.cuña_plate_number as string | undefined,
+      plancha_plate_number: row.plancha_plate_number as string | undefined,
+      driver_id: row.driver_id as number | undefined,
+    };
+
+    // If driver data exists, add it to the vehicle
+    if (row.d_driver_id) {
+      vehicle.driver = {
+        driver_id: row.d_driver_id as number,
+        full_name: row.full_name as string,
+        identification_number: row.identification_number as string,
+        phone_number: row.phone_number as string,
+        operative_license: row.operative_license as string | undefined,
+      };
+    }
+
+    return vehicle;
+  });
 };
 
 export const getVehicle = async (id: number): Promise<Vehicle> => {
-  const sql = 'SELECT * FROM vehicles WHERE vehicle_id = $1';
+  const sql = `
+    SELECT v.*,
+           d.driver_id as d_driver_id,
+           d.full_name,
+           d.identification_number,
+           d.phone_number,
+           d.operative_license
+    FROM vehicles v
+    LEFT JOIN drivers d ON v.driver_id = d.driver_id
+    WHERE v.vehicle_id = $1
+  `;
   const results = await neonService.executeSelectAsObjects(sql, [id]);
-  return results[0] as unknown as Vehicle;
+
+  if (results.length === 0) {
+    throw new Error(`Vehicle with id ${id} not found`);
+  }
+
+  const row = results[0] as Record<string, unknown>;
+  const vehicle: Vehicle = {
+    vehicle_id: row.vehicle_id as number,
+    cuña_circulation_number: row.cuña_circulation_number as string | undefined,
+    plancha_circulation_number: row.plancha_circulation_number as string | undefined,
+    cuña_plate_number: row.cuña_plate_number as string | undefined,
+    plancha_plate_number: row.plancha_plate_number as string | undefined,
+    driver_id: row.driver_id as number | undefined,
+  };
+
+  // If driver data exists, add it to the vehicle
+  if (row.d_driver_id) {
+    vehicle.driver = {
+      driver_id: row.d_driver_id as number,
+      full_name: row.full_name as string,
+      identification_number: row.identification_number as string,
+      phone_number: row.phone_number as string,
+      operative_license: row.operative_license as string | undefined,
+    };
+  }
+
+  return vehicle;
 };
 
 export const createVehicle = async (data: CreateVehicle): Promise<Vehicle> => {
@@ -91,8 +161,10 @@ export const updateVehicle = async (id: number, data: Partial<Vehicle>): Promise
 
   values.push(id); // Add id as the last parameter
   const sql = `UPDATE vehicles SET ${updates.join(', ')} WHERE vehicle_id = $${paramIndex} RETURNING *`;
-  const result = await neonService.executeSelectAsObjects(sql, values);
-  return result[0] as unknown as Vehicle;
+  await neonService.executeSelectAsObjects(sql, values);
+
+  // Return the updated vehicle with driver data
+  return await getVehicle(id);
 };
 
 export const deleteVehicle = async (id: number): Promise<void> => {
