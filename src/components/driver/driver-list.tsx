@@ -25,7 +25,7 @@ export function DriverList() {
     const [driverToDelete, setDriverToDelete] = useState<number | null>(null);
     const [driverToEdit, setDriverToEdit] = useState<Driver | null>(null);
 
-    const displayDrivers = error || !drivers ? mockDrivers : drivers;
+    const displayDrivers = error || !drivers ? [...mockDrivers].sort((a, b) => a.full_name.localeCompare(b.full_name)) : [...drivers].sort((a, b) => a.full_name.localeCompare(b.full_name));
     const isUsingMockData = !!error || !drivers;
 
     const filteredDrivers = displayDrivers.filter(driver =>
