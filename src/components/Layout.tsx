@@ -15,8 +15,8 @@ export default function Layout({ children }: LayoutProps) {
   const navigation = [
     { name: 'Inicio', href: '/', icon: Home },
     { name: 'Conductores', href: '/drivers', icon: Users },
-    { name: 'Vehículos', href: '/vehicles', icon: Car },
     { name: 'Viajes', href: '/trips', icon: RouteIcon },
+    { name: 'Vehículos', href: '/vehicles', icon: Car },
   ]
 
   const isActive = (href: string) => location.pathname === href

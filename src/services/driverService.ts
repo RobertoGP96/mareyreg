@@ -1,6 +1,6 @@
 import { NeonService } from './neon-service';
 import { createVehicle } from './vehicleService';
-import type { Driver, CreateDriver, CreateDriverWithVehicle, CreateVehicle } from '../types/types';
+import type { Driver, CreateDriver, CreateDriverWithVehicle, CreateVehicle, Vehicle, Trip } from '../types/types';
 
 const neonService = new NeonService();
 
@@ -13,6 +13,30 @@ export const getDriver = async (id: number): Promise<Driver> => {
   const sql = 'SELECT * FROM drivers WHERE driver_id = $1';
   const results = await neonService.executeSelectAsObjects(sql, [id]);
   return results[0] as unknown as Driver;
+};
+
+export const getDriverWithDetails = async (id: number): Promise<{
+  driver: Driver;
+  vehicle?: Vehicle;
+  trips: Trip[];
+}> => {
+  // Get driver
+  const driver = await getDriver(id);
+  
+  // Get vehicle associated with driver
+  const vehicleSql = 'SELECT * FROM vehicles WHERE driver_id = $1';
+  const vehicleResults = await neonService.executeSelectAsObjects(vehicleSql, [id]);
+  const vehicle = vehicleResults.length > 0 ? vehicleResults[0] as unknown as Vehicle : undefined;
+  
+  // Get trips for this driver
+  const tripsSql = 'SELECT * FROM trips WHERE driver_id = $1 ORDER BY load_date DESC, load_time DESC';
+  const trips = (await neonService.executeSelectAsObjects(tripsSql, [id])) as unknown as Trip[];
+  
+  return {
+    driver,
+    vehicle,
+    trips,
+  };
 };
 
 export const createDriver = async (data: CreateDriver | CreateDriverWithVehicle): Promise<Driver> => {

@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-quer
 import { AnimatePresence, motion } from 'framer-motion'
 import Layout from './components/Layout'
 import { Button } from './components/ui/button'
-import { DriverList } from './components/driver'
+import { DriverList, DriverDetails } from './components/driver'
 import { VehicleList } from './components/vehicle'
 import { TripList } from './components/trip'
 import { Users, Truck, ClipboardList, RouteIcon } from 'lucide-react'
@@ -34,7 +34,7 @@ function Home() {
           <div>
 
           <div className='w-35 rounded-xl'>
-            <img className='w-full h-auto' src="@/assets/truck.svg" alt="" />
+            <img className='w-full h-auto' src="/truck.svg" alt="" />
           </div>
           <p className='roadway-font text-5xl font-bold'>MAREYreg</p>
           </div>
@@ -126,6 +126,15 @@ function Drivers() {
   )
 }
 
+function DriverDetailsPage() {
+  return (
+    <div className="space-y-6">
+      <DriverDetails />
+    </div>
+  )
+}
+
+
 function Vehicles() {
   return (
     <div className="space-y-6">
@@ -188,6 +197,16 @@ function AnimatedRoutes() {
             transition={{ duration: 0.3 }}
           >
             <Drivers />
+          </motion.div>
+        } />
+        <Route path="/drivers/:id" element={
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <DriverDetailsPage />
           </motion.div>
         } />
         <Route path="/vehicles" element={

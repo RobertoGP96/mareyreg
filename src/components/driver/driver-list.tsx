@@ -3,10 +3,11 @@ import { mockDrivers } from '../../lib/mockData';
 import { Button } from '../ui/button';
 import { Loading } from '../ui/loading';
 import { EmptyState } from '../ui/empty-state';
-import { IdCardIcon, IdCardLanyard, Pen, Phone, Search, Trash2, MoreHorizontal, User, UserPlus } from 'lucide-react';
+import { IdCardIcon, IdCardLanyard, Pen, Phone, Search, Trash2, MoreHorizontal, User, UserPlus, Eye } from 'lucide-react';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../ui/input-group';
 import { Badge } from '../ui/badge';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { DriverForm } from './driver-form';
 import type { CreateDriver, CreateDriverWithVehicle, Driver } from '../../types/types';
@@ -18,6 +19,7 @@ export function DriverList() {
     const createDriverMutation = useCreateDriver();
     const deleteDriverMutation = useDeleteDriver();
     const updateDriverMutation = useUpdateDriver();
+    const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [driverToDelete, setDriverToDelete] = useState<number | null>(null);
@@ -64,6 +66,10 @@ export function DriverList() {
 
     const handleEditDriver = (driver: Driver) => {
         setDriverToEdit(driver);
+    };
+
+    const handleViewDriver = (driverId: number) => {
+        navigate(`/drivers/${driverId}`);
     };
 
     const handleUpdateDriver = async (data: CreateDriverWithVehicle) => {
@@ -172,6 +178,13 @@ export function DriverList() {
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
+                                            <DropdownMenuItem 
+                                                onClick={() => handleViewDriver(driver.driver_id)}
+                                                className="flex items-center space-x-2"
+                                            >
+                                                <Eye className="h-4 w-4" />
+                                                <span>Ver detalles</span>
+                                            </DropdownMenuItem>
                                             <DropdownMenuItem 
                                                 disabled={isUsingMockData} 
                                                 onClick={() => handleEditDriver(driver)}
