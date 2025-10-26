@@ -124,30 +124,30 @@ export function VehicleList() {
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Vehículo #{vehicle.vehicle_id}</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">Vehículo #{vehicle.vehicle_id}</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
                         {vehicle.cuña_plate_number && (
                           <div className="flex items-center space-x-2">
                             <span className="font-medium">Placa Cuña:</span>
-                            <Badge variant="secondary">{vehicle.cuña_plate_number}</Badge>
+                            <Badge variant="secondary" className="truncate">{vehicle.cuña_plate_number}</Badge>
                           </div>
                         )}
                         {vehicle.plancha_plate_number && (
                           <div className="flex items-center space-x-2">
                             <span className="font-medium">Placa Plancha:</span>
-                            <Badge variant="secondary">{vehicle.plancha_plate_number}</Badge>
+                            <Badge variant="secondary" className="truncate">{vehicle.plancha_plate_number}</Badge>
                           </div>
                         )}
                         {vehicle.cuña_circulation_number && (
                           <div className="flex items-center space-x-2">
                             <span className="font-medium">Circulación Cuña:</span>
-                            <span>{vehicle.cuña_circulation_number}</span>
+                            <span className="truncate">{vehicle.cuña_circulation_number}</span>
                           </div>
                         )}
                         {vehicle.plancha_circulation_number && (
                           <div className="flex items-center space-x-2">
                             <span className="font-medium">Circulación Plancha:</span>
-                            <span>{vehicle.plancha_circulation_number}</span>
+                            <span className="truncate">{vehicle.plancha_circulation_number}</span>
                           </div>
                         )}
                       </div>

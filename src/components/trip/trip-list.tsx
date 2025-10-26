@@ -133,39 +133,39 @@ export function TripList() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center space-x-2 mb-2">
                                             <h3 className="text-lg font-semibold text-gray-900">Viaje</h3>
-                                            <Badge variant="outline" className="bg-gray-100">#{trip.trip_id}</Badge>
+                                            <Badge variant="outline" className="bg-gray-100 truncate">#{trip.trip_id}</Badge>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
                                             <div className="flex items-center space-x-2">
                                                 <span className="font-medium">Conductor:</span>
-                                                <span>{driver?.full_name || 'Desconocido'}</span>
+                                                <span className="truncate">{driver?.full_name || 'Desconocido'}</span>
                                             </div>
                                             {trip.container_number && (
                                                 <div className="flex items-center space-x-2">
                                                     <Container className="w-4 h-4 text-gray-400" />
                                                     <span className="font-medium">Contenedor:</span>
-                                                    <Badge variant="secondary">{trip.container_number}</Badge>
+                                                    <Badge variant="secondary" className="truncate">{trip.container_number}</Badge>
                                                 </div>
                                             )}
                                             {trip.load_date && (
                                                 <div className="flex items-center space-x-2">
                                                     <Calendar className="w-4 h-4 text-gray-400" />
                                                     <span className="font-medium">Fecha:</span>
-                                                    <span>{new Date(trip.load_date).toLocaleDateString('es-ES')}</span>
+                                                    <span className="truncate">{new Date(trip.load_date).toLocaleDateString('es-ES')}</span>
                                                 </div>
                                             )}
                                             {trip.load_time && (
                                                 <div className="flex items-center space-x-2">
                                                     <Clock className="w-4 h-4 text-gray-400" />
                                                     <span className="font-medium">Hora:</span>
-                                                    <span>{trip.load_time}</span>
+                                                    <span className="truncate">{trip.load_time}</span>
                                                 </div>
                                             )}
                                             {trip.trip_payment && (
                                                 <div className="flex items-center space-x-2">
                                                     <HandCoinsIcon className="w-4 h-4 text-gray-400" />
                                                     <span className="font-medium">Pago:</span>
-                                                    <span className="font-semibold text-green-600">
+                                                    <span className="font-semibold text-green-600 truncate">
                                                         ${Number(trip.trip_payment).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                                                     </span>
                                                 </div>
@@ -174,7 +174,7 @@ export function TripList() {
                                                 <div className="flex items-center space-x-2">
                                                     <MapPin className="w-4 h-4 text-gray-400" />
                                                     <span className="font-medium">Provincia:</span>
-                                                    <span>{trip.province}</span>
+                                                    <span className="truncate">{trip.province}</span>
                                                 </div>
                                             )}
                                         </div>

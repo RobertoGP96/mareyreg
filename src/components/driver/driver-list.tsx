@@ -148,23 +148,23 @@ export function DriverList() {
                                         </div>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">{driver.full_name}</h3>
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">{driver.full_name}</h3>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
                                             <div className="flex items-center space-x-2">
                                                 <IdCardIcon className="w-4 h-4 text-gray-400" />
                                                 <span className="font-medium">ID:</span>
-                                                <span>{driver.identification_number}</span>
+                                                <span className="truncate">{driver.identification_number}</span>
                                             </div>
                                             <div className="flex items-center space-x-2">
                                                 <Phone className="w-4 h-4 text-gray-400" />
                                                 <span className="font-medium">Teléfono:</span>
-                                                <span>{driver.phone_number}</span>
+                                                <span className="truncate">{driver.phone_number}</span>
                                             </div>
                                             {driver.operative_license && (
                                                 <div className="flex items-center space-x-2">
                                                     <IdCardLanyard className="w-4 h-4 text-gray-400" />
                                                     <span className="font-medium">Licencia:</span>
-                                                    <Badge variant="secondary">{driver.operative_license}</Badge>
+                                                    <Badge variant="secondary" className="truncate">{driver.operative_license}</Badge>
                                                 </div>
                                             )}
                                         </div>
