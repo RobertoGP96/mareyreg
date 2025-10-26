@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
+import { useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { Trip, CreateTrip, Driver } from "@/types/types"
+import { Loader2, Plus, Save } from "lucide-react"
 
 const CUBAN_PROVINCES = [
   "Pinar del Río",
@@ -89,6 +91,28 @@ export function TripForm({
       province: trip?.province || "",
     },
   })
+
+  useEffect(() => {
+    if (trip) {
+      form.reset({
+        driver_id: trip.driver_id || 0,
+        container_number: trip.container_number || "",
+        load_date: trip.load_date ? new Date(trip.load_date).toISOString().split('T')[0] : "",
+        load_time: trip.load_time || "",
+        trip_payment: trip.trip_payment ? Number(trip.trip_payment) : undefined,
+        province: trip.province || "",
+      })
+    } else {
+      form.reset({
+        driver_id: 0,
+        container_number: "",
+        load_date: "",
+        load_time: "",
+        trip_payment: undefined,
+        province: "",
+      })
+    }
+  }, [trip, form])
 
   const handleSubmit = (data: TripFormData) => {
     // Convertir trip_payment a string si viene como number (o dejar undefined)
@@ -245,6 +269,8 @@ export function TripForm({
                 Cancelar
               </Button>
               <Button type="submit" disabled={isLoading}>
+                
+                {isLoading ? <Loader2 className="spin" /> : isEditing ? <Save/> : <Plus/>}
                 {isLoading ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
               </Button>
             </DialogFooter>

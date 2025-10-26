@@ -34,7 +34,7 @@ function Home() {
           <div>
 
           <div className='w-35 rounded-xl'>
-            <img className='w-full h-auto' src="src/assets/truck.svg" alt="" />
+            <img className='w-full h-auto' src="@/assets/truck.svg" alt="" />
           </div>
           <p className='roadway-font text-5xl font-bold'>MAREYreg</p>
           </div>

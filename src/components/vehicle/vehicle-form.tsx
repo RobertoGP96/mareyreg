@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
+import { useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { useDrivers } from "@/hooks/hooks"
 import type { Vehicle, CreateVehicleWithDriver } from "@/types/types"
+import { Loader2, Plus, Save } from "lucide-react"
 
 const vehicleSchema = z.object({
   cuña_circulation_number: z.string().optional(),
@@ -88,6 +90,40 @@ export function VehicleForm({
       },
     },
   })
+
+  useEffect(() => {
+    if (vehicle) {
+      form.reset({
+        cuña_circulation_number: vehicle.cuña_circulation_number || "",
+        plancha_circulation_number: vehicle.plancha_circulation_number || "",
+        cuña_plate_number: vehicle.cuña_plate_number || "",
+        plancha_plate_number: vehicle.plancha_plate_number || "",
+        driverOption: vehicle.driver_id ? "existing" : "none",
+        driver_id: vehicle.driver_id,
+        driverData: {
+          full_name: "",
+          identification_number: "",
+          phone_number: "",
+          operative_license: "",
+        },
+      })
+    } else {
+      form.reset({
+        cuña_circulation_number: "",
+        plancha_circulation_number: "",
+        cuña_plate_number: "",
+        plancha_plate_number: "",
+        driverOption: "none",
+        driver_id: undefined,
+        driverData: {
+          full_name: "",
+          identification_number: "",
+          phone_number: "",
+          operative_license: "",
+        },
+      })
+    }
+  }, [vehicle, form])
 
   const handleSubmit = (data: VehicleFormData) => {
     const submitData: CreateVehicleWithDriver = {
@@ -313,6 +349,8 @@ export function VehicleForm({
                 Cancelar
               </Button>
               <Button type="submit" disabled={isLoading}>
+
+                {isLoading ? <Loader2 className="spin" /> : isEditing ? <Save/> : <Plus/>}
                 {isLoading ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
               </Button>
             </DialogFooter>

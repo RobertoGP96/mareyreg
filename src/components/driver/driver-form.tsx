@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
+import { useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import type { Driver, CreateDriverWithVehicle } from "@/types/types"
+import { Loader2, Plus, Save } from "lucide-react"
 
 const driverSchema = z.object({
   full_name: z.string().min(1, "El nombre completo es requerido"),
@@ -80,6 +82,38 @@ export function DriverForm({
       },
     },
   })
+
+  useEffect(() => {
+    if (driver) {
+      form.reset({
+        full_name: driver.full_name || "",
+        identification_number: driver.identification_number || "",
+        phone_number: driver.phone_number || "",
+        operative_license: driver.operative_license || "",
+        vehicleOption: "none",
+        vehicleData: {
+          cuña_circulation_number: "",
+          plancha_circulation_number: "",
+          cuña_plate_number: "",
+          plancha_plate_number: "",
+        },
+      })
+    } else {
+      form.reset({
+        full_name: "",
+        identification_number: "",
+        phone_number: "",
+        operative_license: "",
+        vehicleOption: "none",
+        vehicleData: {
+          cuña_circulation_number: "",
+          plancha_circulation_number: "",
+          cuña_plate_number: "",
+          plancha_plate_number: "",
+        },
+      })
+    }
+  }, [driver, form])
 
   const handleSubmit = (data: DriverFormData) => {
     const submitData: CreateDriverWithVehicle = {
@@ -268,6 +302,8 @@ export function DriverForm({
                 Cancelar
               </Button>
               <Button type="submit" disabled={isLoading}>
+                
+                {isLoading ? <Loader2 className="spin" /> : isEditing ? <Save/> : <Plus/>}
                 {isLoading ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
               </Button>
             </DialogFooter>
