@@ -85,7 +85,7 @@ export const createTrip = async (data: CreateTrip): Promise<Trip> => {
     placeholders.push(`$${paramIndex++}`);
   }
   if (data.product !== undefined) {
-    fields.push('producto');
+    fields.push('product');
     values.push(data.product);
     placeholders.push(`$${paramIndex++}`);
   }

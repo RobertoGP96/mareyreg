@@ -9,6 +9,7 @@ import { VehicleList } from './components/vehicle'
 import { TripList } from './components/trip'
 import { Users, Truck, ClipboardList, RouteIcon, Trash2 } from 'lucide-react'
 import { api } from './services/services'
+import { DatabaseStorage } from './components/test'
 
 const queryClient = new QueryClient()
 
@@ -34,10 +35,10 @@ function Home() {
         <div className='w-full flex justify-center items-center'>
           <div>
 
-          <div className='w-35 rounded-xl'>
-            <img className='w-full h-auto' src="/truck.svg" alt="" width="140" height="140" />
-          </div>
-          <p className='roadway-font text-5xl font-bold'>MAREYreg</p>
+            <div className='w-35 rounded-xl'>
+              <img className='w-full h-auto' src="/truck.svg" alt="" width="140" height="140" />
+            </div>
+            <p className='roadway-font text-5xl font-bold'>MAREYreg</p>
           </div>
         </div>
         <h1 className="text-3xl font-bold text-gray-900">Inicio</h1>
@@ -167,6 +168,7 @@ function Settings() {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-gray-900">Configuración</h1>
+      <DatabaseStorage />
       <div className="bg-white p-6 rounded-lg shadow-sm border">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Datos de la Base de Datos</h2>
         <p className="text-gray-600 mb-4">
