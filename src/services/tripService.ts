@@ -117,3 +117,8 @@ export const deleteTrip = async (id: number): Promise<void> => {
   const sql = 'DELETE FROM trips WHERE trip_id = $1';
   await neonService.executeDelete(sql, [id]);
 };
+
+export const deleteAllTrips = async (): Promise<void> => {
+  const sql = 'DELETE FROM trips';
+  await neonService.executeDelete(sql);
+};

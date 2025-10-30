@@ -3,7 +3,7 @@ import { mockDrivers } from '../../lib/mockData';
 import { Button } from '../ui/button';
 import { Loading } from '../ui/loading';
 import { EmptyState } from '../ui/empty-state';
-import { IdCardIcon, IdCardLanyard, Pen, Phone, Search, Trash2, MoreHorizontal, UserPlus, Eye } from 'lucide-react';
+import { IdCardIcon, IdCardLanyard, Pen, Phone, Search, Trash2, MoreHorizontal, UserPlus, Eye, Copy } from 'lucide-react';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../ui/input-group';
 import { Badge } from '../ui/badge';
 import { useState } from 'react';
@@ -71,6 +71,16 @@ export function DriverList() {
 
     const handleViewDriver = (driverId: number) => {
         navigate(`/drivers/${driverId}`);
+    };
+
+    const handleCopyContactInfo = async (driver: Driver) => {
+        const contactInfo = `Nombre: ${driver.full_name}\nTeléfono: ${driver.phone_number}`.trim();
+        try {
+            await navigator.clipboard.writeText(contactInfo);
+            toast.success('Información de contacto copiada al portapapeles');
+        } catch {
+            toast.error('Error al copiar al portapapeles');
+        }
     };
 
     const handleUpdateDriver = async (data: CreateDriverWithVehicle) => {
@@ -182,6 +192,13 @@ export function DriverList() {
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
+                                                <DropdownMenuItem
+                                                    onClick={() => handleCopyContactInfo(driver)}
+                                                    className="flex items-center space-x-2"
+                                                >
+                                                    <Copy className="h-4 w-4" />
+                                                    <span>Copiar contacto</span>
+                                                </DropdownMenuItem>
                                                 <DropdownMenuItem
                                                     onClick={() => handleViewDriver(driver.driver_id)}
                                                     className="flex items-center space-x-2"

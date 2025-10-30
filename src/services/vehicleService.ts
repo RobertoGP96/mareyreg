@@ -171,3 +171,8 @@ export const deleteVehicle = async (id: number): Promise<void> => {
   const sql = 'DELETE FROM vehicles WHERE vehicle_id = $1';
   await neonService.executeDelete(sql, [id]);
 };
+
+export const deleteAllVehicles = async (): Promise<void> => {
+  const sql = 'DELETE FROM vehicles';
+  await neonService.executeDelete(sql);
+};
