@@ -116,7 +116,7 @@ export class NeonService {
 
   async getNeonStorageUsed(): Promise<number> {
     const apiKey = import.meta.env?.VITE_NEON_API_KEY;
-    const projectId = import.meta.env?.VITE_STACK_PROJECT_ID;
+    const projectId = import.meta.env?.VITE_STACK_PROJECT_ID || this.projectId;
 
     console.log('API Key:', apiKey ? 'Present' : 'Missing');
     console.log('Project ID:', projectId);
@@ -126,7 +126,7 @@ export class NeonService {
     }
 
     try {
-      const url = `/api/neon/projects/${projectId}`;
+      const url = `https://console.neon.tech/api/v2/projects/${projectId}`;
       console.log('Fetching from:', url);
 
       const response = await fetch(url, {
@@ -147,7 +147,7 @@ export class NeonService {
       const data = await response.json();
       console.log('API Response:', data);
 
-      const storageBytes = data.synthetic_storage_size || 0;
+      const storageBytes = data.project?.synthetic_storage_size || 0;
       console.log('Storage bytes:', storageBytes);
 
       return storageBytes / (1024 * 1024); // Convertir a MB
