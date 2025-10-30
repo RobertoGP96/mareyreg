@@ -84,6 +84,11 @@ export const createTrip = async (data: CreateTrip): Promise<Trip> => {
     values.push(data.province);
     placeholders.push(`$${paramIndex++}`);
   }
+  if (data.product !== undefined) {
+    fields.push('producto');
+    values.push(data.product);
+    placeholders.push(`$${paramIndex++}`);
+  }
 
   const sql = `INSERT INTO trips (${fields.join(', ')}) VALUES (${placeholders.join(', ')}) RETURNING *`;
   const result = await neonService.executeSelectAsObjects(sql, values);

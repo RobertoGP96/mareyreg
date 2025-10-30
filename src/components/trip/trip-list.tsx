@@ -3,7 +3,7 @@ import { mockTrips } from '../../lib/mockData';
 import { Button } from '../ui/button';
 import { Loading } from '../ui/loading';
 import { EmptyState } from '../ui/empty-state';
-import { Calendar, Clock, Container, HandCoinsIcon, MapPin, Pen, Trash2, Search, Plus, Route, MoreHorizontal } from 'lucide-react';
+import { Calendar, Clock, Container, HandCoinsIcon, MapPin, Pen, Trash2, Search, Plus, Route, MoreHorizontal, Package } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../ui/input-group';
 import { useState } from 'react';
@@ -34,6 +34,7 @@ export function TripList() {
             trip.driver_id?.toString().toLowerCase().includes(searchQuery.toLowerCase()) ||
             trip.container_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             trip.province?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            trip.product?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (trip.load_date && new Date(trip.load_date).toLocaleDateString('es-ES').toLowerCase().includes(searchQuery.toLowerCase())) ||
             trip.load_time?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             trip.trip_payment?.toString().toLowerCase().includes(searchQuery.toLowerCase())
@@ -175,6 +176,13 @@ export function TripList() {
                                                     <MapPin className="w-4 h-4 text-gray-400" />
                                                     <span className="font-medium">Provincia:</span>
                                                     <span className="truncate">{trip.province}</span>
+                                                </div>
+                                            )}
+                                            {trip.product && (
+                                                <div className="flex items-center space-x-2">
+                                                    <Package className="w-4 h-4 text-gray-400" />
+                                                    <span className="font-medium">Producto:</span>
+                                                    <span className="truncate">{trip.product}</span>
                                                 </div>
                                             )}
                                         </div>

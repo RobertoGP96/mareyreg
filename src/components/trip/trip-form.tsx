@@ -59,6 +59,7 @@ const tripSchema = z.object({
     (val) => !val || CUBAN_PROVINCES.includes(val as typeof CUBAN_PROVINCES[number]),
     "Provincia no válida"
   ),
+  product: z.string().optional(),
 })
 
 type TripFormData = z.infer<typeof tripSchema>
@@ -89,6 +90,7 @@ export function TripForm({
       load_time: trip?.load_time || "",
       trip_payment: trip?.trip_payment ? Number(trip.trip_payment) : undefined,
       province: trip?.province || "",
+      product: trip?.product || "",
     },
   })
 
@@ -101,6 +103,7 @@ export function TripForm({
         load_time: trip.load_time || "",
         trip_payment: trip.trip_payment ? Number(trip.trip_payment) : undefined,
         province: trip.province || "",
+        product: trip.product || "",
       })
     } else {
       form.reset({
@@ -110,6 +113,7 @@ export function TripForm({
         load_time: "",
         trip_payment: undefined,
         province: "",
+        product: "",
       })
     }
   }, [trip, form])
@@ -255,6 +259,19 @@ export function TripForm({
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="product"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Producto (Opcional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ej: Arroz, Café, Azúcar..." {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

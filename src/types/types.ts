@@ -17,6 +17,7 @@ export interface Trip {
   load_time?: string; // time
   trip_payment?: string; // string from database
   province?: string;
+  product?: string;
 }
 export type CreateTrip = Omit<Trip, 'trip_id'>
 
