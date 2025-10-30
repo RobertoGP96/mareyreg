@@ -145,7 +145,9 @@ export function DriverList() {
                                     <div className="flex items-start space-x-3 flex-1">
                                         <Avatar className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center" >
                                             <AvatarFallback>
-                                                <p className="text-lg uppercase font-semibold text-gray-900 truncate">{driver.full_name.split(" ")[0].charAt(0) + driver.full_name.split(" ")[1].charAt(0)}</p>
+                                                <p className="text-lg uppercase font-semibold text-gray-900 truncate">
+                                                    {driver.full_name ? driver.full_name.split(' ').map(name => name.charAt(0)).join('').toUpperCase().slice(0, 2) : '?'}
+                                                </p>
                                             </AvatarFallback>
                                         </Avatar>
 
