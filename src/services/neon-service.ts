@@ -121,36 +121,54 @@ export class NeonService {
     console.log('API Key:', apiKey ? 'Present' : 'Missing');
     console.log('Project ID:', projectId);
 
-    if (!apiKey || !projectId) {
-      throw new Error('VITE_NEON_API_KEY or VITE_STACK_PROJECT_ID not configured');
+    if (!projectId) {
+      throw new Error('VITE_STACK_PROJECT_ID not configured');
     }
 
     try {
-      const url = `https://console.neon.tech/api/v2/projects/${projectId}`;
+    let url: string;
+    const headers: Record<string, string> = {};
+
+    if (import.meta.env.DEV) {
+      // En desarrollo, usar la API directa
+      url = `https://console.neon.tech/api/v2/projects/${projectId}`;
+      if (apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      }
+      headers['Content-Type'] = 'application/json';
+      console.log('Using direct API in development');
+    } else {
+        // En producción, usar la función serverless
+        url = `/.netlify/functions/get-storage?projectId=${projectId}`;
+        console.log('Using Netlify function in production');
+      }
+
       console.log('Fetching from:', url);
 
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(url, { headers });
 
       console.log('Response status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Response error:', errorText);
-        throw new Error(`Neon API error: ${response.status} ${response.statusText} - ${errorText}`);
+        throw new Error(`${import.meta.env.DEV ? 'Neon API' : 'Function'} error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
-      console.log('API Response:', data);
+      console.log('Response:', data);
 
-      const storageBytes = data.project?.synthetic_storage_size || 0;
-      console.log('Storage bytes:', storageBytes);
+      let storageMB: number;
+      if (import.meta.env.DEV) {
+        const storageBytes = data.project?.synthetic_storage_size || 0;
+        storageMB = storageBytes / (1024 * 1024);
+      } else {
+        storageMB = data.storageMB || 0;
+      }
 
-      return storageBytes / (1024 * 1024); // Convertir a MB
+      console.log('Storage MB:', storageMB);
+
+      return storageMB;
     } catch (error) {
       console.error('Error fetching Neon storage:', error);
       throw error;
