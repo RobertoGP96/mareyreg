@@ -115,38 +115,38 @@ export function VehicleList() {
         <div className="grid gap-4 p-6">
           {filteredVehicles && filteredVehicles.length > 0 ? (
             filteredVehicles.map((vehicle) => (
-              <div key={vehicle.vehicle_id} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4">
+              <div key={vehicle.vehicle_id} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4 overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                  <div className="flex items-start space-x-3 flex-1">
+                  <div className="flex items-start space-x-3 flex-1 min-w-0 overflow-hidden">
                     <div className="shrink-0">
                       <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
                         <Truck className="w-5 h-5 text-gray-600" />
                       </div>
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 overflow-hidden">
                       <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">Vehículo #{vehicle.vehicle_id}</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
                         {vehicle.cuña_plate_number && (
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium">Placa Cuña:</span>
-                            <Badge variant="secondary" className="truncate">{vehicle.cuña_plate_number}</Badge>
+                          <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                            <span className="font-medium shrink-0">Placa Cuña:</span>
+                            <Badge variant="secondary" className="truncate max-w-full">{vehicle.cuña_plate_number}</Badge>
                           </div>
                         )}
                         {vehicle.plancha_plate_number && (
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium">Placa Plancha:</span>
-                            <Badge variant="secondary" className="truncate">{vehicle.plancha_plate_number}</Badge>
+                          <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                            <span className="font-medium shrink-0">Placa Plancha:</span>
+                            <Badge variant="secondary" className="truncate max-w-full">{vehicle.plancha_plate_number}</Badge>
                           </div>
                         )}
                         {vehicle.cuña_circulation_number && (
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium">Circulación Cuña:</span>
+                          <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                            <span className="font-medium shrink-0">Circulación Cuña:</span>
                             <span className="truncate">{vehicle.cuña_circulation_number}</span>
                           </div>
                         )}
                         {vehicle.plancha_circulation_number && (
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium">Circulación Plancha:</span>
+                          <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                            <span className="font-medium shrink-0">Circulación Plancha:</span>
                             <span className="truncate">{vehicle.plancha_circulation_number}</span>
                           </div>
                         )}

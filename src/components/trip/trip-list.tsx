@@ -163,65 +163,65 @@ export function TripList() {
                         filteredTrips.map((trip) => {
                             const driver = drivers?.find(d => d.driver_id === trip.driver_id);
                             return (
-                                <div key={trip.trip_id} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4">
+                                <div key={trip.trip_id} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4 overflow-hidden">
                                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                                        <div className="flex items-start space-x-3 flex-1">
+                                        <div className="flex items-start space-x-3 flex-1 min-w-0 overflow-hidden">
                                             <div className="shrink-0">
                                                 <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
                                                     <Route className="w-5 h-5 text-gray-600" />
                                                 </div>
                                             </div>
-                                            <div className="flex-1 min-w-0">
+                                            <div className="flex-1 min-w-0 overflow-hidden">
                                                 <div className="flex items-center space-x-2 mb-2">
-                                                    <h3 className="text-lg font-semibold text-gray-900">Viaje</h3>
-                                                    <Badge variant="outline" className="bg-gray-100 truncate">#{trip.trip_id}</Badge>
+                                                    <h3 className="text-lg font-semibold text-gray-900 shrink-0">Viaje</h3>
+                                                    <Badge variant="outline" className="bg-gray-100 truncate max-w-full">#{trip.trip_id}</Badge>
                                                 </div>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
-                                                    <div className="flex items-center space-x-2">
-                                                        <span className="font-medium">Conductor:</span>
+                                                    <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                                                        <span className="font-medium shrink-0">Conductor:</span>
                                                         <span className="truncate">{driver?.full_name || 'Desconocido'}</span>
                                                     </div>
                                                     {trip.container_number && (
-                                                        <div className="flex items-center space-x-2">
-                                                            <Container className="w-4 h-4 text-gray-400" />
-                                                            <span className="font-medium">Contenedor:</span>
-                                                            <Badge variant="secondary" className="truncate">{trip.container_number}</Badge>
+                                                        <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                                                            <Container className="w-4 h-4 text-gray-400 shrink-0" />
+                                                            <span className="font-medium shrink-0">Contenedor:</span>
+                                                            <Badge variant="secondary" className="truncate max-w-full">{trip.container_number}</Badge>
                                                         </div>
                                                     )}
                                                     {trip.load_date && (
-                                                        <div className="flex items-center space-x-2">
-                                                            <Calendar className="w-4 h-4 text-gray-400" />
-                                                            <span className="font-medium">Fecha:</span>
+                                                        <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                                                            <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+                                                            <span className="font-medium shrink-0">Fecha:</span>
                                                             <span className="truncate">{new Date(trip.load_date).toLocaleDateString('es-ES')}</span>
                                                         </div>
                                                     )}
                                                     {trip.load_time && (
-                                                        <div className="flex items-center space-x-2">
-                                                            <Clock className="w-4 h-4 text-gray-400" />
-                                                            <span className="font-medium">Hora:</span>
+                                                        <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                                                            <Clock className="w-4 h-4 text-gray-400 shrink-0" />
+                                                            <span className="font-medium shrink-0">Hora:</span>
                                                             <span className="truncate">{trip.load_time}</span>
                                                         </div>
                                                     )}
                                                     {trip.trip_payment && (
-                                                        <div className="flex items-center space-x-2">
-                                                            <HandCoinsIcon className="w-4 h-4 text-gray-400" />
-                                                            <span className="font-medium">Pago:</span>
+                                                        <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                                                            <HandCoinsIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                                                            <span className="font-medium shrink-0">Pago:</span>
                                                             <span className="font-semibold text-green-600 truncate">
                                                                 ${Number(trip.trip_payment).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
                                                             </span>
                                                         </div>
                                                     )}
                                                     {trip.province && (
-                                                        <div className="flex items-center space-x-2">
-                                                            <MapPin className="w-4 h-4 text-gray-400" />
-                                                            <span className="font-medium">Provincia:</span>
+                                                        <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                                                            <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
+                                                            <span className="font-medium shrink-0">Provincia:</span>
                                                             <span className="truncate">{trip.province}</span>
                                                         </div>
                                                     )}
                                                     {trip.product && (
-                                                        <div className="flex items-center space-x-2">
-                                                            <Package className="w-4 h-4 text-gray-400" />
-                                                            <span className="font-medium">Producto:</span>
+                                                        <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                                                            <Package className="w-4 h-4 text-gray-400 shrink-0" />
+                                                            <span className="font-medium shrink-0">Producto:</span>
                                                             <span className="truncate">{trip.product}</span>
                                                         </div>
                                                     )}

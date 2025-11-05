@@ -150,10 +150,10 @@ export function DriverList() {
                 <div className="grid gap-4 p-6">
                     {filteredDrivers && filteredDrivers.length > 0 ? (
                         filteredDrivers.map((driver) => (
-                            <div key={driver.driver_id} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4">
+                            <div key={driver.driver_id} className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4 overflow-hidden">
                                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                                    <div className="flex items-start space-x-3 flex-1">
-                                        <Avatar className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center" >
+                                    <div className="flex items-start space-x-3 flex-1 min-w-0 overflow-hidden">
+                                        <Avatar className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center shrink-0" >
                                             <AvatarFallback>
                                                 <p className="text-lg uppercase font-semibold text-gray-900 truncate">
                                                     {driver.full_name ? driver.full_name.split(' ').map(name => name.charAt(0)).join('').toUpperCase().slice(0, 2) : '?'}
@@ -161,24 +161,24 @@ export function DriverList() {
                                             </AvatarFallback>
                                         </Avatar>
 
-                                        <div className="flex-1 min-w-0">
+                                        <div className="flex-1 min-w-0 overflow-hidden">
                                             <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">{driver.full_name}</h3>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
-                                                <div className="flex items-center space-x-2">
-                                                    <IdCardIcon className="w-4 h-4 text-gray-400" />
-                                                    <span className="font-medium">ID:</span>
+                                                <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                                                    <IdCardIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                                                    <span className="font-medium shrink-0">ID:</span>
                                                     <span className="truncate">{driver.identification_number}</span>
                                                 </div>
-                                                <div className="flex items-center space-x-2">
-                                                    <Phone className="w-4 h-4 text-gray-400" />
-                                                    <span className="font-medium">Teléfono:</span>
+                                                <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                                                    <Phone className="w-4 h-4 text-gray-400 shrink-0" />
+                                                    <span className="font-medium shrink-0">Teléfono:</span>
                                                     <span className="truncate">{driver.phone_number}</span>
                                                 </div>
                                                 {driver.operative_license && (
-                                                    <div className="flex items-center space-x-2">
-                                                        <IdCardLanyard className="w-4 h-4 text-gray-400" />
-                                                        <span className="font-medium">Licencia:</span>
-                                                        <Badge variant="secondary" className="truncate">{driver.operative_license}</Badge>
+                                                    <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
+                                                        <IdCardLanyard className="w-4 h-4 text-gray-400 shrink-0" />
+                                                        <span className="font-medium shrink-0">Licencia:</span>
+                                                        <Badge variant="secondary" className="truncate max-w-full">{driver.operative_license}</Badge>
                                                     </div>
                                                 )}
                                             </div>
