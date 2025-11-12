@@ -30,6 +30,7 @@ import type { Vehicle, CreateVehicleWithDriver } from "@/types/types"
 import { Loader2, Plus, Save } from "lucide-react"
 
 const vehicleSchema = z.object({
+  name: z.string().min(1, "El nombre del vehiculo es requerido"),
   cuña_circulation_number: z.string().optional(),
   plancha_circulation_number: z.string().optional(),
   cuña_plate_number: z.string().optional(),
@@ -76,6 +77,7 @@ export function VehicleForm({
   const form = useForm<VehicleFormData>({
     resolver: zodResolver(vehicleSchema),
     defaultValues: {
+      name: vehicle?.name || "",
       cuña_circulation_number: vehicle?.cuña_circulation_number || "",
       plancha_circulation_number: vehicle?.plancha_circulation_number || "",
       cuña_plate_number: vehicle?.cuña_plate_number || "",
@@ -94,6 +96,7 @@ export function VehicleForm({
   useEffect(() => {
     if (vehicle) {
       form.reset({
+        name:"",
         cuña_circulation_number: vehicle.cuña_circulation_number || "",
         plancha_circulation_number: vehicle.plancha_circulation_number || "",
         cuña_plate_number: vehicle.cuña_plate_number || "",
@@ -109,6 +112,7 @@ export function VehicleForm({
       })
     } else {
       form.reset({
+        name:"",
         cuña_circulation_number: "",
         plancha_circulation_number: "",
         cuña_plate_number: "",
@@ -127,6 +131,7 @@ export function VehicleForm({
 
   const handleSubmit = (data: VehicleFormData) => {
     const submitData: CreateVehicleWithDriver = {
+      name: data.name,
       cuña_circulation_number: data.cuña_circulation_number || undefined,
       plancha_circulation_number: data.plancha_circulation_number || undefined,
       cuña_plate_number: data.cuña_plate_number || undefined,

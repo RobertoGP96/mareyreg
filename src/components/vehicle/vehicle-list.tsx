@@ -124,7 +124,7 @@ export function VehicleList() {
                       </div>
                     </div>
                     <div className="flex-1 min-w-0 overflow-hidden">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">Vehículo #{vehicle.vehicle_id}</h3>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">{vehicle.name || "Vehiculo"} #{vehicle.vehicle_id}</h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
                         {vehicle.cuña_plate_number && (
                           <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
