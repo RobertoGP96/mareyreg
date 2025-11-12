@@ -22,7 +22,7 @@ export interface Trip {
 export type CreateTrip = Omit<Trip, 'trip_id'>
 
 export interface Vehicle {
-  name: string;
+  name?: string;
   vehicle_id: number;
   cuña_circulation_number?: string;
   plancha_circulation_number?: string;

@@ -20,6 +20,7 @@ export const getVehicles = async (): Promise<Vehicle[]> => {
   // Map results to include driver object
   return results.map((row: Record<string, unknown>) => {
     const vehicle: Vehicle = {
+      name: row.name as string | undefined,
       vehicle_id: row.vehicle_id as number,
       cuña_circulation_number: row.cuña_circulation_number as string | undefined,
       plancha_circulation_number: row.plancha_circulation_number as string | undefined,
@@ -63,6 +64,7 @@ export const getVehicle = async (id: number): Promise<Vehicle> => {
 
   const row = results[0] as Record<string, unknown>;
   const vehicle: Vehicle = {
+    name: row.name as string | undefined,
     vehicle_id: row.vehicle_id as number,
     cuña_circulation_number: row.cuña_circulation_number as string | undefined,
     plancha_circulation_number: row.plancha_circulation_number as string | undefined,
@@ -91,6 +93,11 @@ export const createVehicle = async (data: CreateVehicle): Promise<Vehicle> => {
   const placeholders: string[] = [];
 
   let paramIndex = 1;
+  if(data.name !== undefined){
+    fields.push('name');
+    values.push(data.name);
+    placeholders.push(`$${paramIndex++}`);
+  }
   if (data.cuña_circulation_number !== undefined) {
     fields.push('cuña_circulation_number');
     values.push(data.cuña_circulation_number);
@@ -134,6 +141,7 @@ export const createVehicleWithDriver = async (data: CreateVehicleWithDriver): Pr
 
   // Create the vehicle with the driver_id
   const vehicleData: CreateVehicle = {
+    name: data.name,
     cuña_circulation_number: data.cuña_circulation_number,
     plancha_circulation_number: data.plancha_circulation_number,
     cuña_plate_number: data.cuña_plate_number,
