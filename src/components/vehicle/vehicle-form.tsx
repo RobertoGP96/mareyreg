@@ -38,22 +38,31 @@ const vehicleSchema = z.object({
   driverOption: z.enum(["existing", "new", "none"]),
   driver_id: z.number().optional(),
   driverData: z.object({
-    full_name: z.string().min(1, "El nombre completo es requerido"),
-    identification_number: z.string().min(1, "El número de identificación es requerido"),
-    phone_number: z.string().min(1, "El número de teléfono es requerido"),
+    full_name: z.string().optional(),
+    identification_number: z.string().optional(),
+    phone_number: z.string().optional(),
     operative_license: z.string().optional(),
   }).optional(),
 }).refine((data) => {
   if (data.driverOption === "existing") {
-    return data.driver_id !== undefined;
+    return data.driver_id !== undefined && data.driver_id > 0;
   }
   if (data.driverOption === "new") {
-    return data.driverData !== undefined;
+    // Validar que driverData existe y tiene los campos requeridos
+    return (
+      data.driverData !== undefined &&
+      data.driverData.full_name !== undefined &&
+      data.driverData.full_name.length > 0 &&
+      data.driverData.identification_number !== undefined &&
+      data.driverData.identification_number.length > 0 &&
+      data.driverData.phone_number !== undefined &&
+      data.driverData.phone_number.length > 0
+    );
   }
   return true;
 }, {
-  message: "Debe seleccionar un conductor existente o proporcionar datos para crear uno nuevo",
-  path: ["driver_id"],
+  message: "Debe completar todos los campos requeridos del conductor o seleccionar un conductor existente",
+  path: ["driverData"],
 });
 
 type VehicleFormData = z.infer<typeof vehicleSchema>
@@ -131,14 +140,19 @@ export function VehicleForm({
 
   const handleSubmit = (data: VehicleFormData) => {
     const submitData: CreateVehicleWithDriver = {
-      name: data.name,
+      name: data.name || undefined,
       cuña_circulation_number: data.cuña_circulation_number || undefined,
       plancha_circulation_number: data.plancha_circulation_number || undefined,
       cuña_plate_number: data.cuña_plate_number || undefined,
       plancha_plate_number: data.plancha_plate_number || undefined,
       driver_id: data.driverOption === "existing" ? data.driver_id : undefined,
       createDriver: data.driverOption === "new",
-      driverData: data.driverOption === "new" ? data.driverData : undefined,
+      driverData: data.driverOption === "new" && data.driverData ? {
+        full_name: data.driverData.full_name || "",
+        identification_number: data.driverData.identification_number || "",
+        phone_number: data.driverData.phone_number || "",
+        operative_license: data.driverData.operative_license,
+      } : undefined,
     }
     onSubmit(submitData)
   }
