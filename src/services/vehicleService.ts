@@ -156,9 +156,19 @@ export const updateVehicle = async (id: number, data: Partial<Vehicle>): Promise
   const updates: string[] = [];
   const values: unknown[] = [];
 
+  // List of allowed fields to update (exclude vehicle_id, driver object)
+  const allowedFields: (keyof Vehicle)[] = [
+    'name',
+    'cuña_circulation_number',
+    'plancha_circulation_number',
+    'cuña_plate_number',
+    'plancha_plate_number',
+    'driver_id'
+  ];
+
   let paramIndex = 1;
-  Object.keys(data).forEach(key => {
-    const value = data[key as keyof Vehicle];
+  allowedFields.forEach(key => {
+    const value = data[key];
     if (value !== undefined) {
       updates.push(`${key} = $${paramIndex++}`);
       values.push(value);

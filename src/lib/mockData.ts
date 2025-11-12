@@ -26,6 +26,7 @@ export const mockDrivers: Driver[] = [
 export const mockVehicles: Vehicle[] = [
   {
     vehicle_id: 1,
+    name: 'Camión Azul',
     cuña_circulation_number: 'CIRC001',
     plancha_circulation_number: 'PLANCIRC001',
     cuña_plate_number: 'ABC-123',
@@ -33,6 +34,7 @@ export const mockVehicles: Vehicle[] = [
   },
   {
     vehicle_id: 2,
+    name: 'Camión Rojo',
     cuña_circulation_number: 'CIRC002',
     plancha_circulation_number: 'PLANCIRC002',
     cuña_plate_number: 'GHI-789',
@@ -40,6 +42,7 @@ export const mockVehicles: Vehicle[] = [
   },
   {
     vehicle_id: 3,
+    name: 'Camión Verde',
     cuña_circulation_number: 'CIRC003',
     plancha_circulation_number: 'PLANCIRC003',
     cuña_plate_number: 'MNO-345',

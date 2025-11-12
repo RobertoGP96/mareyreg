@@ -96,7 +96,7 @@ export function VehicleForm({
   useEffect(() => {
     if (vehicle) {
       form.reset({
-        name:"",
+        name: vehicle.name || "",
         cuña_circulation_number: vehicle.cuña_circulation_number || "",
         plancha_circulation_number: vehicle.plancha_circulation_number || "",
         cuña_plate_number: vehicle.cuña_plate_number || "",
@@ -112,7 +112,7 @@ export function VehicleForm({
       })
     } else {
       form.reset({
-        name:"",
+        name: "",
         cuña_circulation_number: "",
         plancha_circulation_number: "",
         cuña_plate_number: "",

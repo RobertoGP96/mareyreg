@@ -28,6 +28,7 @@ export function VehicleList() {
 
   const filteredVehicles = displayVehicles.filter(vehicle =>
     vehicle.vehicle_id?.toString().toLowerCase().includes(searchQuery.toLowerCase()) ||
+    vehicle.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     vehicle.cuña_plate_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     vehicle.plancha_plate_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     vehicle.cuña_circulation_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
