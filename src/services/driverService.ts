@@ -58,7 +58,6 @@ export const createDriver = async (data: CreateDriver | CreateDriverWithVehicle)
   const existingDriver = await getDriverByIdentification(data.identification_number);
 
   if (existingDriver) {
-    console.log(`Driver with identification number ${data.identification_number} already exists. Using existing driver.`);
 
     // If createVehicle is true, associate the vehicle with the existing driver
     if ('createVehicle' in data && data.createVehicle && data.vehicleData) {

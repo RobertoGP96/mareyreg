@@ -118,8 +118,6 @@ export class NeonService {
     const apiKey = import.meta.env?.VITE_NEON_API_KEY;
     const projectId = import.meta.env?.VITE_STACK_PROJECT_ID || this.projectId;
 
-    console.log('API Key:', apiKey ? 'Present' : 'Missing');
-    console.log('Project ID:', projectId);
 
     if (!projectId) {
       throw new Error('VITE_STACK_PROJECT_ID not configured');
@@ -136,18 +134,14 @@ export class NeonService {
         headers['Authorization'] = `Bearer ${apiKey}`;
       }
       headers['Content-Type'] = 'application/json';
-      console.log('Using direct API in development');
     } else {
         // En producción, usar la función serverless
         url = `/.netlify/functions/get-storage?projectId=${projectId}`;
-        console.log('Using Netlify function in production');
       }
 
-      console.log('Fetching from:', url);
 
       const response = await fetch(url, { headers });
 
-      console.log('Response status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -156,7 +150,6 @@ export class NeonService {
       }
 
       const data = await response.json();
-      console.log('Response:', data);
 
       let storageMB: number;
       if (import.meta.env.DEV) {
@@ -166,7 +159,6 @@ export class NeonService {
         storageMB = data.storageMB || 0;
       }
 
-      console.log('Storage MB:', storageMB);
 
       return storageMB;
     } catch (error) {

@@ -34,7 +34,7 @@ const driverSchema = z.object({
   operative_license: z.string().optional(),
   vehicleOption: z.enum(["none", "new"]),
   vehicleData: z.object({
-    name:z.string().min(1, "El nombre del vehículo es requerido"),
+    name: z.string().optional(),
     cuña_circulation_number: z.string().optional(),
     plancha_circulation_number: z.string().optional(),
     cuña_plate_number: z.string().optional(),
@@ -42,12 +42,17 @@ const driverSchema = z.object({
   }).optional(),
 }).refine((data) => {
   if (data.vehicleOption === "new") {
-    return data.vehicleData !== undefined;
+    // Validar que vehicleData existe y tiene el nombre requerido
+    return (
+      data.vehicleData !== undefined &&
+      data.vehicleData.name !== undefined &&
+      data.vehicleData.name.length > 0
+    );
   }
   return true;
 }, {
-  message: "Debe proporcionar datos para crear un vehículo nuevo",
-  path: ["vehicleData"],
+  message: "Debe proporcionar el nombre del vehículo",
+  path: ["vehicleData", "name"],
 });
 
 type DriverFormData = z.infer<typeof driverSchema>
@@ -126,7 +131,13 @@ export function DriverForm({
       phone_number: data.phone_number,
       operative_license: data.operative_license,
       createVehicle: data.vehicleOption === "new",
-      vehicleData: data.vehicleOption === "new" ? data.vehicleData : undefined,
+      vehicleData: data.vehicleOption === "new" && data.vehicleData ? {
+        name: data.vehicleData.name || "",
+        cuña_circulation_number: data.vehicleData.cuña_circulation_number,
+        plancha_circulation_number: data.vehicleData.plancha_circulation_number,
+        cuña_plate_number: data.vehicleData.cuña_plate_number,
+        plancha_plate_number: data.vehicleData.plancha_plate_number,
+      } : undefined,
     }
     onSubmit(submitData)
   }
