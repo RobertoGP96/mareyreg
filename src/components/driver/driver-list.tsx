@@ -40,14 +40,24 @@ export function DriverList() {
         try {
             await createDriverMutation.mutateAsync(data);
             setIsCreateDialogOpen(false);
-            toast.success('Conductor creado exitosamente');
+            toast.success('Conductor creado exitosamente', {
+                description: `${data.full_name} ha sido registrado en el sistema.`
+            });
         } catch (error: unknown) {
             console.error('Error creating driver:', error);
-            const err = error as { code?: string; constraint?: string };
+            const err = error as { code?: string; constraint?: string; message?: string };
+            
             if (err.code === '23505' && err.constraint === 'drivers_identification_number_key') {
-                toast.error('El número de identificación ya existe. Por favor, use un número diferente.');
+                toast.error('Error: Número de identificación duplicado', {
+                    description: 'El número de identificación ya existe. Por favor, use un número diferente.',
+                    duration: 5000,
+                });
             } else {
-                toast.error('Error al crear el conductor');
+                const errorMessage = err.message || 'Error desconocido al crear el conductor';
+                toast.error('Error al crear el conductor', {
+                    description: errorMessage,
+                    duration: 5000,
+                });
             }
         }
     };
@@ -58,10 +68,26 @@ export function DriverList() {
         try {
             await deleteDriverMutation.mutateAsync(driverToDelete);
             setDriverToDelete(null);
-            toast.success('Conductor eliminado exitosamente');
-        } catch (error) {
+            toast.success('Conductor eliminado exitosamente', {
+                description: 'El conductor ha sido eliminado del sistema.'
+            });
+        } catch (error: unknown) {
             console.error('Error deleting driver:', error);
-            toast.error('Error al eliminar el conductor');
+            const err = error as { code?: string; message?: string };
+            
+            // Check for foreign key constraint violations
+            if (err.code === '23503') {
+                toast.error('No se puede eliminar el conductor', {
+                    description: 'Este conductor tiene vehículos o viajes asociados. Elimínelos primero.',
+                    duration: 6000,
+                });
+            } else {
+                const errorMessage = err.message || 'Error desconocido al eliminar el conductor';
+                toast.error('Error al eliminar el conductor', {
+                    description: errorMessage,
+                    duration: 5000,
+                });
+            }
         }
     };
 
@@ -97,14 +123,24 @@ export function DriverList() {
         try {
             await updateDriverMutation.mutateAsync({ id: driverToEdit.driver_id, data: driverData });
             setDriverToEdit(null);
-            toast.success('Conductor actualizado exitosamente');
+            toast.success('Conductor actualizado exitosamente', {
+                description: `Los datos de ${data.full_name} han sido actualizados.`
+            });
         } catch (error: unknown) {
             console.error('Error updating driver:', error);
-            const err = error as { code?: string; constraint?: string };
+            const err = error as { code?: string; constraint?: string; message?: string };
+            
             if (err.code === '23505' && err.constraint === 'drivers_identification_number_key') {
-                toast.error('El número de identificación ya existe. Por favor, use un número diferente.');
+                toast.error('Error: Número de identificación duplicado', {
+                    description: 'El número de identificación ya existe. Por favor, use un número diferente.',
+                    duration: 5000,
+                });
             } else {
-                toast.error('Error al actualizar el conductor');
+                const errorMessage = err.message || 'Error desconocido al actualizar el conductor';
+                toast.error('Error al actualizar el conductor', {
+                    description: errorMessage,
+                    duration: 5000,
+                });
             }
         }
     };

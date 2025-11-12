@@ -99,9 +99,20 @@ export const updateTrip = async (id: number, data: Partial<Trip>): Promise<Trip>
   const updates: string[] = [];
   const values: unknown[] = [];
 
+  // List of allowed fields to update (exclude trip_id)
+  const allowedFields: (keyof Trip)[] = [
+    'driver_id',
+    'container_number',
+    'load_date',
+    'load_time',
+    'trip_payment',
+    'province',
+    'product'
+  ];
+
   let paramIndex = 1;
-  Object.keys(data).forEach(key => {
-    const value = data[key as keyof Trip];
+  allowedFields.forEach(key => {
+    const value = data[key];
     if (value !== undefined) {
       updates.push(`${key} = $${paramIndex++}`);
       values.push(value);

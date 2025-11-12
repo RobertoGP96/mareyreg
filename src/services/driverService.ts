@@ -104,9 +104,17 @@ export const updateDriver = async (id: number, data: Partial<Driver>): Promise<D
   const updates: string[] = [];
   const values: unknown[] = [];
 
+  // List of allowed fields to update (exclude driver_id)
+  const allowedFields: (keyof Driver)[] = [
+    'full_name',
+    'identification_number',
+    'phone_number',
+    'operative_license'
+  ];
+
   let paramIndex = 1;
-  Object.keys(data).forEach(key => {
-    const value = data[key as keyof Driver];
+  allowedFields.forEach(key => {
+    const value = data[key];
     if (value !== undefined) {
       updates.push(`${key} = $${paramIndex++}`);
       values.push(value);

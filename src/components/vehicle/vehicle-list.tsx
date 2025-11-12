@@ -7,7 +7,7 @@ import { Badge } from '../ui/badge';
 import { useState } from 'react';
 import { VehicleForm } from './vehicle-form';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import type { CreateVehicle, CreateVehicleWithDriver, Vehicle } from '../../types/types';
+import type { CreateVehicleWithDriver, Vehicle } from '../../types/types';
 import { useVehicles, useCreateVehicleWithDriver, useDeleteVehicle, useUpdateVehicle } from '../../hooks/hooks';
 import { mockVehicles } from '../../lib/mockData';
 import { toast } from 'sonner';
@@ -39,10 +39,16 @@ export function VehicleList() {
     try {
       await createVehicleMutation.mutateAsync(data);
       setIsCreateDialogOpen(false);
-      toast.success('Vehículo creado exitosamente');
+      toast.success('Vehículo creado exitosamente', {
+        description: `El vehículo ${data.name || 'sin nombre'} ha sido registrado.`
+      });
     } catch (error) {
       console.error('Error creating vehicle:', error);
-      toast.error('Error al crear el vehículo');
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error('Error al crear el vehículo', {
+        description: errorMessage,
+        duration: 5000,
+      });
     }
   };
 
@@ -52,10 +58,16 @@ export function VehicleList() {
     try {
       await deleteVehicleMutation.mutateAsync(vehicleToDelete);
       setVehicleToDelete(null);
-      toast.success('Vehículo eliminado exitosamente');
+      toast.success('Vehículo eliminado exitosamente', {
+        description: 'El vehículo ha sido eliminado del sistema.'
+      });
     } catch (error) {
       console.error('Error deleting vehicle:', error);
-      toast.error('Error al eliminar el vehículo');
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error('Error al eliminar el vehículo', {
+        description: errorMessage,
+        duration: 5000,
+      });
     }
   };
 
@@ -63,16 +75,32 @@ export function VehicleList() {
     setVehicleToEdit(vehicle);
   };
 
-  const handleUpdateVehicle = async (data: CreateVehicle) => {
+  const handleUpdateVehicle = async (data: CreateVehicleWithDriver) => {
     if (!vehicleToEdit) return;
     
     try {
-      await updateVehicleMutation.mutateAsync({ id: vehicleToEdit.vehicle_id, data });
+      // Extract only the vehicle fields (excluding driver creation fields)
+      const vehicleData: Partial<Vehicle> = {
+        name: data.name,
+        cuña_circulation_number: data.cuña_circulation_number,
+        plancha_circulation_number: data.plancha_circulation_number,
+        cuña_plate_number: data.cuña_plate_number,
+        plancha_plate_number: data.plancha_plate_number,
+        driver_id: data.driver_id,
+      };
+      
+      await updateVehicleMutation.mutateAsync({ id: vehicleToEdit.vehicle_id, data: vehicleData });
       setVehicleToEdit(null);
-      toast.success('Vehículo actualizado exitosamente');
+      toast.success('Vehículo actualizado exitosamente', {
+        description: `Los datos del vehículo ${data.name || 'sin nombre'} han sido actualizados.`
+      });
     } catch (error) {
       console.error('Error updating vehicle:', error);
-      toast.error('Error al actualizar el vehículo');
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      toast.error('Error al actualizar el vehículo', {
+        description: errorMessage,
+        duration: 5000,
+      });
     }
   };
 

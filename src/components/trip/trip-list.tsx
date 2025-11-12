@@ -77,10 +77,17 @@ export function TripList() {
         try {
             await createTripMutation.mutateAsync(data);
             setIsCreateDialogOpen(false);
-            toast.success('Viaje creado exitosamente');
-        } catch (error) {
+            toast.success('Viaje creado exitosamente', {
+                description: `El viaje con contenedor ${data.container_number || 'sin número'} ha sido registrado.`
+            });
+        } catch (error: unknown) {
             console.error('Error creating trip:', error);
-            toast.error('Error al crear el viaje');
+            const err = error as { code?: string; message?: string };
+            const errorMessage = err.message || 'Error desconocido al crear el viaje';
+            toast.error('Error al crear el viaje', {
+                description: errorMessage,
+                duration: 5000,
+            });
         }
     };
 
@@ -90,10 +97,17 @@ export function TripList() {
         try {
             await deleteTripMutation.mutateAsync(tripToDelete);
             setTripToDelete(null);
-            toast.success('Viaje eliminado exitosamente');
-        } catch (error) {
+            toast.success('Viaje eliminado exitosamente', {
+                description: 'El viaje ha sido eliminado del sistema.'
+            });
+        } catch (error: unknown) {
             console.error('Error deleting trip:', error);
-            toast.error('Error al eliminar el viaje');
+            const err = error as { message?: string };
+            const errorMessage = err.message || 'Error desconocido al eliminar el viaje';
+            toast.error('Error al eliminar el viaje', {
+                description: errorMessage,
+                duration: 5000,
+            });
         }
     };
 
@@ -107,10 +121,17 @@ export function TripList() {
         try {
             await updateTripMutation.mutateAsync({ id: tripToEdit.trip_id, data });
             setTripToEdit(null);
-            toast.success('Viaje actualizado exitosamente');
-        } catch (error) {
+            toast.success('Viaje actualizado exitosamente', {
+                description: `Los datos del viaje ${data.container_number || 'sin número'} han sido actualizados.`
+            });
+        } catch (error: unknown) {
             console.error('Error updating trip:', error);
-            toast.error('Error al actualizar el viaje');
+            const err = error as { message?: string };
+            const errorMessage = err.message || 'Error desconocido al actualizar el viaje';
+            toast.error('Error al actualizar el viaje', {
+                description: errorMessage,
+                duration: 5000,
+            });
         }
     };
 

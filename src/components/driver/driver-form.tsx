@@ -34,6 +34,7 @@ const driverSchema = z.object({
   operative_license: z.string().optional(),
   vehicleOption: z.enum(["none", "new"]),
   vehicleData: z.object({
+    name:z.string().min(1, "El nombre del vehículo es requerido"),
     cuña_circulation_number: z.string().optional(),
     plancha_circulation_number: z.string().optional(),
     cuña_plate_number: z.string().optional(),
@@ -75,6 +76,7 @@ export function DriverForm({
       operative_license: driver?.operative_license || "",
       vehicleOption: "none",
       vehicleData: {
+        name: "",
         cuña_circulation_number: "",
         plancha_circulation_number: "",
         cuña_plate_number: "",
@@ -92,6 +94,7 @@ export function DriverForm({
         operative_license: driver.operative_license || "",
         vehicleOption: "none",
         vehicleData: {
+          name:"",
           cuña_circulation_number: "",
           plancha_circulation_number: "",
           cuña_plate_number: "",
@@ -106,6 +109,7 @@ export function DriverForm({
         operative_license: "",
         vehicleOption: "none",
         vehicleData: {
+          name:"",
           cuña_circulation_number: "",
           plancha_circulation_number: "",
           cuña_plate_number: "",
@@ -233,7 +237,24 @@ export function DriverForm({
               {form.watch("vehicleOption") === "new" && (
                 <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
                   <h4 className="font-medium">Datos del Nuevo Vehículo</h4>
+                  <div className="w'full">
+                    <FormField
+                      control={form.control}
+                      name="vehicleData.name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Nombre</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Nombre del vehículo" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
+
+
                     <FormField
                       control={form.control}
                       name="vehicleData.cuña_circulation_number"
@@ -302,8 +323,8 @@ export function DriverForm({
                 Cancelar
               </Button>
               <Button type="submit" disabled={isLoading}>
-                
-                {isLoading ? <Loader2 className="spin" /> : isEditing ? <Save/> : <Plus/>}
+
+                {isLoading ? <Loader2 className="spin" /> : isEditing ? <Save /> : <Plus />}
                 {isLoading ? "Guardando..." : isEditing ? "Actualizar" : "Crear"}
               </Button>
             </DialogFooter>
