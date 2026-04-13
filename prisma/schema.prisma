@@ -207,14 +207,29 @@ enum PacaStatus {
   reserved
 }
 
+model PacaClassification {
+  classificationId Int      @id @default(autoincrement()) @map("classification_id")
+  name             String   @unique
+  description      String?
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  categories PacaCategory[]
+
+  @@map("paca_classifications")
+}
+
 model PacaCategory {
-  categoryId  Int      @id @default(autoincrement()) @map("category_id")
-  name        String   @unique
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
+  categoryId       Int      @id @default(autoincrement()) @map("category_id")
+  name             String   @unique
+  classificationId Int?     @map("classification_id")
+  description      String?
+  createdAt        DateTime @default(now()) @map("created_at")
 
-  pacas Paca[]
+  classification PacaClassification? @relation(fields: [classificationId], references: [classificationId])
+  pacas          Paca[]
 
+  @@index([classificationId])
   @@map("paca_categories")
 }
 

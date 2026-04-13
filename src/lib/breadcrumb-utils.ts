@@ -13,6 +13,7 @@ const ROUTE_LABELS: Record<string, string> = {
   categorias: "Categorias",
   reservaciones: "Reservaciones",
   ventas: "Ventas",
+  disponibilidad: "Disponibilidad",
   products: "Productos",
   warehouses: "Almacenes",
   stock: "Stock",

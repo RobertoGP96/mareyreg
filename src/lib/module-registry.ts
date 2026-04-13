@@ -10,6 +10,7 @@ import {
   Tags,
   CalendarCheck,
   Receipt,
+  BarChart3,
   Warehouse,
   ArrowLeftRight,
   type LucideIcon,
@@ -54,9 +55,10 @@ export const modules: AppModule[] = [
     enabled: true,
     routes: [
       { name: "Pacas", href: "/pacas", icon: Shirt },
-      { name: "Categorias", href: "/pacas/categorias", icon: Tags },
+      { name: "Disponibilidad", href: "/pacas/disponibilidad", icon: BarChart3 },
       { name: "Reservaciones", href: "/pacas/reservaciones", icon: CalendarCheck },
       { name: "Ventas", href: "/pacas/ventas", icon: Receipt },
+      { name: "Categorias", href: "/pacas/categorias", icon: Tags },
     ],
   },
   {

@@ -27,6 +27,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MoreHorizontal, Pen, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -36,17 +44,25 @@ import {
   deletePacaCategory,
 } from "../actions/paca-category-actions";
 
+interface ClassificationItem {
+  classificationId: number;
+  name: string;
+}
+
 interface CategoryItem {
   categoryId: number;
   name: string;
   description: string | null;
+  classificationId: number | null;
+  classification: { name: string } | null;
 }
 
 interface Props {
   categories: CategoryItem[];
+  classifications: ClassificationItem[];
 }
 
-export function PacaCategoryManager({ categories }: Props) {
+export function PacaCategoryManager({ categories, classifications }: Props) {
   const router = useRouter();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [catToEdit, setCatToEdit] = useState<CategoryItem | null>(null);
@@ -57,9 +73,11 @@ export function PacaCategoryManager({ categories }: Props) {
     e.preventDefault();
     setIsSubmitting(true);
     const fd = new FormData(e.currentTarget);
+    const clsVal = fd.get("classificationId") as string;
     const result = await createPacaCategory({
       name: fd.get("name") as string,
       description: (fd.get("description") as string) || undefined,
+      classificationId: clsVal && clsVal !== "none" ? Number(clsVal) : undefined,
     });
     setIsSubmitting(false);
     if (result.success) {
@@ -76,9 +94,11 @@ export function PacaCategoryManager({ categories }: Props) {
     e.preventDefault();
     setIsSubmitting(true);
     const fd = new FormData(e.currentTarget);
+    const clsVal = fd.get("classificationId") as string;
     const result = await updatePacaCategory(catToEdit.categoryId, {
       name: fd.get("name") as string,
       description: (fd.get("description") as string) || undefined,
+      classificationId: clsVal && clsVal !== "none" ? Number(clsVal) : null,
     });
     setIsSubmitting(false);
     if (result.success) {
@@ -122,7 +142,14 @@ export function PacaCategoryManager({ categories }: Props) {
                 className="bg-card border rounded-lg p-4 flex items-center justify-between"
               >
                 <div>
-                  <p className="font-medium">{cat.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{cat.name}</p>
+                    {cat.classification && (
+                      <Badge variant="outline" className="text-xs">
+                        {cat.classification.name}
+                      </Badge>
+                    )}
+                  </div>
                   {cat.description && (
                     <p className="text-sm text-muted-foreground">{cat.description}</p>
                   )}
@@ -167,6 +194,18 @@ export function PacaCategoryManager({ categories }: Props) {
               <Input name="name" required />
             </div>
             <div className="space-y-2">
+              <Label>Clasificacion</Label>
+              <Select name="classificationId" defaultValue="none">
+                <SelectTrigger><SelectValue placeholder="Sin clasificacion" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin clasificacion</SelectItem>
+                  {classifications.map((c) => (
+                    <SelectItem key={c.classificationId} value={String(c.classificationId)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Descripcion</Label>
               <Input name="description" />
             </div>
@@ -187,6 +226,18 @@ export function PacaCategoryManager({ categories }: Props) {
             <div className="space-y-2">
               <Label>Nombre *</Label>
               <Input name="name" defaultValue={catToEdit?.name} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Clasificacion</Label>
+              <Select name="classificationId" defaultValue={catToEdit?.classificationId ? String(catToEdit.classificationId) : "none"}>
+                <SelectTrigger><SelectValue placeholder="Sin clasificacion" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin clasificacion</SelectItem>
+                  {classifications.map((c) => (
+                    <SelectItem key={c.classificationId} value={String(c.classificationId)}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Descripcion</Label>

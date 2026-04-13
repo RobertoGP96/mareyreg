@@ -1,10 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import { getPacaCategories } from "@/modules/pacas/queries/paca-category-queries";
+import { getClassifications } from "@/modules/pacas/queries/paca-availability-queries";
 import { PacaCategoryManager } from "@/modules/pacas/components/paca-category-manager";
 
 export default async function PacaCategoriasPage() {
-  const categories = await getPacaCategories();
+  const [categories, classifications] = await Promise.all([
+    getPacaCategories(),
+    getClassifications(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -14,7 +18,10 @@ export default async function PacaCategoriasPage() {
           Gestiona las categorias de pacas de ropa
         </p>
       </div>
-      <PacaCategoryManager categories={categories} />
+      <PacaCategoryManager
+        categories={categories as Parameters<typeof PacaCategoryManager>[0]["categories"]}
+        classifications={classifications}
+      />
     </div>
   );
 }

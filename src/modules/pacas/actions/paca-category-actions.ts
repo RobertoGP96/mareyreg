@@ -7,6 +7,7 @@ import type { ActionResult } from "@/types";
 export async function createPacaCategory(data: {
   name: string;
   description?: string;
+  classificationId?: number;
 }): Promise<ActionResult<{ categoryId: number }>> {
   try {
     const existing = await db.pacaCategory.findUnique({ where: { name: data.name } });
@@ -18,6 +19,7 @@ export async function createPacaCategory(data: {
       data: {
         name: data.name,
         description: data.description || null,
+        classificationId: data.classificationId || null,
       },
     });
 
@@ -32,7 +34,7 @@ export async function createPacaCategory(data: {
 
 export async function updatePacaCategory(
   id: number,
-  data: { name?: string; description?: string }
+  data: { name?: string; description?: string; classificationId?: number | null }
 ): Promise<ActionResult<void>> {
   try {
     await db.pacaCategory.update({
@@ -40,6 +42,7 @@ export async function updatePacaCategory(
       data: {
         ...(data.name !== undefined && { name: data.name }),
         ...(data.description !== undefined && { description: data.description }),
+        ...(data.classificationId !== undefined && { classificationId: data.classificationId }),
       },
     });
 
