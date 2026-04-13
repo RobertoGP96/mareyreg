@@ -18,6 +18,8 @@ export async function createPacaEntry(data: {
       return { success: false, error: "La cantidad debe ser al menos 1" };
     }
 
+    const entryCost = (data.purchasePrice ?? 0) * data.quantity;
+
     const result = await db.$transaction(async (tx) => {
       const entry = await tx.pacaEntry.create({
         data: {
@@ -38,9 +40,11 @@ export async function createPacaEntry(data: {
           available: data.quantity,
           reserved: 0,
           sold: 0,
+          totalCost: entryCost,
         },
         update: {
           available: { increment: data.quantity },
+          totalCost: { increment: entryCost },
         },
       });
 
@@ -63,11 +67,16 @@ export async function deletePacaEntry(id: number): Promise<ActionResult<void>> {
       return { success: false, error: "Entrada no encontrada" };
     }
 
+    const entryCost = Number(entry.purchasePrice ?? 0) * entry.quantity;
+
     await db.$transaction(async (tx) => {
       await tx.pacaEntry.delete({ where: { entryId: id } });
       await tx.pacaInventory.update({
         where: { categoryId: entry.categoryId },
-        data: { available: { decrement: entry.quantity } },
+        data: {
+          available: { decrement: entry.quantity },
+          totalCost: { decrement: entryCost },
+        },
       });
     });
 

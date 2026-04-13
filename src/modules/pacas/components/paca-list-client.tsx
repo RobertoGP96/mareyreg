@@ -25,6 +25,7 @@ interface InventoryItem {
   available: number;
   reserved: number;
   sold: number;
+  totalCost: unknown;
   category: {
     name: string;
     classification: { name: string } | null;
@@ -121,40 +122,53 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
         {inventory.length > 0 ? (
           <div className="divide-y">
             <div className="grid grid-cols-12 px-6 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50">
-              <div className="col-span-4">Categoria</div>
+              <div className="col-span-3">Categoria</div>
               <div className="col-span-2">Clasificacion</div>
               <div className="col-span-2 text-center">Disponible</div>
-              <div className="col-span-2 text-center">Reservada</div>
-              <div className="col-span-2 text-center">Vendida</div>
+              <div className="col-span-1 text-center">Reserv.</div>
+              <div className="col-span-1 text-center">Vendida</div>
+              <div className="col-span-1 text-center">Costo/U</div>
+              <div className="col-span-2 text-right">Valor Stock</div>
             </div>
-            {inventory.map((item) => (
-              <div key={item.categoryId} className="grid grid-cols-12 px-6 py-3 items-center hover:bg-muted/30 transition-colors">
-                <div className="col-span-4 font-medium flex items-center gap-2">
-                  <Package className="h-4 w-4 text-muted-foreground" />
-                  {item.category.name}
+            {inventory.map((item) => {
+              const inStock = item.available + item.reserved;
+              const avgCost = inStock > 0 ? Number(item.totalCost) / inStock : 0;
+              const stockValue = Number(item.totalCost);
+              return (
+                <div key={item.categoryId} className="grid grid-cols-12 px-6 py-3 items-center hover:bg-muted/30 transition-colors">
+                  <div className="col-span-3 font-medium flex items-center gap-2">
+                    <Package className="h-4 w-4 text-muted-foreground" />
+                    {item.category.name}
+                  </div>
+                  <div className="col-span-2">
+                    {item.category.classification ? (
+                      <Badge variant="outline" className="text-xs">{item.category.classification.name}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">—</span>
+                    )}
+                  </div>
+                  <div className="col-span-2 text-center">
+                    <Badge className={item.available > 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                      {item.available}
+                    </Badge>
+                  </div>
+                  <div className="col-span-1 text-center">
+                    {item.reserved > 0 ? (
+                      <Badge className="bg-blue-100 text-blue-800">{item.reserved}</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">0</span>
+                    )}
+                  </div>
+                  <div className="col-span-1 text-center text-muted-foreground">{item.sold}</div>
+                  <div className="col-span-1 text-center text-sm">
+                    {avgCost > 0 ? `$${avgCost.toFixed(2)}` : "—"}
+                  </div>
+                  <div className="col-span-2 text-right font-medium text-sm">
+                    {stockValue > 0 ? `$${stockValue.toFixed(2)}` : "—"}
+                  </div>
                 </div>
-                <div className="col-span-2">
-                  {item.category.classification ? (
-                    <Badge variant="outline" className="text-xs">{item.category.classification.name}</Badge>
-                  ) : (
-                    <span className="text-muted-foreground text-sm">—</span>
-                  )}
-                </div>
-                <div className="col-span-2 text-center">
-                  <Badge className={item.available > 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                    {item.available}
-                  </Badge>
-                </div>
-                <div className="col-span-2 text-center">
-                  {item.reserved > 0 ? (
-                    <Badge className="bg-blue-100 text-blue-800">{item.reserved}</Badge>
-                  ) : (
-                    <span className="text-muted-foreground">0</span>
-                  )}
-                </div>
-                <div className="col-span-2 text-center text-muted-foreground">{item.sold}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div className="p-6">

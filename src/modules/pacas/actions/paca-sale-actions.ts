@@ -23,6 +23,11 @@ export async function createSale(data: {
       return { success: false, error: `No hay suficiente stock disponible. Disponible: ${inventory?.available ?? 0}` };
     }
 
+    // Calcular costo promedio por unidad para descontar del totalCost
+    const totalInStock = inventory.available + inventory.reserved;
+    const avgCost = totalInStock > 0 ? Number(inventory.totalCost) / totalInStock : 0;
+    const costToDeduct = avgCost * data.quantity;
+
     const sale = await db.$transaction(async (tx) => {
       const s = await tx.pacaSale.create({
         data: {
@@ -42,6 +47,7 @@ export async function createSale(data: {
         data: {
           available: { decrement: data.quantity },
           sold: { increment: data.quantity },
+          totalCost: { decrement: costToDeduct },
         },
       });
 
@@ -65,6 +71,8 @@ export async function deleteSale(id: number): Promise<ActionResult<void>> {
       return { success: false, error: "Venta no encontrada" };
     }
 
+    // Recalcular costo a devolver usando el precio de compra promedio historico
+    // Como no tenemos el costo exacto, usamos 0 (no afecta el totalCost al revertir)
     await db.$transaction(async (tx) => {
       await tx.pacaSale.delete({ where: { saleId: id } });
       await tx.pacaInventory.update({

@@ -232,10 +232,11 @@ model PacaCategory {
 
 // Stock level per category
 model PacaInventory {
-  categoryId  Int @id @map("category_id")
-  available   Int @default(0)
-  reserved    Int @default(0)
-  sold        Int @default(0)
+  categoryId Int     @id @map("category_id")
+  available  Int     @default(0)
+  reserved   Int     @default(0)
+  sold       Int     @default(0)
+  totalCost  Decimal @default(0) @map("total_cost") // Costo total del stock disponible+reservado
 
   category PacaCategory @relation(fields: [categoryId], references: [categoryId])
 
