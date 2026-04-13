@@ -79,7 +79,7 @@ export function AppSidebar() {
         {/* Dynamic Modules */}
         {modules.map((module) => (
           <SidebarGroup key={module.id}>
-            <SidebarGroupLabel>{module.label}</SidebarGroupLabel>
+            <SidebarGroupLabel className="uppercase tracking-widest text-[10px] font-bold">{module.label}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {module.routes.map((route) => (

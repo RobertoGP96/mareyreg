@@ -15,7 +15,7 @@ export default async function PacasPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Pacas de Ropa</h1>
+        <h1 className="text-3xl font-extrabold font-headline tracking-tight text-primary">Pacas de Ropa</h1>
         <p className="text-muted-foreground mt-1">
           Gestiona las pacas de ropa reciclada
         </p>

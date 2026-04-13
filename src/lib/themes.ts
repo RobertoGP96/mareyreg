@@ -5,7 +5,7 @@ export interface ColorTheme {
 }
 
 export const COLOR_THEMES: ColorTheme[] = [
-  { id: "neutral", label: "Navy", color: "#1e293b" },
+  { id: "neutral", label: "Navy", color: "#001e40" },
   { id: "blue", label: "Azul", color: "#2563eb" },
   { id: "green", label: "Verde", color: "#16a34a" },
   { id: "purple", label: "Purpura", color: "#9333ea" },

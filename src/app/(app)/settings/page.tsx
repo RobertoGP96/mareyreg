@@ -34,7 +34,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-foreground">Configuracion</h1>
+      <h1 className="text-3xl font-extrabold font-headline tracking-tight text-primary">Configuracion</h1>
 
       <div className="bg-card p-6 rounded-lg shadow-sm border">
         <h2 className="text-xl font-semibold text-foreground mb-4">

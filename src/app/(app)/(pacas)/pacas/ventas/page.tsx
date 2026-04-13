@@ -18,7 +18,7 @@ export default async function VentasPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Ventas de Pacas</h1>
+        <h1 className="text-3xl font-extrabold font-headline tracking-tight text-primary">Ventas de Pacas</h1>
         <p className="text-muted-foreground mt-1">
           Registro de ventas de pacas de ropa
         </p>
