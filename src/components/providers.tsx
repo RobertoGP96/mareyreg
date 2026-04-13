@@ -1,6 +1,5 @@
 "use client";
 
-import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { ColorThemeContext, useColorThemeState } from "@/hooks/use-color-theme";
@@ -16,13 +15,11 @@ function ColorThemeProvider({ children }: { children: React.ReactNode }) {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-        <ColorThemeProvider>
-          {children}
-          <Toaster position="top-right" richColors closeButton />
-        </ColorThemeProvider>
-      </ThemeProvider>
-    </SessionProvider>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <ColorThemeProvider>
+        {children}
+        <Toaster position="top-right" richColors closeButton />
+      </ColorThemeProvider>
+    </ThemeProvider>
   );
 }
