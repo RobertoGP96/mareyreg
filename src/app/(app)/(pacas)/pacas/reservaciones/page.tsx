@@ -5,14 +5,21 @@ import { ReservationListClient } from "@/modules/pacas/components/reservation-li
 import { db } from "@/lib/db";
 
 export default async function ReservacionesPage() {
-  const [reservations, availablePacas] = await Promise.all([
+  const [reservations, categoriesWithInventory] = await Promise.all([
     getReservations(),
-    db.paca.findMany({
-      where: { status: "available" },
-      select: { pacaId: true, code: true, status: true },
-      orderBy: { code: "asc" },
+    db.pacaCategory.findMany({
+      include: { inventory: true, classification: true },
+      orderBy: { name: "asc" },
     }),
   ]);
+
+  const availableCategories = categoriesWithInventory
+    .filter((c) => (c.inventory?.available ?? 0) > 0)
+    .map((c) => ({
+      categoryId: c.categoryId,
+      name: c.name,
+      available: c.inventory!.available,
+    }));
 
   return (
     <div className="space-y-6">
@@ -24,7 +31,7 @@ export default async function ReservacionesPage() {
       </div>
       <ReservationListClient
         reservations={reservations as Parameters<typeof ReservationListClient>[0]["reservations"]}
-        availablePacas={availablePacas}
+        availableCategories={availableCategories}
       />
     </div>
   );

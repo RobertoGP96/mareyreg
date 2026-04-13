@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { getDrivers } from "@/modules/fleet/queries/driver-queries";
 import { getVehicles } from "@/modules/fleet/queries/vehicle-queries";
 import { getTrips } from "@/modules/logistics/queries/trip-queries";
-import { getPacasStats } from "@/modules/pacas/queries/paca-queries";
+import { getPacaInventoryStats } from "@/modules/pacas/queries/paca-queries";
 import { getProducts } from "@/modules/inventory/queries/product-queries";
 import { getWarehouses } from "@/modules/inventory/queries/warehouse-queries";
 
@@ -16,7 +16,7 @@ export default async function Home() {
       getDrivers(),
       getVehicles(),
       getTrips(),
-      getPacasStats(),
+      getPacaInventoryStats(),
       getProducts(),
       getWarehouses(),
     ]);

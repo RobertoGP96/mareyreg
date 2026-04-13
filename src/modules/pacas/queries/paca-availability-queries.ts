@@ -1,29 +1,12 @@
 import { db } from "@/lib/db";
 
-export interface AvailabilityItem {
-  classificationName: string;
-  classificationId: number;
-  categoryName: string;
-  categoryId: number;
-  available: number;
-  reserved: number;
-  sold: number;
-  total: number;
-}
-
-export async function getAvailabilityByClassification(): Promise<
-  { classification: string; classificationId: number; categories: { name: string; categoryId: number; available: number; reserved: number; sold: number; total: number }[] }[]
-> {
+export async function getAvailabilityByClassification() {
   const classifications = await db.pacaClassification.findMany({
     orderBy: { sortOrder: "asc" },
     include: {
       categories: {
         orderBy: { name: "asc" },
-        include: {
-          pacas: {
-            select: { status: true },
-          },
-        },
+        include: { inventory: true },
       },
     },
   });
@@ -32,17 +15,16 @@ export async function getAvailabilityByClassification(): Promise<
     classification: cls.name,
     classificationId: cls.classificationId,
     categories: cls.categories.map((cat) => {
-      const available = cat.pacas.filter((p) => p.status === "available").length;
-      const reserved = cat.pacas.filter((p) => p.status === "reserved").length;
-      const sold = cat.pacas.filter((p) => p.status === "sold").length;
-      const total = cat.pacas.length;
+      const available = cat.inventory?.available ?? 0;
+      const reserved = cat.inventory?.reserved ?? 0;
+      const sold = cat.inventory?.sold ?? 0;
       return {
         name: cat.name,
         categoryId: cat.categoryId,
         available,
         reserved,
         sold,
-        total,
+        total: available + reserved + sold,
       };
     }),
   }));

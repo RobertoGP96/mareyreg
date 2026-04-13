@@ -54,7 +54,7 @@ export const modules: AppModule[] = [
     icon: Shirt,
     enabled: true,
     routes: [
-      { name: "Pacas", href: "/pacas", icon: Shirt },
+      { name: "Inventario", href: "/pacas", icon: Shirt },
       { name: "Disponibilidad", href: "/pacas/disponibilidad", icon: BarChart3 },
       { name: "Reservaciones", href: "/pacas/reservaciones", icon: CalendarCheck },
       { name: "Ventas", href: "/pacas/ventas", icon: Receipt },

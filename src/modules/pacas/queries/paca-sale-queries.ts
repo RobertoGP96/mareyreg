@@ -3,12 +3,13 @@ import { db } from "@/lib/db";
 export async function getSales() {
   return db.pacaSale.findMany({
     orderBy: { createdAt: "desc" },
-    include: { paca: { include: { category: true } } },
+    include: { category: { include: { classification: true } } },
   });
 }
 
 export async function getSalesStats() {
   const sales = await db.pacaSale.findMany();
-  const totalRevenue = sales.reduce((sum, s) => sum + Number(s.salePrice), 0);
-  return { totalSales: sales.length, totalRevenue };
+  const totalUnits = sales.reduce((sum, s) => sum + s.quantity, 0);
+  const totalRevenue = sales.reduce((sum, s) => sum + s.quantity * Number(s.salePrice), 0);
+  return { totalSales: totalUnits, totalRevenue };
 }

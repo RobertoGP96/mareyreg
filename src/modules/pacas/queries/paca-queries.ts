@@ -1,25 +1,41 @@
 import { db } from "@/lib/db";
 
-export async function getPacas() {
-  return db.paca.findMany({
+export async function getPacaInventory() {
+  return db.pacaInventory.findMany({
+    include: {
+      category: {
+        include: { classification: true },
+      },
+    },
+    orderBy: { category: { name: "asc" } },
+  });
+}
+
+export async function getPacaEntries() {
+  return db.pacaEntry.findMany({
+    include: { category: true },
     orderBy: { createdAt: "desc" },
-    include: { category: true, warehouse: true },
+    take: 100,
   });
 }
 
-export async function getPaca(id: number) {
-  return db.paca.findUnique({
-    where: { pacaId: id },
-    include: { category: true, warehouse: true },
+export async function getPacaInventoryStats() {
+  const result = await db.pacaInventory.aggregate({
+    _sum: {
+      available: true,
+      reserved: true,
+      sold: true,
+    },
   });
-}
 
-export async function getPacasStats() {
-  const [total, available, sold, inTransit] = await Promise.all([
-    db.paca.count(),
-    db.paca.count({ where: { status: "available" } }),
-    db.paca.count({ where: { status: "sold" } }),
-    db.paca.count({ where: { status: "in_transit" } }),
-  ]);
-  return { total, available, sold, inTransit };
+  const available = result._sum.available ?? 0;
+  const reserved = result._sum.reserved ?? 0;
+  const sold = result._sum.sold ?? 0;
+
+  return {
+    total: available + reserved + sold,
+    available,
+    reserved,
+    sold,
+  };
 }

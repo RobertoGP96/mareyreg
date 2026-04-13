@@ -4,98 +4,78 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 
-export async function createPaca(data: {
-  code: string;
-  weightKg: number;
+export async function createPacaEntry(data: {
   categoryId: number;
-  origin?: string;
-  supplier?: string;
+  quantity: number;
   purchasePrice?: number;
-  salePrice?: number;
-  status?: string;
+  supplier?: string;
+  origin?: string;
   arrivalDate?: string;
   notes?: string;
-  warehouseId?: number;
-}): Promise<ActionResult<{ pacaId: number }>> {
+}): Promise<ActionResult<{ entryId: number }>> {
   try {
-    const existing = await db.paca.findUnique({ where: { code: data.code } });
-    if (existing) {
-      return { success: false, error: `Ya existe una paca con el codigo ${data.code}` };
+    if (data.quantity < 1) {
+      return { success: false, error: "La cantidad debe ser al menos 1" };
     }
 
-    const paca = await db.paca.create({
-      data: {
-        code: data.code,
-        weightKg: data.weightKg,
-        categoryId: data.categoryId,
-        origin: data.origin || null,
-        supplier: data.supplier || null,
-        purchasePrice: data.purchasePrice || null,
-        salePrice: data.salePrice || null,
-        status: (data.status as "available" | "sold" | "in_transit" | "reserved") || "available",
-        arrivalDate: data.arrivalDate || null,
-        notes: data.notes || null,
-        warehouseId: data.warehouseId || null,
-      },
+    const result = await db.$transaction(async (tx) => {
+      const entry = await tx.pacaEntry.create({
+        data: {
+          categoryId: data.categoryId,
+          quantity: data.quantity,
+          purchasePrice: data.purchasePrice ?? null,
+          supplier: data.supplier || null,
+          origin: data.origin || null,
+          arrivalDate: data.arrivalDate || null,
+          notes: data.notes || null,
+        },
+      });
+
+      await tx.pacaInventory.upsert({
+        where: { categoryId: data.categoryId },
+        create: {
+          categoryId: data.categoryId,
+          available: data.quantity,
+          reserved: 0,
+          sold: 0,
+        },
+        update: {
+          available: { increment: data.quantity },
+        },
+      });
+
+      return entry;
     });
 
     revalidatePath("/pacas");
-    return { success: true, data: { pacaId: paca.pacaId } };
+    revalidatePath("/pacas/disponibilidad");
+    return { success: true, data: { entryId: result.entryId } };
   } catch (error) {
-    console.error("Error creating paca:", error);
-    return { success: false, error: "Error al crear la paca" };
+    console.error("Error creating paca entry:", error);
+    return { success: false, error: "Error al registrar la entrada" };
   }
 }
 
-export async function updatePaca(
-  id: number,
-  data: {
-    code?: string;
-    weightKg?: number;
-    categoryId?: number;
-    origin?: string;
-    supplier?: string;
-    purchasePrice?: number;
-    salePrice?: number;
-    status?: string;
-    arrivalDate?: string;
-    notes?: string;
-    warehouseId?: number | null;
-  }
-): Promise<ActionResult<void>> {
+export async function deletePacaEntry(id: number): Promise<ActionResult<void>> {
   try {
-    await db.paca.update({
-      where: { pacaId: id },
-      data: {
-        ...(data.code !== undefined && { code: data.code }),
-        ...(data.weightKg !== undefined && { weightKg: data.weightKg }),
-        ...(data.categoryId !== undefined && { categoryId: data.categoryId }),
-        ...(data.origin !== undefined && { origin: data.origin }),
-        ...(data.supplier !== undefined && { supplier: data.supplier }),
-        ...(data.purchasePrice !== undefined && { purchasePrice: data.purchasePrice }),
-        ...(data.salePrice !== undefined && { salePrice: data.salePrice }),
-        ...(data.status !== undefined && { status: data.status as "available" | "sold" | "in_transit" | "reserved" }),
-        ...(data.arrivalDate !== undefined && { arrivalDate: data.arrivalDate }),
-        ...(data.notes !== undefined && { notes: data.notes }),
-        ...(data.warehouseId !== undefined && { warehouseId: data.warehouseId }),
-      },
+    const entry = await db.pacaEntry.findUnique({ where: { entryId: id } });
+    if (!entry) {
+      return { success: false, error: "Entrada no encontrada" };
+    }
+
+    await db.$transaction(async (tx) => {
+      await tx.pacaEntry.delete({ where: { entryId: id } });
+      await tx.pacaInventory.update({
+        where: { categoryId: entry.categoryId },
+        data: { available: { decrement: entry.quantity } },
+      });
     });
 
     revalidatePath("/pacas");
+    revalidatePath("/pacas/disponibilidad");
     return { success: true, data: undefined };
   } catch (error) {
-    console.error("Error updating paca:", error);
-    return { success: false, error: "Error al actualizar la paca" };
-  }
-}
-
-export async function deletePaca(id: number): Promise<ActionResult<void>> {
-  try {
-    await db.paca.delete({ where: { pacaId: id } });
-    revalidatePath("/pacas");
-    return { success: true, data: undefined };
-  } catch (error) {
-    console.error("Error deleting paca:", error);
-    return { success: false, error: "Error al eliminar la paca" };
+    console.error("Error deleting paca entry:", error);
+    return { success: false, error: "Error al eliminar la entrada" };
   }
 }

@@ -5,15 +5,22 @@ import { SaleListClient } from "@/modules/pacas/components/sale-list-client";
 import { db } from "@/lib/db";
 
 export default async function VentasPage() {
-  const [sales, stats, availablePacas] = await Promise.all([
+  const [sales, stats, categoriesWithInventory] = await Promise.all([
     getSales(),
     getSalesStats(),
-    db.paca.findMany({
-      where: { status: { in: ["available", "reserved"] } },
-      select: { pacaId: true, code: true, salePrice: true },
-      orderBy: { code: "asc" },
+    db.pacaCategory.findMany({
+      include: { inventory: true },
+      orderBy: { name: "asc" },
     }),
   ]);
+
+  const availableCategories = categoriesWithInventory
+    .filter((c) => (c.inventory?.available ?? 0) > 0)
+    .map((c) => ({
+      categoryId: c.categoryId,
+      name: c.name,
+      available: c.inventory!.available,
+    }));
 
   return (
     <div className="space-y-6">
@@ -25,7 +32,7 @@ export default async function VentasPage() {
       </div>
       <SaleListClient
         sales={sales as Parameters<typeof SaleListClient>[0]["sales"]}
-        availablePacas={availablePacas as Parameters<typeof SaleListClient>[0]["availablePacas"]}
+        availableCategories={availableCategories}
         stats={stats}
       />
     </div>

@@ -198,14 +198,8 @@ model Payment {
 
 // =============================================
 // PACAS MODULE - Bales of recycled clothing
+// Manages QUANTITIES per category, not individual items
 // =============================================
-
-enum PacaStatus {
-  available
-  sold
-  in_transit
-  reserved
-}
 
 model PacaClassification {
   classificationId Int      @id @default(autoincrement()) @map("classification_id")
@@ -227,49 +221,56 @@ model PacaCategory {
   createdAt        DateTime @default(now()) @map("created_at")
 
   classification PacaClassification? @relation(fields: [classificationId], references: [classificationId])
-  pacas          Paca[]
+  inventory      PacaInventory?
+  entries        PacaEntry[]
+  reservations   PacaReservation[]
+  sales          PacaSale[]
 
   @@index([classificationId])
   @@map("paca_categories")
 }
 
-model Paca {
-  pacaId        Int        @id @default(autoincrement()) @map("paca_id")
-  code          String     @unique
-  weightKg      Decimal    @map("weight_kg")
-  categoryId    Int        @map("category_id")
-  origin        String?
-  supplier      String?
-  purchasePrice Decimal?   @map("purchase_price")
-  salePrice     Decimal?   @map("sale_price")
-  status        PacaStatus @default(available)
-  arrivalDate   String?    @map("arrival_date")
-  notes         String?
-  warehouseId   Int?       @map("warehouse_id")
-  createdAt     DateTime   @default(now()) @map("created_at")
-  updatedAt     DateTime   @default(now()) @updatedAt @map("updated_at")
+// Stock level per category
+model PacaInventory {
+  categoryId  Int @id @map("category_id")
+  available   Int @default(0)
+  reserved    Int @default(0)
+  sold        Int @default(0)
 
-  category     PacaCategory      @relation(fields: [categoryId], references: [categoryId])
-  warehouse    Warehouse?        @relation(fields: [warehouseId], references: [warehouseId])
-  reservations PacaReservation[]
-  sales        PacaSale[]
+  category PacaCategory @relation(fields: [categoryId], references: [categoryId])
+
+  @@map("paca_inventory")
+}
+
+// Register incoming stock
+model PacaEntry {
+  entryId       Int      @id @default(autoincrement()) @map("entry_id")
+  categoryId    Int      @map("category_id")
+  quantity      Int
+  purchasePrice Decimal? @map("purchase_price")
+  supplier      String?
+  origin        String?
+  arrivalDate   String?  @map("arrival_date")
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  category PacaCategory @relation(fields: [categoryId], references: [categoryId])
 
   @@index([categoryId])
-  @@index([status])
-  @@index([arrivalDate])
-  @@map("pacas")
+  @@map("paca_entries")
 }
 
 enum ReservationStatus {
   active
   completed
   cancelled
-  expired
 }
 
+// Reserve quantity from a category
 model PacaReservation {
   reservationId   Int               @id @default(autoincrement()) @map("reservation_id")
-  pacaId          Int               @map("paca_id")
+  categoryId      Int               @map("category_id")
+  quantity        Int
   clientName      String            @map("client_name")
   clientPhone     String?           @map("client_phone")
   clientEmail     String?           @map("client_email")
@@ -279,27 +280,29 @@ model PacaReservation {
   status          ReservationStatus @default(active)
   createdAt       DateTime          @default(now()) @map("created_at")
 
-  paca Paca @relation(fields: [pacaId], references: [pacaId])
+  category PacaCategory @relation(fields: [categoryId], references: [categoryId])
 
-  @@index([pacaId])
+  @@index([categoryId])
   @@index([status])
   @@map("paca_reservations")
 }
 
+// Register sales by quantity
 model PacaSale {
   saleId        Int      @id @default(autoincrement()) @map("sale_id")
-  pacaId        Int      @map("paca_id")
+  categoryId    Int      @map("category_id")
+  quantity      Int
+  salePrice     Decimal  @map("sale_price")
   clientName    String   @map("client_name")
   clientPhone   String?  @map("client_phone")
-  saleDate      String   @map("sale_date")
-  salePrice     Decimal  @map("sale_price")
   paymentMethod String?  @map("payment_method")
+  saleDate      String   @map("sale_date")
   notes         String?
   createdAt     DateTime @default(now()) @map("created_at")
 
-  paca Paca @relation(fields: [pacaId], references: [pacaId])
+  category PacaCategory @relation(fields: [categoryId], references: [categoryId])
 
-  @@index([pacaId])
+  @@index([categoryId])
   @@index([saleDate])
   @@map("paca_sales")
 }
@@ -342,7 +345,6 @@ model Warehouse {
 
   stockMovements StockMovement[]
   stockLevels    StockLevel[]
-  pacas          Paca[]
 
   @@map("warehouses")
 }

@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 
 export async function createReservation(data: {
-  pacaId: number;
+  categoryId: number;
+  quantity: number;
   clientName: string;
   clientPhone?: string;
   clientEmail?: string;
@@ -14,15 +15,19 @@ export async function createReservation(data: {
   notes?: string;
 }): Promise<ActionResult<{ reservationId: number }>> {
   try {
-    const paca = await db.paca.findUnique({ where: { pacaId: data.pacaId } });
-    if (!paca || paca.status !== "available") {
-      return { success: false, error: "La paca no esta disponible para reservar" };
+    const inventory = await db.pacaInventory.findUnique({
+      where: { categoryId: data.categoryId },
+    });
+
+    if (!inventory || inventory.available < data.quantity) {
+      return { success: false, error: `No hay suficiente stock disponible. Disponible: ${inventory?.available ?? 0}` };
     }
 
     const reservation = await db.$transaction(async (tx) => {
       const res = await tx.pacaReservation.create({
         data: {
-          pacaId: data.pacaId,
+          categoryId: data.categoryId,
+          quantity: data.quantity,
           clientName: data.clientName,
           clientPhone: data.clientPhone || null,
           clientEmail: data.clientEmail || null,
@@ -32,9 +37,12 @@ export async function createReservation(data: {
         },
       });
 
-      await tx.paca.update({
-        where: { pacaId: data.pacaId },
-        data: { status: "reserved" },
+      await tx.pacaInventory.update({
+        where: { categoryId: data.categoryId },
+        data: {
+          available: { decrement: data.quantity },
+          reserved: { increment: data.quantity },
+        },
       });
 
       return res;
@@ -42,6 +50,7 @@ export async function createReservation(data: {
 
     revalidatePath("/pacas");
     revalidatePath("/pacas/reservaciones");
+    revalidatePath("/pacas/disponibilidad");
     return { success: true, data: { reservationId: reservation.reservationId } };
   } catch (error) {
     console.error("Error creating reservation:", error);
@@ -62,14 +71,18 @@ export async function cancelReservation(id: number): Promise<ActionResult<void>>
         data: { status: "cancelled" },
       });
 
-      await tx.paca.update({
-        where: { pacaId: reservation.pacaId },
-        data: { status: "available" },
+      await tx.pacaInventory.update({
+        where: { categoryId: reservation.categoryId },
+        data: {
+          reserved: { decrement: reservation.quantity },
+          available: { increment: reservation.quantity },
+        },
       });
     });
 
     revalidatePath("/pacas");
     revalidatePath("/pacas/reservaciones");
+    revalidatePath("/pacas/disponibilidad");
     return { success: true, data: undefined };
   } catch (error) {
     console.error("Error cancelling reservation:", error);
@@ -90,14 +103,18 @@ export async function completeReservation(id: number): Promise<ActionResult<void
         data: { status: "completed" },
       });
 
-      await tx.paca.update({
-        where: { pacaId: reservation.pacaId },
-        data: { status: "sold" },
+      await tx.pacaInventory.update({
+        where: { categoryId: reservation.categoryId },
+        data: {
+          reserved: { decrement: reservation.quantity },
+          sold: { increment: reservation.quantity },
+        },
       });
     });
 
     revalidatePath("/pacas");
     revalidatePath("/pacas/reservaciones");
+    revalidatePath("/pacas/disponibilidad");
     return { success: true, data: undefined };
   } catch (error) {
     console.error("Error completing reservation:", error);

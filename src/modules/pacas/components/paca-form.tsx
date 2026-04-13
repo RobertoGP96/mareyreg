@@ -17,82 +17,55 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PACA_STATUSES } from "@/lib/constants";
 
-interface PacaFormProps {
+interface EntryFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: Record<string, unknown>) => void;
+  onSubmit: (data: {
+    categoryId: number;
+    quantity: number;
+    purchasePrice?: number;
+    supplier?: string;
+    origin?: string;
+    arrivalDate?: string;
+    notes?: string;
+  }) => void;
   isLoading: boolean;
   categories: { categoryId: number; name: string }[];
-  warehouses: { warehouseId: number; name: string }[];
-  paca?: {
-    code: string;
-    weightKg: unknown;
-    categoryId: number;
-    origin: string | null;
-    supplier: string | null;
-    purchasePrice: unknown;
-    salePrice: unknown;
-    status: string;
-    arrivalDate: string | null;
-    notes: string | null;
-    warehouseId: number | null;
-  } | null;
 }
 
-export function PacaForm({
+export function PacaEntryForm({
   open,
   onOpenChange,
   onSubmit,
   isLoading,
   categories,
-  warehouses,
-  paca,
-}: PacaFormProps) {
-  const isEdit = !!paca;
-
+}: EntryFormProps) {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const warehouseVal = fd.get("warehouseId") as string;
     onSubmit({
-      code: fd.get("code") as string,
-      weightKg: Number(fd.get("weightKg")),
       categoryId: Number(fd.get("categoryId")),
-      origin: fd.get("origin") as string || undefined,
-      supplier: fd.get("supplier") as string || undefined,
+      quantity: Number(fd.get("quantity")),
       purchasePrice: fd.get("purchasePrice") ? Number(fd.get("purchasePrice")) : undefined,
-      salePrice: fd.get("salePrice") ? Number(fd.get("salePrice")) : undefined,
-      status: fd.get("status") as string,
-      arrivalDate: fd.get("arrivalDate") as string || undefined,
-      notes: fd.get("notes") as string || undefined,
-      warehouseId: warehouseVal && warehouseVal !== "none" ? Number(warehouseVal) : null,
+      supplier: (fd.get("supplier") as string) || undefined,
+      origin: (fd.get("origin") as string) || undefined,
+      arrivalDate: (fd.get("arrivalDate") as string) || undefined,
+      notes: (fd.get("notes") as string) || undefined,
     });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar Paca" : "Nueva Paca"}</DialogTitle>
+          <DialogTitle>Registrar Entrada de Pacas</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Codigo *</Label>
-              <Input name="code" defaultValue={paca?.code} required />
-            </div>
-            <div className="space-y-2">
-              <Label>Peso (kg) *</Label>
-              <Input name="weightKg" type="number" step="0.01" defaultValue={paca ? String(paca.weightKg) : ""} required />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
               <Label>Categoria *</Label>
-              <Select name="categoryId" defaultValue={paca ? String(paca.categoryId) : undefined}>
+              <Select name="categoryId" required>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar..." />
                 </SelectTrigger>
@@ -106,74 +79,40 @@ export function PacaForm({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Estado</Label>
-              <Select name="status" defaultValue={paca?.status ?? "available"}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PACA_STATUSES.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Cantidad *</Label>
+              <Input name="quantity" type="number" min="1" required placeholder="Ej: 10" />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Origen</Label>
-              <Input name="origin" defaultValue={paca?.origin ?? ""} />
+              <Label>Precio de compra (unidad)</Label>
+              <Input name="purchasePrice" type="number" step="0.01" placeholder="Ej: 25.00" />
             </div>
-            <div className="space-y-2">
-              <Label>Proveedor</Label>
-              <Input name="supplier" defaultValue={paca?.supplier ?? ""} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Precio compra</Label>
-              <Input name="purchasePrice" type="number" step="0.01" defaultValue={paca?.purchasePrice ? String(paca.purchasePrice) : ""} />
-            </div>
-            <div className="space-y-2">
-              <Label>Precio venta</Label>
-              <Input name="salePrice" type="number" step="0.01" defaultValue={paca?.salePrice ? String(paca.salePrice) : ""} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Fecha de llegada</Label>
-              <Input name="arrivalDate" type="date" defaultValue={paca?.arrivalDate ?? ""} />
+              <Input name="arrivalDate" type="date" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Proveedor</Label>
+              <Input name="supplier" placeholder="Nombre del proveedor" />
             </div>
             <div className="space-y-2">
-              <Label>Almacen</Label>
-              <Select name="warehouseId" defaultValue={paca?.warehouseId ? String(paca.warehouseId) : "none"}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sin asignar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin asignar</SelectItem>
-                  {warehouses.map((w) => (
-                    <SelectItem key={w.warehouseId} value={String(w.warehouseId)}>
-                      {w.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Origen</Label>
+              <Input name="origin" placeholder="Pais o region" />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label>Notas</Label>
-            <Textarea name="notes" defaultValue={paca?.notes ?? ""} />
+            <Textarea name="notes" placeholder="Observaciones..." />
           </div>
 
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Guardando..." : isEdit ? "Actualizar" : "Crear Paca"}
+            {isLoading ? "Registrando..." : "Registrar Entrada"}
           </Button>
         </form>
       </DialogContent>

@@ -43,12 +43,6 @@ export const MOVEMENT_TYPES = [
   { value: "adjustment", label: "Ajuste" },
 ] as const;
 
-export const PACA_STATUSES = [
-  { value: "available", label: "Disponible" },
-  { value: "sold", label: "Vendida" },
-  { value: "in_transit", label: "En Transito" },
-  { value: "reserved", label: "Reservada" },
-] as const;
 
 export const PRODUCT_UNITS = [
   { value: "kg", label: "Kilogramos" },

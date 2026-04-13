@@ -1,29 +1,28 @@
 export const dynamic = "force-dynamic";
 
-import { getPacas } from "@/modules/pacas/queries/paca-queries";
+import { getPacaInventory, getPacaEntries } from "@/modules/pacas/queries/paca-queries";
 import { getPacaCategories } from "@/modules/pacas/queries/paca-category-queries";
 import { PacaListClient } from "@/modules/pacas/components/paca-list-client";
-import { db } from "@/lib/db";
 
 export default async function PacasPage() {
-  const [pacas, categories, warehouses] = await Promise.all([
-    getPacas(),
+  const [inventory, entries, categories] = await Promise.all([
+    getPacaInventory(),
+    getPacaEntries(),
     getPacaCategories(),
-    db.warehouse.findMany({ select: { warehouseId: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-extrabold font-headline tracking-tight text-primary">Pacas de Ropa</h1>
+        <h1 className="text-3xl font-extrabold font-headline tracking-tight text-primary">Inventario de Pacas</h1>
         <p className="text-muted-foreground mt-1">
-          Gestiona las pacas de ropa reciclada
+          Gestiona las entradas y cantidades de pacas por categoria
         </p>
       </div>
       <PacaListClient
-        initialPacas={pacas as Parameters<typeof PacaListClient>[0]["initialPacas"]}
+        inventory={inventory as Parameters<typeof PacaListClient>[0]["inventory"]}
+        entries={entries as Parameters<typeof PacaListClient>[0]["entries"]}
         categories={categories}
-        warehouses={warehouses}
       />
     </div>
   );

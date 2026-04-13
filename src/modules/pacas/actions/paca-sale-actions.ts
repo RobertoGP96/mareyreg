@@ -5,42 +5,44 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 
 export async function createSale(data: {
-  pacaId: number;
+  categoryId: number;
+  quantity: number;
+  salePrice: number;
   clientName: string;
   clientPhone?: string;
-  saleDate: string;
-  salePrice: number;
   paymentMethod?: string;
+  saleDate: string;
   notes?: string;
 }): Promise<ActionResult<{ saleId: number }>> {
   try {
-    const paca = await db.paca.findUnique({ where: { pacaId: data.pacaId } });
-    if (!paca || (paca.status !== "available" && paca.status !== "reserved")) {
-      return { success: false, error: "La paca no esta disponible para venta" };
+    const inventory = await db.pacaInventory.findUnique({
+      where: { categoryId: data.categoryId },
+    });
+
+    if (!inventory || inventory.available < data.quantity) {
+      return { success: false, error: `No hay suficiente stock disponible. Disponible: ${inventory?.available ?? 0}` };
     }
 
     const sale = await db.$transaction(async (tx) => {
       const s = await tx.pacaSale.create({
         data: {
-          pacaId: data.pacaId,
+          categoryId: data.categoryId,
+          quantity: data.quantity,
+          salePrice: data.salePrice,
           clientName: data.clientName,
           clientPhone: data.clientPhone || null,
-          saleDate: data.saleDate,
-          salePrice: data.salePrice,
           paymentMethod: data.paymentMethod || null,
+          saleDate: data.saleDate,
           notes: data.notes || null,
         },
       });
 
-      await tx.paca.update({
-        where: { pacaId: data.pacaId },
-        data: { status: "sold" },
-      });
-
-      // Complete any active reservations for this paca
-      await tx.pacaReservation.updateMany({
-        where: { pacaId: data.pacaId, status: "active" },
-        data: { status: "completed" },
+      await tx.pacaInventory.update({
+        where: { categoryId: data.categoryId },
+        data: {
+          available: { decrement: data.quantity },
+          sold: { increment: data.quantity },
+        },
       });
 
       return s;
@@ -48,7 +50,7 @@ export async function createSale(data: {
 
     revalidatePath("/pacas");
     revalidatePath("/pacas/ventas");
-    revalidatePath("/pacas/reservaciones");
+    revalidatePath("/pacas/disponibilidad");
     return { success: true, data: { saleId: sale.saleId } };
   } catch (error) {
     console.error("Error creating sale:", error);
@@ -65,14 +67,18 @@ export async function deleteSale(id: number): Promise<ActionResult<void>> {
 
     await db.$transaction(async (tx) => {
       await tx.pacaSale.delete({ where: { saleId: id } });
-      await tx.paca.update({
-        where: { pacaId: sale.pacaId },
-        data: { status: "available" },
+      await tx.pacaInventory.update({
+        where: { categoryId: sale.categoryId },
+        data: {
+          sold: { decrement: sale.quantity },
+          available: { increment: sale.quantity },
+        },
       });
     });
 
     revalidatePath("/pacas");
     revalidatePath("/pacas/ventas");
+    revalidatePath("/pacas/disponibilidad");
     return { success: true, data: undefined };
   } catch (error) {
     console.error("Error deleting sale:", error);

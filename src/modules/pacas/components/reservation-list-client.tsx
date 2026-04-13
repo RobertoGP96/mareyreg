@@ -19,7 +19,8 @@ import { RESERVATION_STATUSES } from "@/lib/constants";
 
 interface ReservationItem {
   reservationId: number;
-  pacaId: number;
+  categoryId: number;
+  quantity: number;
   clientName: string;
   clientPhone: string | null;
   clientEmail: string | null;
@@ -27,28 +28,27 @@ interface ReservationItem {
   expirationDate: string | null;
   notes: string | null;
   status: string;
-  paca: { code: string; category: { name: string } };
+  category: { name: string; classification: { name: string } | null };
 }
 
-interface PacaOption {
-  pacaId: number;
-  code: string;
-  status: string;
+interface CategoryOption {
+  categoryId: number;
+  name: string;
+  available: number;
 }
 
 const STATUS_COLORS: Record<string, string> = {
   active: "bg-green-100 text-green-800",
   completed: "bg-blue-100 text-blue-800",
   cancelled: "bg-red-100 text-red-800",
-  expired: "bg-yellow-100 text-yellow-800",
 };
 
 export function ReservationListClient({
   reservations,
-  availablePacas,
+  availableCategories,
 }: {
   reservations: ReservationItem[];
-  availablePacas: PacaOption[];
+  availableCategories: CategoryOption[];
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -60,7 +60,7 @@ export function ReservationListClient({
   const filtered = reservations.filter(
     (r) =>
       r.clientName.toLowerCase().includes(search.toLowerCase()) ||
-      r.paca.code.toLowerCase().includes(search.toLowerCase())
+      r.category.name.toLowerCase().includes(search.toLowerCase())
   );
 
   const getStatusLabel = (status: string) =>
@@ -71,7 +71,8 @@ export function ReservationListClient({
     setIsSubmitting(true);
     const fd = new FormData(e.currentTarget);
     const result = await createReservation({
-      pacaId: Number(fd.get("pacaId")),
+      categoryId: Number(fd.get("categoryId")),
+      quantity: Number(fd.get("quantity")),
       clientName: fd.get("clientName") as string,
       clientPhone: (fd.get("clientPhone") as string) || undefined,
       clientEmail: (fd.get("clientEmail") as string) || undefined,
@@ -94,13 +95,8 @@ export function ReservationListClient({
     setIsSubmitting(true);
     const result = await cancelReservation(toCancel);
     setIsSubmitting(false);
-    if (result.success) {
-      setToCancel(null);
-      toast.success("Reservacion cancelada");
-      router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    if (result.success) { setToCancel(null); toast.success("Reservacion cancelada"); router.refresh(); }
+    else { toast.error(result.error); }
   };
 
   const handleComplete = async () => {
@@ -108,13 +104,8 @@ export function ReservationListClient({
     setIsSubmitting(true);
     const result = await completeReservation(toComplete);
     setIsSubmitting(false);
-    if (result.success) {
-      setToComplete(null);
-      toast.success("Reservacion completada - paca marcada como vendida");
-      router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    if (result.success) { setToComplete(null); toast.success("Reservacion completada"); router.refresh(); }
+    else { toast.error(result.error); }
   };
 
   return (
@@ -129,7 +120,7 @@ export function ReservationListClient({
           </div>
           <div className="mt-4">
             <InputGroup>
-              <InputGroupInput placeholder="Buscar por cliente o codigo de paca..." value={search} onChange={(e) => setSearch(e.target.value)} />
+              <InputGroupInput placeholder="Buscar por cliente o categoria..." value={search} onChange={(e) => setSearch(e.target.value)} />
               <InputGroupAddon><Search /></InputGroupAddon>
               <InputGroupAddon align="inline-end"><Badge>{filtered.length}</Badge></InputGroupAddon>
             </InputGroup>
@@ -145,7 +136,7 @@ export function ReservationListClient({
                     <Badge className={STATUS_COLORS[r.status]}>{getStatusLabel(r.status)}</Badge>
                   </div>
                   <div className="text-sm text-muted-foreground space-y-0.5">
-                    <p>Paca: <span className="font-medium text-foreground">{r.paca.code}</span> ({r.paca.category.name})</p>
+                    <p>Categoria: <span className="font-medium text-foreground">{r.category.name}</span> — Cantidad: <span className="font-medium text-foreground">{r.quantity}</span></p>
                     <p>Fecha: {r.reservationDate} {r.expirationDate ? `| Expira: ${r.expirationDate}` : ""}</p>
                     {r.clientPhone && <p>Tel: {r.clientPhone}</p>}
                     {r.notes && <p>Notas: {r.notes}</p>}
@@ -167,50 +158,42 @@ export function ReservationListClient({
         </div>
       </div>
 
-      {/* Create Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>Nueva Reservacion</DialogTitle></DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Paca *</Label>
-              <Select name="pacaId">
-                <SelectTrigger><SelectValue placeholder="Seleccionar paca disponible..." /></SelectTrigger>
-                <SelectContent>
-                  {availablePacas.map((p) => (
-                    <SelectItem key={p.pacaId} value={String(p.pacaId)}>{p.code}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Categoria *</Label>
+                <Select name="categoryId">
+                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectContent>
+                    {availableCategories.map((c) => (
+                      <SelectItem key={c.categoryId} value={String(c.categoryId)}>
+                        {c.name} ({c.available} disp.)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Cantidad *</Label>
+                <Input name="quantity" type="number" min="1" required />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Nombre del cliente *</Label>
               <Input name="clientName" required />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Telefono</Label>
-                <Input name="clientPhone" />
-              </div>
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input name="clientEmail" type="email" />
-              </div>
+              <div className="space-y-2"><Label>Telefono</Label><Input name="clientPhone" /></div>
+              <div className="space-y-2"><Label>Email</Label><Input name="clientEmail" type="email" /></div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Fecha de reservacion *</Label>
-                <Input name="reservationDate" type="date" required />
-              </div>
-              <div className="space-y-2">
-                <Label>Fecha de expiracion</Label>
-                <Input name="expirationDate" type="date" />
-              </div>
+              <div className="space-y-2"><Label>Fecha reservacion *</Label><Input name="reservationDate" type="date" required /></div>
+              <div className="space-y-2"><Label>Fecha expiracion</Label><Input name="expirationDate" type="date" /></div>
             </div>
-            <div className="space-y-2">
-              <Label>Notas</Label>
-              <Textarea name="notes" />
-            </div>
+            <div className="space-y-2"><Label>Notas</Label><Textarea name="notes" /></div>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Creando..." : "Crear Reservacion"}
             </Button>
@@ -218,32 +201,24 @@ export function ReservationListClient({
         </DialogContent>
       </Dialog>
 
-      {/* Cancel Confirm */}
       <AlertDialog open={!!toCancel} onOpenChange={() => setToCancel(null)}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Cancelar reservacion?</AlertDialogTitle>
-            <AlertDialogDescription>La paca volvera a estar disponible.</AlertDialogDescription>
-          </AlertDialogHeader>
+            <AlertDialogDescription>Las pacas volveran a estar disponibles.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>No</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCancel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isSubmitting}>
-              {isSubmitting ? "Cancelando..." : "Si, Cancelar"}
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleCancel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isSubmitting}>Si, Cancelar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Complete Confirm */}
       <AlertDialog open={!!toComplete} onOpenChange={() => setToComplete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Completar reservacion?</AlertDialogTitle>
-            <AlertDialogDescription>La paca sera marcada como vendida.</AlertDialogDescription>
-          </AlertDialogHeader>
+            <AlertDialogDescription>Las pacas seran marcadas como vendidas.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>No</AlertDialogCancel>
-            <AlertDialogAction onClick={handleComplete} disabled={isSubmitting}>
-              {isSubmitting ? "Completando..." : "Si, Completar"}
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleComplete} disabled={isSubmitting}>Si, Completar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
