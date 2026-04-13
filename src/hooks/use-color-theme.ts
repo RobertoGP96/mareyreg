@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import { DEFAULT_THEME, COLOR_THEMES } from "@/lib/themes";
+import { DEFAULT_THEME, COLOR_PALETTES } from "@/lib/themes";
 
 interface ColorThemeContextType {
   colorTheme: string;
@@ -21,10 +21,20 @@ export function useColorThemeState() {
   const [colorTheme, setColorThemeState] = useState(DEFAULT_THEME);
 
   useEffect(() => {
-    const stored = localStorage.getItem("color-theme");
-    if (stored && COLOR_THEMES.some((t) => t.id === stored)) {
+    let stored = localStorage.getItem("color-theme");
+
+    // Migrate old theme IDs
+    if (stored === "neutral") {
+      stored = "navy";
+      localStorage.setItem("color-theme", stored);
+    }
+
+    if (stored && COLOR_PALETTES.some((t) => t.id === stored)) {
       setColorThemeState(stored);
       document.documentElement.setAttribute("data-theme", stored);
+    } else if (stored) {
+      // Old theme ID no longer exists, reset to default
+      localStorage.removeItem("color-theme");
     }
   }, []);
 

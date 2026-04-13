@@ -1,17 +1,20 @@
-export interface ColorTheme {
+export interface ColorPalette {
   id: string;
   label: string;
-  color: string; // Preview color for swatch
+  previewColors: [string, string, string]; // [sidebar, primary, accent]
 }
 
-export const COLOR_THEMES: ColorTheme[] = [
-  { id: "neutral", label: "Navy", color: "#001e40" },
-  { id: "blue", label: "Azul", color: "#2563eb" },
-  { id: "green", label: "Verde", color: "#16a34a" },
-  { id: "purple", label: "Purpura", color: "#9333ea" },
-  { id: "orange", label: "Naranja", color: "#ea580c" },
-  { id: "rose", label: "Rosa", color: "#e11d48" },
-  { id: "teal", label: "Teal", color: "#0d9488" },
+export const COLOR_PALETTES: ColorPalette[] = [
+  { id: "navy", label: "Navy", previewColors: ["#001e40", "#003366", "#ff7010"] },
+  { id: "ocean", label: "Ocean", previewColors: ["#0c4a5e", "#0891b2", "#06b6d4"] },
+  { id: "sunset", label: "Sunset", previewColors: ["#451a03", "#d97706", "#eab308"] },
+  { id: "royal", label: "Royal", previewColors: ["#2e1065", "#7c3aed", "#818cf8"] },
 ];
 
-export const DEFAULT_THEME = "neutral";
+export const COLOR_THEMES = COLOR_PALETTES.map((p) => ({
+  id: p.id,
+  label: p.label,
+  color: p.previewColors[1],
+}));
+
+export const DEFAULT_THEME = "navy";

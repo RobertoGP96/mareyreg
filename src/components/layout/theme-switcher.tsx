@@ -2,7 +2,7 @@
 
 import { useTheme } from "next-themes";
 import { useColorTheme } from "@/hooks/use-color-theme";
-import { COLOR_THEMES } from "@/lib/themes";
+import { COLOR_PALETTES } from "@/lib/themes";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,6 +13,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Palette, Sun, Moon, Monitor, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
@@ -26,21 +27,32 @@ export function ThemeSwitcher() {
           <span className="sr-only">Cambiar tema</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuLabel className="text-xs text-muted-foreground">
-          Color
+          Paleta
         </DropdownMenuLabel>
-        <div className="grid grid-cols-4 gap-1 p-2">
-          {COLOR_THEMES.map((t) => (
+        <div className="flex flex-col gap-0.5 p-1">
+          {COLOR_PALETTES.map((palette) => (
             <button
-              key={t.id}
-              onClick={() => setColorTheme(t.id)}
-              className="flex items-center justify-center h-8 w-8 rounded-md border hover:scale-110 transition-transform"
-              style={{ backgroundColor: t.color }}
-              title={t.label}
+              key={palette.id}
+              onClick={() => setColorTheme(palette.id)}
+              className={cn(
+                "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm w-full hover:bg-accent transition-colors",
+                colorTheme === palette.id && "bg-accent"
+              )}
             >
-              {colorTheme === t.id && (
-                <Check className="h-3.5 w-3.5 text-white" />
+              <div className="flex h-5 w-8 rounded-sm overflow-hidden border shrink-0">
+                {palette.previewColors.map((color, i) => (
+                  <div
+                    key={i}
+                    className="flex-1"
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+              <span className="flex-1 text-left">{palette.label}</span>
+              {colorTheme === palette.id && (
+                <Check className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
               )}
             </button>
           ))}

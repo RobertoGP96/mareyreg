@@ -33,22 +33,16 @@ export interface AppModule {
 
 export const modules: AppModule[] = [
   {
-    id: "fleet",
-    label: "Flota",
-    icon: Truck,
+    id: "logistics",
+    label: "Logistica",
+    icon: RouteIcon,
     enabled: true,
     routes: [
       { name: "Entidades", href: "/entities", icon: Building2 },
       { name: "Conductores", href: "/drivers", icon: Users },
       { name: "Vehiculos", href: "/vehicles", icon: Truck },
+      { name: "Viajes", href: "/trips", icon: RouteIcon },
     ],
-  },
-  {
-    id: "logistics",
-    label: "Logistica",
-    icon: RouteIcon,
-    enabled: true,
-    routes: [{ name: "Viajes", href: "/trips", icon: RouteIcon }],
   },
   {
     id: "pacas",

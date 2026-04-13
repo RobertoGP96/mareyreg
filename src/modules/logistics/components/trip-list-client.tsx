@@ -36,8 +36,9 @@ import {
   Box,
 } from "lucide-react";
 import { toast } from "sonner";
-import { deleteTrip } from "../actions/trip-actions";
+import { createTrip, updateTrip, deleteTrip } from "../actions/trip-actions";
 import { createContainer, deleteContainer } from "../actions/container-actions";
+import { TripForm } from "./trip-form";
 import { ContainerForm } from "./container-form";
 import type { Driver } from "@/types";
 
@@ -64,9 +65,11 @@ interface Props {
   drivers: Driver[];
 }
 
-export function TripListClient({ initialTrips }: Props) {
+export function TripListClient({ initialTrips, drivers }: Props) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [tripToEdit, setTripToEdit] = useState<TripRow | null>(null);
   const [tripToDelete, setTripToDelete] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [containerTripId, setContainerTripId] = useState<number | null>(null);
@@ -86,6 +89,49 @@ export function TripListClient({ initialTrips }: Props) {
         c.serialNumber.toLowerCase().includes(searchQuery.toLowerCase())
       )
   );
+
+  const handleCreateTrip = async (data: {
+    driver_id: number;
+    load_date?: string;
+    load_time?: string;
+    trip_payment?: string;
+    province?: string;
+    product?: string;
+  }) => {
+    setIsSubmitting(true);
+    const result = await createTrip(data);
+    setIsSubmitting(false);
+
+    if (result.success) {
+      setIsCreateOpen(false);
+      toast.success("Viaje creado exitosamente");
+      router.refresh();
+    } else {
+      toast.error(result.error);
+    }
+  };
+
+  const handleUpdateTrip = async (data: {
+    driver_id: number;
+    load_date?: string;
+    load_time?: string;
+    trip_payment?: string;
+    province?: string;
+    product?: string;
+  }) => {
+    if (!tripToEdit) return;
+    setIsSubmitting(true);
+    const result = await updateTrip(tripToEdit.tripId, data);
+    setIsSubmitting(false);
+
+    if (result.success) {
+      setTripToEdit(null);
+      toast.success("Viaje actualizado exitosamente");
+      router.refresh();
+    } else {
+      toast.error(result.error);
+    }
+  };
 
   const handleDeleteTrip = async () => {
     if (!tripToDelete) return;
@@ -147,7 +193,7 @@ export function TripListClient({ initialTrips }: Props) {
             <h2 className="text-lg font-medium text-foreground">
               Lista de Viajes
             </h2>
-            <Button onClick={() => toast.info("Formulario de viaje - En desarrollo")}>
+            <Button onClick={() => setIsCreateOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Agregar
             </Button>
@@ -209,7 +255,6 @@ export function TripListClient({ initialTrips }: Props) {
                           </div>
                         )}
                       </div>
-                      {/* Containers */}
                       {trip.containers.length > 0 && (
                         <div className="flex items-center gap-2 mt-3 flex-wrap">
                           <Box className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -250,7 +295,10 @@ export function TripListClient({ initialTrips }: Props) {
                         <Box className="h-4 w-4" />
                         <span>Agregar contenedor</span>
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="flex items-center space-x-2">
+                      <DropdownMenuItem
+                        onClick={() => setTripToEdit(trip)}
+                        className="flex items-center space-x-2"
+                      >
                         <Pen className="h-4 w-4" />
                         <span>Editar</span>
                       </DropdownMenuItem>
@@ -274,6 +322,37 @@ export function TripListClient({ initialTrips }: Props) {
           )}
         </div>
       </div>
+
+      {/* Create Trip Dialog */}
+      <TripForm
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        onSubmit={handleCreateTrip}
+        isLoading={isSubmitting}
+        drivers={drivers}
+      />
+
+      {/* Edit Trip Dialog */}
+      <TripForm
+        open={!!tripToEdit}
+        onOpenChange={(open) => !open && setTripToEdit(null)}
+        onSubmit={handleUpdateTrip}
+        isLoading={isSubmitting}
+        drivers={drivers}
+        trip={
+          tripToEdit
+            ? {
+                tripId: tripToEdit.tripId,
+                driverId: tripToEdit.driverId,
+                loadDate: tripToEdit.loadDate,
+                loadTime: tripToEdit.loadTime,
+                tripPayment: tripToEdit.tripPayment,
+                province: tripToEdit.province,
+                product: tripToEdit.product,
+              }
+            : null
+        }
+      />
 
       {/* Container Form Dialog */}
       <ContainerForm
