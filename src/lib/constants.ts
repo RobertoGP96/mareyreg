@@ -42,3 +42,26 @@ export const MOVEMENT_TYPES = [
   { value: "transfer", label: "Transferencia" },
   { value: "adjustment", label: "Ajuste" },
 ] as const;
+
+export const PACA_STATUSES = [
+  { value: "available", label: "Disponible" },
+  { value: "sold", label: "Vendida" },
+  { value: "in_transit", label: "En Transito" },
+  { value: "reserved", label: "Reservada" },
+] as const;
+
+export const PRODUCT_UNITS = [
+  { value: "kg", label: "Kilogramos" },
+  { value: "litros", label: "Litros" },
+  { value: "unidades", label: "Unidades" },
+  { value: "pacas", label: "Pacas" },
+  { value: "metros", label: "Metros" },
+] as const;
+
+export const PRODUCT_CATEGORIES = [
+  { value: "materiales", label: "Materiales" },
+  { value: "alimentos", label: "Alimentos" },
+  { value: "ropa", label: "Ropa" },
+  { value: "combustible", label: "Combustible" },
+  { value: "otro", label: "Otro" },
+] as const;

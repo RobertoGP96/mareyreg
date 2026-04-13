@@ -197,7 +197,54 @@ model Payment {
 }
 
 // =============================================
-// INVENTORY MODULE (Future)
+// PACAS MODULE - Bales of recycled clothing
+// =============================================
+
+enum PacaStatus {
+  available
+  sold
+  in_transit
+  reserved
+}
+
+model PacaCategory {
+  categoryId  Int      @id @default(autoincrement()) @map("category_id")
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  pacas Paca[]
+
+  @@map("paca_categories")
+}
+
+model Paca {
+  pacaId        Int        @id @default(autoincrement()) @map("paca_id")
+  code          String     @unique
+  weightKg      Decimal    @map("weight_kg")
+  categoryId    Int        @map("category_id")
+  origin        String?
+  supplier      String?
+  purchasePrice Decimal?   @map("purchase_price")
+  salePrice     Decimal?   @map("sale_price")
+  status        PacaStatus @default(available)
+  arrivalDate   String?    @map("arrival_date")
+  notes         String?
+  warehouseId   Int?       @map("warehouse_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  category  PacaCategory @relation(fields: [categoryId], references: [categoryId])
+  warehouse Warehouse?   @relation(fields: [warehouseId], references: [warehouseId])
+
+  @@index([categoryId])
+  @@index([status])
+  @@index([arrivalDate])
+  @@map("pacas")
+}
+
+// =============================================
+// INVENTORY MODULE
 // =============================================
 
 enum MovementType {
@@ -234,6 +281,7 @@ model Warehouse {
 
   stockMovements StockMovement[]
   stockLevels    StockLevel[]
+  pacas          Paca[]
 
   @@map("warehouses")
 }
