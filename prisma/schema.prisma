@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================
+// CORE MODULE - Shared tables
+// =============================================
+
+enum UserRole {
+  admin
+  dispatcher
+  viewer
+}
+
+model User {
+  userId       Int       @id @default(autoincrement()) @map("user_id")
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  fullName     String    @map("full_name")
+  role         UserRole  @default(viewer)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  auditLogs      AuditLog[]
+  stockMovements StockMovement[]
+
+  @@map("users")
+}
+
+model AuditLog {
+  logId      Int      @id @default(autoincrement()) @map("log_id")
+  userId     Int?     @map("user_id")
+  action     String   // create, update, delete
+  entityType String   @map("entity_type")
+  entityId   Int?     @map("entity_id")
+  module     String   // fleet, logistics, payments, inventory
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [userId])
+
+  @@map("audit_log")
+}
+
+// =============================================
+// FLEET MODULE - Drivers & Vehicles
+// =============================================
+
+enum DriverStatus {
+  active
+  inactive
+}
+
+enum VehicleStatus {
+  active
+  maintenance
+  inactive
+}
+
+model Driver {
+  driverId             Int          @id @default(autoincrement()) @map("driver_id")
+  fullName             String       @map("full_name")
+  identificationNumber String       @unique @map("identification_number")
+  phoneNumber          String       @map("phone_number")
+  operativeLicense     String?      @map("operative_license")
+  status               DriverStatus @default(active)
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @default(now()) @updatedAt @map("updated_at")
+
+  vehicles Vehicle[]
+  trips    Trip[]
+
+  @@index([identificationNumber])
+  @@index([fullName])
+  @@map("drivers")
+}
+
+model Vehicle {
+  vehicleId                Int           @id @default(autoincrement()) @map("vehicle_id")
+  name                     String?
+  cunaCirculationNumber    String?       @map("cuña_circulation_number")
+  planchaCirculationNumber String?       @map("plancha_circulation_number")
+  cunaPlateNumber          String?       @map("cuña_plate_number")
+  planchaPlateNumber       String?       @map("plancha_plate_number")
+  driverId                 Int?          @map("driver_id")
+  status                   VehicleStatus @default(active)
+  createdAt                DateTime      @default(now()) @map("created_at")
+  updatedAt                DateTime      @default(now()) @updatedAt @map("updated_at")
+
+  driver Driver? @relation(fields: [driverId], references: [driverId])
+
+  @@index([driverId])
+  @@map("vehicles")
+}
+
+// =============================================
+// LOGISTICS MODULE - Trips, Routes, Cargo
+// =============================================
+
+enum TripStatus {
+  scheduled
+  in_progress
+  completed
+  cancelled
+}
+
+enum CargoType {
+  bulk
+  container
+  refrigerated
+  general
+}
+
+model Route {
+  routeId              Int      @id @default(autoincrement()) @map("route_id")
+  originProvince       String   @map("origin_province")
+  destinationProvince  String   @map("destination_province")
+  distanceKm           Decimal? @map("distance_km")
+  estimatedHours       Decimal? @map("estimated_hours")
+  description          String?
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  trips Trip[]
+
+  @@map("routes")
+}
+
+model Trip {
+  tripId          Int        @id @default(autoincrement()) @map("trip_id")
+  driverId        Int        @map("driver_id")
+  routeId         Int?       @map("route_id")
+  containerNumber String?    @map("container_number")
+  loadDate        String?    @map("load_date")
+  loadTime        String?    @map("load_time")
+  tripPayment     String?    @map("trip_payment")
+  province        String?
+  product         String?
+  status          TripStatus @default(completed)
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at")
+
+  driver   Driver    @relation(fields: [driverId], references: [driverId])
+  route    Route?    @relation(fields: [routeId], references: [routeId])
+  cargo    Cargo[]
+  payments Payment[]
+  stockMovements StockMovement[]
+
+  @@index([driverId])
+  @@index([loadDate])
+  @@index([province])
+  @@map("trips")
+}
+
+model Cargo {
+  cargoId     Int       @id @default(autoincrement()) @map("cargo_id")
+  tripId      Int       @map("trip_id")
+  productName String    @map("product_name")
+  weightKg    Decimal?  @map("weight_kg")
+  cargoType   CargoType @default(general) @map("cargo_type")
+  description String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [tripId], onDelete: Cascade)
+
+  @@map("cargo")
+}
+
+// =============================================
+// PAYMENTS MODULE
+// =============================================
+
+enum PaymentStatus {
+  pending
+  paid
+  cancelled
+}
+
+model Payment {
+  paymentId     Int           @id @default(autoincrement()) @map("payment_id")
+  tripId        Int           @map("trip_id")
+  amount        Decimal
+  paymentDate   String?       @map("payment_date")
+  paymentMethod String?       @map("payment_method")
+  status        PaymentStatus @default(pending)
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [tripId])
+
+  @@map("payments")
+}
+
+// =============================================
+// INVENTORY MODULE (Future)
+// =============================================
+
+enum MovementType {
+  entry
+  exit
+  transfer
+  adjustment
+}
+
+model Product {
+  productId   Int      @id @default(autoincrement()) @map("product_id")
+  name        String
+  sku         String?  @unique
+  category    String?
+  unit        String   // kg, litros, unidades
+  minStock    Decimal  @default(0) @map("min_stock")
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  stockMovements StockMovement[]
+  stockLevels    StockLevel[]
+
+  @@map("products")
+}
+
+model Warehouse {
+  warehouseId Int      @id @default(autoincrement()) @map("warehouse_id")
+  name        String
+  location    String?
+  province    String?
+  capacity    Decimal?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  stockMovements StockMovement[]
+  stockLevels    StockLevel[]
+
+  @@map("warehouses")
+}
+
+model StockMovement {
+  movementId      Int          @id @default(autoincrement()) @map("movement_id")
+  productId       Int          @map("product_id")
+  warehouseId     Int          @map("warehouse_id")
+  quantity        Decimal
+  movementType    MovementType @map("movement_type")
+  referenceTripId Int?         @map("reference_trip_id")
+  notes           String?
+  createdAt       DateTime     @default(now()) @map("created_at")
+  createdBy       Int?         @map("created_by")
+
+  product   Product    @relation(fields: [productId], references: [productId])
+  warehouse Warehouse  @relation(fields: [warehouseId], references: [warehouseId])
+  trip      Trip?      @relation(fields: [referenceTripId], references: [tripId])
+  user      User?      @relation(fields: [createdBy], references: [userId])
+
+  @@index([productId])
+  @@index([warehouseId])
+  @@map("stock_movements")
+}
+
+model StockLevel {
+  productId       Int      @map("product_id")
+  warehouseId     Int      @map("warehouse_id")
+  currentQuantity Decimal  @default(0) @map("current_quantity")
+  lastUpdated     DateTime @default(now()) @map("last_updated")
+
+  product   Product   @relation(fields: [productId], references: [productId])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [warehouseId])
+
+  @@id([productId, warehouseId])
+  @@map("stock_levels")
+}
