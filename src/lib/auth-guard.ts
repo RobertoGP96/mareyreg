@@ -1,10 +1,9 @@
 import { auth } from "@/lib/auth";
-import { redirect } from "next/navigation";
 
 export async function requireAuth() {
   const session = await auth();
   if (!session?.user) {
-    redirect("/login");
+    throw new Error("No autenticado");
   }
   return session;
 }
@@ -21,7 +20,7 @@ export async function requireModule(moduleId: string) {
   const session = await requireAuth();
   if (session.user.role === "admin") return session;
   if (!session.user.modules?.includes(moduleId)) {
-    redirect("/");
+    throw new Error("No tienes acceso a este modulo");
   }
   return session;
 }
