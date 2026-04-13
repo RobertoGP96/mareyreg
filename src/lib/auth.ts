@@ -20,6 +20,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const user = await db.user.findUnique({
           where: { email: credentials.email as string },
+          include: { modulePermissions: true },
         });
 
         if (!user) return null;
@@ -36,6 +37,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email,
           name: user.fullName,
           role: user.role,
+          modules: user.modulePermissions.map((p) => p.moduleId),
         };
       },
     }),

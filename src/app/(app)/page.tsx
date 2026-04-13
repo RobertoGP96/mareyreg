@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { Users, Truck, RouteIcon, Shirt, Package, Warehouse, ClipboardList, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { auth } from "@/lib/auth";
 import { getDrivers } from "@/modules/fleet/queries/driver-queries";
 import { getVehicles } from "@/modules/fleet/queries/vehicle-queries";
 import { getEntities } from "@/modules/fleet/queries/entity-queries";
@@ -11,7 +12,17 @@ import { getPacaInventoryStats } from "@/modules/pacas/queries/paca-queries";
 import { getProducts } from "@/modules/inventory/queries/product-queries";
 import { getWarehouses } from "@/modules/inventory/queries/warehouse-queries";
 
+const MODULE_STATS: Record<string, string[]> = {
+  logistics: ["Entidades", "Conductores", "Vehiculos", "Viajes"],
+  pacas: ["Pacas"],
+  inventory: ["Productos", "Almacenes"],
+};
+
 export default async function Home() {
+  const session = await auth();
+  const userModules = session?.user?.modules ?? [];
+  const isAdmin = session?.user?.role === "admin";
+
   const [drivers, vehicles, entities, trips, pacasStats, products, warehouses] =
     await Promise.all([
       getDrivers(),
@@ -23,7 +34,7 @@ export default async function Home() {
       getWarehouses(),
     ]);
 
-  const stats = [
+  const allStats = [
     { label: "Entidades", count: entities.length, href: "/entities", icon: Building2 },
     { label: "Conductores", count: drivers.length, href: "/drivers", icon: Users },
     { label: "Vehiculos", count: vehicles.length, href: "/vehicles", icon: Truck },
@@ -32,6 +43,13 @@ export default async function Home() {
     { label: "Productos", count: products.length, href: "/products", icon: Package },
     { label: "Almacenes", count: warehouses.length, href: "/warehouses", icon: Warehouse },
   ];
+
+  const stats = allStats.filter((s) => {
+    if (isAdmin) return true;
+    return Object.entries(MODULE_STATS).some(
+      ([moduleId, labels]) => labels.includes(s.label) && userModules.includes(moduleId)
+    );
+  });
 
   return (
     <div className="space-y-6">

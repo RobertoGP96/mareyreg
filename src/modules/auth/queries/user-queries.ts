@@ -9,6 +9,9 @@ export async function getUsers() {
       fullName: true,
       role: true,
       createdAt: true,
+      modulePermissions: {
+        select: { moduleId: true },
+      },
     },
   });
 }

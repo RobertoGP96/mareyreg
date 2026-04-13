@@ -26,10 +26,21 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  auditLogs      AuditLog[]
-  stockMovements StockMovement[]
+  auditLogs         AuditLog[]
+  stockMovements    StockMovement[]
+  modulePermissions UserModulePermission[]
 
   @@map("users")
+}
+
+model UserModulePermission {
+  userId   Int    @map("user_id")
+  moduleId String @map("module_id")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@id([userId, moduleId])
+  @@map("user_module_permissions")
 }
 
 model AuditLog {

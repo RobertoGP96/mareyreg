@@ -65,6 +65,7 @@ export async function createUser(data: {
   password: string;
   fullName: string;
   role: "admin" | "dispatcher" | "viewer";
+  modules: string[];
 }): Promise<ActionResult<{ userId: number }>> {
   try {
     await requireRole(["admin"]);
@@ -83,6 +84,9 @@ export async function createUser(data: {
         passwordHash,
         fullName: data.fullName,
         role: data.role,
+        modulePermissions: {
+          create: data.modules.map((moduleId) => ({ moduleId })),
+        },
       },
     });
 
@@ -101,6 +105,7 @@ export async function updateUser(
     fullName?: string;
     role?: "admin" | "dispatcher" | "viewer";
     password?: string;
+    modules?: string[];
   }
 ): Promise<ActionResult<void>> {
   try {
@@ -116,6 +121,15 @@ export async function updateUser(
       where: { userId: id },
       data: updateData,
     });
+
+    if (data.modules !== undefined) {
+      await db.userModulePermission.deleteMany({ where: { userId: id } });
+      if (data.modules.length > 0) {
+        await db.userModulePermission.createMany({
+          data: data.modules.map((moduleId) => ({ userId: id, moduleId })),
+        });
+      }
+    }
 
     revalidatePath("/settings/users");
     return { success: true, data: undefined };

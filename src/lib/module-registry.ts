@@ -91,6 +91,10 @@ export function getEnabledModules(): AppModule[] {
   return modules.filter((m) => m.enabled);
 }
 
+export function getEnabledModuleIds(): string[] {
+  return getEnabledModules().map((m) => m.id);
+}
+
 export function getAllNavigationRoutes(): ModuleRoute[] {
   const enabledRoutes = getEnabledModules().flatMap((m) => m.routes);
   return [...fixedRoutes, ...enabledRoutes, settingsRoute];

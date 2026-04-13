@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   Sidebar,
   SidebarContent,
@@ -20,7 +21,13 @@ import { getEnabledModules } from "@/lib/module-registry";
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const modules = getEnabledModules();
+  const { data: session } = useSession();
+  const allModules = getEnabledModules();
+
+  const modules = allModules.filter((module) => {
+    if (session?.user?.role === "admin") return true;
+    return session?.user?.modules?.includes(module.id) ?? false;
+  });
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";

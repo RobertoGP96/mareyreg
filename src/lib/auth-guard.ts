@@ -16,3 +16,12 @@ export async function requireRole(roles: string[]) {
   }
   return session;
 }
+
+export async function requireModule(moduleId: string) {
+  const session = await requireAuth();
+  if (session.user.role === "admin") return session;
+  if (!session.user.modules?.includes(moduleId)) {
+    redirect("/");
+  }
+  return session;
+}

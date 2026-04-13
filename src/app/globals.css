@@ -16,9 +16,9 @@
   --font-sans: var(--font-body), 'Inter', system-ui, sans-serif;
   --font-headline: var(--font-headline), 'Manrope', system-ui, sans-serif;
 
-  --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.625rem;
+  --radius-sm: 0.1rem;
+  --radius-md: 0.3rem;
+  --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
 
   --color-background: var(--background);

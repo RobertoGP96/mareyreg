@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -12,12 +14,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Trash2, Users, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { clearAllData } from "@/modules/core/actions/admin-actions";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "admin";
   const [isClearing, setIsClearing] = useState(false);
 
   const handleClearData = async () => {
@@ -36,38 +40,59 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <h1 className="text-3xl font-extrabold font-headline tracking-tight text-primary">Configuracion</h1>
 
-      <div className="bg-card p-6 rounded-lg shadow-sm border">
-        <h2 className="text-xl font-semibold text-foreground mb-4">
-          Datos de la Base de Datos
-        </h2>
-        <p className="text-muted-foreground mb-4">
-          Esta accion borrara permanentemente todos los conductores, vehiculos y
-          viajes de la base de datos. Esta accion no se puede deshacer.
-        </p>
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive">
-              <Trash2 className="h-4 w-4 mr-2" />
-              Borrar Todos los Datos
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Esta accion borrara permanentemente todos los datos de la base de
-                datos. Esto incluye todos los conductores, vehiculos y viajes.
-                Esta accion no se puede deshacer.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleClearData} disabled={isClearing}>
-                {isClearing ? "Borrando..." : "Borrar Todo"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {isAdmin && (
+          <Link href="/settings/users" className="block">
+            <div className="bg-card p-6 rounded-lg shadow-sm border hover:border-primary transition-colors h-full">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Users className="h-6 w-6 text-primary" />
+                  </div>
+                  <h2 className="text-xl font-semibold">Usuarios</h2>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground text-sm">
+                Gestiona los usuarios y permisos del sistema
+              </p>
+            </div>
+          </Link>
+        )}
+
+        <div className="bg-card p-6 rounded-lg shadow-sm border">
+          <h2 className="text-xl font-semibold text-foreground mb-4">
+            Datos de la Base de Datos
+          </h2>
+          <p className="text-muted-foreground mb-4">
+            Esta accion borrara permanentemente todos los conductores, vehiculos y
+            viajes de la base de datos. Esta accion no se puede deshacer.
+          </p>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Borrar Todos los Datos
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta accion borrara permanentemente todos los datos de la base de
+                  datos. Esto incluye todos los conductores, vehiculos y viajes.
+                  Esta accion no se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleClearData} disabled={isClearing}>
+                  {isClearing ? "Borrando..." : "Borrar Todo"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </div>
     </div>
   );

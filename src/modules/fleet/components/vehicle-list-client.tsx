@@ -28,7 +28,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Search, Trash2, MoreHorizontal, Plus, Pen, Truck } from "lucide-react";
 import { toast } from "sonner";
-import { deleteVehicle } from "../actions/vehicle-actions";
+import {
+  createVehicle,
+  updateVehicle,
+  deleteVehicle,
+} from "../actions/vehicle-actions";
+import { VehicleForm } from "./vehicle-form";
 import type { Driver } from "@/types";
 
 interface VehicleRow {
@@ -53,9 +58,11 @@ interface Props {
   drivers: Driver[];
 }
 
-export function VehicleListClient({ initialVehicles }: Props) {
+export function VehicleListClient({ initialVehicles, drivers }: Props) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [vehicleToEdit, setVehicleToEdit] = useState<VehicleRow | null>(null);
   const [vehicleToDelete, setVehicleToDelete] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -66,6 +73,60 @@ export function VehicleListClient({ initialVehicles }: Props) {
       v.plancha_plate_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       v.driver?.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleCreateVehicle = async (data: {
+    name?: string;
+    cuña_circulation_number?: string;
+    plancha_circulation_number?: string;
+    cuña_plate_number?: string;
+    plancha_plate_number?: string;
+    driver_id?: number;
+  }) => {
+    setIsSubmitting(true);
+    const result = await createVehicle(data);
+    setIsSubmitting(false);
+
+    if (result.success) {
+      setIsCreateDialogOpen(false);
+      toast.success("Vehiculo creado exitosamente", {
+        description: `${data.name || "Vehiculo"} ha sido registrado en el sistema.`,
+      });
+      router.refresh();
+    } else {
+      toast.error("Error al crear el vehiculo", {
+        description: result.error,
+      });
+    }
+  };
+
+  const handleUpdateVehicle = async (data: {
+    name?: string;
+    cuña_circulation_number?: string;
+    plancha_circulation_number?: string;
+    cuña_plate_number?: string;
+    plancha_plate_number?: string;
+    driver_id?: number;
+  }) => {
+    if (!vehicleToEdit) return;
+    setIsSubmitting(true);
+    const result = await updateVehicle(vehicleToEdit.vehicle_id, {
+      ...data,
+      driver_id: data.driver_id ?? null,
+    });
+    setIsSubmitting(false);
+
+    if (result.success) {
+      setVehicleToEdit(null);
+      toast.success("Vehiculo actualizado exitosamente", {
+        description: `Los datos del vehiculo han sido actualizados.`,
+      });
+      router.refresh();
+    } else {
+      toast.error("Error al actualizar el vehiculo", {
+        description: result.error,
+      });
+    }
+  };
 
   const handleDeleteVehicle = async () => {
     if (!vehicleToDelete) return;
@@ -90,7 +151,7 @@ export function VehicleListClient({ initialVehicles }: Props) {
             <h2 className="text-lg font-medium text-foreground">
               Lista de Vehiculos
             </h2>
-            <Button onClick={() => toast.info("Formulario de vehiculo - En desarrollo")}>
+            <Button onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Agregar
             </Button>
@@ -158,7 +219,10 @@ export function VehicleListClient({ initialVehicles }: Props) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="flex items-center space-x-2">
+                      <DropdownMenuItem
+                        onClick={() => setVehicleToEdit(vehicle)}
+                        className="flex items-center space-x-2"
+                      >
                         <Pen className="h-4 w-4" />
                         <span>Editar</span>
                       </DropdownMenuItem>
@@ -182,6 +246,34 @@ export function VehicleListClient({ initialVehicles }: Props) {
           )}
         </div>
       </div>
+
+      <VehicleForm
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onSubmit={handleCreateVehicle}
+        isLoading={isSubmitting}
+        drivers={drivers}
+      />
+
+      <VehicleForm
+        open={!!vehicleToEdit}
+        onOpenChange={(open) => !open && setVehicleToEdit(null)}
+        onSubmit={handleUpdateVehicle}
+        isLoading={isSubmitting}
+        vehicle={
+          vehicleToEdit
+            ? {
+                name: vehicleToEdit.name,
+                cuña_circulation_number: vehicleToEdit.cuña_circulation_number,
+                plancha_circulation_number: vehicleToEdit.plancha_circulation_number,
+                cuña_plate_number: vehicleToEdit.cuña_plate_number,
+                plancha_plate_number: vehicleToEdit.plancha_plate_number,
+                driver_id: vehicleToEdit.driver_id,
+              }
+            : null
+        }
+        drivers={drivers}
+      />
 
       <AlertDialog
         open={!!vehicleToDelete}

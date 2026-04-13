@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -45,6 +46,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
 import { createUser, updateUser, deleteUser } from "../actions/auth-actions";
+import { getEnabledModules } from "@/lib/module-registry";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Administrador",
@@ -58,12 +60,15 @@ const ROLE_COLORS: Record<string, string> = {
   viewer: "bg-gray-100 text-gray-800",
 };
 
+const enabledModules = getEnabledModules();
+
 interface UserItem {
   userId: number;
   email: string;
   fullName: string;
   role: string;
   createdAt: Date;
+  modulePermissions: { moduleId: string }[];
 }
 
 interface Props {
@@ -77,12 +82,32 @@ export function UserListClient({ users }: Props) {
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
   const [userToEdit, setUserToEdit] = useState<UserItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createModules, setCreateModules] = useState<string[]>(
+    enabledModules.map((m) => m.id)
+  );
+  const [editModules, setEditModules] = useState<string[]>([]);
 
   const filtered = users.filter(
     (u) =>
       u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const toggleCreateModule = (moduleId: string) => {
+    setCreateModules((prev) =>
+      prev.includes(moduleId)
+        ? prev.filter((m) => m !== moduleId)
+        : [...prev, moduleId]
+    );
+  };
+
+  const toggleEditModule = (moduleId: string) => {
+    setEditModules((prev) =>
+      prev.includes(moduleId)
+        ? prev.filter((m) => m !== moduleId)
+        : [...prev, moduleId]
+    );
+  };
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -93,10 +118,12 @@ export function UserListClient({ users }: Props) {
       email: fd.get("email") as string,
       password: fd.get("password") as string,
       role: fd.get("role") as "admin" | "dispatcher" | "viewer",
+      modules: createModules,
     });
     setIsSubmitting(false);
     if (result.success) {
       setIsCreateOpen(false);
+      setCreateModules(enabledModules.map((m) => m.id));
       toast.success("Usuario creado");
       router.refresh();
     } else {
@@ -115,6 +142,7 @@ export function UserListClient({ users }: Props) {
       email: fd.get("email") as string,
       role: fd.get("role") as "admin" | "dispatcher" | "viewer",
       ...(password ? { password } : {}),
+      modules: editModules,
     });
     setIsSubmitting(false);
     if (result.success) {
@@ -138,6 +166,11 @@ export function UserListClient({ users }: Props) {
     } else {
       toast.error(result.error);
     }
+  };
+
+  const openEdit = (user: UserItem) => {
+    setUserToEdit(user);
+    setEditModules(user.modulePermissions.map((p) => p.moduleId));
   };
 
   return (
@@ -192,6 +225,18 @@ export function UserListClient({ users }: Props) {
                   <Badge className={ROLE_COLORS[user.role]}>
                     {ROLE_LABELS[user.role]}
                   </Badge>
+                  {user.role !== "admin" && (
+                    <div className="flex gap-1">
+                      {user.modulePermissions.map((p) => {
+                        const mod = enabledModules.find((m) => m.id === p.moduleId);
+                        return mod ? (
+                          <Badge key={p.moduleId} variant="outline" className="text-xs">
+                            {mod.label}
+                          </Badge>
+                        ) : null;
+                      })}
+                    </div>
+                  )}
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -200,7 +245,7 @@ export function UserListClient({ users }: Props) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setUserToEdit(user)}>
+                    <DropdownMenuItem onClick={() => openEdit(user)}>
                       <Pen className="h-4 w-4 mr-2" />
                       Editar
                     </DropdownMenuItem>
@@ -253,6 +298,23 @@ export function UserListClient({ users }: Props) {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>Modulos permitidos</Label>
+              <div className="space-y-2 rounded-md border p-3">
+                {enabledModules.map((mod) => (
+                  <div key={mod.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`create-${mod.id}`}
+                      checked={createModules.includes(mod.id)}
+                      onCheckedChange={() => toggleCreateModule(mod.id)}
+                    />
+                    <Label htmlFor={`create-${mod.id}`} className="font-normal cursor-pointer">
+                      {mod.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </div>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Creando..." : "Crear Usuario"}
             </Button>
@@ -291,6 +353,23 @@ export function UserListClient({ users }: Props) {
                   <SelectItem value="viewer">Observador</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Modulos permitidos</Label>
+              <div className="space-y-2 rounded-md border p-3">
+                {enabledModules.map((mod) => (
+                  <div key={mod.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`edit-${mod.id}`}
+                      checked={editModules.includes(mod.id)}
+                      onCheckedChange={() => toggleEditModule(mod.id)}
+                    />
+                    <Label htmlFor={`edit-${mod.id}`} className="font-normal cursor-pointer">
+                      {mod.label}
+                    </Label>
+                  </div>
+                ))}
+              </div>
             </div>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Actualizando..." : "Actualizar"}

@@ -28,6 +28,7 @@ export const authConfig: NextAuthConfig = {
         token.userId = Number(user.id);
         token.role = (user as { role: string }).role;
         token.fullName = user.name;
+        token.modules = (user as { modules: string[] }).modules ?? [];
       }
       return token;
     },
@@ -36,6 +37,7 @@ export const authConfig: NextAuthConfig = {
         session.user.userId = token.userId as number;
         session.user.role = token.role as string;
         session.user.fullName = token.fullName as string;
+        session.user.modules = token.modules as string[];
       }
       return session;
     },
