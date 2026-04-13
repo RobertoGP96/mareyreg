@@ -3,17 +3,28 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, IdCardIcon, Phone, IdCardLanyard, Truck, RouteIcon } from "lucide-react";
-import type { Driver, Vehicle, Trip } from "@/types";
+import { ArrowLeft, IdCardIcon, Phone, IdCardLanyard, Truck, RouteIcon, Building2, Box } from "lucide-react";
+import type { Vehicle, Entity, Trip, Container } from "@/types";
+
+interface DriverInfo {
+  driverId: number;
+  fullName: string;
+  identificationNumber: string;
+  phoneNumber: string;
+  operativeLicense: string | null;
+  entity: Entity;
+}
+
+type TripWithContainers = Trip & { containers: Container[] };
 
 interface Props {
-  driver: Driver;
+  driver: DriverInfo;
   vehicles: Vehicle[];
-  trips: Trip[];
+  trips: TripWithContainers[];
 }
 
 export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
-  const vehicle = vehicles[0]; // Primary vehicle
+  const vehicle = vehicles[0];
 
   return (
     <div className="space-y-6">
@@ -31,6 +42,11 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
       <div className="bg-card p-6 rounded-lg shadow-sm border">
         <h2 className="text-lg font-semibold mb-4">Informacion del Conductor</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">Entidad:</span>
+            <Badge variant="secondary">{driver.entity.name}</Badge>
+          </div>
           <div className="flex items-center gap-2">
             <IdCardIcon className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium">ID:</span>
@@ -105,10 +121,16 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
                     <span className="font-semibold">${trip.tripPayment}</span>
                   )}
                 </div>
-                {trip.containerNumber && (
-                  <p className="text-muted-foreground mt-1">
-                    Contenedor: {trip.containerNumber}
-                  </p>
+                {trip.containers.length > 0 && (
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <Box className="h-3.5 w-3.5 text-muted-foreground" />
+                    {trip.containers.map((c) => (
+                      <Badge key={c.containerId} variant="outline" className="text-xs">
+                        {c.serialNumber}
+                        {c.type && ` (${c.type})`}
+                      </Badge>
+                    ))}
+                  </div>
                 )}
               </div>
             ))}

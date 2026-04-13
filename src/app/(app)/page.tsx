@@ -1,20 +1,22 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { Users, Truck, RouteIcon, Shirt, Package, Warehouse, ClipboardList } from "lucide-react";
+import { Users, Truck, RouteIcon, Shirt, Package, Warehouse, ClipboardList, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getDrivers } from "@/modules/fleet/queries/driver-queries";
 import { getVehicles } from "@/modules/fleet/queries/vehicle-queries";
+import { getEntities } from "@/modules/fleet/queries/entity-queries";
 import { getTrips } from "@/modules/logistics/queries/trip-queries";
 import { getPacaInventoryStats } from "@/modules/pacas/queries/paca-queries";
 import { getProducts } from "@/modules/inventory/queries/product-queries";
 import { getWarehouses } from "@/modules/inventory/queries/warehouse-queries";
 
 export default async function Home() {
-  const [drivers, vehicles, trips, pacasStats, products, warehouses] =
+  const [drivers, vehicles, entities, trips, pacasStats, products, warehouses] =
     await Promise.all([
       getDrivers(),
       getVehicles(),
+      getEntities(),
       getTrips(),
       getPacaInventoryStats(),
       getProducts(),
@@ -22,6 +24,7 @@ export default async function Home() {
     ]);
 
   const stats = [
+    { label: "Entidades", count: entities.length, href: "/entities", icon: Building2 },
     { label: "Conductores", count: drivers.length, href: "/drivers", icon: Users },
     { label: "Vehiculos", count: vehicles.length, href: "/vehicles", icon: Truck },
     { label: "Viajes", count: trips.length, href: "/trips", icon: RouteIcon },

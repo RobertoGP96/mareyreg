@@ -38,6 +38,7 @@ import {
   UserPlus,
   Eye,
   Copy,
+  Building2,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -46,19 +47,20 @@ import {
   deleteDriver,
 } from "../actions/driver-actions";
 import { DriverForm } from "./driver-form";
-import type { Driver } from "@/types";
+import type { DriverWithEntity, Entity } from "@/types";
 
 interface Props {
-  initialDrivers: Driver[];
+  initialDrivers: DriverWithEntity[];
   vehicles: unknown[];
+  entities: Entity[];
 }
 
-export function DriverListClient({ initialDrivers }: Props) {
+export function DriverListClient({ initialDrivers, entities }: Props) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [driverToDelete, setDriverToDelete] = useState<number | null>(null);
-  const [driverToEdit, setDriverToEdit] = useState<Driver | null>(null);
+  const [driverToEdit, setDriverToEdit] = useState<DriverWithEntity | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const sortedDrivers = [...initialDrivers].sort((a, b) =>
@@ -76,21 +78,18 @@ export function DriverListClient({ initialDrivers }: Props) {
         .includes(searchQuery.toLowerCase()) ||
       driver.operativeLicense
         ?.toLowerCase()
+        .includes(searchQuery.toLowerCase()) ||
+      driver.entity.name
+        .toLowerCase()
         .includes(searchQuery.toLowerCase())
   );
 
   const handleCreateDriver = async (data: {
+    entity_id: number;
     full_name: string;
     identification_number: string;
     phone_number: string;
     operative_license?: string;
-    vehicleData?: {
-      name?: string;
-      cuña_circulation_number?: string;
-      plancha_circulation_number?: string;
-      cuña_plate_number?: string;
-      plancha_plate_number?: string;
-    };
   }) => {
     setIsSubmitting(true);
     const result = await createDriver(data);
@@ -110,6 +109,7 @@ export function DriverListClient({ initialDrivers }: Props) {
   };
 
   const handleUpdateDriver = async (data: {
+    entity_id: number;
     full_name: string;
     identification_number: string;
     phone_number: string;
@@ -150,7 +150,7 @@ export function DriverListClient({ initialDrivers }: Props) {
     }
   };
 
-  const handleCopyContactInfo = async (driver: Driver) => {
+  const handleCopyContactInfo = async (driver: DriverWithEntity) => {
     const contactInfo =
       `Nombre: ${driver.fullName}\nTelefono: ${driver.phoneNumber}`.trim();
     try {
@@ -215,9 +215,15 @@ export function DriverListClient({ initialDrivers }: Props) {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0 overflow-hidden">
-                      <h3 className="text-lg font-semibold text-foreground mb-2 truncate">
-                        {driver.fullName}
-                      </h3>
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="text-lg font-semibold text-foreground truncate">
+                          {driver.fullName}
+                        </h3>
+                        <Badge variant="secondary" className="shrink-0">
+                          <Building2 className="w-3 h-3 mr-1" />
+                          {driver.entity.name}
+                        </Badge>
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
                         <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
                           <IdCardIcon className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -310,6 +316,7 @@ export function DriverListClient({ initialDrivers }: Props) {
         onOpenChange={setIsCreateDialogOpen}
         onSubmit={handleCreateDriver}
         isLoading={isSubmitting}
+        entities={entities}
       />
 
       <DriverForm
@@ -318,6 +325,7 @@ export function DriverListClient({ initialDrivers }: Props) {
         onSubmit={handleUpdateDriver}
         isLoading={isSubmitting}
         driver={driverToEdit}
+        entities={entities}
       />
 
       <AlertDialog

@@ -13,6 +13,7 @@ export async function createVehicle(data: {
   driver_id?: number;
   createDriver?: boolean;
   driverData?: {
+    entity_id: number;
     full_name: string;
     identification_number: string;
     phone_number: string;
@@ -26,6 +27,7 @@ export async function createVehicle(data: {
     if (data.createDriver && data.driverData) {
       const newDriver = await db.driver.create({
         data: {
+          entityId: data.driverData.entity_id,
           fullName: data.driverData.full_name,
           identificationNumber: data.driverData.identification_number,
           phoneNumber: data.driverData.phone_number,

@@ -12,9 +12,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Driver } from "@/types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { Entity } from "@/types";
 
 const driverSchema = z.object({
+  entity_id: z.number().min(1, "La entidad es requerida"),
   full_name: z.string().min(1, "El nombre es requerido"),
   identification_number: z.string().min(1, "La identificacion es requerida"),
   phone_number: z.string().min(1, "El telefono es requerido"),
@@ -23,12 +31,21 @@ const driverSchema = z.object({
 
 type DriverFormData = z.infer<typeof driverSchema>;
 
+interface DriverForEdit {
+  entityId: number;
+  fullName: string;
+  identificationNumber: string;
+  phoneNumber: string;
+  operativeLicense: string | null;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (data: DriverFormData) => Promise<void>;
   isLoading: boolean;
-  driver?: Driver | null;
+  driver?: DriverForEdit | null;
+  entities: Entity[];
 }
 
 export function DriverForm({
@@ -37,10 +54,12 @@ export function DriverForm({
   onSubmit,
   isLoading,
   driver,
+  entities,
 }: Props) {
   const form = useForm<DriverFormData>({
     resolver: zodResolver(driverSchema),
     defaultValues: {
+      entity_id: driver?.entityId ?? 0,
       full_name: driver?.fullName ?? "",
       identification_number: driver?.identificationNumber ?? "",
       phone_number: driver?.phoneNumber ?? "",
@@ -48,9 +67,9 @@ export function DriverForm({
     },
   });
 
-  // Reset form when driver changes
   if (driver) {
     form.reset({
+      entity_id: driver.entityId,
       full_name: driver.fullName,
       identification_number: driver.identificationNumber,
       phone_number: driver.phoneNumber,
@@ -72,6 +91,34 @@ export function DriverForm({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="entity_id">Entidad</Label>
+            <Select
+              value={form.watch("entity_id")?.toString() || ""}
+              onValueChange={(value) =>
+                form.setValue("entity_id", parseInt(value, 10))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar entidad" />
+              </SelectTrigger>
+              <SelectContent>
+                {entities.map((entity) => (
+                  <SelectItem
+                    key={entity.entityId}
+                    value={entity.entityId.toString()}
+                  >
+                    {entity.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {form.formState.errors.entity_id && (
+              <p className="text-red-500 text-sm mt-1">
+                {form.formState.errors.entity_id.message}
+              </p>
+            )}
+          </div>
           <div>
             <Label htmlFor="full_name">Nombre Completo</Label>
             <Input id="full_name" {...form.register("full_name")} />

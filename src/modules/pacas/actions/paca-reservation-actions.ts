@@ -4,6 +4,13 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 
+const revalidateAll = () => {
+  revalidatePath("/pacas");
+  revalidatePath("/pacas/reservaciones");
+  revalidatePath("/pacas/ventas");
+  revalidatePath("/pacas/disponibilidad");
+};
+
 export async function createReservation(data: {
   categoryId: number;
   quantity: number;
@@ -48,13 +55,114 @@ export async function createReservation(data: {
       return res;
     });
 
-    revalidatePath("/pacas");
-    revalidatePath("/pacas/reservaciones");
-    revalidatePath("/pacas/disponibilidad");
+    revalidateAll();
     return { success: true, data: { reservationId: reservation.reservationId } };
   } catch (error) {
     console.error("Error creating reservation:", error);
     return { success: false, error: "Error al crear la reservacion" };
+  }
+}
+
+export async function updateReservation(
+  id: number,
+  data: {
+    clientName?: string;
+    clientPhone?: string;
+    clientEmail?: string;
+    reservationDate?: string;
+    expirationDate?: string;
+    notes?: string;
+    quantity?: number;
+  }
+): Promise<ActionResult<void>> {
+  try {
+    const reservation = await db.pacaReservation.findUnique({ where: { reservationId: id } });
+    if (!reservation || reservation.status !== "active") {
+      return { success: false, error: "La reservacion no esta activa" };
+    }
+
+    // Si cambia la cantidad, ajustar inventario
+    if (data.quantity !== undefined && data.quantity !== reservation.quantity) {
+      const diff = data.quantity - reservation.quantity;
+      const inventory = await db.pacaInventory.findUnique({
+        where: { categoryId: reservation.categoryId },
+      });
+
+      if (diff > 0 && (!inventory || inventory.available < diff)) {
+        return { success: false, error: `No hay suficiente stock. Disponible: ${inventory?.available ?? 0}` };
+      }
+
+      await db.$transaction(async (tx) => {
+        await tx.pacaReservation.update({
+          where: { reservationId: id },
+          data: {
+            ...(data.clientName !== undefined && { clientName: data.clientName }),
+            ...(data.clientPhone !== undefined && { clientPhone: data.clientPhone || null }),
+            ...(data.clientEmail !== undefined && { clientEmail: data.clientEmail || null }),
+            ...(data.reservationDate !== undefined && { reservationDate: data.reservationDate }),
+            ...(data.expirationDate !== undefined && { expirationDate: data.expirationDate || null }),
+            ...(data.notes !== undefined && { notes: data.notes || null }),
+            quantity: data.quantity,
+          },
+        });
+
+        await tx.pacaInventory.update({
+          where: { categoryId: reservation.categoryId },
+          data: {
+            available: { decrement: diff },
+            reserved: { increment: diff },
+          },
+        });
+      });
+    } else {
+      await db.pacaReservation.update({
+        where: { reservationId: id },
+        data: {
+          ...(data.clientName !== undefined && { clientName: data.clientName }),
+          ...(data.clientPhone !== undefined && { clientPhone: data.clientPhone || null }),
+          ...(data.clientEmail !== undefined && { clientEmail: data.clientEmail || null }),
+          ...(data.reservationDate !== undefined && { reservationDate: data.reservationDate }),
+          ...(data.expirationDate !== undefined && { expirationDate: data.expirationDate || null }),
+          ...(data.notes !== undefined && { notes: data.notes || null }),
+        },
+      });
+    }
+
+    revalidateAll();
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error("Error updating reservation:", error);
+    return { success: false, error: "Error al actualizar la reservacion" };
+  }
+}
+
+export async function deleteReservation(id: number): Promise<ActionResult<void>> {
+  try {
+    const reservation = await db.pacaReservation.findUnique({ where: { reservationId: id } });
+    if (!reservation) {
+      return { success: false, error: "Reservacion no encontrada" };
+    }
+
+    await db.$transaction(async (tx) => {
+      // Si estaba activa, devolver al inventario
+      if (reservation.status === "active") {
+        await tx.pacaInventory.update({
+          where: { categoryId: reservation.categoryId },
+          data: {
+            reserved: { decrement: reservation.quantity },
+            available: { increment: reservation.quantity },
+          },
+        });
+      }
+
+      await tx.pacaReservation.delete({ where: { reservationId: id } });
+    });
+
+    revalidateAll();
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error("Error deleting reservation:", error);
+    return { success: false, error: "Error al eliminar la reservacion" };
   }
 }
 
@@ -80,9 +188,7 @@ export async function cancelReservation(id: number): Promise<ActionResult<void>>
       });
     });
 
-    revalidatePath("/pacas");
-    revalidatePath("/pacas/reservaciones");
-    revalidatePath("/pacas/disponibilidad");
+    revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
     console.error("Error cancelling reservation:", error);
@@ -90,7 +196,16 @@ export async function cancelReservation(id: number): Promise<ActionResult<void>>
   }
 }
 
-export async function completeReservation(id: number): Promise<ActionResult<void>> {
+// Completar reservacion CON datos de venta proporcionados por el usuario
+export async function completeReservation(
+  id: number,
+  saleData: {
+    salePrice: number;
+    paymentMethod?: string;
+    saleDate: string;
+    notes?: string;
+  }
+): Promise<ActionResult<void>> {
   try {
     const reservation = await db.pacaReservation.findUnique({ where: { reservationId: id } });
     if (!reservation || reservation.status !== "active") {
@@ -101,7 +216,6 @@ export async function completeReservation(id: number): Promise<ActionResult<void
       where: { categoryId: reservation.categoryId },
     });
 
-    // Calcular costo promedio para descontar
     const totalInStock = (inventory?.available ?? 0) + (inventory?.reserved ?? 0);
     const avgCost = totalInStock > 0 ? Number(inventory?.totalCost ?? 0) / totalInStock : 0;
     const costToDeduct = avgCost * reservation.quantity;
@@ -121,25 +235,21 @@ export async function completeReservation(id: number): Promise<ActionResult<void
         },
       });
 
-      // Crear registro de venta automaticamente
       await tx.pacaSale.create({
         data: {
           categoryId: reservation.categoryId,
           quantity: reservation.quantity,
-          salePrice: avgCost, // Precio de costo promedio como referencia
+          salePrice: saleData.salePrice,
           clientName: reservation.clientName,
           clientPhone: reservation.clientPhone,
-          paymentMethod: null,
-          saleDate: new Date().toISOString().split("T")[0],
-          notes: `Venta desde reservacion #${reservation.reservationId} - Actualizar precio de venta`,
+          paymentMethod: saleData.paymentMethod || null,
+          saleDate: saleData.saleDate,
+          notes: saleData.notes || `Venta desde reservacion #${reservation.reservationId}`,
         },
       });
     });
 
-    revalidatePath("/pacas");
-    revalidatePath("/pacas/reservaciones");
-    revalidatePath("/pacas/ventas");
-    revalidatePath("/pacas/disponibilidad");
+    revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
     console.error("Error completing reservation:", error);

@@ -13,6 +13,7 @@ import {
   BarChart3,
   Warehouse,
   ArrowLeftRight,
+  Building2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,6 +38,7 @@ export const modules: AppModule[] = [
     icon: Truck,
     enabled: true,
     routes: [
+      { name: "Entidades", href: "/entities", icon: Building2 },
       { name: "Conductores", href: "/drivers", icon: Users },
       { name: "Vehiculos", href: "/vehicles", icon: Truck },
     ],

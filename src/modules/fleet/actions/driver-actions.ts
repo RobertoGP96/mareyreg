@@ -6,6 +6,7 @@ import type { ActionResult } from "@/types";
 import { getDriverByIdentification } from "../queries/driver-queries";
 
 export async function createDriver(data: {
+  entity_id: number;
   full_name: string;
   identification_number: string;
   phone_number: string;
@@ -19,7 +20,6 @@ export async function createDriver(data: {
   };
 }): Promise<ActionResult<{ driver_id: number }>> {
   try {
-    // Check for duplicate
     const existing = await getDriverByIdentification(
       data.identification_number
     );
@@ -32,6 +32,7 @@ export async function createDriver(data: {
 
     const driver = await db.driver.create({
       data: {
+        entityId: data.entity_id,
         fullName: data.full_name,
         identificationNumber: data.identification_number,
         phoneNumber: data.phone_number,
@@ -39,7 +40,6 @@ export async function createDriver(data: {
       },
     });
 
-    // Create vehicle if provided
     if (data.vehicleData) {
       await db.vehicle.create({
         data: {
@@ -67,6 +67,7 @@ export async function createDriver(data: {
 export async function updateDriver(
   id: number,
   data: {
+    entity_id?: number;
     full_name?: string;
     identification_number?: string;
     phone_number?: string;
@@ -77,6 +78,7 @@ export async function updateDriver(
     await db.driver.update({
       where: { driverId: id },
       data: {
+        ...(data.entity_id !== undefined && { entityId: data.entity_id }),
         ...(data.full_name !== undefined && { fullName: data.full_name }),
         ...(data.identification_number !== undefined && {
           identificationNumber: data.identification_number,

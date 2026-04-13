@@ -6,23 +6,30 @@ import type { ActionResult } from "@/types";
 
 export async function createTrip(data: {
   driver_id: number;
-  container_number?: string;
   load_date?: string;
   load_time?: string;
   trip_payment?: string;
   province?: string;
   product?: string;
+  containers?: { serial_number: string; type?: string }[];
 }): Promise<ActionResult<{ trip_id: number }>> {
   try {
     const trip = await db.trip.create({
       data: {
         driverId: data.driver_id,
-        containerNumber: data.container_number || null,
         loadDate: data.load_date || null,
         loadTime: data.load_time || null,
         tripPayment: data.trip_payment || null,
         province: data.province || null,
         product: data.product || null,
+        ...(data.containers?.length && {
+          containers: {
+            create: data.containers.map((c) => ({
+              serialNumber: c.serial_number,
+              type: c.type || null,
+            })),
+          },
+        }),
       },
     });
 
@@ -39,7 +46,6 @@ export async function updateTrip(
   id: number,
   data: {
     driver_id?: number;
-    container_number?: string;
     load_date?: string;
     load_time?: string;
     trip_payment?: string;
@@ -52,9 +58,6 @@ export async function updateTrip(
       where: { tripId: id },
       data: {
         ...(data.driver_id !== undefined && { driverId: data.driver_id }),
-        ...(data.container_number !== undefined && {
-          containerNumber: data.container_number,
-        }),
         ...(data.load_date !== undefined && { loadDate: data.load_date }),
         ...(data.load_time !== undefined && { loadTime: data.load_time }),
         ...(data.trip_payment !== undefined && {

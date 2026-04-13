@@ -36,6 +36,14 @@ export const CARGO_TYPES = [
   { value: "general", label: "General" },
 ] as const;
 
+export const CONTAINER_TYPES = [
+  { value: "20ft", label: "20 pies" },
+  { value: "40ft", label: "40 pies" },
+  { value: "40ft_hc", label: "40 pies HC" },
+  { value: "reefer", label: "Refrigerado" },
+  { value: "other", label: "Otro" },
+] as const;
+
 export const MOVEMENT_TYPES = [
   { value: "entry", label: "Entrada" },
   { value: "exit", label: "Salida" },

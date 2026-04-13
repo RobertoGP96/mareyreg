@@ -33,21 +33,30 @@ import {
   Plus,
   Pen,
   RouteIcon,
+  Box,
 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteTrip } from "../actions/trip-actions";
+import { createContainer, deleteContainer } from "../actions/container-actions";
+import { ContainerForm } from "./container-form";
 import type { Driver } from "@/types";
+
+interface ContainerRow {
+  containerId: number;
+  serialNumber: string;
+  type: string | null;
+}
 
 interface TripRow {
   tripId: number;
   driverId: number;
-  containerNumber: string | null;
   loadDate: string | null;
   loadTime: string | null;
   tripPayment: string | null;
   province: string | null;
   product: string | null;
   driverFullName: string | null;
+  containers: ContainerRow[];
 }
 
 interface Props {
@@ -60,6 +69,11 @@ export function TripListClient({ initialTrips }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [tripToDelete, setTripToDelete] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [containerTripId, setContainerTripId] = useState<number | null>(null);
+  const [containerToDelete, setContainerToDelete] = useState<{
+    id: number;
+    serial: string;
+  } | null>(null);
 
   const filteredTrips = initialTrips.filter(
     (trip) =>
@@ -68,7 +82,9 @@ export function TripListClient({ initialTrips }: Props) {
         .includes(searchQuery.toLowerCase()) ||
       trip.province?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       trip.product?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      trip.containerNumber?.toLowerCase().includes(searchQuery.toLowerCase())
+      trip.containers.some((c) =>
+        c.serialNumber.toLowerCase().includes(searchQuery.toLowerCase())
+      )
   );
 
   const handleDeleteTrip = async () => {
@@ -80,6 +96,43 @@ export function TripListClient({ initialTrips }: Props) {
     if (result.success) {
       setTripToDelete(null);
       toast.success("Viaje eliminado exitosamente");
+      router.refresh();
+    } else {
+      toast.error(result.error);
+    }
+  };
+
+  const handleAddContainer = async (data: {
+    serial_number: string;
+    type?: string;
+  }) => {
+    if (!containerTripId) return;
+    setIsSubmitting(true);
+    const result = await createContainer({
+      trip_id: containerTripId,
+      serial_number: data.serial_number,
+      type: data.type,
+    });
+    setIsSubmitting(false);
+
+    if (result.success) {
+      setContainerTripId(null);
+      toast.success("Contenedor agregado exitosamente");
+      router.refresh();
+    } else {
+      toast.error(result.error);
+    }
+  };
+
+  const handleDeleteContainer = async () => {
+    if (!containerToDelete) return;
+    setIsSubmitting(true);
+    const result = await deleteContainer(containerToDelete.id);
+    setIsSubmitting(false);
+
+    if (result.success) {
+      setContainerToDelete(null);
+      toast.success("Contenedor eliminado exitosamente");
       router.refresh();
     } else {
       toast.error(result.error);
@@ -155,13 +208,32 @@ export function TripListClient({ initialTrips }: Props) {
                             {trip.tripPayment}
                           </div>
                         )}
-                        {trip.containerNumber && (
-                          <div>
-                            <span className="font-medium">Contenedor:</span>{" "}
-                            {trip.containerNumber}
-                          </div>
-                        )}
                       </div>
+                      {/* Containers */}
+                      {trip.containers.length > 0 && (
+                        <div className="flex items-center gap-2 mt-3 flex-wrap">
+                          <Box className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm font-medium text-muted-foreground">
+                            Contenedores:
+                          </span>
+                          {trip.containers.map((c) => (
+                            <Badge
+                              key={c.containerId}
+                              variant="secondary"
+                              className="text-xs cursor-pointer hover:bg-destructive/10"
+                              onClick={() =>
+                                setContainerToDelete({
+                                  id: c.containerId,
+                                  serial: c.serialNumber,
+                                })
+                              }
+                            >
+                              {c.serialNumber}
+                              {c.type && ` (${c.type})`}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <DropdownMenu>
@@ -171,6 +243,13 @@ export function TripListClient({ initialTrips }: Props) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={() => setContainerTripId(trip.tripId)}
+                        className="flex items-center space-x-2"
+                      >
+                        <Box className="h-4 w-4" />
+                        <span>Agregar contenedor</span>
+                      </DropdownMenuItem>
                       <DropdownMenuItem className="flex items-center space-x-2">
                         <Pen className="h-4 w-4" />
                         <span>Editar</span>
@@ -196,6 +275,15 @@ export function TripListClient({ initialTrips }: Props) {
         </div>
       </div>
 
+      {/* Container Form Dialog */}
+      <ContainerForm
+        open={!!containerTripId}
+        onOpenChange={(open) => !open && setContainerTripId(null)}
+        onSubmit={handleAddContainer}
+        isLoading={isSubmitting}
+      />
+
+      {/* Delete Trip Dialog */}
       <AlertDialog
         open={!!tripToDelete}
         onOpenChange={() => setTripToDelete(null)}
@@ -204,13 +292,40 @@ export function TripListClient({ initialTrips }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion eliminara permanentemente el viaje.
+              Esta accion eliminara permanentemente el viaje y todos sus
+              contenedores asociados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteTrip}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Container Dialog */}
+      <AlertDialog
+        open={!!containerToDelete}
+        onOpenChange={() => setContainerToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar contenedor?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminara el contenedor {containerToDelete?.serial} de este
+              viaje.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteContainer}
               className="bg-red-600 hover:bg-red-700"
               disabled={isSubmitting}
             >

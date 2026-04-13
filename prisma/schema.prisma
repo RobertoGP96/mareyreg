@@ -49,8 +49,19 @@ model AuditLog {
 }
 
 // =============================================
-// FLEET MODULE - Drivers & Vehicles
+// FLEET MODULE - Entities, Drivers & Vehicles
 // =============================================
+
+model Entity {
+  entityId  Int      @id @default(autoincrement()) @map("entity_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  drivers Driver[]
+
+  @@map("entities")
+}
 
 enum DriverStatus {
   active
@@ -65,6 +76,7 @@ enum VehicleStatus {
 
 model Driver {
   driverId             Int          @id @default(autoincrement()) @map("driver_id")
+  entityId             Int          @map("entity_id")
   fullName             String       @map("full_name")
   identificationNumber String       @unique @map("identification_number")
   phoneNumber          String       @map("phone_number")
@@ -73,9 +85,11 @@ model Driver {
   createdAt            DateTime     @default(now()) @map("created_at")
   updatedAt            DateTime     @default(now()) @updatedAt @map("updated_at")
 
+  entity   Entity    @relation(fields: [entityId], references: [entityId])
   vehicles Vehicle[]
   trips    Trip[]
 
+  @@index([entityId])
   @@index([identificationNumber])
   @@index([fullName])
   @@map("drivers")
@@ -135,26 +149,40 @@ model Trip {
   tripId          Int        @id @default(autoincrement()) @map("trip_id")
   driverId        Int        @map("driver_id")
   routeId         Int?       @map("route_id")
-  containerNumber String?    @map("container_number")
   loadDate        String?    @map("load_date")
-  loadTime        String?    @map("load_time")
-  tripPayment     String?    @map("trip_payment")
-  province        String?
-  product         String?
-  status          TripStatus @default(completed)
-  createdAt       DateTime   @default(now()) @map("created_at")
-  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at")
+  loadTime    String?    @map("load_time")
+  tripPayment String?    @map("trip_payment")
+  province    String?
+  product     String?
+  status      TripStatus @default(completed)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @default(now()) @updatedAt @map("updated_at")
 
-  driver   Driver    @relation(fields: [driverId], references: [driverId])
-  route    Route?    @relation(fields: [routeId], references: [routeId])
-  cargo    Cargo[]
-  payments Payment[]
+  driver     Driver      @relation(fields: [driverId], references: [driverId])
+  route      Route?      @relation(fields: [routeId], references: [routeId])
+  containers Container[]
+  cargo      Cargo[]
+  payments   Payment[]
   stockMovements StockMovement[]
 
   @@index([driverId])
   @@index([loadDate])
   @@index([province])
   @@map("trips")
+}
+
+model Container {
+  containerId  Int      @id @default(autoincrement()) @map("container_id")
+  tripId       Int      @map("trip_id")
+  serialNumber String   @map("serial_number")
+  type         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  trip Trip @relation(fields: [tripId], references: [tripId], onDelete: Cascade)
+
+  @@index([tripId])
+  @@index([serialNumber])
+  @@map("containers")
 }
 
 model Cargo {
