@@ -34,13 +34,13 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">Configuracion</h1>
+      <h1 className="text-3xl font-bold text-foreground">Configuracion</h1>
 
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">
+      <div className="bg-card p-6 rounded-lg shadow-sm border">
+        <h2 className="text-xl font-semibold text-foreground mb-4">
           Datos de la Base de Datos
         </h2>
-        <p className="text-gray-600 mb-4">
+        <p className="text-muted-foreground mb-4">
           Esta accion borrara permanentemente todos los conductores, vehiculos y
           viajes de la base de datos. Esta accion no se puede deshacer.
         </p>

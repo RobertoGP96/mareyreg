@@ -28,22 +28,22 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
       </div>
 
       {/* Driver Info */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="bg-card p-6 rounded-lg shadow-sm border">
         <h2 className="text-lg font-semibold mb-4">Informacion del Conductor</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <IdCardIcon className="h-4 w-4 text-gray-400" />
+            <IdCardIcon className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium">ID:</span>
             <span>{driver.identificationNumber}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Phone className="h-4 w-4 text-gray-400" />
+            <Phone className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium">Telefono:</span>
             <span>{driver.phoneNumber}</span>
           </div>
           {driver.operativeLicense && (
             <div className="flex items-center gap-2">
-              <IdCardLanyard className="h-4 w-4 text-gray-400" />
+              <IdCardLanyard className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium">Licencia:</span>
               <Badge variant="secondary">{driver.operativeLicense}</Badge>
             </div>
@@ -53,7 +53,7 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
 
       {/* Vehicle */}
       {vehicle && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div className="bg-card p-6 rounded-lg shadow-sm border">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Truck className="h-5 w-5" />
             Vehiculo Asignado
@@ -81,7 +81,7 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
       )}
 
       {/* Trips */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border">
+      <div className="bg-card p-6 rounded-lg shadow-sm border">
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <RouteIcon className="h-5 w-5" />
           Viajes ({trips.length})
@@ -106,7 +106,7 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
                   )}
                 </div>
                 {trip.containerNumber && (
-                  <p className="text-gray-500 mt-1">
+                  <p className="text-muted-foreground mt-1">
                     Contenedor: {trip.containerNumber}
                   </p>
                 )}
@@ -114,7 +114,7 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
             ))}
           </div>
         ) : (
-          <p className="text-gray-500">No hay viajes registrados.</p>
+          <p className="text-muted-foreground">No hay viajes registrados.</p>
         )}
       </div>
     </div>

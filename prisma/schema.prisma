@@ -234,13 +234,59 @@ model Paca {
   createdAt     DateTime   @default(now()) @map("created_at")
   updatedAt     DateTime   @default(now()) @updatedAt @map("updated_at")
 
-  category  PacaCategory @relation(fields: [categoryId], references: [categoryId])
-  warehouse Warehouse?   @relation(fields: [warehouseId], references: [warehouseId])
+  category     PacaCategory      @relation(fields: [categoryId], references: [categoryId])
+  warehouse    Warehouse?        @relation(fields: [warehouseId], references: [warehouseId])
+  reservations PacaReservation[]
+  sales        PacaSale[]
 
   @@index([categoryId])
   @@index([status])
   @@index([arrivalDate])
   @@map("pacas")
+}
+
+enum ReservationStatus {
+  active
+  completed
+  cancelled
+  expired
+}
+
+model PacaReservation {
+  reservationId   Int               @id @default(autoincrement()) @map("reservation_id")
+  pacaId          Int               @map("paca_id")
+  clientName      String            @map("client_name")
+  clientPhone     String?           @map("client_phone")
+  clientEmail     String?           @map("client_email")
+  reservationDate String            @map("reservation_date")
+  expirationDate  String?           @map("expiration_date")
+  notes           String?
+  status          ReservationStatus @default(active)
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  paca Paca @relation(fields: [pacaId], references: [pacaId])
+
+  @@index([pacaId])
+  @@index([status])
+  @@map("paca_reservations")
+}
+
+model PacaSale {
+  saleId        Int      @id @default(autoincrement()) @map("sale_id")
+  pacaId        Int      @map("paca_id")
+  clientName    String   @map("client_name")
+  clientPhone   String?  @map("client_phone")
+  saleDate      String   @map("sale_date")
+  salePrice     Decimal  @map("sale_price")
+  paymentMethod String?  @map("payment_method")
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  paca Paca @relation(fields: [pacaId], references: [pacaId])
+
+  @@index([pacaId])
+  @@index([saleDate])
+  @@map("paca_sales")
 }
 
 // =============================================

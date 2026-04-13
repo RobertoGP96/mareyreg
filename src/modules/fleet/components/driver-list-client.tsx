@@ -163,10 +163,10 @@ export function DriverListClient({ initialDrivers }: Props) {
 
   return (
     <>
-      <div className="bg-white shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b border-gray-200">
+      <div className="bg-card shadow-sm rounded-lg border">
+        <div className="px-6 py-4 border-b border-border">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-medium text-gray-900">
+            <h2 className="text-lg font-medium text-foreground">
               Lista de Conductores
             </h2>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
@@ -196,13 +196,13 @@ export function DriverListClient({ initialDrivers }: Props) {
             filteredDrivers.map((driver) => (
               <div
                 key={driver.driverId}
-                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4 overflow-hidden"
+                className="bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4 overflow-hidden"
               >
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   <div className="flex items-start space-x-3 flex-1 min-w-0 overflow-hidden">
-                    <Avatar className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center shrink-0">
+                    <Avatar className="w-10 h-10 bg-muted rounded-full flex items-center justify-center shrink-0">
                       <AvatarFallback>
-                        <p className="text-lg uppercase font-semibold text-gray-900 truncate">
+                        <p className="text-lg uppercase font-semibold text-foreground truncate">
                           {driver.fullName
                             ? driver.fullName
                                 .split(" ")
@@ -215,19 +215,19 @@ export function DriverListClient({ initialDrivers }: Props) {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0 overflow-hidden">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">
+                      <h3 className="text-lg font-semibold text-foreground mb-2 truncate">
                         {driver.fullName}
                       </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
                         <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
-                          <IdCardIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                          <IdCardIcon className="w-4 h-4 text-muted-foreground shrink-0" />
                           <span className="font-medium shrink-0">ID:</span>
                           <span className="truncate">
                             {driver.identificationNumber}
                           </span>
                         </div>
                         <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
-                          <Phone className="w-4 h-4 text-gray-400 shrink-0" />
+                          <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
                           <span className="font-medium shrink-0">
                             Telefono:
                           </span>
@@ -237,7 +237,7 @@ export function DriverListClient({ initialDrivers }: Props) {
                         </div>
                         {driver.operativeLicense && (
                           <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
-                            <IdCardLanyard className="w-4 h-4 text-gray-400 shrink-0" />
+                            <IdCardLanyard className="w-4 h-4 text-muted-foreground shrink-0" />
                             <span className="font-medium shrink-0">
                               Licencia:
                             </span>

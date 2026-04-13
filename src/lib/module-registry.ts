@@ -8,6 +8,8 @@ import {
   Settings,
   Shirt,
   Tags,
+  CalendarCheck,
+  Receipt,
   Warehouse,
   ArrowLeftRight,
   type LucideIcon,
@@ -53,6 +55,8 @@ export const modules: AppModule[] = [
     routes: [
       { name: "Pacas", href: "/pacas", icon: Shirt },
       { name: "Categorias", href: "/pacas/categorias", icon: Tags },
+      { name: "Reservaciones", href: "/pacas/reservaciones", icon: CalendarCheck },
+      { name: "Ventas", href: "/pacas/ventas", icon: Receipt },
     ],
   },
   {

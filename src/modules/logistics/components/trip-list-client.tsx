@@ -88,10 +88,10 @@ export function TripListClient({ initialTrips }: Props) {
 
   return (
     <>
-      <div className="bg-white shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b border-gray-200">
+      <div className="bg-card shadow-sm rounded-lg border">
+        <div className="px-6 py-4 border-b border-border">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-medium text-gray-900">
+            <h2 className="text-lg font-medium text-foreground">
               Lista de Viajes
             </h2>
             <Button onClick={() => toast.info("Formulario de viaje - En desarrollo")}>
@@ -120,23 +120,23 @@ export function TripListClient({ initialTrips }: Props) {
             filteredTrips.map((trip) => (
               <div
                 key={trip.tripId}
-                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4"
+                className="bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start space-x-3 flex-1 min-w-0">
-                    <div className="p-2 rounded-xl bg-gray-100">
-                      <RouteIcon className="h-5 w-5 text-gray-600" />
+                    <div className="p-2 rounded-xl bg-muted">
+                      <RouteIcon className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">
+                        <h3 className="text-lg font-semibold text-foreground truncate">
                           {trip.driverFullName || `Viaje #${trip.tripId}`}
                         </h3>
                         {trip.province && (
                           <Badge variant="outline">{trip.province}</Badge>
                         )}
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-gray-600">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-muted-foreground">
                         {trip.loadDate && (
                           <div>
                             <span className="font-medium">Fecha:</span>{" "}

@@ -84,10 +84,10 @@ export function VehicleListClient({ initialVehicles }: Props) {
 
   return (
     <>
-      <div className="bg-white shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b border-gray-200">
+      <div className="bg-card shadow-sm rounded-lg border">
+        <div className="px-6 py-4 border-b border-border">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-medium text-gray-900">
+            <h2 className="text-lg font-medium text-foreground">
               Lista de Vehiculos
             </h2>
             <Button onClick={() => toast.info("Formulario de vehiculo - En desarrollo")}>
@@ -116,18 +116,18 @@ export function VehicleListClient({ initialVehicles }: Props) {
             filteredVehicles.map((vehicle) => (
               <div
                 key={vehicle.vehicle_id}
-                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4"
+                className="bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start space-x-3 flex-1 min-w-0">
-                    <div className="p-2 rounded-xl bg-gray-100">
-                      <Truck className="h-5 w-5 text-gray-600" />
+                    <div className="p-2 rounded-xl bg-muted">
+                      <Truck className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-gray-900 truncate">
+                      <h3 className="text-lg font-semibold text-foreground truncate">
                         {vehicle.name || `Vehiculo #${vehicle.vehicle_id}`}
                       </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600 mt-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground mt-2">
                         {vehicle.cuña_plate_number && (
                           <div>
                             <span className="font-medium">Placa Cuna:</span>{" "}

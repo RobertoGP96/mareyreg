@@ -58,6 +58,20 @@ export const PRODUCT_UNITS = [
   { value: "metros", label: "Metros" },
 ] as const;
 
+export const RESERVATION_STATUSES = [
+  { value: "active", label: "Activa" },
+  { value: "completed", label: "Completada" },
+  { value: "cancelled", label: "Cancelada" },
+  { value: "expired", label: "Expirada" },
+] as const;
+
+export const PAYMENT_METHODS = [
+  { value: "efectivo", label: "Efectivo" },
+  { value: "transferencia", label: "Transferencia" },
+  { value: "tarjeta", label: "Tarjeta" },
+  { value: "otro", label: "Otro" },
+] as const;
+
 export const PRODUCT_CATEGORIES = [
   { value: "materiales", label: "Materiales" },
   { value: "alimentos", label: "Alimentos" },
