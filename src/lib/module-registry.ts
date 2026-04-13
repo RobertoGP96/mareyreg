@@ -6,6 +6,10 @@ import {
   DollarSign,
   Package,
   Settings,
+  Shirt,
+  Tags,
+  Warehouse,
+  ArrowLeftRight,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,22 +46,32 @@ export const modules: AppModule[] = [
     routes: [{ name: "Viajes", href: "/trips", icon: RouteIcon }],
   },
   {
-    id: "payments",
-    label: "Pagos",
-    icon: DollarSign,
-    enabled: false, // Activar en Fase 3
-    routes: [{ name: "Pagos", href: "/payments", icon: DollarSign }],
+    id: "pacas",
+    label: "Pacas",
+    icon: Shirt,
+    enabled: true,
+    routes: [
+      { name: "Pacas", href: "/pacas", icon: Shirt },
+      { name: "Categorias", href: "/pacas/categorias", icon: Tags },
+    ],
   },
   {
     id: "inventory",
     label: "Inventario",
     icon: Package,
-    enabled: false, // Activar en Fase 4
+    enabled: true,
     routes: [
       { name: "Productos", href: "/products", icon: Package },
-      { name: "Almacenes", href: "/warehouses", icon: Package },
-      { name: "Stock", href: "/stock", icon: Package },
+      { name: "Almacenes", href: "/warehouses", icon: Warehouse },
+      { name: "Stock", href: "/stock", icon: ArrowLeftRight },
     ],
+  },
+  {
+    id: "payments",
+    label: "Pagos",
+    icon: DollarSign,
+    enabled: false,
+    routes: [{ name: "Pagos", href: "/payments", icon: DollarSign }],
   },
 ];
 
