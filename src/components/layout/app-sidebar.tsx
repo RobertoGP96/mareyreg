@@ -29,9 +29,13 @@ export function AppSidebar() {
     return session?.user?.modules?.includes(module.id) ?? false;
   });
 
+  const allHrefs = modules.flatMap((m) => m.routes.map((r) => r.href));
+
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
-    return pathname === href || pathname.startsWith(href + "/");
+    if (pathname === href) return true;
+    if (allHrefs.includes(pathname)) return false;
+    return pathname.startsWith(href + "/");
   };
 
   return (
