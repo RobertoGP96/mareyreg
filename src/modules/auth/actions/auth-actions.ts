@@ -5,6 +5,32 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { requireRole } from "@/lib/auth-guard";
+import { signIn } from "@/lib/auth";
+import { AuthError } from "next-auth";
+
+export async function loginUser(data: {
+  email: string;
+  password: string;
+  callbackUrl?: string;
+}): Promise<ActionResult<{ callbackUrl: string }>> {
+  try {
+    await signIn("credentials", {
+      email: data.email,
+      password: data.password,
+      redirect: false,
+    });
+
+    return {
+      success: true,
+      data: { callbackUrl: data.callbackUrl || "/" },
+    };
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { success: false, error: "Credenciales incorrectas" };
+    }
+    throw error;
+  }
+}
 
 export async function registerInitialAdmin(data: {
   email: string;

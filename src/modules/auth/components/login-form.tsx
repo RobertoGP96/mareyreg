@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { loginUser } from "../actions/auth-actions";
 
 export function LoginForm() {
   const router = useRouter();
@@ -23,22 +23,18 @@ export function LoginForm() {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    const result = await loginUser({ email, password, callbackUrl });
 
     setIsLoading(false);
 
-    if (result?.error) {
+    if (!result.success) {
       toast.error("Credenciales incorrectas", {
         description: "Verifica tu email y contrasena",
       });
       return;
     }
 
-    router.push(callbackUrl);
+    router.push(result.data.callbackUrl);
     router.refresh();
   };
 
