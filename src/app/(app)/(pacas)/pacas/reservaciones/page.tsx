@@ -22,9 +22,9 @@ export default async function ReservacionesPage() {
     }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-extrabold font-headline tracking-tight text-primary">Reservaciones</h1>
+        <h1 className="text-2xl font-extrabold font-headline tracking-tight text-primary">Reservaciones</h1>
         <p className="text-muted-foreground mt-1">
           Gestiona las reservaciones de pacas
         </p>

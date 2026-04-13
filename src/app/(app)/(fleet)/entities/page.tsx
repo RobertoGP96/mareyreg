@@ -7,7 +7,7 @@ export default async function EntitiesPage() {
   const entities = await getEntities();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <EntityListClient initialEntities={entities} />
     </div>
   );

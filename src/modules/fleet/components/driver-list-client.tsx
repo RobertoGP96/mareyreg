@@ -164,9 +164,9 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
   return (
     <>
       <div className="bg-card shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b border-border">
+        <div className="px-4 py-3 border-b border-border">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-medium text-foreground">
+            <h2 className="text-base font-medium text-foreground">
               Lista de Conductores
             </h2>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
@@ -191,7 +191,7 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
             </InputGroup>
           </div>
         </div>
-        <div className="grid gap-4 p-6">
+        <div className="grid gap-4 p-4">
           {filteredDrivers.length > 0 ? (
             filteredDrivers.map((driver) => (
               <div
@@ -216,7 +216,7 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
                     </Avatar>
                     <div className="flex-1 min-w-0 overflow-hidden">
                       <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-lg font-semibold text-foreground truncate">
+                        <h3 className="text-base font-semibold text-foreground truncate">
                           {driver.fullName}
                         </h3>
                         <Badge variant="secondary" className="shrink-0">

@@ -188,9 +188,9 @@ export function TripListClient({ initialTrips, drivers }: Props) {
   return (
     <>
       <div className="bg-card shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b border-border">
+        <div className="px-4 py-3 border-b border-border">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-medium text-foreground">
+            <h2 className="text-base font-medium text-foreground">
               Lista de Viajes
             </h2>
             <Button onClick={() => setIsCreateOpen(true)}>
@@ -214,7 +214,7 @@ export function TripListClient({ initialTrips, drivers }: Props) {
             </InputGroup>
           </div>
         </div>
-        <div className="grid gap-4 p-6">
+        <div className="grid gap-4 p-4">
           {filteredTrips.length > 0 ? (
             filteredTrips.map((trip) => (
               <div
@@ -228,7 +228,7 @@ export function TripListClient({ initialTrips, drivers }: Props) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-lg font-semibold text-foreground truncate">
+                        <h3 className="text-base font-semibold text-foreground truncate">
                           {trip.driverFullName || `Viaje #${trip.tripId}`}
                         </h3>
                         {trip.province && (

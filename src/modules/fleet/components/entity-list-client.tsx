@@ -106,9 +106,9 @@ export function EntityListClient({ initialEntities }: Props) {
   return (
     <>
       <div className="bg-card shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b border-border">
+        <div className="px-4 py-3 border-b border-border">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-medium text-foreground">
+            <h2 className="text-base font-medium text-foreground">
               Lista de Entidades
             </h2>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
@@ -132,7 +132,7 @@ export function EntityListClient({ initialEntities }: Props) {
             </InputGroup>
           </div>
         </div>
-        <div className="grid gap-4 p-6">
+        <div className="grid gap-4 p-4">
           {filteredEntities.length > 0 ? (
             filteredEntities.map((entity) => (
               <div
@@ -144,7 +144,7 @@ export function EntityListClient({ initialEntities }: Props) {
                     <div className="p-2 rounded-xl bg-muted">
                       <Building2 className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <h3 className="text-lg font-semibold text-foreground truncate">
+                    <h3 className="text-base font-semibold text-foreground truncate">
                       {entity.name}
                     </h3>
                   </div>

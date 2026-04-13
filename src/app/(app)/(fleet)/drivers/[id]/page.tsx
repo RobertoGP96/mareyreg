@@ -23,7 +23,7 @@ export default async function DriverDetailsPage({ params }: Props) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <DriverDetailsClient
         driver={details.driver}
         vehicles={details.vehicles}

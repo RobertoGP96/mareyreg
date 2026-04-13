@@ -8,7 +8,7 @@ export default async function TripsPage() {
   const [trips, drivers] = await Promise.all([getTrips(), getDrivers()]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <TripListClient initialTrips={trips} drivers={drivers} />
     </div>
   );

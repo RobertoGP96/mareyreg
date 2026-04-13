@@ -127,14 +127,14 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
   return (
     <>
       <div className="bg-card shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-medium">Categorias de Pacas</h2>
+        <div className="px-4 py-3 border-b flex justify-between items-center">
+          <h2 className="text-base font-medium">Categorias de Pacas</h2>
           <Button onClick={() => setIsCreateOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Agregar
           </Button>
         </div>
-        <div className="grid gap-3 p-6">
+        <div className="grid gap-3 p-4">
           {categories.length > 0 ? (
             categories.map((cat) => (
               <div

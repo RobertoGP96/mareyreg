@@ -47,23 +47,23 @@ export function AvailabilityView({ data }: Props) {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-3xl font-bold text-green-600">{totalAvailable}</p>
+          <p className="text-2xl font-bold text-green-600">{totalAvailable}</p>
           <p className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
             Disponibles
           </p>
         </div>
         <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-3xl font-bold text-blue-600">{totalReserved}</p>
+          <p className="text-2xl font-bold text-blue-600">{totalReserved}</p>
           <p className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
             Reservadas
           </p>
         </div>
         <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-3xl font-bold">{totalAll}</p>
+          <p className="text-2xl font-bold">{totalAll}</p>
           <p className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
             Total
           </p>
@@ -77,12 +77,12 @@ export function AvailabilityView({ data }: Props) {
         return (
           <div key={group.classificationId} className="bg-card border rounded-xl overflow-hidden">
             {/* Classification header */}
-            <div className="bg-primary/5 border-b px-6 py-3 flex items-center justify-between">
+            <div className="bg-primary/5 border-b px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-1.5 rounded-md bg-primary/10">
                   <Package className="h-4 w-4 text-primary" />
                 </div>
-                <h3 className="font-bold text-lg uppercase tracking-wider">
+                <h3 className="font-bold text-base uppercase tracking-wider">
                   {group.classification}
                 </h3>
               </div>
@@ -94,7 +94,7 @@ export function AvailabilityView({ data }: Props) {
             {/* Categories table */}
             <div className="divide-y">
               {/* Table header */}
-              <div className="grid grid-cols-12 px-6 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50">
+              <div className="grid grid-cols-12 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50">
                 <div className="col-span-5">Categoria</div>
                 <div className="col-span-2 text-center">Disponible</div>
                 <div className="col-span-2 text-center">Reservada</div>
@@ -105,7 +105,7 @@ export function AvailabilityView({ data }: Props) {
               {group.categories.map((cat) => (
                 <div
                   key={cat.categoryId}
-                  className="grid grid-cols-12 px-6 py-3 items-center hover:bg-muted/30 transition-colors"
+                  className="grid grid-cols-12 px-4 py-3 items-center hover:bg-muted/30 transition-colors"
                 >
                   <div className="col-span-5 font-medium">{cat.name}</div>
                   <div className="col-span-2 text-center">
@@ -138,7 +138,7 @@ export function AvailabilityView({ data }: Props) {
               ))}
 
               {group.categories.length === 0 && (
-                <div className="px-6 py-4 text-center text-muted-foreground">
+                <div className="px-4 py-4 text-center text-muted-foreground">
                   Sin categorias
                 </div>
               )}

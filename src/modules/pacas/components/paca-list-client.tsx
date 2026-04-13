@@ -96,23 +96,23 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-green-600">{totalAvailable}</p>
+          <p className="text-xl font-bold text-green-600">{totalAvailable}</p>
           <p className="text-xs text-muted-foreground uppercase tracking-wider">Disponibles</p>
         </div>
         <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-blue-600">{totalReserved}</p>
+          <p className="text-xl font-bold text-blue-600">{totalReserved}</p>
           <p className="text-xs text-muted-foreground uppercase tracking-wider">Reservadas</p>
         </div>
         <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-muted-foreground">{totalSold}</p>
+          <p className="text-xl font-bold text-muted-foreground">{totalSold}</p>
           <p className="text-xs text-muted-foreground uppercase tracking-wider">Vendidas</p>
         </div>
       </div>
 
       {/* Inventory Table */}
       <div className="bg-card shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-medium">Inventario por Categoria</h2>
+        <div className="px-4 py-3 border-b flex justify-between items-center">
+          <h2 className="text-base font-medium">Inventario por Categoria</h2>
           <Button onClick={() => setIsEntryOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Registrar Entrada
@@ -121,7 +121,7 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
 
         {inventory.length > 0 ? (
           <div className="divide-y">
-            <div className="grid grid-cols-12 px-6 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50">
+            <div className="grid grid-cols-12 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50">
               <div className="col-span-3">Categoria</div>
               <div className="col-span-2">Clasificacion</div>
               <div className="col-span-2 text-center">Disponible</div>
@@ -135,7 +135,7 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
               const avgCost = inStock > 0 ? Number(item.totalCost) / inStock : 0;
               const stockValue = Number(item.totalCost);
               return (
-                <div key={item.categoryId} className="grid grid-cols-12 px-6 py-3 items-center hover:bg-muted/30 transition-colors">
+                <div key={item.categoryId} className="grid grid-cols-12 px-4 py-3 items-center hover:bg-muted/30 transition-colors">
                   <div className="col-span-3 font-medium flex items-center gap-2">
                     <Package className="h-4 w-4 text-muted-foreground" />
                     {item.category.name}
@@ -171,7 +171,7 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
             })}
           </div>
         ) : (
-          <div className="p-6">
+          <div className="p-4">
             <EmptyState title="Sin inventario" description="Registra la primera entrada de pacas." />
           </div>
         )}
@@ -179,12 +179,12 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
 
       {/* Recent Entries */}
       <div className="bg-card shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b">
-          <h2 className="text-lg font-medium">Entradas Recientes</h2>
+        <div className="px-4 py-3 border-b">
+          <h2 className="text-base font-medium">Entradas Recientes</h2>
         </div>
         <div className="divide-y">
           {entries.length > 0 ? entries.map((entry) => (
-            <div key={entry.entryId} className="px-6 py-3 flex items-center justify-between">
+            <div key={entry.entryId} className="px-4 py-3 flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{entry.category.name}</span>
@@ -203,7 +203,7 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
               </Button>
             </div>
           )) : (
-            <div className="px-6 py-4 text-center text-muted-foreground">Sin entradas registradas</div>
+            <div className="px-4 py-4 text-center text-muted-foreground">Sin entradas registradas</div>
           )}
         </div>
       </div>

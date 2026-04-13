@@ -176,9 +176,9 @@ export function UserListClient({ users }: Props) {
   return (
     <>
       <div className="bg-card shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b">
+        <div className="px-4 py-3 border-b">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-medium">Usuarios del Sistema</h2>
+            <h2 className="text-base font-medium">Usuarios del Sistema</h2>
             <Button onClick={() => setIsCreateOpen(true)}>
               <UserPlus className="w-4 h-4 mr-2" />
               Agregar
@@ -200,7 +200,7 @@ export function UserListClient({ users }: Props) {
             </InputGroup>
           </div>
         </div>
-        <div className="grid gap-4 p-6">
+        <div className="grid gap-4 p-4">
           {filtered.length > 0 ? (
             filtered.map((user) => (
               <div

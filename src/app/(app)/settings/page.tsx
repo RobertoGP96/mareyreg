@@ -37,19 +37,19 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-extrabold font-headline tracking-tight text-primary">Configuracion</h1>
+    <div className="space-y-4">
+      <h1 className="text-2xl font-extrabold font-headline tracking-tight text-primary">Configuracion</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {isAdmin && (
           <Link href="/settings/users" className="block">
-            <div className="bg-card p-6 rounded-lg shadow-sm border hover:border-primary transition-colors h-full">
+            <div className="bg-card p-4 rounded-lg shadow-sm border hover:border-primary transition-colors h-full">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-primary/10">
                     <Users className="h-6 w-6 text-primary" />
                   </div>
-                  <h2 className="text-xl font-semibold">Usuarios</h2>
+                  <h2 className="text-lg font-semibold">Usuarios</h2>
                 </div>
                 <ChevronRight className="h-5 w-5 text-muted-foreground" />
               </div>
@@ -60,8 +60,8 @@ export default function SettingsPage() {
           </Link>
         )}
 
-        <div className="bg-card p-6 rounded-lg shadow-sm border">
-          <h2 className="text-xl font-semibold text-foreground mb-4">
+        <div className="bg-card p-4 rounded-lg shadow-sm border">
+          <h2 className="text-lg font-semibold text-foreground mb-4">
             Datos de la Base de Datos
           </h2>
           <p className="text-muted-foreground mb-4">

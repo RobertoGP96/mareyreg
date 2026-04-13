@@ -7,9 +7,9 @@ export default async function DisponibilidadPage() {
   const data = await getAvailabilityByClassification();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-extrabold font-headline tracking-tight text-primary">Disponibilidad de Pacas</h1>
+        <h1 className="text-2xl font-extrabold font-headline tracking-tight text-primary">Disponibilidad de Pacas</h1>
         <p className="text-muted-foreground mt-1">
           Control de inventario por clasificacion y categoria
         </p>

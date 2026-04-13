@@ -92,16 +92,16 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
     MOVEMENT_TYPES.find((m) => m.value === type)?.label ?? type;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Stock Levels */}
       <div className="bg-card shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-medium">Niveles de Stock</h2>
+        <div className="px-4 py-3 border-b flex justify-between items-center">
+          <h2 className="text-base font-medium">Niveles de Stock</h2>
           <Button onClick={() => setIsCreateOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />Nuevo Movimiento
           </Button>
         </div>
-        <div className="grid gap-4 p-6">
+        <div className="grid gap-4 p-4">
           {stockLevels.length > 0 ? stockLevels.map((sl) => {
             const qty = Number(sl.currentQuantity);
             const minStock = Number(sl.product.minStock);
@@ -141,10 +141,10 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
 
       {/* Recent Movements */}
       <div className="bg-card shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b">
-          <h2 className="text-lg font-medium">Movimientos Recientes</h2>
+        <div className="px-4 py-3 border-b">
+          <h2 className="text-base font-medium">Movimientos Recientes</h2>
         </div>
-        <div className="grid gap-3 p-6">
+        <div className="grid gap-3 p-4">
           {movements.length > 0 ? movements.map((m) => (
             <div key={m.movementId} className="bg-card border rounded-lg p-3 flex items-center justify-between">
               <div>

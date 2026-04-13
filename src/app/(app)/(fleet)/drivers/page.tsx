@@ -13,7 +13,7 @@ export default async function DriversPage() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <DriverListClient
         initialDrivers={drivers}
         vehicles={vehicles}

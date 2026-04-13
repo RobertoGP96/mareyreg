@@ -52,9 +52,9 @@ export default async function Home() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
-        <h1 className="text-3xl font-extrabold font-headline tracking-tight text-primary">Inicio</h1>
+        <h1 className="text-2xl font-extrabold font-headline tracking-tight text-primary">Inicio</h1>
         <p className="text-muted-foreground mt-1">
           Bienvenido al Sistema de Gestion MAREYreg
         </p>
@@ -62,18 +62,18 @@ export default async function Home() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {stats.map((s) => (
-          <div key={s.href} className="bg-card p-5 rounded-lg shadow-sm border">
+          <div key={s.href} className="bg-card p-4 rounded-lg shadow-sm border">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 rounded-lg bg-muted">
                 <s.icon className="h-6 w-6 text-muted-foreground" />
               </div>
               <div className="flex-1">
-                <h2 className="text-lg font-semibold">{s.label}</h2>
+                <h2 className="text-base font-semibold">{s.label}</h2>
                 {s.extra && (
                   <p className="text-xs text-muted-foreground">{s.extra}</p>
                 )}
               </div>
-              <p className="text-2xl font-bold text-muted-foreground">{s.count}</p>
+              <p className="text-xl font-bold text-muted-foreground">{s.count}</p>
             </div>
             <Link href={s.href}>
               <Button variant="outline" className="w-full" size="sm">

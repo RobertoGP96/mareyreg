@@ -27,7 +27,7 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
   const vehicle = vehicles[0];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center gap-4">
         <Link href="/drivers">
           <Button variant="outline" size="sm">
@@ -35,12 +35,12 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
             Volver
           </Button>
         </Link>
-        <h1 className="text-2xl font-bold">{driver.fullName}</h1>
+        <h1 className="text-xl font-bold">{driver.fullName}</h1>
       </div>
 
       {/* Driver Info */}
-      <div className="bg-card p-6 rounded-lg shadow-sm border">
-        <h2 className="text-lg font-semibold mb-4">Informacion del Conductor</h2>
+      <div className="bg-card p-4 rounded-lg shadow-sm border">
+        <h2 className="text-base font-semibold mb-4">Informacion del Conductor</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
@@ -69,8 +69,8 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
 
       {/* Vehicle */}
       {vehicle && (
-        <div className="bg-card p-6 rounded-lg shadow-sm border">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+        <div className="bg-card p-4 rounded-lg shadow-sm border">
+          <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
             <Truck className="h-5 w-5" />
             Vehiculo Asignado
           </h2>
@@ -97,8 +97,8 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
       )}
 
       {/* Trips */}
-      <div className="bg-card p-6 rounded-lg shadow-sm border">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+      <div className="bg-card p-4 rounded-lg shadow-sm border">
+        <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
           <RouteIcon className="h-5 w-5" />
           Viajes ({trips.length})
         </h2>

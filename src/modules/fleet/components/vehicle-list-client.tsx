@@ -146,9 +146,9 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
   return (
     <>
       <div className="bg-card shadow-sm rounded-lg border">
-        <div className="px-6 py-4 border-b border-border">
+        <div className="px-4 py-3 border-b border-border">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-medium text-foreground">
+            <h2 className="text-base font-medium text-foreground">
               Lista de Vehiculos
             </h2>
             <Button onClick={() => setIsCreateDialogOpen(true)}>
@@ -172,7 +172,7 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
             </InputGroup>
           </div>
         </div>
-        <div className="grid gap-4 p-6">
+        <div className="grid gap-4 p-4">
           {filteredVehicles.length > 0 ? (
             filteredVehicles.map((vehicle) => (
               <div
@@ -185,7 +185,7 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
                       <Truck className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold text-foreground truncate">
+                      <h3 className="text-base font-semibold text-foreground truncate">
                         {vehicle.name || `Vehiculo #${vehicle.vehicle_id}`}
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground mt-2">

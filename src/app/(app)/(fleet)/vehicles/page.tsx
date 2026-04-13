@@ -11,7 +11,7 @@ export default async function VehiclesPage() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <VehicleListClient initialVehicles={vehicles} drivers={drivers} />
     </div>
   );
