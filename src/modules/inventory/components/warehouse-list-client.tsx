@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MoreHorizontal, Pen, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { createWarehouse, updateWarehouse, deleteWarehouse } from "../actions/warehouse-actions";
-import { CUBAN_PROVINCES } from "@/lib/constants";
+import { CUBAN_PROVINCES, WAREHOUSE_TYPES } from "@/lib/constants";
 
 interface WarehouseItem {
   warehouseId: number;
@@ -23,6 +23,9 @@ interface WarehouseItem {
   location: string | null;
   province: string | null;
   capacity: unknown;
+  warehouseType: string | null;
+  contactPhone: string | null;
+  isActive: boolean;
 }
 
 export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[] }) {
@@ -40,6 +43,9 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
       w.province?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const getWarehouseTypeLabel = (value: string) =>
+    WAREHOUSE_TYPES.find((t) => t.value === value)?.label ?? value;
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, editId?: number) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -49,6 +55,8 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
       location: (fd.get("location") as string) || undefined,
       province: (fd.get("province") as string) || undefined,
       capacity: fd.get("capacity") ? Number(fd.get("capacity")) : undefined,
+      warehouseType: (fd.get("warehouseType") as string) || undefined,
+      contactPhone: (fd.get("contactPhone") as string) || undefined,
     };
 
     const result = editId
@@ -103,8 +111,25 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
           </Select>
         </div>
         <div className="space-y-2">
+          <Label>Tipo de almacen</Label>
+          <Select name="warehouseType" defaultValue={warehouse?.warehouseType ?? undefined}>
+            <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+            <SelectContent>
+              {WAREHOUSE_TYPES.map((t) => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
           <Label>Capacidad</Label>
           <Input name="capacity" type="number" defaultValue={warehouse?.capacity ? String(warehouse.capacity) : ""} />
+        </div>
+        <div className="space-y-2">
+          <Label>Telefono de contacto</Label>
+          <Input name="contactPhone" defaultValue={warehouse?.contactPhone ?? ""} placeholder="+53 ..." />
         </div>
       </div>
     </div>
@@ -130,13 +155,18 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
         </div>
         <div className="grid gap-4 p-6">
           {filtered.length > 0 ? filtered.map((w) => (
-            <div key={w.warehouseId} className="bg-card border rounded-lg p-4 flex items-center justify-between">
+            <div key={w.warehouseId} className={`bg-card border rounded-lg p-4 flex items-center justify-between ${!w.isActive ? "opacity-50" : ""}`}>
               <div>
-                <p className="font-medium">{w.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {[w.location, w.province].filter(Boolean).join(", ") || "Sin ubicacion"}
-                  {w.capacity ? ` | Capacidad: ${String(w.capacity)}` : ""}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{w.name}</p>
+                  {w.warehouseType && <Badge variant="secondary">{getWarehouseTypeLabel(w.warehouseType)}</Badge>}
+                  {!w.isActive && <Badge variant="destructive">Inactivo</Badge>}
+                </div>
+                <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                  <span>{[w.location, w.province].filter(Boolean).join(", ") || "Sin ubicacion"}</span>
+                  {w.capacity != null && Number(w.capacity) > 0 && <span>Capacidad: {String(w.capacity)}</span>}
+                  {w.contactPhone && <span>Tel: {w.contactPhone}</span>}
+                </div>
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

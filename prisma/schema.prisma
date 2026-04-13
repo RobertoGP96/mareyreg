@@ -362,26 +362,39 @@ model Product {
   productId   Int      @id @default(autoincrement()) @map("product_id")
   name        String
   sku         String?  @unique
+  barcode     String?  @unique
   category    String?
-  unit        String   // kg, litros, unidades
+  unit        String
   minStock    Decimal  @default(0) @map("min_stock")
+  maxStock    Decimal? @map("max_stock")
+  costPrice   Decimal? @map("cost_price")
+  brand       String?
+  supplier    String?
+  supplierRef String?  @map("supplier_ref")
+  isActive    Boolean  @default(true) @map("is_active")
   description String?
+  notes       String?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   stockMovements StockMovement[]
   stockLevels    StockLevel[]
 
+  @@index([category])
+  @@index([isActive])
   @@map("products")
 }
 
 model Warehouse {
-  warehouseId Int      @id @default(autoincrement()) @map("warehouse_id")
-  name        String
-  location    String?
-  province    String?
-  capacity    Decimal?
-  createdAt   DateTime @default(now()) @map("created_at")
+  warehouseId   Int      @id @default(autoincrement()) @map("warehouse_id")
+  name          String
+  location      String?
+  province      String?
+  capacity      Decimal?
+  warehouseType String?  @map("warehouse_type")
+  contactPhone  String?  @map("contact_phone")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   stockMovements StockMovement[]
   stockLevels    StockLevel[]
@@ -395,7 +408,9 @@ model StockMovement {
   warehouseId     Int          @map("warehouse_id")
   quantity        Decimal
   movementType    MovementType @map("movement_type")
+  unitCost        Decimal?     @map("unit_cost")
   referenceTripId Int?         @map("reference_trip_id")
+  referenceDoc    String?      @map("reference_doc")
   notes           String?
   createdAt       DateTime     @default(now()) @map("created_at")
   createdBy       Int?         @map("created_by")
@@ -407,6 +422,7 @@ model StockMovement {
 
   @@index([productId])
   @@index([warehouseId])
+  @@index([createdAt])
   @@map("stock_movements")
 }
 

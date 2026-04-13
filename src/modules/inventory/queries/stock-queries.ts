@@ -15,11 +15,14 @@ export async function getStockLevels() {
   });
 }
 
-export async function getLowStockAlerts() {
+export async function getStockAlerts() {
   const levels = await db.stockLevel.findMany({
     include: { product: true, warehouse: true },
   });
-  return levels.filter(
-    (l) => Number(l.currentQuantity) < Number(l.product.minStock)
-  );
+  return levels.filter((l) => {
+    const qty = Number(l.currentQuantity);
+    const min = Number(l.product.minStock);
+    const max = l.product.maxStock ? Number(l.product.maxStock) : null;
+    return qty < min || (max !== null && qty > max);
+  });
 }

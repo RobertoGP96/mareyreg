@@ -9,7 +9,9 @@ export async function createStockMovement(data: {
   warehouseId: number;
   quantity: number;
   movementType: string;
+  unitCost?: number;
   referenceTripId?: number;
+  referenceDoc?: string;
   notes?: string;
 }): Promise<ActionResult<{ movementId: number }>> {
   try {
@@ -20,7 +22,9 @@ export async function createStockMovement(data: {
           warehouseId: data.warehouseId,
           quantity: data.quantity,
           movementType: data.movementType as "entry" | "exit" | "transfer" | "adjustment",
+          unitCost: data.unitCost ?? null,
           referenceTripId: data.referenceTripId || null,
+          referenceDoc: data.referenceDoc || null,
           notes: data.notes || null,
         },
       });
@@ -49,6 +53,14 @@ export async function createStockMovement(data: {
           lastUpdated: new Date(),
         },
       });
+
+      // Actualizar costo del producto en entradas con costo unitario
+      if (data.movementType === "entry" && data.unitCost) {
+        await tx.product.update({
+          where: { productId: data.productId },
+          data: { costPrice: data.unitCost },
+        });
+      }
 
       return movement;
     });

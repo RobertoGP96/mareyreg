@@ -9,6 +9,8 @@ export async function createWarehouse(data: {
   location?: string;
   province?: string;
   capacity?: number;
+  warehouseType?: string;
+  contactPhone?: string;
 }): Promise<ActionResult<{ warehouseId: number }>> {
   try {
     const warehouse = await db.warehouse.create({
@@ -17,6 +19,8 @@ export async function createWarehouse(data: {
         location: data.location || null,
         province: data.province || null,
         capacity: data.capacity || null,
+        warehouseType: data.warehouseType || null,
+        contactPhone: data.contactPhone || null,
       },
     });
 
@@ -30,7 +34,15 @@ export async function createWarehouse(data: {
 
 export async function updateWarehouse(
   id: number,
-  data: { name?: string; location?: string; province?: string; capacity?: number }
+  data: {
+    name?: string;
+    location?: string;
+    province?: string;
+    capacity?: number;
+    warehouseType?: string;
+    contactPhone?: string;
+    isActive?: boolean;
+  }
 ): Promise<ActionResult<void>> {
   try {
     await db.warehouse.update({
@@ -40,6 +52,9 @@ export async function updateWarehouse(
         ...(data.location !== undefined && { location: data.location }),
         ...(data.province !== undefined && { province: data.province }),
         ...(data.capacity !== undefined && { capacity: data.capacity }),
+        ...(data.warehouseType !== undefined && { warehouseType: data.warehouseType || null }),
+        ...(data.contactPhone !== undefined && { contactPhone: data.contactPhone || null }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
       },
     });
 

@@ -9,16 +9,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, AlertTriangle } from "lucide-react";
+import { Plus, AlertTriangle, ArrowUpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { createStockMovement } from "../actions/stock-actions";
-import { MOVEMENT_TYPES } from "@/lib/constants";
+import { MOVEMENT_TYPES, getUnitAbbreviation } from "@/lib/constants";
 
 interface StockLevelItem {
   productId: number;
   warehouseId: number;
   currentQuantity: unknown;
-  product: { name: string; minStock: unknown; unit: string };
+  product: { name: string; minStock: unknown; maxStock: unknown; unit: string; costPrice: unknown };
   warehouse: { name: string };
 }
 
@@ -26,15 +26,18 @@ interface MovementItem {
   movementId: number;
   quantity: unknown;
   movementType: string;
+  unitCost: unknown;
+  referenceDoc: string | null;
   notes: string | null;
   createdAt: Date;
-  product: { name: string };
+  product: { name: string; unit: string };
   warehouse: { name: string };
 }
 
 interface ProductItem {
   productId: number;
   name: string;
+  unit: string;
 }
 
 interface WarehouseItem {
@@ -60,6 +63,7 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
   const router = useRouter();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [movementType, setMovementType] = useState("entry");
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -70,6 +74,8 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
       warehouseId: Number(fd.get("warehouseId")),
       quantity: Number(fd.get("quantity")),
       movementType: fd.get("movementType") as string,
+      unitCost: fd.get("unitCost") ? Number(fd.get("unitCost")) : undefined,
+      referenceDoc: (fd.get("referenceDoc") as string) || undefined,
       notes: (fd.get("notes") as string) || undefined,
     });
     setIsSubmitting(false);
@@ -97,7 +103,12 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
         </div>
         <div className="grid gap-4 p-6">
           {stockLevels.length > 0 ? stockLevels.map((sl) => {
-            const isLow = Number(sl.currentQuantity) < Number(sl.product.minStock);
+            const qty = Number(sl.currentQuantity);
+            const minStock = Number(sl.product.minStock);
+            const maxStock = sl.product.maxStock ? Number(sl.product.maxStock) : null;
+            const isLow = qty < minStock;
+            const isOver = maxStock !== null && qty > maxStock;
+            const abbr = getUnitAbbreviation(sl.product.unit);
             return (
               <div key={`${sl.productId}-${sl.warehouseId}`} className="bg-card border rounded-lg p-4 flex items-center justify-between">
                 <div>
@@ -108,10 +119,19 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
                         <AlertTriangle className="h-3 w-3 mr-1" />Stock bajo
                       </Badge>
                     )}
+                    {isOver && (
+                      <Badge className="bg-orange-100 text-orange-800">
+                        <ArrowUpCircle className="h-3 w-3 mr-1" />Sobrestock
+                      </Badge>
+                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Almacen: {sl.warehouse.name} | Cantidad: {String(sl.currentQuantity)} {sl.product.unit} | Min: {String(sl.product.minStock)}
-                  </p>
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                    <span>Almacen: {sl.warehouse.name}</span>
+                    <span>Cantidad: {String(sl.currentQuantity)} {abbr}</span>
+                    <span>Min: {String(sl.product.minStock)} {abbr}</span>
+                    {maxStock !== null && <span>Max: {String(sl.product.maxStock)} {abbr}</span>}
+                    {sl.product.costPrice != null && Number(sl.product.costPrice) > 0 && <span>Costo: ${String(sl.product.costPrice)}</span>}
+                  </div>
                 </div>
               </div>
             );
@@ -135,11 +155,14 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
                   <span className="font-medium">{m.product.name}</span>
                   <span className="text-muted-foreground">- {m.warehouse.name}</span>
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Cantidad: {String(m.quantity)} {m.notes ? `| ${m.notes}` : ""}
-                </p>
+                <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                  <span>Cantidad: {String(m.quantity)} {getUnitAbbreviation(m.product.unit)}</span>
+                  {m.unitCost != null && Number(m.unitCost) > 0 && <span>Costo: ${String(m.unitCost)}/{getUnitAbbreviation(m.product.unit)}</span>}
+                  {m.referenceDoc && <span>Doc: {m.referenceDoc}</span>}
+                  {m.notes && <span>{m.notes}</span>}
+                </div>
               </div>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">
                 {new Date(m.createdAt).toLocaleDateString("es-ES")}
               </span>
             </div>
@@ -158,7 +181,9 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
                 <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                 <SelectContent>
                   {products.map((p) => (
-                    <SelectItem key={p.productId} value={String(p.productId)}>{p.name}</SelectItem>
+                    <SelectItem key={p.productId} value={String(p.productId)}>
+                      {p.name} ({getUnitAbbreviation(p.unit)})
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -181,7 +206,7 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
               </div>
               <div className="space-y-2">
                 <Label>Tipo *</Label>
-                <Select name="movementType" defaultValue="entry">
+                <Select name="movementType" defaultValue="entry" onValueChange={setMovementType}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {MOVEMENT_TYPES.map((t) => (
@@ -190,6 +215,16 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            {movementType === "entry" && (
+              <div className="space-y-2">
+                <Label>Costo unitario</Label>
+                <Input name="unitCost" type="number" step="0.01" placeholder="Precio de compra por unidad" />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Documento de referencia</Label>
+              <Input name="referenceDoc" placeholder="No. factura, vale de salida, etc." />
             </div>
             <div className="space-y-2">
               <Label>Notas</Label>
