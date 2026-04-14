@@ -340,13 +340,11 @@ export function ReservationListClient({
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle asChild>
-              <FormDialogHeader
+            <FormDialogHeader
                 icon={BookmarkCheck}
                 title="Nueva reservación"
                 description="Reserva pacas para un cliente indicando cantidad y fecha."
               />
-            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -407,13 +405,11 @@ export function ReservationListClient({
       <Dialog open={!!toEdit} onOpenChange={(o) => !o && setToEdit(null)}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle asChild>
-              <FormDialogHeader
+            <FormDialogHeader
                 icon={Pen}
                 title="Editar reservación"
                 description={toEdit?.clientName}
               />
-            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleUpdate} className="space-y-5">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
@@ -462,13 +458,11 @@ export function ReservationListClient({
       <Dialog open={!!toComplete} onOpenChange={(o) => !o && setToComplete(null)}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle asChild>
-              <FormDialogHeader
+            <FormDialogHeader
                 icon={CheckCircle}
                 title="Completar reservación"
                 description="Registra la venta con precio y método de pago."
               />
-            </DialogTitle>
           </DialogHeader>
           <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm space-y-1.5 mb-2">
             <p className="flex items-center gap-1.5">

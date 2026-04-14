@@ -265,13 +265,11 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle asChild>
-              <FormDialogHeader
+            <FormDialogHeader
                 icon={WarehouseIcon}
                 title="Nuevo almacén"
                 description="Registra un nuevo punto de almacenamiento."
               />
-            </DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => handleSubmit(e)}>
             <FormFields />
@@ -291,13 +289,11 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
       <Dialog open={!!toEdit} onOpenChange={(o) => !o && setToEdit(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle asChild>
-              <FormDialogHeader
+            <FormDialogHeader
                 icon={WarehouseIcon}
                 title="Editar almacén"
                 description={toEdit?.name}
               />
-            </DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => handleSubmit(e, toEdit?.warehouseId)}>
             <FormFields warehouse={toEdit} />

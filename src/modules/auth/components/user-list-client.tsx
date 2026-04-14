@@ -287,13 +287,11 @@ export function UserListClient({ users }: Props) {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle asChild>
-              <FormDialogHeader
+            <FormDialogHeader
                 icon={UserPlus}
                 title="Crear usuario"
                 description="Añade un nuevo usuario con su rol y módulos asignados."
               />
-            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-5">
             <Field label="Nombre completo" icon={User} required>
@@ -355,13 +353,11 @@ export function UserListClient({ users }: Props) {
       <Dialog open={!!userToEdit} onOpenChange={(o) => !o && setUserToEdit(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle asChild>
-              <FormDialogHeader
+            <FormDialogHeader
                 icon={Pen}
                 title="Editar usuario"
                 description={userToEdit?.fullName}
               />
-            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleUpdate} className="space-y-5">
             <Field label="Nombre completo" icon={User} required>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod/v4";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,7 +8,6 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,15 +68,27 @@ export function DriverForm({
     },
   });
 
-  if (driver) {
-    form.reset({
-      entity_id: driver.entityId,
-      full_name: driver.fullName,
-      identification_number: driver.identificationNumber,
-      phone_number: driver.phoneNumber,
-      operative_license: driver.operativeLicense ?? "",
-    });
-  }
+  useEffect(() => {
+    if (!open) return;
+    if (driver) {
+      form.reset({
+        entity_id: driver.entityId,
+        full_name: driver.fullName,
+        identification_number: driver.identificationNumber,
+        phone_number: driver.phoneNumber,
+        operative_license: driver.operativeLicense ?? "",
+      });
+    } else {
+      form.reset({
+        entity_id: 0,
+        full_name: "",
+        identification_number: "",
+        phone_number: "",
+        operative_license: "",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, driver]);
 
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
@@ -87,13 +99,11 @@ export function DriverForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle asChild>
-            <FormDialogHeader
+          <FormDialogHeader
               icon={User}
               title={driver ? "Editar conductor" : "Nuevo conductor"}
               description={driver ? "Actualiza los datos del conductor." : "Registra un nuevo conductor en el sistema."}
             />
-          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5">

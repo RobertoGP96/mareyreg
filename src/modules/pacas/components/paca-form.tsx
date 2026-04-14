@@ -4,7 +4,6 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,13 +70,11 @@ export function PacaEntryForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle asChild>
-            <FormDialogHeader
+          <FormDialogHeader
               icon={Shirt}
               title="Registrar entrada de pacas"
               description="Añade pacas al inventario indicando categoría y cantidad."
             />
-          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
           <FormSection icon={Layers} title="Clasificación" description="Categoría y cantidad recibida.">

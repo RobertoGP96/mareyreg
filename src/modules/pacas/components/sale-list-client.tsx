@@ -264,13 +264,11 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle asChild>
-              <FormDialogHeader
+            <FormDialogHeader
                 icon={ShoppingCart}
                 title="Registrar venta"
                 description="Crea una venta directa de pacas."
               />
-            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

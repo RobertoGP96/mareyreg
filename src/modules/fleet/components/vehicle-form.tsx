@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod/v4";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,7 +8,6 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,16 +72,29 @@ export function VehicleForm({
     },
   });
 
-  if (vehicle) {
-    form.reset({
-      name: vehicle.name ?? "",
-      cuña_circulation_number: vehicle.cuña_circulation_number ?? "",
-      plancha_circulation_number: vehicle.plancha_circulation_number ?? "",
-      cuña_plate_number: vehicle.cuña_plate_number ?? "",
-      plancha_plate_number: vehicle.plancha_plate_number ?? "",
-      driver_id: vehicle.driver_id ?? undefined,
-    });
-  }
+  useEffect(() => {
+    if (!open) return;
+    if (vehicle) {
+      form.reset({
+        name: vehicle.name ?? "",
+        cuña_circulation_number: vehicle.cuña_circulation_number ?? "",
+        plancha_circulation_number: vehicle.plancha_circulation_number ?? "",
+        cuña_plate_number: vehicle.cuña_plate_number ?? "",
+        plancha_plate_number: vehicle.plancha_plate_number ?? "",
+        driver_id: vehicle.driver_id ?? undefined,
+      });
+    } else {
+      form.reset({
+        name: "",
+        cuña_circulation_number: "",
+        plancha_circulation_number: "",
+        cuña_plate_number: "",
+        plancha_plate_number: "",
+        driver_id: undefined,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, vehicle]);
 
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
@@ -92,13 +105,11 @@ export function VehicleForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle asChild>
-            <FormDialogHeader
+          <FormDialogHeader
               icon={Truck}
               title={vehicle ? "Editar vehículo" : "Nuevo vehículo"}
               description={vehicle ? "Actualiza los datos del vehículo." : "Registra un nuevo vehículo con sus placas y documentación."}
             />
-          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">

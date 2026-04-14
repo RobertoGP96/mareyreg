@@ -345,13 +345,11 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle asChild>
-              <FormDialogHeader
+            <FormDialogHeader
                 icon={Package}
                 title="Nuevo producto"
                 description="Registra un nuevo producto en el catálogo."
               />
-            </DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => handleSubmit(e)}>
             <ProductFormFields />
@@ -371,13 +369,11 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
       <Dialog open={!!toEdit} onOpenChange={(o) => !o && setToEdit(null)}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle asChild>
-              <FormDialogHeader
+            <FormDialogHeader
                 icon={Package}
                 title="Editar producto"
                 description={toEdit?.name}
               />
-            </DialogTitle>
           </DialogHeader>
           <form onSubmit={(e) => handleSubmit(e, toEdit?.productId)}>
             <ProductFormFields product={toEdit} />

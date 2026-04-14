@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod/v4";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,7 +8,6 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,16 +74,30 @@ export function TripForm({
     },
   });
 
-  if (trip) {
-    form.reset({
-      driver_id: trip.driverId,
-      load_date: trip.loadDate ?? "",
-      load_time: trip.loadTime ?? "",
-      trip_payment: trip.tripPayment ?? "",
-      province: trip.province ?? "",
-      product: trip.product ?? "",
-    });
-  }
+  // Reset form values when opening with a different trip (edit) or reopening (create)
+  useEffect(() => {
+    if (!open) return;
+    if (trip) {
+      form.reset({
+        driver_id: trip.driverId,
+        load_date: trip.loadDate ?? "",
+        load_time: trip.loadTime ?? "",
+        trip_payment: trip.tripPayment ?? "",
+        province: trip.province ?? "",
+        product: trip.product ?? "",
+      });
+    } else {
+      form.reset({
+        driver_id: 0,
+        load_date: "",
+        load_time: "",
+        trip_payment: "",
+        province: "",
+        product: "",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, trip?.tripId]);
 
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
@@ -94,13 +108,11 @@ export function TripForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle asChild>
-            <FormDialogHeader
+          <FormDialogHeader
               icon={RouteIcon}
               title={trip ? "Editar viaje" : "Nuevo viaje"}
               description={trip ? "Actualiza los datos del viaje." : "Programa un viaje con conductor, destino y carga."}
             />
-          </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">

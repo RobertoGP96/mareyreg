@@ -7,7 +7,6 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,13 +50,11 @@ export function ContainerForm({ open, onOpenChange, onSubmit, isLoading }: Props
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle asChild>
-            <FormDialogHeader
+          <FormDialogHeader
               icon={Container}
               title="Agregar contenedor"
               description="Registra un contenedor identificado por número de serie."
             />
-          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5">
           <Field

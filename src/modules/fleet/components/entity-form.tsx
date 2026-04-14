@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod/v4";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,7 +8,6 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,9 +43,11 @@ export function EntityForm({
     },
   });
 
-  if (entity) {
-    form.reset({ name: entity.name });
-  }
+  useEffect(() => {
+    if (!open) return;
+    form.reset({ name: entity?.name ?? "" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, entity]);
 
   const handleSubmit = form.handleSubmit(async (data) => {
     await onSubmit(data);
@@ -56,13 +58,11 @@ export function EntityForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle asChild>
-            <FormDialogHeader
+          <FormDialogHeader
               icon={Building2}
               title={entity ? "Editar entidad" : "Nueva entidad"}
               description={entity ? "Actualiza el nombre de la entidad." : "Registra una nueva entidad operativa."}
             />
-          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5">
           <Field
