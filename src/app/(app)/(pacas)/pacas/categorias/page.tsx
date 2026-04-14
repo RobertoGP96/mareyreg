@@ -13,8 +13,10 @@ export default async function PacaCategoriasPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold font-headline tracking-tight text-foreground">Categorias de Pacas</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-xl md:text-2xl font-semibold font-headline tracking-tight text-foreground">
+          Categorias de Pacas
+        </h1>
+        <p className="text-sm md:text-base text-muted-foreground mt-1">
           Gestiona las categorias de pacas de ropa
         </p>
       </div>

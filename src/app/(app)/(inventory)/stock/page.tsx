@@ -16,8 +16,10 @@ export default async function StockPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold font-headline tracking-tight text-foreground">Stock</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-xl md:text-2xl font-semibold font-headline tracking-tight text-foreground">
+          Stock
+        </h1>
+        <p className="text-sm md:text-base text-muted-foreground mt-1">
           Niveles de stock y movimientos
         </p>
       </div>

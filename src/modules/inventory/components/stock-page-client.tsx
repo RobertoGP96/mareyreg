@@ -95,10 +95,12 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
     <div className="space-y-4">
       {/* Stock Levels */}
       <div className="bg-card rounded-lg border">
-        <div className="px-4 py-3 border-b flex justify-between items-center">
+        <div className="px-4 py-3 border-b flex flex-wrap gap-2 justify-between items-center">
           <h2 className="text-base font-medium">Niveles de Stock</h2>
           <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />Nuevo Movimiento
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Nuevo Movimiento</span>
+            <span className="sm:hidden">Nuevo</span>
           </Button>
         </div>
         <div className="grid gap-4 p-4">
@@ -110,9 +112,9 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
             const isOver = maxStock !== null && qty > maxStock;
             const abbr = getUnitAbbreviation(sl.product.unit);
             return (
-              <div key={`${sl.productId}-${sl.warehouseId}`} className="bg-card border rounded-lg p-4 flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
+              <div key={`${sl.productId}-${sl.warehouseId}`} className="bg-card border rounded-lg p-4 flex flex-wrap items-start gap-3 justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium">{sl.product.name}</p>
                     {isLow && (
                       <Badge className="bg-yellow-100 text-yellow-800">
@@ -125,7 +127,7 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
                       </Badge>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
                     <span>Almacen: {sl.warehouse.name}</span>
                     <span>Cantidad: {String(sl.currentQuantity)} {abbr}</span>
                     <span>Min: {String(sl.product.minStock)} {abbr}</span>
@@ -146,23 +148,23 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
         </div>
         <div className="grid gap-3 p-4">
           {movements.length > 0 ? movements.map((m) => (
-            <div key={m.movementId} className="bg-card border rounded-lg p-3 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
+            <div key={m.movementId} className="bg-card border rounded-lg p-3 flex flex-wrap items-start gap-2 justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
                   <Badge className={MOVEMENT_COLORS[m.movementType]}>
                     {getMovementLabel(m.movementType)}
                   </Badge>
                   <span className="font-medium">{m.product.name}</span>
                   <span className="text-muted-foreground">- {m.warehouse.name}</span>
                 </div>
-                <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground mt-1">
                   <span>Cantidad: {String(m.quantity)} {getUnitAbbreviation(m.product.unit)}</span>
                   {m.unitCost != null && Number(m.unitCost) > 0 && <span>Costo: ${String(m.unitCost)}/{getUnitAbbreviation(m.product.unit)}</span>}
                   {m.referenceDoc && <span>Doc: {m.referenceDoc}</span>}
                   {m.notes && <span>{m.notes}</span>}
                 </div>
               </div>
-              <span className="text-xs text-muted-foreground whitespace-nowrap ml-4">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
                 {new Date(m.createdAt).toLocaleDateString("es-ES")}
               </span>
             </div>

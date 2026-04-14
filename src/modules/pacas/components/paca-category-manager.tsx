@@ -127,11 +127,11 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
   return (
     <>
       <div className="bg-card rounded-lg border">
-        <div className="px-4 py-3 border-b flex justify-between items-center">
+        <div className="px-4 py-3 border-b flex flex-wrap gap-2 justify-between items-center">
           <h2 className="text-base font-medium">Categorias de Pacas</h2>
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Agregar
+          <Button onClick={() => setIsCreateOpen(true)} className="sm:w-auto">
+            <Plus className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Agregar</span>
           </Button>
         </div>
         <div className="grid gap-3 p-4">
@@ -139,11 +139,11 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
             categories.map((cat) => (
               <div
                 key={cat.categoryId}
-                className="bg-card border rounded-lg p-4 flex items-center justify-between"
+                className="bg-card border rounded-lg p-4 flex flex-wrap items-start gap-2 justify-between"
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">{cat.name}</p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium break-words">{cat.name}</p>
                     {cat.classification && (
                       <Badge variant="outline" className="text-xs">
                         {cat.classification.name}
@@ -151,7 +151,7 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
                     )}
                   </div>
                   {cat.description && (
-                    <p className="text-sm text-muted-foreground">{cat.description}</p>
+                    <p className="text-sm text-muted-foreground break-words">{cat.description}</p>
                   )}
                 </div>
                 <DropdownMenu>

@@ -10,16 +10,22 @@ export async function createPacaCategory(data: {
   classificationId?: number;
 }): Promise<ActionResult<{ categoryId: number }>> {
   try {
-    const existing = await db.pacaCategory.findUnique({ where: { name: data.name } });
+    const classificationId = data.classificationId || null;
+    const existing = await db.pacaCategory.findFirst({
+      where: { name: data.name, classificationId },
+    });
     if (existing) {
-      return { success: false, error: `Ya existe la categoria "${data.name}"` };
+      return {
+        success: false,
+        error: `Ya existe la categoria "${data.name}" en esta clasificacion`,
+      };
     }
 
     const category = await db.pacaCategory.create({
       data: {
         name: data.name,
         description: data.description || null,
-        classificationId: data.classificationId || null,
+        classificationId,
       },
     });
 
@@ -37,6 +43,33 @@ export async function updatePacaCategory(
   data: { name?: string; description?: string; classificationId?: number | null }
 ): Promise<ActionResult<void>> {
   try {
+    if (data.name !== undefined || data.classificationId !== undefined) {
+      const current = await db.pacaCategory.findUnique({
+        where: { categoryId: id },
+        select: { name: true, classificationId: true },
+      });
+      if (!current) {
+        return { success: false, error: "Categoria no encontrada" };
+      }
+      const nextName = data.name ?? current.name;
+      const nextClassificationId =
+        data.classificationId !== undefined ? data.classificationId : current.classificationId;
+
+      const duplicate = await db.pacaCategory.findFirst({
+        where: {
+          name: nextName,
+          classificationId: nextClassificationId,
+          NOT: { categoryId: id },
+        },
+      });
+      if (duplicate) {
+        return {
+          success: false,
+          error: `Ya existe la categoria "${nextName}" en esta clasificacion`,
+        };
+      }
+    }
+
     await db.pacaCategory.update({
       where: { categoryId: id },
       data: {

@@ -254,7 +254,7 @@ model PacaClassification {
 
 model PacaCategory {
   categoryId       Int      @id @default(autoincrement()) @map("category_id")
-  name             String   @unique
+  name             String
   classificationId Int?     @map("classification_id")
   description      String?
   createdAt        DateTime @default(now()) @map("created_at")
@@ -265,6 +265,7 @@ model PacaCategory {
   reservations   PacaReservation[]
   sales          PacaSale[]
 
+  @@unique([name, classificationId])
   @@index([classificationId])
   @@map("paca_categories")
 }

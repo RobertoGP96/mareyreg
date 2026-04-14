@@ -27,26 +27,42 @@ export function Topbar() {
       <SidebarTrigger className="-ml-1 size-8 rounded-md hover:bg-accent/60" />
       <Separator orientation="vertical" className="mx-1 !h-5 bg-border/80" />
       <Breadcrumb>
-        <BreadcrumbList className="gap-1.5 text-[0.82rem]">
-          {breadcrumbs.map((crumb, index) => (
-            <Fragment key={index}>
-              {index > 0 && <BreadcrumbSeparator className="[&>svg]:size-3.5 text-muted-foreground/50" />}
-              <BreadcrumbItem>
-                {crumb.href ? (
-                  <BreadcrumbLink
-                    href={crumb.href}
-                    className="text-muted-foreground hover:text-foreground transition-colors font-medium"
-                  >
-                    {crumb.label}
-                  </BreadcrumbLink>
-                ) : (
-                  <BreadcrumbPage className="text-foreground font-semibold">
-                    {crumb.label}
-                  </BreadcrumbPage>
+        <BreadcrumbList className="gap-1.5 text-[0.82rem] flex-nowrap">
+          {breadcrumbs.map((crumb, index) => {
+            const Icon = crumb.icon;
+            const isLast = index === breadcrumbs.length - 1;
+            return (
+              <Fragment key={index}>
+                {index > 0 && (
+                  <BreadcrumbSeparator className="[&>svg]:size-3.5 text-muted-foreground/50" />
                 )}
-              </BreadcrumbItem>
-            </Fragment>
-          ))}
+                <BreadcrumbItem>
+                  {crumb.href ? (
+                    <BreadcrumbLink
+                      href={crumb.href}
+                      title={crumb.label}
+                      aria-label={crumb.label}
+                      className="text-muted-foreground hover:text-foreground transition-colors font-medium flex items-center gap-1.5"
+                    >
+                      {Icon && <Icon className="size-4 shrink-0" aria-hidden="true" />}
+                      <span className={isLast ? "inline" : "hidden sm:inline"}>
+                        {crumb.label}
+                      </span>
+                    </BreadcrumbLink>
+                  ) : (
+                    <BreadcrumbPage
+                      title={crumb.label}
+                      aria-label={crumb.label}
+                      className="text-foreground font-semibold flex items-center gap-1.5"
+                    >
+                      {Icon && <Icon className="size-4 shrink-0" aria-hidden="true" />}
+                      <span className="inline">{crumb.label}</span>
+                    </BreadcrumbPage>
+                  )}
+                </BreadcrumbItem>
+              </Fragment>
+            );
+          })}
         </BreadcrumbList>
       </Breadcrumb>
       <div className="flex-1" />

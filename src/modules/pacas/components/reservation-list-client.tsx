@@ -284,9 +284,15 @@ export function ReservationListClient({
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {r.status === "active" && (
-                      <Button size="sm" variant="brand" onClick={() => setToComplete(r)}>
+                      <Button
+                        size="sm"
+                        variant="brand"
+                        onClick={() => setToComplete(r)}
+                        title="Completar"
+                        aria-label="Completar"
+                      >
                         <CircleCheck className="h-4 w-4" />
-                        Completar
+                        <span className="hidden sm:inline">Completar</span>
                       </Button>
                     )}
                     <DropdownMenu>
