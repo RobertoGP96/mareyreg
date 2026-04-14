@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Building2 } from "lucide-react";
 import type { Entity } from "@/types";
 
 const entitySchema = z.object({
@@ -55,21 +56,25 @@ export function EntityForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-primary" />
             {entity ? "Editar Entidad" : "Nueva Entidad"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="name">Nombre</Label>
-            <Input id="name" {...form.register("name")} />
+            <Label htmlFor="name" className="flex items-center gap-1.5 mb-1.5">
+              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+              Nombre
+            </Label>
+            <Input id="name" placeholder="Nombre de la entidad" {...form.register("name")} />
             {form.formState.errors.name && (
-              <p className="text-red-500 text-sm mt-1">
+              <p className="text-destructive text-sm mt-1">
                 {form.formState.errors.name.message}
               </p>
             )}
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"

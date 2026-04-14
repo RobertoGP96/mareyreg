@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { RouteIcon, User, Calendar, MapPin, Package, DollarSign } from "lucide-react";
 import { CUBAN_PROVINCES, PRODUCTS } from "@/lib/constants";
 import type { Driver } from "@/types";
 
@@ -92,13 +93,17 @@ export function TripForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <RouteIcon className="h-5 w-5 text-primary" />
             {trip ? "Editar Viaje" : "Nuevo Viaje"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label>Conductor</Label>
+            <Label className="flex items-center gap-1.5 mb-1.5">
+              <User className="h-3.5 w-3.5 text-muted-foreground" />
+              Conductor
+            </Label>
             <Select
               value={form.watch("driver_id")?.toString() || ""}
               onValueChange={(value) =>
@@ -117,23 +122,32 @@ export function TripForm({
               </SelectContent>
             </Select>
             {form.formState.errors.driver_id && (
-              <p className="text-red-500 text-sm mt-1">
+              <p className="text-destructive text-sm mt-1">
                 {form.formState.errors.driver_id.message}
               </p>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Fecha de Carga</Label>
+              <Label className="flex items-center gap-1.5 mb-1.5">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                Fecha de Carga
+              </Label>
               <Input type="date" {...form.register("load_date")} />
             </div>
             <div>
-              <Label>Hora de Carga</Label>
+              <Label className="flex items-center gap-1.5 mb-1.5">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                Hora de Carga
+              </Label>
               <Input type="time" {...form.register("load_time")} />
             </div>
           </div>
           <div>
-            <Label>Provincia</Label>
+            <Label className="flex items-center gap-1.5 mb-1.5">
+              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+              Provincia
+            </Label>
             <Select
               value={form.watch("province") || ""}
               onValueChange={(value) => form.setValue("province", value)}
@@ -151,7 +165,10 @@ export function TripForm({
             </Select>
           </div>
           <div>
-            <Label>Producto</Label>
+            <Label className="flex items-center gap-1.5 mb-1.5">
+              <Package className="h-3.5 w-3.5 text-muted-foreground" />
+              Producto
+            </Label>
             <Select
               value={form.watch("product") || ""}
               onValueChange={(value) => form.setValue("product", value)}
@@ -169,13 +186,16 @@ export function TripForm({
             </Select>
           </div>
           <div>
-            <Label>Pago del Viaje</Label>
+            <Label className="flex items-center gap-1.5 mb-1.5">
+              <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+              Pago del Viaje
+            </Label>
             <Input
               placeholder="0.00"
               {...form.register("trip_payment")}
             />
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"

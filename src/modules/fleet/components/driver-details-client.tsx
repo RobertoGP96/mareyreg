@@ -35,11 +35,11 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
             Volver
           </Button>
         </Link>
-        <h1 className="text-xl font-bold">{driver.fullName}</h1>
+        <h1 className="text-xl font-semibold">{driver.fullName}</h1>
       </div>
 
       {/* Driver Info */}
-      <div className="bg-card p-4 rounded-lg shadow-sm border">
+      <div className="bg-card p-4 rounded-lg border">
         <h2 className="text-base font-semibold mb-4">Informacion del Conductor</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div className="flex items-center gap-2">
@@ -69,7 +69,7 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
 
       {/* Vehicle */}
       {vehicle && (
-        <div className="bg-card p-4 rounded-lg shadow-sm border">
+        <div className="bg-card p-4 rounded-lg border">
           <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
             <Truck className="h-5 w-5" />
             Vehiculo Asignado
@@ -97,7 +97,7 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
       )}
 
       {/* Trips */}
-      <div className="bg-card p-4 rounded-lg shadow-sm border">
+      <div className="bg-card p-4 rounded-lg border">
         <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
           <RouteIcon className="h-5 w-5" />
           Viajes ({trips.length})

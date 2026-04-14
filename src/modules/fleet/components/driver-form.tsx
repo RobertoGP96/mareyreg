@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Building2, User, IdCard, Phone, FileText } from "lucide-react";
 import type { Entity } from "@/types";
 
 const driverSchema = z.object({
@@ -86,13 +87,17 @@ export function DriverForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <User className="h-5 w-5 text-primary" />
             {driver ? "Editar Conductor" : "Nuevo Conductor"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="entity_id">Entidad</Label>
+            <Label htmlFor="entity_id" className="flex items-center gap-1.5 mb-1.5">
+              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+              Entidad
+            </Label>
             <Select
               value={form.watch("entity_id")?.toString() || ""}
               onValueChange={(value) =>
@@ -114,51 +119,65 @@ export function DriverForm({
               </SelectContent>
             </Select>
             {form.formState.errors.entity_id && (
-              <p className="text-red-500 text-sm mt-1">
+              <p className="text-destructive text-sm mt-1">
                 {form.formState.errors.entity_id.message}
               </p>
             )}
           </div>
           <div>
-            <Label htmlFor="full_name">Nombre Completo</Label>
-            <Input id="full_name" {...form.register("full_name")} />
+            <Label htmlFor="full_name" className="flex items-center gap-1.5 mb-1.5">
+              <User className="h-3.5 w-3.5 text-muted-foreground" />
+              Nombre Completo
+            </Label>
+            <Input id="full_name" placeholder="Nombre del conductor" {...form.register("full_name")} />
             {form.formState.errors.full_name && (
-              <p className="text-red-500 text-sm mt-1">
+              <p className="text-destructive text-sm mt-1">
                 {form.formState.errors.full_name.message}
               </p>
             )}
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="identification_number" className="flex items-center gap-1.5 mb-1.5">
+                <IdCard className="h-3.5 w-3.5 text-muted-foreground" />
+                Identificacion
+              </Label>
+              <Input
+                id="identification_number"
+                placeholder="Numero de ID"
+                {...form.register("identification_number")}
+              />
+              {form.formState.errors.identification_number && (
+                <p className="text-destructive text-sm mt-1">
+                  {form.formState.errors.identification_number.message}
+                </p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="phone_number" className="flex items-center gap-1.5 mb-1.5">
+                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                Telefono
+              </Label>
+              <Input id="phone_number" placeholder="Numero de telefono" {...form.register("phone_number")} />
+              {form.formState.errors.phone_number && (
+                <p className="text-destructive text-sm mt-1">
+                  {form.formState.errors.phone_number.message}
+                </p>
+              )}
+            </div>
+          </div>
           <div>
-            <Label htmlFor="identification_number">
-              Numero de Identificacion
+            <Label htmlFor="operative_license" className="flex items-center gap-1.5 mb-1.5">
+              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+              Licencia Operativa
             </Label>
             <Input
-              id="identification_number"
-              {...form.register("identification_number")}
-            />
-            {form.formState.errors.identification_number && (
-              <p className="text-red-500 text-sm mt-1">
-                {form.formState.errors.identification_number.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor="phone_number">Telefono</Label>
-            <Input id="phone_number" {...form.register("phone_number")} />
-            {form.formState.errors.phone_number && (
-              <p className="text-red-500 text-sm mt-1">
-                {form.formState.errors.phone_number.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor="operative_license">Licencia Operativa</Label>
-            <Input
               id="operative_license"
+              placeholder="Opcional"
               {...form.register("operative_license")}
             />
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"

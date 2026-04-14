@@ -54,7 +54,7 @@ export default async function Home() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-extrabold font-headline tracking-tight text-primary">Inicio</h1>
+        <h1 className="text-2xl font-semibold font-headline tracking-tight text-foreground">Inicio</h1>
         <p className="text-muted-foreground mt-1">
           Bienvenido al Sistema de Gestion MAREYreg
         </p>
@@ -62,7 +62,7 @@ export default async function Home() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {stats.map((s) => (
-          <div key={s.href} className="bg-card p-4 rounded-lg shadow-sm border">
+          <div key={s.href} className="bg-card p-4 rounded-lg border">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 rounded-lg bg-muted">
                 <s.icon className="h-6 w-6 text-muted-foreground" />

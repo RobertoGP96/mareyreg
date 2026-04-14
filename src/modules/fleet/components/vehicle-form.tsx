@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Truck, Tag, FileText, User } from "lucide-react";
 import type { Driver } from "@/types";
 
 const vehicleSchema = z.object({
@@ -90,38 +91,49 @@ export function VehicleForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Truck className="h-5 w-5 text-primary" />
             {vehicle ? "Editar Vehiculo" : "Nuevo Vehiculo"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="name">Nombre</Label>
+            <Label htmlFor="name" className="flex items-center gap-1.5 mb-1.5">
+              <Truck className="h-3.5 w-3.5 text-muted-foreground" />
+              Nombre
+            </Label>
             <Input
               id="name"
               placeholder="Ej: Camion 01"
               {...form.register("name")}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="cuña_plate_number">Placa Cuna</Label>
+              <Label htmlFor="cuña_plate_number" className="flex items-center gap-1.5 mb-1.5">
+                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                Placa Cuna
+              </Label>
               <Input
                 id="cuña_plate_number"
                 {...form.register("cuña_plate_number")}
               />
             </div>
             <div>
-              <Label htmlFor="plancha_plate_number">Placa Plancha</Label>
+              <Label htmlFor="plancha_plate_number" className="flex items-center gap-1.5 mb-1.5">
+                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                Placa Plancha
+              </Label>
               <Input
                 id="plancha_plate_number"
                 {...form.register("plancha_plate_number")}
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label htmlFor="cuña_circulation_number">
+              <Label htmlFor="cuña_circulation_number" className="flex items-center gap-1.5 mb-1.5">
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                 Circulacion Cuna
               </Label>
               <Input
@@ -130,7 +142,8 @@ export function VehicleForm({
               />
             </div>
             <div>
-              <Label htmlFor="plancha_circulation_number">
+              <Label htmlFor="plancha_circulation_number" className="flex items-center gap-1.5 mb-1.5">
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                 Circulacion Plancha
               </Label>
               <Input
@@ -140,7 +153,10 @@ export function VehicleForm({
             </div>
           </div>
           <div>
-            <Label htmlFor="driver_id">Conductor</Label>
+            <Label htmlFor="driver_id" className="flex items-center gap-1.5 mb-1.5">
+              <User className="h-3.5 w-3.5 text-muted-foreground" />
+              Conductor
+            </Label>
             <Select
               value={form.watch("driver_id")?.toString() || "none"}
               onValueChange={(value) =>
@@ -166,7 +182,7 @@ export function VehicleForm({
               </SelectContent>
             </Select>
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"

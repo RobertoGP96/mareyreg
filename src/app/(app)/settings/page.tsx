@@ -38,7 +38,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-extrabold font-headline tracking-tight text-primary">Configuracion</h1>
+      <h1 className="text-2xl font-semibold font-headline tracking-tight text-foreground">Configuracion</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {isAdmin && (

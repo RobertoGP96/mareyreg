@@ -45,7 +45,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-muted text-primary">
                   <img
                     src="/truck-white.svg"
                     alt="MAREYreg"
@@ -90,7 +90,7 @@ export function AppSidebar() {
         {/* Dynamic Modules */}
         {modules.map((module) => (
           <SidebarGroup key={module.id}>
-            <SidebarGroupLabel className="uppercase tracking-widest text-[10px] font-bold">{module.label}</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground tracking-wide">{module.label}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {module.routes.map((route) => (

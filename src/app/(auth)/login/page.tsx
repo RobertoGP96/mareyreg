@@ -5,16 +5,16 @@ import { Shield } from "lucide-react";
 export default function LoginPage() {
   return (
     <div className="flex-1 flex flex-col">
-      {/* Dark header */}
-      <div className="bg-primary py-10 flex flex-col items-center gap-3">
-        <div className="flex items-center justify-center w-16 h-16 rounded-xl bg-primary-foreground/10 border border-primary-foreground/20">
-          <Shield className="h-8 w-8 text-primary-foreground" />
+      {/* Warm header */}
+      <div className="bg-muted py-10 flex flex-col items-center gap-3 border-b">
+        <div className="flex items-center justify-center w-16 h-16 rounded-xl bg-background border">
+          <Shield className="h-8 w-8 text-primary" />
         </div>
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-primary-foreground roadway-font tracking-wide">
+          <h1 className="text-2xl font-bold text-foreground roadway-font tracking-wide">
             MAREYREG
           </h1>
-          <p className="text-xs text-primary-foreground/60 uppercase tracking-[0.25em] mt-1">
+          <p className="text-xs text-muted-foreground uppercase tracking-[0.25em] mt-1">
             Sistema de Gestion
           </p>
         </div>
@@ -23,9 +23,9 @@ export default function LoginPage() {
       {/* Form card */}
       <div className="flex-1 flex items-start justify-center px-4 -mt-6">
         <div className="w-full max-w-md">
-          <div className="bg-card rounded-xl shadow-lg border p-8">
+          <div className="bg-card rounded-xl border p-8 shadow-sm">
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-foreground">
+              <h2 className="text-xl font-semibold text-foreground">
                 Autenticacion del Sistema
               </h2>
               <p className="text-sm text-muted-foreground mt-1">

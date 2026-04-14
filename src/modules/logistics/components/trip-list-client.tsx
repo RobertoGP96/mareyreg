@@ -187,7 +187,7 @@ export function TripListClient({ initialTrips, drivers }: Props) {
 
   return (
     <>
-      <div className="bg-card shadow-sm rounded-lg border">
+      <div className="bg-card rounded-lg border">
         <div className="px-4 py-3 border-b border-border">
           <div className="flex justify-between items-center">
             <h2 className="text-base font-medium text-foreground">
@@ -219,7 +219,7 @@ export function TripListClient({ initialTrips, drivers }: Props) {
             filteredTrips.map((trip) => (
               <div
                 key={trip.tripId}
-                className="bg-card border border-border rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 p-4"
+                className="bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors duration-200 p-4"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start space-x-3 flex-1 min-w-0">

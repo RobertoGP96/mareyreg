@@ -143,7 +143,7 @@ export function ReservationListClient({
 
   return (
     <>
-      <div className="bg-card shadow-sm rounded-lg border">
+      <div className="bg-card rounded-lg border">
         <div className="px-4 py-3 border-b">
           <div className="flex justify-between items-center">
             <h2 className="text-base font-medium">Reservaciones</h2>

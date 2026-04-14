@@ -11,7 +11,7 @@ export default async function UsersPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-extrabold font-headline tracking-tight text-primary">Usuarios</h1>
+        <h1 className="text-2xl font-semibold font-headline tracking-tight text-foreground">Usuarios</h1>
         <p className="text-muted-foreground mt-1">
           Gestiona los usuarios del sistema
         </p>

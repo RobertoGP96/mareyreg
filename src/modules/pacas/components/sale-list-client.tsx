@@ -92,20 +92,20 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
         <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
           <div className="p-2 rounded-lg bg-muted"><DollarSign className="h-5 w-5 text-muted-foreground" /></div>
           <div>
-            <p className="text-xl font-bold">{stats.totalSales}</p>
+            <p className="text-xl font-semibold">{stats.totalSales}</p>
             <p className="text-sm text-muted-foreground">Pacas vendidas</p>
           </div>
         </div>
         <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
           <div className="p-2 rounded-lg bg-muted"><DollarSign className="h-5 w-5 text-muted-foreground" /></div>
           <div>
-            <p className="text-xl font-bold">${stats.totalRevenue.toFixed(2)}</p>
+            <p className="text-xl font-semibold">${stats.totalRevenue.toFixed(2)}</p>
             <p className="text-sm text-muted-foreground">Ingresos totales</p>
           </div>
         </div>
       </div>
 
-      <div className="bg-card shadow-sm rounded-lg border">
+      <div className="bg-card rounded-lg border">
         <div className="px-4 py-3 border-b">
           <div className="flex justify-between items-center">
             <h2 className="text-base font-medium">Ventas</h2>

@@ -126,7 +126,7 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
 
   return (
     <>
-      <div className="bg-card shadow-sm rounded-lg border">
+      <div className="bg-card rounded-lg border">
         <div className="px-4 py-3 border-b flex justify-between items-center">
           <h2 className="text-base font-medium">Categorias de Pacas</h2>
           <Button onClick={() => setIsCreateOpen(true)}>

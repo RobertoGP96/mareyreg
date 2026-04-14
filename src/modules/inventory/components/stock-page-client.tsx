@@ -94,7 +94,7 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
   return (
     <div className="space-y-4">
       {/* Stock Levels */}
-      <div className="bg-card shadow-sm rounded-lg border">
+      <div className="bg-card rounded-lg border">
         <div className="px-4 py-3 border-b flex justify-between items-center">
           <h2 className="text-base font-medium">Niveles de Stock</h2>
           <Button onClick={() => setIsCreateOpen(true)}>
@@ -140,7 +140,7 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
       </div>
 
       {/* Recent Movements */}
-      <div className="bg-card shadow-sm rounded-lg border">
+      <div className="bg-card rounded-lg border">
         <div className="px-4 py-3 border-b">
           <h2 className="text-base font-medium">Movimientos Recientes</h2>
         </div>

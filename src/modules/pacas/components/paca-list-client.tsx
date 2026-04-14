@@ -96,21 +96,21 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-xl font-bold text-green-600">{totalAvailable}</p>
+          <p className="text-xl font-semibold text-green-600">{totalAvailable}</p>
           <p className="text-xs text-muted-foreground uppercase tracking-wider">Disponibles</p>
         </div>
         <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-xl font-bold text-blue-600">{totalReserved}</p>
+          <p className="text-xl font-semibold text-blue-600">{totalReserved}</p>
           <p className="text-xs text-muted-foreground uppercase tracking-wider">Reservadas</p>
         </div>
         <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-xl font-bold text-muted-foreground">{totalSold}</p>
+          <p className="text-xl font-semibold text-muted-foreground">{totalSold}</p>
           <p className="text-xs text-muted-foreground uppercase tracking-wider">Vendidas</p>
         </div>
       </div>
 
       {/* Inventory Table */}
-      <div className="bg-card shadow-sm rounded-lg border">
+      <div className="bg-card rounded-lg border">
         <div className="px-4 py-3 border-b flex justify-between items-center">
           <h2 className="text-base font-medium">Inventario por Categoria</h2>
           <Button onClick={() => setIsEntryOpen(true)}>
@@ -178,7 +178,7 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
       </div>
 
       {/* Recent Entries */}
-      <div className="bg-card shadow-sm rounded-lg border">
+      <div className="bg-card rounded-lg border">
         <div className="px-4 py-3 border-b">
           <h2 className="text-base font-medium">Entradas Recientes</h2>
         </div>

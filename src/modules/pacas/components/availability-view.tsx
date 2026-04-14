@@ -51,19 +51,19 @@ export function AvailabilityView({ data }: Props) {
       {/* Summary stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-green-600">{totalAvailable}</p>
+          <p className="text-2xl font-semibold text-green-600">{totalAvailable}</p>
           <p className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
             Disponibles
           </p>
         </div>
         <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-blue-600">{totalReserved}</p>
+          <p className="text-2xl font-semibold text-blue-600">{totalReserved}</p>
           <p className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
             Reservadas
           </p>
         </div>
         <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold">{totalAll}</p>
+          <p className="text-2xl font-semibold">{totalAll}</p>
           <p className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
             Total
           </p>
@@ -82,7 +82,7 @@ export function AvailabilityView({ data }: Props) {
                 <div className="p-1.5 rounded-md bg-primary/10">
                   <Package className="h-4 w-4 text-primary" />
                 </div>
-                <h3 className="font-bold text-base uppercase tracking-wider">
+                <h3 className="font-semibold text-base uppercase tracking-wider">
                   {group.classification}
                 </h3>
               </div>

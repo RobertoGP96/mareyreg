@@ -9,7 +9,7 @@ export default async function WarehousesPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-extrabold font-headline tracking-tight text-primary">Almacenes</h1>
+        <h1 className="text-2xl font-semibold font-headline tracking-tight text-foreground">Almacenes</h1>
         <p className="text-muted-foreground mt-1">
           Gestiona los almacenes del inventario
         </p>
