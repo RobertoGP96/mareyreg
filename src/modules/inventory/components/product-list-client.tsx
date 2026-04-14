@@ -43,18 +43,19 @@ import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
 import {
   MoreHorizontal,
-  Pen,
+  SquarePen,
   Plus,
   Search,
   Trash2,
   Package,
-  Tag,
-  Hash,
-  Layers,
+  Barcode,
+  ScanBarcode,
+  Bookmark,
+  FolderTree,
   Ruler,
   Warehouse as WarehouseIcon,
-  DollarSign,
-  Truck,
+  CircleDollarSign,
+  Store,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -162,15 +163,15 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
           <Input name="name" defaultValue={product?.name} required placeholder="Ej. Aceite multigrado 20W-50" />
         </Field>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="SKU" icon={Tag}>
+          <Field label="SKU" icon={Barcode}>
             <Input name="sku" defaultValue={product?.sku ?? ""} placeholder="MAT-001" />
           </Field>
-          <Field label="Código de barras" icon={Hash}>
+          <Field label="Código de barras" icon={ScanBarcode}>
             <Input name="barcode" defaultValue={product?.barcode ?? ""} placeholder="EAN-13" />
           </Field>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Categoría" icon={Layers}>
+          <Field label="Categoría" icon={FolderTree}>
             <Select name="category" defaultValue={product?.category ?? undefined}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Seleccionar..." />
@@ -210,21 +211,21 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
           <Field label="Stock máximo" icon={WarehouseIcon} hint="Opcional.">
             <Input name="maxStock" type="number" step="0.01" defaultValue={product?.maxStock ? String(product.maxStock) : ""} placeholder="—" />
           </Field>
-          <Field label="Costo unitario" icon={DollarSign}>
+          <Field label="Costo unitario" icon={CircleDollarSign}>
             <Input name="costPrice" type="number" step="0.01" defaultValue={product?.costPrice ? String(product.costPrice) : ""} placeholder="$0.00" />
           </Field>
         </div>
       </FormSection>
 
-      <FormSection icon={Truck} title="Proveedor" description="Información comercial.">
+      <FormSection icon={Store} title="Proveedor" description="Información comercial.">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Field label="Marca" icon={Tag}>
+          <Field label="Marca" icon={Bookmark}>
             <Input name="brand" defaultValue={product?.brand ?? ""} />
           </Field>
-          <Field label="Proveedor" icon={Truck}>
+          <Field label="Proveedor" icon={Store}>
             <Input name="supplier" defaultValue={product?.supplier ?? ""} />
           </Field>
-          <Field label="Ref. proveedor" icon={Hash}>
+          <Field label="Ref. proveedor" icon={Barcode}>
             <Input name="supplierRef" defaultValue={product?.supplierRef ?? ""} placeholder="Código del proveedor" />
           </Field>
         </div>
@@ -300,7 +301,7 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
                     )}
                     {p.costPrice != null && Number(p.costPrice) > 0 && (
                       <span className="text-[var(--success)]">
-                        <DollarSign className="h-3 w-3 inline -mt-0.5" />
+                        <CircleDollarSign className="h-3 w-3 inline -mt-0.5" />
                         {String(p.costPrice)}
                       </span>
                     )}
@@ -315,7 +316,7 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem onClick={() => setToEdit(p)}>
-                      <Pen className="h-4 w-4" /> Editar
+                      <SquarePen className="h-4 w-4" /> Editar
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setToDelete(p.productId)}

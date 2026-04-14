@@ -16,7 +16,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { Home, Settings, Sparkles } from "lucide-react";
+import { LayoutDashboard, Settings2, Sparkles, PanelsTopLeft } from "lucide-react";
 import { getEnabledModules } from "@/lib/module-registry";
 
 export function AppSidebar() {
@@ -46,16 +46,15 @@ export function AppSidebar() {
             <SidebarMenuButton size="lg" asChild className="hover:bg-sidebar-accent/50 data-[state=open]:bg-sidebar-accent/60">
               <Link href="/">
                 <div className="relative flex aspect-square size-9 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-[var(--brand)] to-[color-mix(in_oklch,var(--brand)_60%,#b45309)] shadow-[0_4px_12px_-2px_color-mix(in_oklch,var(--brand)_40%,transparent)]">
-                  <img
-                    src="/truck-white.svg"
-                    alt="MAREYreg"
-                    className="size-5 relative z-10"
+                  <PanelsTopLeft
+                    className="size-5 text-white relative z-10"
+                    strokeWidth={2.25}
                   />
                   <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/20" />
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
                   <span className="truncate font-semibold roadway-font text-[1.05rem] text-sidebar-foreground">
-                    MAREYreg
+                    MAREYway
                   </span>
                   <span className="truncate text-[0.68rem] uppercase tracking-[0.18em] text-sidebar-foreground/50">
                     Sistema de Gestión
@@ -83,7 +82,7 @@ export function AppSidebar() {
                     {isActive("/") && (
                       <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-[var(--brand)]" />
                     )}
-                    <Home />
+                    <LayoutDashboard />
                     <span>Inicio</span>
                   </Link>
                 </SidebarMenuButton>
@@ -153,7 +152,7 @@ export function AppSidebar() {
                 {isActive("/settings") && (
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-[var(--brand)]" />
                 )}
-                <Settings />
+                <Settings2 />
                 <span>Configuración</span>
               </Link>
             </SidebarMenuButton>

@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Field, FormDialogHeader } from "@/components/ui/field";
-import { Container, Hash, Layers, Loader2 } from "lucide-react";
+import { Container, Barcode, PackageCheck, Loader2 } from "lucide-react";
 import { CONTAINER_TYPES } from "@/lib/constants";
 
 const containerSchema = z.object({
@@ -60,14 +60,14 @@ export function ContainerForm({ open, onOpenChange, onSubmit, isLoading }: Props
           <Field
             id="serial_number"
             label="Número de serie"
-            icon={Hash}
+            icon={Barcode}
             required
             error={form.formState.errors.serial_number?.message}
           >
             <Input id="serial_number" placeholder="Ej. MSKU1234567" {...form.register("serial_number")} />
           </Field>
 
-          <Field label="Tipo" icon={Layers} hint="Opcional.">
+          <Field label="Tipo" icon={PackageCheck} hint="Opcional.">
             <Select
               value={form.watch("type") || ""}
               onValueChange={(value) => form.setValue("type", value)}

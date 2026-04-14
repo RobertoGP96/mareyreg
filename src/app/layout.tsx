@@ -16,7 +16,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "MAREYreg - Sistema de Gestion",
+  title: "MAREYway - Sistema de Gestion",
   description:
     "Sistema de gestion de conductores, vehiculos, viajes, pacas e inventario",
 };

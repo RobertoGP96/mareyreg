@@ -1,18 +1,18 @@
 import {
-  Home,
-  Users,
+  LayoutDashboard,
+  Contact,
   Truck,
-  RouteIcon,
-  DollarSign,
+  Route,
+  CircleDollarSign,
   Package,
-  Settings,
-  Shirt,
+  Settings2,
+  Package2,
   Tags,
-  CalendarCheck,
-  Receipt,
-  BarChart3,
+  BookmarkCheck,
+  ShoppingBag,
+  PackageCheck,
   Warehouse,
-  ArrowLeftRight,
+  PackageOpen,
   Building2,
   type LucideIcon,
 } from "lucide-react";
@@ -35,25 +35,25 @@ export const modules: AppModule[] = [
   {
     id: "logistics",
     label: "Logistica",
-    icon: RouteIcon,
+    icon: Route,
     enabled: true,
     routes: [
       { name: "Entidades", href: "/entities", icon: Building2 },
-      { name: "Conductores", href: "/drivers", icon: Users },
+      { name: "Conductores", href: "/drivers", icon: Contact },
       { name: "Vehiculos", href: "/vehicles", icon: Truck },
-      { name: "Viajes", href: "/trips", icon: RouteIcon },
+      { name: "Viajes", href: "/trips", icon: Route },
     ],
   },
   {
     id: "pacas",
     label: "Pacas",
-    icon: Shirt,
+    icon: Package2,
     enabled: true,
     routes: [
-      { name: "Inventario", href: "/pacas", icon: Shirt },
-      { name: "Disponibilidad", href: "/pacas/disponibilidad", icon: BarChart3 },
-      { name: "Reservaciones", href: "/pacas/reservaciones", icon: CalendarCheck },
-      { name: "Ventas", href: "/pacas/ventas", icon: Receipt },
+      { name: "Inventario", href: "/pacas", icon: Package2 },
+      { name: "Disponibilidad", href: "/pacas/disponibilidad", icon: PackageCheck },
+      { name: "Reservaciones", href: "/pacas/reservaciones", icon: BookmarkCheck },
+      { name: "Ventas", href: "/pacas/ventas", icon: ShoppingBag },
       { name: "Categorias", href: "/pacas/categorias", icon: Tags },
     ],
   },
@@ -65,26 +65,26 @@ export const modules: AppModule[] = [
     routes: [
       { name: "Productos", href: "/products", icon: Package },
       { name: "Almacenes", href: "/warehouses", icon: Warehouse },
-      { name: "Stock", href: "/stock", icon: ArrowLeftRight },
+      { name: "Stock", href: "/stock", icon: PackageOpen },
     ],
   },
   {
     id: "payments",
     label: "Pagos",
-    icon: DollarSign,
+    icon: CircleDollarSign,
     enabled: false,
-    routes: [{ name: "Pagos", href: "/payments", icon: DollarSign }],
+    routes: [{ name: "Pagos", href: "/payments", icon: CircleDollarSign }],
   },
 ];
 
 export const fixedRoutes: ModuleRoute[] = [
-  { name: "Inicio", href: "/", icon: Home },
+  { name: "Inicio", href: "/", icon: LayoutDashboard },
 ];
 
 export const settingsRoute: ModuleRoute = {
   name: "Configuracion",
   href: "/settings",
-  icon: Settings,
+  icon: Settings2,
 };
 
 export function getEnabledModules(): AppModule[] {

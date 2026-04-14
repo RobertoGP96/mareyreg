@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Trash2, Users, ChevronRight } from "lucide-react";
+import { Trash2, UsersRound, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { clearAllData } from "@/modules/core/actions/admin-actions";
 import { toast } from "sonner";
@@ -47,7 +47,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-primary/10">
-                    <Users className="h-6 w-6 text-primary" />
+                    <UsersRound className="h-6 w-6 text-primary" />
                   </div>
                   <h2 className="text-lg font-semibold">Usuarios</h2>
                 </div>

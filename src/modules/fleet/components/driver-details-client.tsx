@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, IdCardIcon, Phone, IdCardLanyard, Truck, RouteIcon, Building2, Box } from "lucide-react";
+import { ArrowLeft, Fingerprint, Phone, FileBadge, Truck, Route as RouteIcon, Building2, Container as ContainerIcon } from "lucide-react";
 import type { Vehicle, Entity, Trip, Container } from "@/types";
 
 interface DriverInfo {
@@ -48,7 +48,7 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
             <Badge variant="secondary">{driver.entity.name}</Badge>
           </div>
           <div className="flex items-center gap-2">
-            <IdCardIcon className="h-4 w-4 text-muted-foreground" />
+            <Fingerprint className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium">ID:</span>
             <span>{driver.identificationNumber}</span>
           </div>
@@ -59,7 +59,7 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
           </div>
           {driver.operativeLicense && (
             <div className="flex items-center gap-2">
-              <IdCardLanyard className="h-4 w-4 text-muted-foreground" />
+              <FileBadge className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium">Licencia:</span>
               <Badge variant="secondary">{driver.operativeLicense}</Badge>
             </div>
@@ -123,7 +123,7 @@ export function DriverDetailsClient({ driver, vehicles, trips }: Props) {
                 </div>
                 {trip.containers.length > 0 && (
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    <Box className="h-3.5 w-3.5 text-muted-foreground" />
+                    <ContainerIcon className="h-3.5 w-3.5 text-muted-foreground" />
                     {trip.containers.map((c) => (
                       <Badge key={c.containerId} variant="outline" className="text-xs">
                         {c.serialNumber}

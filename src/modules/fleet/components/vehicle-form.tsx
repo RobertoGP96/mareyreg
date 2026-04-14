@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
-import { Truck, Tag, FileText, User, Loader2 } from "lucide-react";
+import { Truck, SquareStack, FileBadge, UserRound, Loader2 } from "lucide-react";
 import type { Driver } from "@/types";
 
 const vehicleSchema = z.object({
@@ -118,7 +118,7 @@ export function VehicleForm({
               <Input id="name" placeholder="Ej. Camión 01" {...form.register("name")} />
             </Field>
 
-            <Field label="Conductor asignado" icon={User} hint="Puede dejarse sin asignar.">
+            <Field label="Conductor asignado" icon={UserRound} hint="Puede dejarse sin asignar.">
               <Select
                 value={form.watch("driver_id")?.toString() || "none"}
                 onValueChange={(value) =>
@@ -143,23 +143,23 @@ export function VehicleForm({
             </Field>
           </FormSection>
 
-          <FormSection icon={Tag} title="Placas" description="Placas de circulación de cuña y plancha.">
+          <FormSection icon={SquareStack} title="Placas" description="Placas de circulación de cuña y plancha.">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field id="cuña_plate_number" label="Placa Cuña" icon={Tag}>
+              <Field id="cuña_plate_number" label="Placa Cuña" icon={SquareStack}>
                 <Input id="cuña_plate_number" placeholder="ABC-1234" {...form.register("cuña_plate_number")} />
               </Field>
-              <Field id="plancha_plate_number" label="Placa Plancha" icon={Tag}>
+              <Field id="plancha_plate_number" label="Placa Plancha" icon={SquareStack}>
                 <Input id="plancha_plate_number" placeholder="XYZ-5678" {...form.register("plancha_plate_number")} />
               </Field>
             </div>
           </FormSection>
 
-          <FormSection icon={FileText} title="Documentación" description="Números de circulación oficiales.">
+          <FormSection icon={FileBadge} title="Documentación" description="Números de circulación oficiales.">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field id="cuña_circulation_number" label="Circulación Cuña" icon={FileText}>
+              <Field id="cuña_circulation_number" label="Circulación Cuña" icon={FileBadge}>
                 <Input id="cuña_circulation_number" {...form.register("cuña_circulation_number")} />
               </Field>
-              <Field id="plancha_circulation_number" label="Circulación Plancha" icon={FileText}>
+              <Field id="plancha_circulation_number" label="Circulación Plancha" icon={FileBadge}>
                 <Input id="plancha_circulation_number" {...form.register("plancha_circulation_number")} />
               </Field>
             </div>

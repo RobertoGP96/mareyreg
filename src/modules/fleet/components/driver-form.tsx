@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Field, FormDialogHeader } from "@/components/ui/field";
-import { Building2, User, IdCard, Phone, FileText, Loader2 } from "lucide-react";
+import { Building2, UserRound, Fingerprint, Phone, FileBadge, Loader2 } from "lucide-react";
 import type { Entity } from "@/types";
 
 const driverSchema = z.object({
@@ -100,7 +100,7 @@ export function DriverForm({
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <FormDialogHeader
-              icon={User}
+              icon={UserRound}
               title={driver ? "Editar conductor" : "Nuevo conductor"}
               description={driver ? "Actualiza los datos del conductor." : "Registra un nuevo conductor en el sistema."}
             />
@@ -138,7 +138,7 @@ export function DriverForm({
           <Field
             id="full_name"
             label="Nombre completo"
-            icon={User}
+            icon={UserRound}
             required
             error={form.formState.errors.full_name?.message}
           >
@@ -149,7 +149,7 @@ export function DriverForm({
             <Field
               id="identification_number"
               label="Identificación"
-              icon={IdCard}
+              icon={Fingerprint}
               required
               error={form.formState.errors.identification_number?.message}
             >
@@ -173,7 +173,7 @@ export function DriverForm({
           <Field
             id="operative_license"
             label="Licencia operativa"
-            icon={FileText}
+            icon={FileBadge}
             hint="Opcional — ingresa el número de licencia si aplica."
           >
             <Input

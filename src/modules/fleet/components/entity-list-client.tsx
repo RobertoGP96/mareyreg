@@ -27,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, Trash2, MoreHorizontal, Plus, Pen, Building2 } from "lucide-react";
+import { Search, Trash2, MoreHorizontal, Plus, SquarePen, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createEntity,
@@ -140,7 +140,7 @@ export function EntityListClient({ initialEntities }: Props) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem onClick={() => setEntityToEdit(entity)}>
-                      <Pen className="h-4 w-4" /> Editar
+                      <SquarePen className="h-4 w-4" /> Editar
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setEntityToDelete(entity.entityId)}

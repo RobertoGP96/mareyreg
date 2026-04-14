@@ -9,11 +9,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import {
   Plus,
   Trash2,
-  Shirt,
-  CheckCircle2,
-  Clock,
-  ArrowDownCircle,
-  Layers,
+  Package2,
+  CircleCheck,
+  Bookmark,
+  HandCoins,
+  FolderTree,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -97,15 +97,15 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
   const totalSold = inventory.reduce((s, i) => s + i.sold, 0);
 
   const summaryCards = [
-    { label: "Disponibles", value: totalAvailable, icon: CheckCircle2, color: "text-[var(--success)]", bg: "from-[var(--success)]/20 to-[var(--success)]/5", ring: "ring-[var(--success)]/20" },
-    { label: "Reservadas",  value: totalReserved,  icon: Clock,         color: "text-[var(--info)]",    bg: "from-[var(--info)]/20 to-[var(--info)]/5",       ring: "ring-[var(--info)]/20" },
-    { label: "Vendidas",    value: totalSold,      icon: ArrowDownCircle, color: "text-muted-foreground",bg: "from-muted to-transparent",                       ring: "ring-border" },
+    { label: "Disponibles", value: totalAvailable, icon: CircleCheck, color: "text-[var(--success)]", bg: "from-[var(--success)]/20 to-[var(--success)]/5", ring: "ring-[var(--success)]/20" },
+    { label: "Reservadas",  value: totalReserved,  icon: Bookmark,         color: "text-[var(--info)]",    bg: "from-[var(--info)]/20 to-[var(--info)]/5",       ring: "ring-[var(--info)]/20" },
+    { label: "Vendidas",    value: totalSold,      icon: HandCoins, color: "text-muted-foreground",bg: "from-muted to-transparent",                       ring: "ring-border" },
   ];
 
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Shirt}
+        icon={Package2}
         title="Inventario de pacas"
         description="Stock por categoría con seguimiento de disponibles, reservadas y vendidas."
       >
@@ -143,7 +143,7 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
       <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 className="font-headline font-semibold text-foreground flex items-center gap-2">
-            <Layers className="h-4 w-4 text-[var(--brand)]" />
+            <FolderTree className="h-4 w-4 text-[var(--brand)]" />
             Inventario por categoría
           </h2>
           <Badge variant="brand">{inventory.length}</Badge>
@@ -172,7 +172,7 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
                     <tr key={item.categoryId} className="transition-colors hover:bg-[var(--brand)]/[0.04]">
                       <td className="px-5 py-3 font-medium text-foreground">
                         <div className="flex items-center gap-2">
-                          <Shirt className="h-4 w-4 text-muted-foreground" />
+                          <Package2 className="h-4 w-4 text-muted-foreground" />
                           {item.category.name}
                         </div>
                       </td>
@@ -219,7 +219,7 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
       <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 className="font-headline font-semibold text-foreground flex items-center gap-2">
-            <ArrowDownCircle className="h-4 w-4 text-[var(--brand)]" />
+            <HandCoins className="h-4 w-4 text-[var(--brand)]" />
             Entradas recientes
           </h2>
           <Badge variant="outline">{entries.length}</Badge>

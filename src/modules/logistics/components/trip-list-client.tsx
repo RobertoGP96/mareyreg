@@ -32,12 +32,12 @@ import {
   Trash2,
   MoreHorizontal,
   Plus,
-  Pen,
-  RouteIcon,
-  Box,
-  Calendar,
+  SquarePen,
+  Route as RouteIcon,
+  Container,
+  CalendarDays,
   Package,
-  DollarSign,
+  CircleDollarSign,
   MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -227,7 +227,7 @@ export function TripListClient({ initialTrips, drivers }: Props) {
                     <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.82rem] text-muted-foreground">
                       {trip.loadDate && (
                         <span className="inline-flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5" />
+                          <CalendarDays className="h-3.5 w-3.5" />
                           {trip.loadDate}
                           {trip.loadTime && ` · ${trip.loadTime}`}
                         </span>
@@ -240,7 +240,7 @@ export function TripListClient({ initialTrips, drivers }: Props) {
                       )}
                       {trip.tripPayment && (
                         <span className="inline-flex items-center gap-1.5 text-[var(--success)]">
-                          <DollarSign className="h-3.5 w-3.5" />
+                          <CircleDollarSign className="h-3.5 w-3.5" />
                           {trip.tripPayment}
                         </span>
                       )}
@@ -248,7 +248,7 @@ export function TripListClient({ initialTrips, drivers }: Props) {
                     {trip.containers.length > 0 && (
                       <div className="flex items-center gap-2 mt-3 flex-wrap">
                         <span className="inline-flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
-                          <Box className="h-3 w-3" />
+                          <Container className="h-3 w-3" />
                           Contenedores
                         </span>
                         {trip.containers.map((c) => (
@@ -279,10 +279,10 @@ export function TripListClient({ initialTrips, drivers }: Props) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuItem onClick={() => setContainerTripId(trip.tripId)}>
-                        <Box className="h-4 w-4" /> Agregar contenedor
+                        <Container className="h-4 w-4" /> Agregar contenedor
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setTripToEdit(trip)}>
-                        <Pen className="h-4 w-4" /> Editar
+                        <SquarePen className="h-4 w-4" /> Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => setTripToDelete(trip.tripId)}

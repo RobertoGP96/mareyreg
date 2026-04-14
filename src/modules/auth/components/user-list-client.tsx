@@ -36,16 +36,15 @@ import {
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import {
   MoreHorizontal,
-  Pen,
+  SquarePen,
   Trash2,
-  UserPlus,
+  UserRoundPlus,
   Search,
-  Users,
-  Shield,
-  User,
-  Mail,
-  Lock,
-  Key,
+  UsersRound,
+  ShieldCheck,
+  UserRound,
+  AtSign,
+  KeyRound,
   Loader2,
 } from "lucide-react";
 import {
@@ -178,13 +177,13 @@ export function UserListClient({ users }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Users}
+        icon={UsersRound}
         title="Usuarios del sistema"
         description="Gestiona accesos, roles y módulos permitidos por usuario."
         badge={`${users.length} usuarios`}
       >
         <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
-          <UserPlus className="h-4 w-4" />
+          <UserRoundPlus className="h-4 w-4" />
           Nuevo usuario
         </Button>
       </PageHeader>
@@ -227,12 +226,12 @@ export function UserListClient({ users }: Props) {
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <p className="font-semibold text-foreground truncate">{user.fullName}</p>
                     <Badge variant={ROLE_BADGE[user.role] || "secondary"} className="gap-1">
-                      <Shield className="h-3 w-3" />
+                      <ShieldCheck className="h-3 w-3" />
                       {ROLE_LABELS[user.role]}
                     </Badge>
                   </div>
                   <p className="text-[0.82rem] text-muted-foreground mb-1.5">
-                    <Mail className="h-3 w-3 inline mr-1" />
+                    <AtSign className="h-3 w-3 inline mr-1" />
                     {user.email}
                   </p>
                   {user.role !== "admin" && user.modulePermissions.length > 0 && (
@@ -256,7 +255,7 @@ export function UserListClient({ users }: Props) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem onClick={() => openEdit(user)}>
-                      <Pen className="h-4 w-4" /> Editar
+                      <SquarePen className="h-4 w-4" /> Editar
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setUserToDelete(user.userId)}
@@ -288,24 +287,24 @@ export function UserListClient({ users }: Props) {
         <DialogContent>
           <DialogHeader>
             <FormDialogHeader
-                icon={UserPlus}
+                icon={UserRoundPlus}
                 title="Crear usuario"
                 description="Añade un nuevo usuario con su rol y módulos asignados."
               />
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-5">
-            <Field label="Nombre completo" icon={User} required>
+            <Field label="Nombre completo" icon={UserRound} required>
               <Input name="fullName" required placeholder="Nombre del usuario" />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Email" icon={Mail} required>
+              <Field label="Email" icon={AtSign} required>
                 <Input name="email" type="email" required />
               </Field>
-              <Field label="Contraseña" icon={Lock} required hint="Mínimo 6 caracteres.">
+              <Field label="Contraseña" icon={KeyRound} required hint="Mínimo 6 caracteres.">
                 <Input name="password" type="password" required minLength={6} />
               </Field>
             </div>
-            <Field label="Rol" icon={Shield} required>
+            <Field label="Rol" icon={ShieldCheck} required>
               <Select name="role" defaultValue="viewer">
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -317,7 +316,7 @@ export function UserListClient({ users }: Props) {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Módulos permitidos" icon={Key} hint="No aplica para administradores.">
+            <Field label="Módulos permitidos" icon={KeyRound} hint="No aplica para administradores.">
               <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
                 {enabledModules.map((mod) => (
                   <div key={mod.id} className="flex items-center gap-2">
@@ -354,24 +353,24 @@ export function UserListClient({ users }: Props) {
         <DialogContent>
           <DialogHeader>
             <FormDialogHeader
-                icon={Pen}
+                icon={SquarePen}
                 title="Editar usuario"
                 description={userToEdit?.fullName}
               />
           </DialogHeader>
           <form onSubmit={handleUpdate} className="space-y-5">
-            <Field label="Nombre completo" icon={User} required>
+            <Field label="Nombre completo" icon={UserRound} required>
               <Input name="fullName" defaultValue={userToEdit?.fullName} required />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Email" icon={Mail} required>
+              <Field label="Email" icon={AtSign} required>
                 <Input name="email" type="email" defaultValue={userToEdit?.email} required />
               </Field>
-              <Field label="Nueva contraseña" icon={Lock} hint="Deja vacío para no cambiar.">
+              <Field label="Nueva contraseña" icon={KeyRound} hint="Deja vacío para no cambiar.">
                 <Input name="password" type="password" minLength={6} />
               </Field>
             </div>
-            <Field label="Rol" icon={Shield} required>
+            <Field label="Rol" icon={ShieldCheck} required>
               <Select name="role" defaultValue={userToEdit?.role}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
@@ -383,7 +382,7 @@ export function UserListClient({ users }: Props) {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Módulos permitidos" icon={Key}>
+            <Field label="Módulos permitidos" icon={KeyRound}>
               <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
                 {enabledModules.map((mod) => (
                   <div key={mod.id} className="flex items-center gap-2">

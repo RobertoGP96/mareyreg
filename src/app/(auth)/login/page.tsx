@@ -23,11 +23,11 @@ export default function LoginPage() {
           {/* Logo top */}
           <div className="flex items-center gap-3">
             <div className="relative flex size-11 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[var(--brand)] to-amber-700 shadow-[0_8px_24px_-4px_color-mix(in_oklch,var(--brand)_50%,transparent)]">
-              <img src="/truck-white.svg" alt="MAREYreg" className="size-6 relative z-10" />
+              <img src="/truck-white.svg" alt="MAREYway" className="size-6 relative z-10" />
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/25" />
             </div>
             <div>
-              <div className="roadway-font text-xl font-bold tracking-wider">MAREYREG</div>
+              <div className="roadway-font text-xl font-bold tracking-wider">MAREYWAY</div>
               <div className="text-[0.62rem] uppercase tracking-[0.22em] text-white/50">
                 Sistema de Gestión
               </div>
@@ -95,7 +95,7 @@ export default function LoginPage() {
           {/* Footer */}
           <div className="flex items-center justify-between text-[0.72rem] text-white/40">
             <span className="uppercase tracking-[0.16em]">
-              &copy; {new Date().getFullYear()} MAREYreg
+              &copy; {new Date().getFullYear()} MAREYway
             </span>
             <span className="uppercase tracking-[0.16em]">v1.0</span>
           </div>
@@ -107,12 +107,12 @@ export default function LoginPage() {
         {/* Logo mobile */}
         <div className="lg:hidden mb-8 flex flex-col items-center gap-3">
           <div className="relative flex size-14 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-[var(--brand)] to-amber-700 shadow-[0_8px_24px_-4px_color-mix(in_oklch,var(--brand)_50%,transparent)]">
-            <img src="/truck-white.svg" alt="MAREYreg" className="size-7 relative z-10" />
+            <img src="/truck-white.svg" alt="MAREYway" className="size-7 relative z-10" />
             <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/25" />
           </div>
           <div className="text-center">
             <h1 className="roadway-font text-2xl font-bold tracking-wider text-foreground">
-              MAREYREG
+              MAREYWAY
             </h1>
             <p className="text-[0.68rem] uppercase tracking-[0.22em] text-muted-foreground">
               Sistema de Gestión

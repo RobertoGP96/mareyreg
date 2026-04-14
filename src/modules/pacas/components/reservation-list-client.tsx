@@ -36,19 +36,19 @@ import { FormSection } from "@/components/ui/form-section";
 import {
   Plus,
   Search,
-  CheckCircle,
-  XCircle,
-  Pen,
+  CircleCheck,
+  X,
+  SquarePen,
   Trash2,
   MoreHorizontal,
   BookmarkCheck,
-  User,
-  Phone,
-  Mail,
-  Calendar,
-  Layers,
+  UserRound,
+  PhoneCall,
+  AtSign,
+  CalendarDays,
+  FolderTree,
   Hash,
-  DollarSign,
+  CircleDollarSign,
   CreditCard,
   Loader2,
 } from "lucide-react";
@@ -258,20 +258,20 @@ export function ReservationListClient({
                     </div>
                     <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.82rem] text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
-                        <Layers className="h-3.5 w-3.5" />
+                        <FolderTree className="h-3.5 w-3.5" />
                         <span className="font-medium text-foreground">{r.category.name}</span>
                         {r.category.classification && (
                           <span className="opacity-70">· {r.category.classification.name}</span>
                         )}
                       </span>
                       <span className="inline-flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5" />
+                        <CalendarDays className="h-3.5 w-3.5" />
                         {r.reservationDate}
                         {r.expirationDate && ` → ${r.expirationDate}`}
                       </span>
                       {r.clientPhone && (
                         <span className="inline-flex items-center gap-1.5">
-                          <Phone className="h-3.5 w-3.5" />
+                          <PhoneCall className="h-3.5 w-3.5" />
                           {r.clientPhone}
                         </span>
                       )}
@@ -285,7 +285,7 @@ export function ReservationListClient({
                   <div className="flex items-center gap-1 shrink-0">
                     {r.status === "active" && (
                       <Button size="sm" variant="brand" onClick={() => setToComplete(r)}>
-                        <CheckCircle className="h-4 w-4" />
+                        <CircleCheck className="h-4 w-4" />
                         Completar
                       </Button>
                     )}
@@ -299,13 +299,13 @@ export function ReservationListClient({
                         {r.status === "active" && (
                           <>
                             <DropdownMenuItem onClick={() => setToEdit(r)}>
-                              <Pen className="h-4 w-4" /> Editar
+                              <SquarePen className="h-4 w-4" /> Editar
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => setToCancel(r.reservationId)}
                               className="text-[var(--warning)] focus:text-[var(--warning)]"
                             >
-                              <XCircle className="h-4 w-4" /> Cancelar
+                              <X className="h-4 w-4" /> Cancelar
                             </DropdownMenuItem>
                           </>
                         )}
@@ -348,7 +348,7 @@ export function ReservationListClient({
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Categoría" icon={Layers} required>
+              <Field label="Categoría" icon={FolderTree} required>
                 <Select name="categoryId">
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Seleccionar..." />
@@ -366,22 +366,22 @@ export function ReservationListClient({
                 <Input name="quantity" type="number" min="1" required />
               </Field>
             </div>
-            <Field label="Cliente" icon={User} required>
+            <Field label="Cliente" icon={UserRound} required>
               <Input name="clientName" required placeholder="Nombre del cliente" />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Teléfono" icon={Phone}>
+              <Field label="Teléfono" icon={PhoneCall}>
                 <Input name="clientPhone" />
               </Field>
-              <Field label="Email" icon={Mail}>
+              <Field label="Email" icon={AtSign}>
                 <Input name="clientEmail" type="email" />
               </Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Fecha reservación" icon={Calendar} required>
+              <Field label="Fecha reservación" icon={CalendarDays} required>
                 <Input name="reservationDate" type="date" required />
               </Field>
-              <Field label="Fecha expiración" icon={Calendar}>
+              <Field label="Fecha expiración" icon={CalendarDays}>
                 <Input name="expirationDate" type="date" />
               </Field>
             </div>
@@ -406,35 +406,35 @@ export function ReservationListClient({
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <FormDialogHeader
-                icon={Pen}
+                icon={SquarePen}
                 title="Editar reservación"
                 description={toEdit?.clientName}
               />
           </DialogHeader>
           <form onSubmit={handleUpdate} className="space-y-5">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
-              <Layers className="h-4 w-4 text-muted-foreground" />
+              <FolderTree className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium">Categoría:</span> {toEdit?.category.name}
             </div>
             <Field label="Cantidad" icon={Hash} required>
               <Input name="quantity" type="number" min="1" defaultValue={toEdit?.quantity} required />
             </Field>
-            <Field label="Cliente" icon={User} required>
+            <Field label="Cliente" icon={UserRound} required>
               <Input name="clientName" defaultValue={toEdit?.clientName} required />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Teléfono" icon={Phone}>
+              <Field label="Teléfono" icon={PhoneCall}>
                 <Input name="clientPhone" defaultValue={toEdit?.clientPhone ?? ""} />
               </Field>
-              <Field label="Email" icon={Mail}>
+              <Field label="Email" icon={AtSign}>
                 <Input name="clientEmail" type="email" defaultValue={toEdit?.clientEmail ?? ""} />
               </Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Fecha reservación" icon={Calendar} required>
+              <Field label="Fecha reservación" icon={CalendarDays} required>
                 <Input name="reservationDate" type="date" defaultValue={toEdit?.reservationDate} required />
               </Field>
-              <Field label="Fecha expiración" icon={Calendar}>
+              <Field label="Fecha expiración" icon={CalendarDays}>
                 <Input name="expirationDate" type="date" defaultValue={toEdit?.expirationDate ?? ""} />
               </Field>
             </div>
@@ -459,18 +459,18 @@ export function ReservationListClient({
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <FormDialogHeader
-                icon={CheckCircle}
+                icon={CircleCheck}
                 title="Completar reservación"
                 description="Registra la venta con precio y método de pago."
               />
           </DialogHeader>
           <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm space-y-1.5 mb-2">
             <p className="flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5 text-muted-foreground" />
+              <UserRound className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="font-medium">Cliente:</span> {toComplete?.clientName}
             </p>
             <p className="flex items-center gap-1.5">
-              <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+              <FolderTree className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="font-medium">Categoría:</span> {toComplete?.category.name}
             </p>
             <p className="flex items-center gap-1.5">
@@ -479,12 +479,12 @@ export function ReservationListClient({
             </p>
           </div>
           <form onSubmit={handleComplete} className="space-y-5">
-            <FormSection icon={DollarSign} title="Datos de venta" description="Precio por unidad y fecha.">
+            <FormSection icon={CircleDollarSign} title="Datos de venta" description="Precio por unidad y fecha.">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Precio por unidad" icon={DollarSign} required>
+                <Field label="Precio por unidad" icon={CircleDollarSign} required>
                   <Input name="salePrice" type="number" step="0.01" required placeholder="Ej. 35.00" />
                 </Field>
-                <Field label="Fecha de venta" icon={Calendar} required>
+                <Field label="Fecha de venta" icon={CalendarDays} required>
                   <Input name="saleDate" type="date" required defaultValue={new Date().toISOString().split("T")[0]} />
                 </Field>
               </div>

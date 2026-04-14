@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { MoreHorizontal, Pen, Plus, Trash2 } from "lucide-react";
+import { MoreHorizontal, SquarePen, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createPacaCategory,
@@ -162,7 +162,7 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => setCatToEdit(cat)}>
-                      <Pen className="h-4 w-4 mr-2" />
+                      <SquarePen className="h-4 w-4 mr-2" />
                       Editar
                     </DropdownMenuItem>
                     <DropdownMenuItem

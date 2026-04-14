@@ -18,14 +18,14 @@ import {
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
 import {
-  Shirt,
+  Package2,
   Hash,
-  Layers,
-  DollarSign,
-  Calendar,
-  Truck,
-  Globe2,
-  StickyNote,
+  FolderTree,
+  CircleDollarSign,
+  CalendarDays,
+  Store,
+  Globe,
+  NotebookPen,
   Loader2,
 } from "lucide-react";
 
@@ -71,15 +71,15 @@ export function PacaEntryForm({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <FormDialogHeader
-              icon={Shirt}
+              icon={Package2}
               title="Registrar entrada de pacas"
               description="Añade pacas al inventario indicando categoría y cantidad."
             />
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <FormSection icon={Layers} title="Clasificación" description="Categoría y cantidad recibida.">
+          <FormSection icon={FolderTree} title="Clasificación" description="Categoría y cantidad recibida.">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Categoría" icon={Layers} required>
+              <Field label="Categoría" icon={FolderTree} required>
                 <Select name="categoryId" required>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Seleccionar..." />
@@ -99,24 +99,24 @@ export function PacaEntryForm({
             </div>
           </FormSection>
 
-          <FormSection icon={DollarSign} title="Datos comerciales" description="Costo y detalles de llegada.">
+          <FormSection icon={CircleDollarSign} title="Datos comerciales" description="Costo y detalles de llegada.">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Precio de compra (unidad)" icon={DollarSign}>
+              <Field label="Precio de compra (unidad)" icon={CircleDollarSign}>
                 <Input name="purchasePrice" type="number" step="0.01" placeholder="Ej. 25.00" />
               </Field>
-              <Field label="Fecha de llegada" icon={Calendar}>
+              <Field label="Fecha de llegada" icon={CalendarDays}>
                 <Input name="arrivalDate" type="date" />
               </Field>
-              <Field label="Proveedor" icon={Truck}>
+              <Field label="Proveedor" icon={Store}>
                 <Input name="supplier" placeholder="Nombre del proveedor" />
               </Field>
-              <Field label="Origen" icon={Globe2}>
+              <Field label="Origen" icon={Globe}>
                 <Input name="origin" placeholder="País o región" />
               </Field>
             </div>
           </FormSection>
 
-          <FormSection icon={StickyNote} title="Notas" description="Observaciones adicionales (opcional).">
+          <FormSection icon={NotebookPen} title="Notas" description="Observaciones adicionales (opcional).">
             <Textarea name="notes" placeholder="Observaciones, defectos visibles, estado general…" />
           </FormSection>
 

@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, User, ChevronsUpDown } from "lucide-react";
+import { LogOut, UserRound, ChevronsUpDown } from "lucide-react";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Administrador",
@@ -73,7 +73,7 @@ export function UserNav({ user }: UserNavProps) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="cursor-pointer">
-          <User className="mr-2 h-4 w-4" />
+          <UserRound className="mr-2 h-4 w-4" />
           <span>Mi Perfil</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

@@ -49,7 +49,7 @@ export function DashboardHero({ userName, totalCount }: { userName: string; tota
             {greeting}, <span className="text-gradient-brand">{userName}</span>
           </h1>
           <p className="mt-1.5 text-sm md:text-base text-muted-foreground max-w-xl">
-            Panorama actual del sistema MAREYreg — todas tus operaciones de flota, inventario y logística en un solo lugar.
+            Panorama actual del sistema MAREYway — todas tus operaciones de flota, inventario y logística en un solo lugar.
           </p>
         </div>
 

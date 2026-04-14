@@ -5,10 +5,10 @@ import { motion } from "framer-motion";
 import {
   ArrowUpRight,
   Building2,
-  Users,
+  Contact,
   Truck,
   Route as RouteIcon,
-  Shirt,
+  Package2,
   Package,
   Warehouse,
   type LucideIcon,
@@ -28,10 +28,10 @@ export type DashboardIconKey =
 // without trying to serialize the forwardRef component.
 const ICON_MAP: Record<DashboardIconKey, LucideIcon> = {
   building: Building2,
-  users: Users,
+  users: Contact,
   truck: Truck,
   route: RouteIcon,
-  shirt: Shirt,
+  shirt: Package2,
   package: Package,
   warehouse: Warehouse,
 };

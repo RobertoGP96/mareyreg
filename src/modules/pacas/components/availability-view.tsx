@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Package } from "lucide-react";
+import { PackageCheck } from "lucide-react";
 
 interface CategoryAvailability {
   name: string;
@@ -80,7 +80,7 @@ export function AvailabilityView({ data }: Props) {
             <div className="bg-primary/5 border-b px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-1.5 rounded-md bg-primary/10">
-                  <Package className="h-4 w-4 text-primary" />
+                  <PackageCheck className="h-4 w-4 text-primary" />
                 </div>
                 <h3 className="font-semibold text-base uppercase tracking-wider">
                   {group.classification}

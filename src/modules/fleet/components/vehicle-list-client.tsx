@@ -27,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, Trash2, MoreHorizontal, Plus, Pen, Truck, Tag, User } from "lucide-react";
+import { Search, Trash2, MoreHorizontal, Plus, SquarePen, Truck, SquareStack, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import {
   createVehicle,
@@ -177,7 +177,7 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
                     </h3>
                     {vehicle.driver && (
                       <Badge variant="info" className="gap-1">
-                        <User className="h-3 w-3" />
+                        <UserRound className="h-3 w-3" />
                         {vehicle.driver.full_name}
                       </Badge>
                     )}
@@ -185,13 +185,13 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
                   <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.82rem] text-muted-foreground">
                     {vehicle.cuña_plate_number && (
                       <span className="inline-flex items-center gap-1.5">
-                        <Tag className="h-3.5 w-3.5" />
+                        <SquareStack className="h-3.5 w-3.5" />
                         <span className="font-medium">Cuña:</span> {vehicle.cuña_plate_number}
                       </span>
                     )}
                     {vehicle.plancha_plate_number && (
                       <span className="inline-flex items-center gap-1.5">
-                        <Tag className="h-3.5 w-3.5" />
+                        <SquareStack className="h-3.5 w-3.5" />
                         <span className="font-medium">Plancha:</span> {vehicle.plancha_plate_number}
                       </span>
                     )}
@@ -205,7 +205,7 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem onClick={() => setVehicleToEdit(vehicle)}>
-                      <Pen className="h-4 w-4" /> Editar
+                      <SquarePen className="h-4 w-4" /> Editar
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setVehicleToDelete(vehicle.vehicle_id)}

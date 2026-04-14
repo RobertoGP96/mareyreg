@@ -29,18 +29,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  IdCardIcon,
-  IdCardLanyard,
-  Pen,
+  Fingerprint,
+  FileBadge,
+  SquarePen,
   Phone,
   Search,
   Trash2,
   MoreHorizontal,
-  UserPlus,
+  UserRoundPlus,
   Eye,
   Copy,
   Building2,
-  Users,
+  Contact,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -149,13 +149,13 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Users}
+        icon={Contact}
         title="Conductores"
         description="Gestiona los conductores asignados a tu flota y sus datos de contacto."
         badge={`${initialDrivers.length} registrados`}
       >
         <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
-          <UserPlus className="h-4 w-4" />
+          <UserRoundPlus className="h-4 w-4" />
           Agregar conductor
         </Button>
       </PageHeader>
@@ -210,14 +210,14 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
                     </Badge>
                     {driver.operativeLicense && (
                       <Badge variant="info" className="gap-1">
-                        <IdCardLanyard className="h-3 w-3" />
+                        <FileBadge className="h-3 w-3" />
                         {driver.operativeLicense}
                       </Badge>
                     )}
                   </div>
                   <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.82rem] text-muted-foreground">
                     <span className="inline-flex items-center gap-1.5">
-                      <IdCardIcon className="h-3.5 w-3.5" />
+                      <Fingerprint className="h-3.5 w-3.5" />
                       {driver.identificationNumber}
                     </span>
                     <span className="inline-flex items-center gap-1.5">
@@ -241,7 +241,7 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
                       <Eye className="h-4 w-4" /> Ver detalles
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setDriverToEdit(driver)}>
-                      <Pen className="h-4 w-4" /> Editar
+                      <SquarePen className="h-4 w-4" /> Editar
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setDriverToDelete(driver.driverId)}

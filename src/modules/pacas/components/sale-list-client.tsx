@@ -36,15 +36,16 @@ import {
   Plus,
   Search,
   Trash2,
-  DollarSign,
-  ShoppingCart,
-  User,
-  Phone,
-  Calendar,
-  Layers,
+  CircleDollarSign,
+  ShoppingBag,
+  UserRound,
+  PhoneCall,
+  CalendarDays,
+  FolderTree,
   Hash,
   CreditCard,
   TrendingUp,
+  Wallet,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -129,7 +130,7 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={ShoppingCart}
+        icon={ShoppingBag}
         title="Ventas de pacas"
         description="Historial de ventas con cliente, categoría y método de pago."
       >
@@ -152,7 +153,7 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
               </p>
             </div>
             <div className="flex size-11 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--info)]/20 to-[var(--info)]/5 ring-1 ring-inset ring-[var(--info)]/20">
-              <ShoppingCart className="h-5 w-5 text-[var(--info)]" strokeWidth={2.2} />
+              <ShoppingBag className="h-5 w-5 text-[var(--info)]" strokeWidth={2.2} />
             </div>
           </div>
         </div>
@@ -211,20 +212,20 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
                     </div>
                     <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.82rem] text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
-                        <Layers className="h-3.5 w-3.5" />
+                        <FolderTree className="h-3.5 w-3.5" />
                         <span className="font-medium text-foreground">{s.category.name}</span>
                       </span>
                       <span className="inline-flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5" />
+                        <CalendarDays className="h-3.5 w-3.5" />
                         {s.saleDate}
                       </span>
                       <span className="inline-flex items-center gap-1.5 text-[var(--success)] font-semibold">
-                        <DollarSign className="h-3.5 w-3.5" />
+                        <CircleDollarSign className="h-3.5 w-3.5" />
                         Total: ${total.toFixed(2)}
                       </span>
                       {s.clientPhone && (
                         <span className="inline-flex items-center gap-1.5">
-                          <Phone className="h-3.5 w-3.5" />
+                          <PhoneCall className="h-3.5 w-3.5" />
                           {s.clientPhone}
                         </span>
                       )}
@@ -265,14 +266,14 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <FormDialogHeader
-                icon={ShoppingCart}
+                icon={ShoppingBag}
                 title="Registrar venta"
                 description="Crea una venta directa de pacas."
               />
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Categoría" icon={Layers} required>
+              <Field label="Categoría" icon={FolderTree} required>
                 <Select name="categoryId">
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Seleccionar..." />
@@ -290,19 +291,19 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
                 <Input name="quantity" type="number" min="1" required />
               </Field>
             </div>
-            <Field label="Cliente" icon={User} required>
+            <Field label="Cliente" icon={UserRound} required>
               <Input name="clientName" required placeholder="Nombre del cliente" />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Teléfono" icon={Phone}>
+              <Field label="Teléfono" icon={PhoneCall}>
                 <Input name="clientPhone" />
               </Field>
-              <Field label="Fecha de venta" icon={Calendar} required>
+              <Field label="Fecha de venta" icon={CalendarDays} required>
                 <Input name="saleDate" type="date" required defaultValue={new Date().toISOString().split("T")[0]} />
               </Field>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Precio por unidad" icon={DollarSign} required>
+              <Field label="Precio por unidad" icon={CircleDollarSign} required>
                 <Input name="salePrice" type="number" step="0.01" required placeholder="0.00" />
               </Field>
               <Field label="Método de pago" icon={CreditCard}>

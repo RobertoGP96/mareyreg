@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
-import { RouteIcon, User, Calendar, MapPin, Package, DollarSign, Clock, Loader2 } from "lucide-react";
+import { Route as RouteIcon, UserRound, CalendarDays, MapPin, Package, CircleDollarSign, Clock, Loader2 } from "lucide-react";
 import { CUBAN_PROVINCES, PRODUCTS } from "@/lib/constants";
 import type { Driver } from "@/types";
 
@@ -116,8 +116,8 @@ export function TripForm({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <FormSection icon={User} title="Asignación" description="Conductor responsable del viaje.">
-            <Field label="Conductor" icon={User} required error={form.formState.errors.driver_id?.message}>
+          <FormSection icon={UserRound} title="Asignación" description="Conductor responsable del viaje.">
+            <Field label="Conductor" icon={UserRound} required error={form.formState.errors.driver_id?.message}>
               <Select
                 value={form.watch("driver_id")?.toString() || ""}
                 onValueChange={(value) => form.setValue("driver_id", parseInt(value, 10))}
@@ -136,9 +136,9 @@ export function TripForm({
             </Field>
           </FormSection>
 
-          <FormSection icon={Calendar} title="Programación" description="Fecha y hora de carga.">
+          <FormSection icon={CalendarDays} title="Programación" description="Fecha y hora de carga.">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Fecha de carga" icon={Calendar}>
+              <Field label="Fecha de carga" icon={CalendarDays}>
                 <Input type="date" {...form.register("load_date")} />
               </Field>
               <Field label="Hora de carga" icon={Clock}>
@@ -181,7 +181,7 @@ export function TripForm({
               </Field>
             </div>
 
-            <Field label="Pago del viaje" icon={DollarSign} hint="Monto estimado o acordado.">
+            <Field label="Pago del viaje" icon={CircleDollarSign} hint="Monto estimado o acordado.">
               <Input placeholder="0.00" {...form.register("trip_payment")} />
             </Field>
           </FormSection>

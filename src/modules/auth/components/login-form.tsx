@@ -11,7 +11,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { toast } from "sonner";
-import { Loader2, LogIn, Mail, Lock } from "lucide-react";
+import { Loader2, LogIn, AtSign, KeyRound } from "lucide-react";
 import { loginUser } from "../actions/auth-actions";
 
 export function LoginForm() {
@@ -47,18 +47,18 @@ export function LoginForm() {
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="space-y-1.5">
         <Label htmlFor="email">
-          <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+          <AtSign className="h-3.5 w-3.5 text-muted-foreground" />
           Correo electrónico
         </Label>
         <InputGroup>
           <InputGroupAddon>
-            <Mail className="h-4 w-4" />
+            <AtSign className="h-4 w-4" />
           </InputGroupAddon>
           <InputGroupInput
             id="email"
             name="email"
             type="email"
-            placeholder="nombre@mareyreg.com"
+            placeholder="nombre@mareyway.com"
             required
             autoComplete="email"
           />
@@ -68,7 +68,7 @@ export function LoginForm() {
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label htmlFor="password">
-            <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+            <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
             Contraseña
           </Label>
           <button
@@ -80,7 +80,7 @@ export function LoginForm() {
         </div>
         <InputGroup>
           <InputGroupAddon>
-            <Lock className="h-4 w-4" />
+            <KeyRound className="h-4 w-4" />
           </InputGroupAddon>
           <InputGroupInput
             id="password"

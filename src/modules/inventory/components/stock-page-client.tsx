@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, AlertTriangle, ArrowUpCircle } from "lucide-react";
+import { Plus, TriangleAlert, PackagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { createStockMovement } from "../actions/stock-actions";
 import { MOVEMENT_TYPES, getUnitAbbreviation } from "@/lib/constants";
@@ -116,12 +116,12 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
                     <p className="font-medium">{sl.product.name}</p>
                     {isLow && (
                       <Badge className="bg-yellow-100 text-yellow-800">
-                        <AlertTriangle className="h-3 w-3 mr-1" />Stock bajo
+                        <TriangleAlert className="h-3 w-3 mr-1" />Stock bajo
                       </Badge>
                     )}
                     {isOver && (
                       <Badge className="bg-orange-100 text-orange-800">
-                        <ArrowUpCircle className="h-3 w-3 mr-1" />Sobrestock
+                        <PackagePlus className="h-3 w-3 mr-1" />Sobrestock
                       </Badge>
                     )}
                   </div>

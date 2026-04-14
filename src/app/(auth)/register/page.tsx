@@ -15,12 +15,12 @@ export default async function RegisterPage() {
         {/* Logo */}
         <div className="flex flex-col items-center gap-3 mb-6">
           <div className="relative flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--brand)] to-amber-700 shadow-[0_12px_32px_-6px_color-mix(in_oklch,var(--brand)_55%,transparent)]">
-            <img src="/truck-white.svg" alt="MAREYreg" className="size-8 relative z-10" />
+            <img src="/truck-white.svg" alt="MAREYway" className="size-8 relative z-10" />
             <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/25" />
           </div>
           <div className="text-center">
             <h1 className="roadway-font text-2xl font-bold tracking-wider text-foreground">
-              MAREYREG
+              MAREYWAY
             </h1>
             <p className="text-[0.68rem] uppercase tracking-[0.22em] text-muted-foreground">
               Sistema de Gestión
@@ -54,7 +54,7 @@ export default async function RegisterPage() {
         </div>
 
         <p className="mt-6 text-[0.72rem] text-center text-muted-foreground/70">
-          &copy; {new Date().getFullYear()} MAREYreg · Sistema de Gestión
+          &copy; {new Date().getFullYear()} MAREYway · Sistema de Gestión
         </p>
       </div>
     </div>

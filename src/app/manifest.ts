@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "MAREYreg - Sistema de Gestion",
-    short_name: "MAREYreg",
+    name: "MAREYway - Sistema de Gestion",
+    short_name: "MAREYway",
     description:
       "Sistema de gestion de conductores, vehiculos, viajes, pacas e inventario",
     start_url: "/",

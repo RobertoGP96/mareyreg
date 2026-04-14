@@ -33,14 +33,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import {
   MoreHorizontal,
-  Pen,
+  SquarePen,
   Plus,
   Search,
   Trash2,
   Warehouse as WarehouseIcon,
   MapPin,
   Phone,
-  Box,
+  PackageCheck,
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -137,7 +137,7 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
             </SelectContent>
           </Select>
         </Field>
-        <Field label="Tipo de almacén" icon={Box}>
+        <Field label="Tipo de almacén" icon={PackageCheck}>
           <Select name="warehouseType" defaultValue={warehouse?.warehouseType ?? undefined}>
             <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
             <SelectContent>
@@ -149,7 +149,7 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
         </Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Capacidad" icon={Box}>
+        <Field label="Capacidad" icon={PackageCheck}>
           <Input name="capacity" type="number" defaultValue={warehouse?.capacity ? String(warehouse.capacity) : ""} />
         </Field>
         <Field label="Teléfono de contacto" icon={Phone}>
@@ -215,7 +215,7 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
                     </span>
                     {w.capacity != null && Number(w.capacity) > 0 && (
                       <span className="inline-flex items-center gap-1.5">
-                        <Box className="h-3.5 w-3.5" />
+                        <PackageCheck className="h-3.5 w-3.5" />
                         Cap.: <span className="tabular-nums font-medium text-foreground">{String(w.capacity)}</span>
                       </span>
                     )}
@@ -235,7 +235,7 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem onClick={() => setToEdit(w)}>
-                      <Pen className="h-4 w-4" /> Editar
+                      <SquarePen className="h-4 w-4" /> Editar
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setToDelete(w.warehouseId)}

@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/input-group";
 import { Field } from "@/components/ui/field";
 import { toast } from "sonner";
-import { Loader2, User, Mail, Lock, ArrowRight } from "lucide-react";
+import { Loader2, UserRound, AtSign, KeyRound, UserRoundPlus } from "lucide-react";
 import { registerInitialAdmin } from "../actions/auth-actions";
 
 export function RegisterForm() {
@@ -52,37 +52,37 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <Field id="fullName" label="Nombre completo" icon={User} required>
+      <Field id="fullName" label="Nombre completo" icon={UserRound} required>
         <InputGroup>
           <InputGroupAddon>
-            <User className="h-4 w-4" />
+            <UserRound className="h-4 w-4" />
           </InputGroupAddon>
           <InputGroupInput id="fullName" name="fullName" placeholder="Juan Pérez" required />
         </InputGroup>
       </Field>
 
-      <Field id="email" label="Correo electrónico" icon={Mail} required>
+      <Field id="email" label="Correo electrónico" icon={AtSign} required>
         <InputGroup>
           <InputGroupAddon>
-            <Mail className="h-4 w-4" />
+            <AtSign className="h-4 w-4" />
           </InputGroupAddon>
-          <InputGroupInput id="email" name="email" type="email" placeholder="admin@mareyreg.com" required />
+          <InputGroupInput id="email" name="email" type="email" placeholder="admin@mareyway.com" required />
         </InputGroup>
       </Field>
 
-      <Field id="password" label="Contraseña" icon={Lock} required hint="Mínimo 6 caracteres.">
+      <Field id="password" label="Contraseña" icon={KeyRound} required hint="Mínimo 6 caracteres.">
         <InputGroup>
           <InputGroupAddon>
-            <Lock className="h-4 w-4" />
+            <KeyRound className="h-4 w-4" />
           </InputGroupAddon>
           <InputGroupInput id="password" name="password" type="password" placeholder="••••••••" required />
         </InputGroup>
       </Field>
 
-      <Field id="confirmPassword" label="Confirmar contraseña" icon={Lock} required>
+      <Field id="confirmPassword" label="Confirmar contraseña" icon={KeyRound} required>
         <InputGroup>
           <InputGroupAddon>
-            <Lock className="h-4 w-4" />
+            <KeyRound className="h-4 w-4" />
           </InputGroupAddon>
           <InputGroupInput id="confirmPassword" name="confirmPassword" type="password" placeholder="••••••••" required />
         </InputGroup>
@@ -97,7 +97,7 @@ export function RegisterForm() {
         ) : (
           <>
             Crear administrador
-            <ArrowRight className="h-4 w-4" />
+            <UserRoundPlus className="h-4 w-4" />
           </>
         )}
       </Button>
