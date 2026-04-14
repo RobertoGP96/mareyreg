@@ -5,14 +5,48 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { PageHeader } from "@/components/ui/page-header";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Trash2, DollarSign } from "lucide-react";
+import { Field, FormDialogHeader } from "@/components/ui/field";
+import {
+  Plus,
+  Search,
+  Trash2,
+  DollarSign,
+  ShoppingCart,
+  User,
+  Phone,
+  Calendar,
+  Layers,
+  Hash,
+  CreditCard,
+  TrendingUp,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { createSale, deleteSale } from "../actions/paca-sale-actions";
 import { PAYMENT_METHODS } from "@/lib/constants";
@@ -73,8 +107,11 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
       notes: (fd.get("notes") as string) || undefined,
     });
     setIsSubmitting(false);
-    if (result.success) { setIsCreateOpen(false); toast.success("Venta registrada"); router.refresh(); }
-    else { toast.error(result.error); }
+    if (result.success) {
+      setIsCreateOpen(false);
+      toast.success("Venta registrada");
+      router.refresh();
+    } else toast.error(result.error);
   };
 
   const handleDelete = async () => {
@@ -82,78 +119,166 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
     setIsSubmitting(true);
     const result = await deleteSale(toDelete);
     setIsSubmitting(false);
-    if (result.success) { setToDelete(null); toast.success("Venta eliminada"); router.refresh(); }
-    else { toast.error(result.error); }
+    if (result.success) {
+      setToDelete(null);
+      toast.success("Venta eliminada");
+      router.refresh();
+    } else toast.error(result.error);
   };
 
   return (
-    <>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-muted"><DollarSign className="h-5 w-5 text-muted-foreground" /></div>
-          <div>
-            <p className="text-xl font-semibold">{stats.totalSales}</p>
-            <p className="text-sm text-muted-foreground">Pacas vendidas</p>
+    <div className="space-y-5">
+      <PageHeader
+        icon={ShoppingCart}
+        title="Ventas de pacas"
+        description="Historial de ventas con cliente, categoría y método de pago."
+      >
+        <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Registrar venta
+        </Button>
+      </PageHeader>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-panel">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Pacas vendidas
+              </p>
+              <p className="text-3xl font-bold font-headline tabular-nums text-foreground mt-1">
+                {stats.totalSales}
+              </p>
+            </div>
+            <div className="flex size-11 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--info)]/20 to-[var(--info)]/5 ring-1 ring-inset ring-[var(--info)]/20">
+              <ShoppingCart className="h-5 w-5 text-[var(--info)]" strokeWidth={2.2} />
+            </div>
           </div>
         </div>
-        <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-muted"><DollarSign className="h-5 w-5 text-muted-foreground" /></div>
-          <div>
-            <p className="text-xl font-semibold">${stats.totalRevenue.toFixed(2)}</p>
-            <p className="text-sm text-muted-foreground">Ingresos totales</p>
+        <div className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-panel">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Ingresos totales
+              </p>
+              <p className="text-3xl font-bold font-headline tabular-nums text-[var(--success)] mt-1">
+                ${stats.totalRevenue.toFixed(2)}
+              </p>
+            </div>
+            <div className="flex size-11 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--success)]/20 to-[var(--success)]/5 ring-1 ring-inset ring-[var(--success)]/20">
+              <TrendingUp className="h-5 w-5 text-[var(--success)]" strokeWidth={2.2} />
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-card rounded-lg border">
-        <div className="px-4 py-3 border-b">
-          <div className="flex justify-between items-center">
-            <h2 className="text-base font-medium">Ventas</h2>
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />Registrar Venta
-            </Button>
-          </div>
-          <div className="mt-4">
-            <InputGroup>
-              <InputGroupInput placeholder="Buscar por cliente o categoria..." value={search} onChange={(e) => setSearch(e.target.value)} />
-              <InputGroupAddon><Search /></InputGroupAddon>
-              <InputGroupAddon align="inline-end"><Badge>{filtered.length}</Badge></InputGroupAddon>
-            </InputGroup>
-          </div>
+      <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-4 py-3">
+          <InputGroup className="flex-1 min-w-[240px]">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="Buscar por cliente o categoría…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <InputGroupAddon align="inline-end">
+              <Badge variant="brand">{filtered.length}</Badge>
+            </InputGroupAddon>
+          </InputGroup>
         </div>
-        <div className="grid gap-4 p-4">
-          {filtered.length > 0 ? filtered.map((s) => (
-            <div key={s.saleId} className="bg-card border rounded-lg p-4 flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold">{s.clientName}</span>
-                  <Badge variant="outline">{s.quantity} pacas</Badge>
-                  <Badge variant="secondary">${String(s.salePrice)}/u</Badge>
-                  <Badge variant="secondary">{getPaymentLabel(s.paymentMethod)}</Badge>
+
+        <div className="divide-y divide-border/60">
+          {filtered.length > 0 ? (
+            filtered.map((s) => {
+              const total = s.quantity * Number(s.salePrice);
+              return (
+                <div
+                  key={s.saleId}
+                  className="group flex items-start gap-4 px-5 py-4 transition-colors hover:bg-[var(--brand)]/[0.04]"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <span className="font-semibold text-foreground">{s.clientName}</span>
+                      <Badge variant="outline" className="gap-1">
+                        <Hash className="h-3 w-3" />
+                        {s.quantity} pacas
+                      </Badge>
+                      <Badge variant="info">${String(s.salePrice)}/u</Badge>
+                      <Badge variant="secondary">{getPaymentLabel(s.paymentMethod)}</Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.82rem] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5" />
+                        <span className="font-medium text-foreground">{s.category.name}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {s.saleDate}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-[var(--success)] font-semibold">
+                        <DollarSign className="h-3.5 w-3.5" />
+                        Total: ${total.toFixed(2)}
+                      </span>
+                      {s.clientPhone && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5" />
+                          {s.clientPhone}
+                        </span>
+                      )}
+                    </div>
+                    {s.notes && (
+                      <p className="mt-1.5 text-[0.82rem] text-muted-foreground italic line-clamp-2">
+                        “{s.notes}”
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-8 text-destructive opacity-60 group-hover:opacity-100"
+                    onClick={() => setToDelete(s.saleId)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  <p>Categoria: <span className="font-medium text-foreground">{s.category.name}</span></p>
-                  <p>Fecha: {s.saleDate} | Total: ${(s.quantity * Number(s.salePrice)).toFixed(2)} {s.clientPhone ? `| Tel: ${s.clientPhone}` : ""}</p>
-                  {s.notes && <p>Notas: {s.notes}</p>}
-                </div>
-              </div>
-              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setToDelete(s.saleId)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              );
+            })
+          ) : (
+            <div className="p-8">
+              <EmptyState
+                title="No hay ventas"
+                description={
+                  search
+                    ? `No se encontraron resultados para "${search}".`
+                    : "Registra la primera venta para empezar."
+                }
+              />
             </div>
-          )) : <EmptyState title="No hay ventas" description="No se han registrado ventas." />}
+          )}
         </div>
       </div>
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Registrar Venta</DialogTitle></DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Categoria *</Label>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle asChild>
+              <FormDialogHeader
+                icon={ShoppingCart}
+                title="Registrar venta"
+                description="Crea una venta directa de pacas."
+              />
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Categoría" icon={Layers} required>
                 <Select name="categoryId">
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
                   <SelectContent>
                     {availableCategories.map((c) => (
                       <SelectItem key={c.categoryId} value={String(c.categoryId)}>
@@ -162,50 +287,75 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Cantidad *</Label>
+              </Field>
+              <Field label="Cantidad" icon={Hash} required>
                 <Input name="quantity" type="number" min="1" required />
-              </div>
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label>Cliente *</Label>
-              <Input name="clientName" required />
+            <Field label="Cliente" icon={User} required>
+              <Input name="clientName" required placeholder="Nombre del cliente" />
+            </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Teléfono" icon={Phone}>
+                <Input name="clientPhone" />
+              </Field>
+              <Field label="Fecha de venta" icon={Calendar} required>
+                <Input name="saleDate" type="date" required defaultValue={new Date().toISOString().split("T")[0]} />
+              </Field>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Telefono</Label><Input name="clientPhone" /></div>
-              <div className="space-y-2"><Label>Fecha *</Label><Input name="saleDate" type="date" required /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Precio por unidad *</Label><Input name="salePrice" type="number" step="0.01" required /></div>
-              <div className="space-y-2">
-                <Label>Metodo de pago</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Precio por unidad" icon={DollarSign} required>
+                <Input name="salePrice" type="number" step="0.01" required placeholder="0.00" />
+              </Field>
+              <Field label="Método de pago" icon={CreditCard}>
                 <Select name="paymentMethod">
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
                   <SelectContent>
-                    {PAYMENT_METHODS.map((m) => (<SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>))}
+                    {PAYMENT_METHODS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             </div>
-            <div className="space-y-2"><Label>Notas</Label><Textarea name="notes" /></div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Registrando..." : "Registrar Venta"}
-            </Button>
+            <Field label="Notas">
+              <Textarea name="notes" placeholder="Observaciones de la venta…" />
+            </Field>
+            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="brand" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting ? "Registrando…" : "Registrar venta"}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>
 
       <AlertDialog open={!!toDelete} onOpenChange={() => setToDelete(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Eliminar venta?</AlertDialogTitle>
-            <AlertDialogDescription>Las pacas volveran a estar disponibles.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar venta?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Las pacas volverán a estar disponibles.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isSubmitting}>Eliminar</AlertDialogAction>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={isSubmitting}
+            >
+              Eliminar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

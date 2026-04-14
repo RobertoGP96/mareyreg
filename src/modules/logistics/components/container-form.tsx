@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -19,6 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Field, FormDialogHeader } from "@/components/ui/field";
+import { Container, Hash, Layers, Loader2 } from "lucide-react";
 import { CONTAINER_TYPES } from "@/lib/constants";
 
 const containerSchema = z.object({
@@ -35,18 +36,10 @@ interface Props {
   isLoading: boolean;
 }
 
-export function ContainerForm({
-  open,
-  onOpenChange,
-  onSubmit,
-  isLoading,
-}: Props) {
+export function ContainerForm({ open, onOpenChange, onSubmit, isLoading }: Props) {
   const form = useForm<ContainerFormData>({
     resolver: zodResolver(containerSchema),
-    defaultValues: {
-      serial_number: "",
-      type: "",
-    },
+    defaultValues: { serial_number: "", type: "" },
   });
 
   const handleSubmit = form.handleSubmit(async (data) => {
@@ -58,28 +51,31 @@ export function ContainerForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Agregar Contenedor</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="serial_number">Numero de Serie</Label>
-            <Input
-              id="serial_number"
-              {...form.register("serial_number")}
+          <DialogTitle asChild>
+            <FormDialogHeader
+              icon={Container}
+              title="Agregar contenedor"
+              description="Registra un contenedor identificado por número de serie."
             />
-            {form.formState.errors.serial_number && (
-              <p className="text-red-500 text-sm mt-1">
-                {form.formState.errors.serial_number.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor="type">Tipo</Label>
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <Field
+            id="serial_number"
+            label="Número de serie"
+            icon={Hash}
+            required
+            error={form.formState.errors.serial_number?.message}
+          >
+            <Input id="serial_number" placeholder="Ej. MSKU1234567" {...form.register("serial_number")} />
+          </Field>
+
+          <Field label="Tipo" icon={Layers} hint="Opcional.">
             <Select
               value={form.watch("type") || ""}
               onValueChange={(value) => form.setValue("type", value)}
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Seleccionar tipo" />
               </SelectTrigger>
               <SelectContent>
@@ -90,17 +86,15 @@ export function ContainerForm({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+          </Field>
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Agregando..." : "Agregar"}
+            <Button type="submit" variant="brand" disabled={isLoading}>
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isLoading ? "Agregando..." : "Agregar contenedor"}
             </Button>
           </div>
         </form>

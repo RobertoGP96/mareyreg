@@ -5,7 +5,16 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Plus, Trash2, Package } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import {
+  Plus,
+  Trash2,
+  Shirt,
+  CheckCircle2,
+  Clock,
+  ArrowDownCircle,
+  Layers,
+} from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,9 +77,7 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
       setIsEntryOpen(false);
       toast.success("Entrada registrada exitosamente");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   const handleDeleteEntry = async () => {
@@ -82,133 +89,181 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
       setEntryToDelete(null);
       toast.success("Entrada eliminada");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   const totalAvailable = inventory.reduce((s, i) => s + i.available, 0);
   const totalReserved = inventory.reduce((s, i) => s + i.reserved, 0);
   const totalSold = inventory.reduce((s, i) => s + i.sold, 0);
 
+  const summaryCards = [
+    { label: "Disponibles", value: totalAvailable, icon: CheckCircle2, color: "text-[var(--success)]", bg: "from-[var(--success)]/20 to-[var(--success)]/5", ring: "ring-[var(--success)]/20" },
+    { label: "Reservadas",  value: totalReserved,  icon: Clock,         color: "text-[var(--info)]",    bg: "from-[var(--info)]/20 to-[var(--info)]/5",       ring: "ring-[var(--info)]/20" },
+    { label: "Vendidas",    value: totalSold,      icon: ArrowDownCircle, color: "text-muted-foreground",bg: "from-muted to-transparent",                       ring: "ring-border" },
+  ];
+
   return (
-    <>
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-xl font-semibold text-green-600">{totalAvailable}</p>
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">Disponibles</p>
-        </div>
-        <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-xl font-semibold text-blue-600">{totalReserved}</p>
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">Reservadas</p>
-        </div>
-        <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-xl font-semibold text-muted-foreground">{totalSold}</p>
-          <p className="text-xs text-muted-foreground uppercase tracking-wider">Vendidas</p>
-        </div>
+    <div className="space-y-5">
+      <PageHeader
+        icon={Shirt}
+        title="Inventario de pacas"
+        description="Stock por categoría con seguimiento de disponibles, reservadas y vendidas."
+      >
+        <Button variant="brand" onClick={() => setIsEntryOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Registrar entrada
+        </Button>
+      </PageHeader>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {summaryCards.map((s) => (
+          <div
+            key={s.label}
+            className="relative overflow-hidden rounded-xl border border-border bg-card p-5 shadow-panel"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {s.label}
+                </p>
+                <p className="text-3xl font-bold font-headline tabular-nums text-foreground mt-1">
+                  {s.value}
+                </p>
+              </div>
+              <div className={`flex size-11 items-center justify-center rounded-lg bg-gradient-to-br ${s.bg} ring-1 ring-inset ${s.ring}`}>
+                <s.icon className={`h-5 w-5 ${s.color}`} strokeWidth={2.2} />
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Inventory Table */}
-      <div className="bg-card rounded-lg border">
-        <div className="px-4 py-3 border-b flex justify-between items-center">
-          <h2 className="text-base font-medium">Inventario por Categoria</h2>
-          <Button onClick={() => setIsEntryOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Registrar Entrada
-          </Button>
+      {/* Inventory table */}
+      <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <h2 className="font-headline font-semibold text-foreground flex items-center gap-2">
+            <Layers className="h-4 w-4 text-[var(--brand)]" />
+            Inventario por categoría
+          </h2>
+          <Badge variant="brand">{inventory.length}</Badge>
         </div>
 
         {inventory.length > 0 ? (
-          <div className="divide-y">
-            <div className="grid grid-cols-12 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50">
-              <div className="col-span-3">Categoria</div>
-              <div className="col-span-2">Clasificacion</div>
-              <div className="col-span-2 text-center">Disponible</div>
-              <div className="col-span-1 text-center">Reserv.</div>
-              <div className="col-span-1 text-center">Vendida</div>
-              <div className="col-span-1 text-center">Costo/U</div>
-              <div className="col-span-2 text-right">Valor Stock</div>
-            </div>
-            {inventory.map((item) => {
-              const inStock = item.available + item.reserved;
-              const avgCost = inStock > 0 ? Number(item.totalCost) / inStock : 0;
-              const stockValue = Number(item.totalCost);
-              return (
-                <div key={item.categoryId} className="grid grid-cols-12 px-4 py-3 items-center hover:bg-muted/30 transition-colors">
-                  <div className="col-span-3 font-medium flex items-center gap-2">
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                    {item.category.name}
-                  </div>
-                  <div className="col-span-2">
-                    {item.category.classification ? (
-                      <Badge variant="outline" className="text-xs">{item.category.classification.name}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">—</span>
-                    )}
-                  </div>
-                  <div className="col-span-2 text-center">
-                    <Badge className={item.available > 0 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                      {item.available}
-                    </Badge>
-                  </div>
-                  <div className="col-span-1 text-center">
-                    {item.reserved > 0 ? (
-                      <Badge className="bg-blue-100 text-blue-800">{item.reserved}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">0</span>
-                    )}
-                  </div>
-                  <div className="col-span-1 text-center text-muted-foreground">{item.sold}</div>
-                  <div className="col-span-1 text-center text-sm">
-                    {avgCost > 0 ? `$${avgCost.toFixed(2)}` : "—"}
-                  </div>
-                  <div className="col-span-2 text-right font-medium text-sm">
-                    {stockValue > 0 ? `$${stockValue.toFixed(2)}` : "—"}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 border-b border-border">
+                <tr className="text-left text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  <th className="px-5 py-2.5">Categoría</th>
+                  <th className="px-3 py-2.5">Clasificación</th>
+                  <th className="px-3 py-2.5 text-center">Disponible</th>
+                  <th className="px-3 py-2.5 text-center">Reserv.</th>
+                  <th className="px-3 py-2.5 text-center">Vendida</th>
+                  <th className="px-3 py-2.5 text-right">Costo/U</th>
+                  <th className="px-5 py-2.5 text-right">Valor stock</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {inventory.map((item) => {
+                  const inStock = item.available + item.reserved;
+                  const avgCost = inStock > 0 ? Number(item.totalCost) / inStock : 0;
+                  const stockValue = Number(item.totalCost);
+                  return (
+                    <tr key={item.categoryId} className="transition-colors hover:bg-[var(--brand)]/[0.04]">
+                      <td className="px-5 py-3 font-medium text-foreground">
+                        <div className="flex items-center gap-2">
+                          <Shirt className="h-4 w-4 text-muted-foreground" />
+                          {item.category.name}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        {item.category.classification ? (
+                          <Badge variant="outline">{item.category.classification.name}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <Badge variant={item.available > 0 ? "success" : "destructive"}>
+                          {item.available}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        {item.reserved > 0 ? (
+                          <Badge variant="info">{item.reserved}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground tabular-nums">0</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-center text-muted-foreground tabular-nums">{item.sold}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">
+                        {avgCost > 0 ? `$${avgCost.toFixed(2)}` : "—"}
+                      </td>
+                      <td className="px-5 py-3 text-right font-semibold tabular-nums text-foreground">
+                        {stockValue > 0 ? `$${stockValue.toFixed(2)}` : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <div className="p-4">
-            <EmptyState title="Sin inventario" description="Registra la primera entrada de pacas." />
+          <div className="p-8">
+            <EmptyState title="Sin inventario" description="Registra la primera entrada de pacas para empezar." />
           </div>
         )}
       </div>
 
-      {/* Recent Entries */}
-      <div className="bg-card rounded-lg border">
-        <div className="px-4 py-3 border-b">
-          <h2 className="text-base font-medium">Entradas Recientes</h2>
+      {/* Recent entries */}
+      <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <h2 className="font-headline font-semibold text-foreground flex items-center gap-2">
+            <ArrowDownCircle className="h-4 w-4 text-[var(--brand)]" />
+            Entradas recientes
+          </h2>
+          <Badge variant="outline">{entries.length}</Badge>
         </div>
-        <div className="divide-y">
-          {entries.length > 0 ? entries.map((entry) => (
-            <div key={entry.entryId} className="px-4 py-3 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{entry.category.name}</span>
-                  <Badge variant="secondary">+{entry.quantity}</Badge>
+        <div className="divide-y divide-border/60">
+          {entries.length > 0 ? (
+            entries.map((entry) => (
+              <div
+                key={entry.entryId}
+                className="group flex items-center justify-between px-5 py-3 transition-colors hover:bg-[var(--brand)]/[0.04]"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-medium text-foreground">{entry.category.name}</span>
+                    <Badge variant="success">+{entry.quantity}</Badge>
+                  </div>
+                  <p className="text-[0.82rem] text-muted-foreground">
+                    {[
+                      entry.supplier && `Proveedor: ${entry.supplier}`,
+                      entry.purchasePrice && `Precio: $${String(entry.purchasePrice)}`,
+                      entry.arrivalDate && `Fecha: ${entry.arrivalDate}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || new Date(entry.createdAt).toLocaleDateString("es-ES")}
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {[
-                    entry.supplier && `Proveedor: ${entry.supplier}`,
-                    entry.purchasePrice && `Precio: $${String(entry.purchasePrice)}`,
-                    entry.arrivalDate && `Fecha: ${entry.arrivalDate}`,
-                  ].filter(Boolean).join(" | ") || new Date(entry.createdAt).toLocaleDateString("es-ES")}
-                </p>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-8 text-destructive opacity-60 group-hover:opacity-100"
+                  onClick={() => setEntryToDelete(entry.entryId)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
-              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setEntryToDelete(entry.entryId)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
+            ))
+          ) : (
+            <div className="px-5 py-6 text-center text-sm text-muted-foreground">
+              Sin entradas registradas.
             </div>
-          )) : (
-            <div className="px-4 py-4 text-center text-muted-foreground">Sin entradas registradas</div>
           )}
         </div>
       </div>
 
-      {/* Entry Form */}
       <PacaEntryForm
         open={isEntryOpen}
         onOpenChange={setIsEntryOpen}
@@ -217,21 +272,26 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
         categories={categories}
       />
 
-      {/* Delete Entry Confirm */}
       <AlertDialog open={!!entryToDelete} onOpenChange={() => setEntryToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar entrada?</AlertDialogTitle>
-            <AlertDialogDescription>Se descontaran las pacas del inventario disponible.</AlertDialogDescription>
+            <AlertDialogTitle>¿Eliminar entrada?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se descontarán las pacas del inventario disponible.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteEntry} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isSubmitting}>
-              {isSubmitting ? "Eliminando..." : "Eliminar"}
+            <AlertDialogAction
+              onClick={handleDeleteEntry}
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

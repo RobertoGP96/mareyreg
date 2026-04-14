@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -19,7 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Building2, User, IdCard, Phone, FileText } from "lucide-react";
+import { Field, FormDialogHeader } from "@/components/ui/field";
+import { Building2, User, IdCard, Phone, FileText, Loader2 } from "lucide-react";
 import type { Entity } from "@/types";
 
 const driverSchema = z.object({
@@ -85,26 +85,31 @@ export function DriverForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <User className="h-5 w-5 text-primary" />
-            {driver ? "Editar Conductor" : "Nuevo Conductor"}
+          <DialogTitle asChild>
+            <FormDialogHeader
+              icon={User}
+              title={driver ? "Editar conductor" : "Nuevo conductor"}
+              description={driver ? "Actualiza los datos del conductor." : "Registra un nuevo conductor en el sistema."}
+            />
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="entity_id" className="flex items-center gap-1.5 mb-1.5">
-              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-              Entidad
-            </Label>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <Field
+            label="Entidad"
+            icon={Building2}
+            required
+            error={form.formState.errors.entity_id?.message}
+          >
             <Select
               value={form.watch("entity_id")?.toString() || ""}
               onValueChange={(value) =>
                 form.setValue("entity_id", parseInt(value, 10))
               }
             >
-              <SelectTrigger>
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="Seleccionar entidad" />
               </SelectTrigger>
               <SelectContent>
@@ -118,66 +123,57 @@ export function DriverForm({
                 ))}
               </SelectContent>
             </Select>
-            {form.formState.errors.entity_id && (
-              <p className="text-destructive text-sm mt-1">
-                {form.formState.errors.entity_id.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor="full_name" className="flex items-center gap-1.5 mb-1.5">
-              <User className="h-3.5 w-3.5 text-muted-foreground" />
-              Nombre Completo
-            </Label>
-            <Input id="full_name" placeholder="Nombre del conductor" {...form.register("full_name")} />
-            {form.formState.errors.full_name && (
-              <p className="text-destructive text-sm mt-1">
-                {form.formState.errors.full_name.message}
-              </p>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="identification_number" className="flex items-center gap-1.5 mb-1.5">
-                <IdCard className="h-3.5 w-3.5 text-muted-foreground" />
-                Identificacion
-              </Label>
+          </Field>
+
+          <Field
+            id="full_name"
+            label="Nombre completo"
+            icon={User}
+            required
+            error={form.formState.errors.full_name?.message}
+          >
+            <Input id="full_name" placeholder="Ej. Juan Pérez López" {...form.register("full_name")} />
+          </Field>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field
+              id="identification_number"
+              label="Identificación"
+              icon={IdCard}
+              required
+              error={form.formState.errors.identification_number?.message}
+            >
               <Input
                 id="identification_number"
-                placeholder="Numero de ID"
+                placeholder="Número de ID"
                 {...form.register("identification_number")}
               />
-              {form.formState.errors.identification_number && (
-                <p className="text-destructive text-sm mt-1">
-                  {form.formState.errors.identification_number.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="phone_number" className="flex items-center gap-1.5 mb-1.5">
-                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                Telefono
-              </Label>
-              <Input id="phone_number" placeholder="Numero de telefono" {...form.register("phone_number")} />
-              {form.formState.errors.phone_number && (
-                <p className="text-destructive text-sm mt-1">
-                  {form.formState.errors.phone_number.message}
-                </p>
-              )}
-            </div>
+            </Field>
+            <Field
+              id="phone_number"
+              label="Teléfono"
+              icon={Phone}
+              required
+              error={form.formState.errors.phone_number?.message}
+            >
+              <Input id="phone_number" placeholder="Número de contacto" {...form.register("phone_number")} />
+            </Field>
           </div>
-          <div>
-            <Label htmlFor="operative_license" className="flex items-center gap-1.5 mb-1.5">
-              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-              Licencia Operativa
-            </Label>
+
+          <Field
+            id="operative_license"
+            label="Licencia operativa"
+            icon={FileText}
+            hint="Opcional — ingresa el número de licencia si aplica."
+          >
             <Input
               id="operative_license"
-              placeholder="Opcional"
+              placeholder="Número de licencia"
               {...form.register("operative_license")}
             />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
+          </Field>
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
             <Button
               type="button"
               variant="outline"
@@ -185,12 +181,9 @@ export function DriverForm({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading
-                ? "Guardando..."
-                : driver
-                  ? "Actualizar"
-                  : "Crear"}
+            <Button type="submit" variant="brand" disabled={isLoading}>
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isLoading ? "Guardando..." : driver ? "Actualizar" : "Crear conductor"}
             </Button>
           </div>
         </form>

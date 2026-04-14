@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   InputGroup,
   InputGroupAddon,
@@ -34,6 +35,10 @@ import {
   Pen,
   RouteIcon,
   Box,
+  Calendar,
+  Package,
+  DollarSign,
+  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import { createTrip, updateTrip, deleteTrip } from "../actions/trip-actions";
@@ -80,9 +85,7 @@ export function TripListClient({ initialTrips, drivers }: Props) {
 
   const filteredTrips = initialTrips.filter(
     (trip) =>
-      trip.driverFullName
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
+      trip.driverFullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       trip.province?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       trip.product?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       trip.containers.some((c) =>
@@ -101,14 +104,11 @@ export function TripListClient({ initialTrips, drivers }: Props) {
     setIsSubmitting(true);
     const result = await createTrip(data);
     setIsSubmitting(false);
-
     if (result.success) {
       setIsCreateOpen(false);
       toast.success("Viaje creado exitosamente");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   const handleUpdateTrip = async (data: {
@@ -123,14 +123,11 @@ export function TripListClient({ initialTrips, drivers }: Props) {
     setIsSubmitting(true);
     const result = await updateTrip(tripToEdit.tripId, data);
     setIsSubmitting(false);
-
     if (result.success) {
       setTripToEdit(null);
       toast.success("Viaje actualizado exitosamente");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   const handleDeleteTrip = async () => {
@@ -138,20 +135,14 @@ export function TripListClient({ initialTrips, drivers }: Props) {
     setIsSubmitting(true);
     const result = await deleteTrip(tripToDelete);
     setIsSubmitting(false);
-
     if (result.success) {
       setTripToDelete(null);
       toast.success("Viaje eliminado exitosamente");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
-  const handleAddContainer = async (data: {
-    serial_number: string;
-    type?: string;
-  }) => {
+  const handleAddContainer = async (data: { serial_number: string; type?: string }) => {
     if (!containerTripId) return;
     setIsSubmitting(true);
     const result = await createContainer({
@@ -160,14 +151,11 @@ export function TripListClient({ initialTrips, drivers }: Props) {
       type: data.type,
     });
     setIsSubmitting(false);
-
     if (result.success) {
       setContainerTripId(null);
       toast.success("Contenedor agregado exitosamente");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   const handleDeleteContainer = async () => {
@@ -175,139 +163,132 @@ export function TripListClient({ initialTrips, drivers }: Props) {
     setIsSubmitting(true);
     const result = await deleteContainer(containerToDelete.id);
     setIsSubmitting(false);
-
     if (result.success) {
       setContainerToDelete(null);
       toast.success("Contenedor eliminado exitosamente");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   return (
-    <>
-      <div className="bg-card rounded-lg border">
-        <div className="px-4 py-3 border-b border-border">
-          <div className="flex justify-between items-center">
-            <h2 className="text-base font-medium text-foreground">
-              Lista de Viajes
-            </h2>
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Agregar
-            </Button>
-          </div>
-          <div className="mt-4">
-            <InputGroup>
-              <InputGroupInput
-                placeholder="Buscar viajes..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <InputGroupAddon>
-                <Search />
-              </InputGroupAddon>
-              <InputGroupAddon align="inline-end">
-                <Badge>{filteredTrips.length}</Badge>
-              </InputGroupAddon>
-            </InputGroup>
-          </div>
+    <div className="space-y-5">
+      <PageHeader
+        icon={RouteIcon}
+        title="Viajes"
+        description="Programación y seguimiento de viajes con conductor, destino y contenedores."
+        badge={`${initialTrips.length} viajes`}
+      >
+        <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Nuevo viaje
+        </Button>
+      </PageHeader>
+
+      <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-4 py-3">
+          <InputGroup className="flex-1 min-w-[240px]">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="Buscar por conductor, provincia, producto o contenedor…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <InputGroupAddon align="inline-end">
+              <Badge variant="brand">{filteredTrips.length}</Badge>
+            </InputGroupAddon>
+          </InputGroup>
         </div>
-        <div className="grid gap-4 p-4">
+
+        <div className="divide-y divide-border/60">
           {filteredTrips.length > 0 ? (
             filteredTrips.map((trip) => (
               <div
                 key={trip.tripId}
-                className="bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors duration-200 p-4"
+                className="group px-5 py-4 transition-colors hover:bg-[var(--brand)]/[0.04]"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start space-x-3 flex-1 min-w-0">
-                    <div className="p-2 rounded-xl bg-muted">
-                      <RouteIcon className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-base font-semibold text-foreground truncate">
-                          {trip.driverFullName || `Viaje #${trip.tripId}`}
-                        </h3>
-                        {trip.province && (
-                          <Badge variant="outline">{trip.province}</Badge>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-muted-foreground">
-                        {trip.loadDate && (
-                          <div>
-                            <span className="font-medium">Fecha:</span>{" "}
-                            {trip.loadDate}
-                          </div>
-                        )}
-                        {trip.product && (
-                          <div>
-                            <span className="font-medium">Producto:</span>{" "}
-                            {trip.product}
-                          </div>
-                        )}
-                        {trip.tripPayment && (
-                          <div>
-                            <span className="font-medium">Pago:</span> $
-                            {trip.tripPayment}
-                          </div>
-                        )}
-                      </div>
-                      {trip.containers.length > 0 && (
-                        <div className="flex items-center gap-2 mt-3 flex-wrap">
-                          <Box className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="text-sm font-medium text-muted-foreground">
-                            Contenedores:
-                          </span>
-                          {trip.containers.map((c) => (
-                            <Badge
-                              key={c.containerId}
-                              variant="secondary"
-                              className="text-xs cursor-pointer hover:bg-destructive/10"
-                              onClick={() =>
-                                setContainerToDelete({
-                                  id: c.containerId,
-                                  serial: c.serialNumber,
-                                })
-                              }
-                            >
-                              {c.serialNumber}
-                              {c.type && ` (${c.type})`}
-                            </Badge>
-                          ))}
-                        </div>
+                <div className="flex items-start gap-4">
+                  <div className="flex size-11 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--brand)]/20 to-[var(--brand)]/5 ring-1 ring-inset ring-[var(--brand)]/20 shrink-0">
+                    <RouteIcon className="h-5 w-5 text-[var(--brand)]" strokeWidth={2.2} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <h3 className="font-semibold text-foreground truncate">
+                        {trip.driverFullName || `Viaje #${trip.tripId}`}
+                      </h3>
+                      {trip.province && (
+                        <Badge variant="info" className="gap-1">
+                          <MapPin className="h-3 w-3" />
+                          {trip.province}
+                        </Badge>
                       )}
                     </div>
+                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.82rem] text-muted-foreground">
+                      {trip.loadDate && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5" />
+                          {trip.loadDate}
+                          {trip.loadTime && ` · ${trip.loadTime}`}
+                        </span>
+                      )}
+                      {trip.product && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Package className="h-3.5 w-3.5" />
+                          {trip.product}
+                        </span>
+                      )}
+                      {trip.tripPayment && (
+                        <span className="inline-flex items-center gap-1.5 text-[var(--success)]">
+                          <DollarSign className="h-3.5 w-3.5" />
+                          {trip.tripPayment}
+                        </span>
+                      )}
+                    </div>
+                    {trip.containers.length > 0 && (
+                      <div className="flex items-center gap-2 mt-3 flex-wrap">
+                        <span className="inline-flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                          <Box className="h-3 w-3" />
+                          Contenedores
+                        </span>
+                        {trip.containers.map((c) => (
+                          <Badge
+                            key={c.containerId}
+                            variant="outline"
+                            className="gap-1 cursor-pointer hover:bg-destructive/10 hover:border-destructive/30 hover:text-destructive transition-colors"
+                            onClick={() =>
+                              setContainerToDelete({
+                                id: c.containerId,
+                                serial: c.serialNumber,
+                              })
+                            }
+                            title="Click para eliminar"
+                          >
+                            {c.serialNumber}
+                            {c.type && <span className="opacity-60">· {c.type}</span>}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Button variant="ghost" size="icon" className="size-8 opacity-60 group-hover:opacity-100">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => setContainerTripId(trip.tripId)}
-                        className="flex items-center space-x-2"
-                      >
-                        <Box className="h-4 w-4" />
-                        <span>Agregar contenedor</span>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => setContainerTripId(trip.tripId)}>
+                        <Box className="h-4 w-4" /> Agregar contenedor
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setTripToEdit(trip)}
-                        className="flex items-center space-x-2"
-                      >
-                        <Pen className="h-4 w-4" />
-                        <span>Editar</span>
+                      <DropdownMenuItem onClick={() => setTripToEdit(trip)}>
+                        <Pen className="h-4 w-4" /> Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => setTripToDelete(trip.tripId)}
-                        className="flex items-center space-x-2 text-red-600 focus:text-red-600"
+                        className="text-destructive focus:text-destructive"
                       >
-                        <Trash2 className="h-4 w-4" />
-                        <span>Eliminar</span>
+                        <Trash2 className="h-4 w-4" /> Eliminar
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -315,15 +296,20 @@ export function TripListClient({ initialTrips, drivers }: Props) {
               </div>
             ))
           ) : (
-            <EmptyState
-              title="No hay viajes"
-              description="No se encontraron viajes registrados."
-            />
+            <div className="p-8">
+              <EmptyState
+                title="No hay viajes"
+                description={
+                  searchQuery
+                    ? `No se encontraron resultados para "${searchQuery}".`
+                    : "Crea el primer viaje para empezar."
+                }
+              />
+            </div>
           )}
         </div>
       </div>
 
-      {/* Create Trip Dialog */}
       <TripForm
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
@@ -332,7 +318,6 @@ export function TripListClient({ initialTrips, drivers }: Props) {
         drivers={drivers}
       />
 
-      {/* Edit Trip Dialog */}
       <TripForm
         open={!!tripToEdit}
         onOpenChange={(open) => !open && setTripToEdit(null)}
@@ -354,7 +339,6 @@ export function TripListClient({ initialTrips, drivers }: Props) {
         }
       />
 
-      {/* Container Form Dialog */}
       <ContainerForm
         open={!!containerTripId}
         onOpenChange={(open) => !open && setContainerTripId(null)}
@@ -362,57 +346,47 @@ export function TripListClient({ initialTrips, drivers }: Props) {
         isLoading={isSubmitting}
       />
 
-      {/* Delete Trip Dialog */}
-      <AlertDialog
-        open={!!tripToDelete}
-        onOpenChange={() => setTripToDelete(null)}
-      >
+      <AlertDialog open={!!tripToDelete} onOpenChange={() => setTripToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar viaje?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion eliminara permanentemente el viaje y todos sus
-              contenedores asociados.
+              Esta acción eliminará permanentemente el viaje y todos sus contenedores asociados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteTrip}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-white hover:bg-destructive/90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Eliminando..." : "Eliminar"}
+              {isSubmitting ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Container Dialog */}
-      <AlertDialog
-        open={!!containerToDelete}
-        onOpenChange={() => setContainerToDelete(null)}
-      >
+      <AlertDialog open={!!containerToDelete} onOpenChange={() => setContainerToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar contenedor?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar contenedor?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminara el contenedor {containerToDelete?.serial} de este
-              viaje.
+              Se eliminará el contenedor <span className="font-semibold text-foreground">{containerToDelete?.serial}</span> de este viaje.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteContainer}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-white hover:bg-destructive/90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Eliminando..." : "Eliminar"}
+              {isSubmitting ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

@@ -34,7 +34,7 @@ export function LoginForm() {
 
     if (!result.success) {
       toast.error("Credenciales incorrectas", {
-        description: "Verifica tu email y contrasena",
+        description: "Verifica tu email y contraseña",
       });
       return;
     }
@@ -45,12 +45,10 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="space-y-2">
-        <Label
-          htmlFor="email"
-          className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-        >
-          Correo Electronico
+      <div className="space-y-1.5">
+        <Label htmlFor="email">
+          <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+          Correo electrónico
         </Label>
         <InputGroup>
           <InputGroupAddon>
@@ -67,19 +65,17 @@ export function LoginForm() {
         </InputGroup>
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <Label
-            htmlFor="password"
-            className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-          >
-            Contrasena
+          <Label htmlFor="password">
+            <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+            Contraseña
           </Label>
           <button
             type="button"
-            className="text-xs text-primary hover:underline font-medium"
+            className="text-xs text-[var(--brand)] hover:underline font-medium"
           >
-            Olvidaste tu contrasena?
+            ¿Olvidaste tu contraseña?
           </button>
         </div>
         <InputGroup>
@@ -97,30 +93,32 @@ export function LoginForm() {
         </InputGroup>
       </div>
 
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center gap-2">
         <Checkbox id="remember" />
         <label
           htmlFor="remember"
           className="text-sm text-muted-foreground cursor-pointer select-none"
         >
-          Recordar dispositivo por 30 dias
+          Recordar dispositivo por 30 días
         </label>
       </div>
 
       <Button
         type="submit"
-        className="w-full h-12 text-sm font-semibold uppercase tracking-wider"
+        variant="brand"
+        size="lg"
+        className="w-full h-11 text-sm font-semibold"
         disabled={isLoading}
       >
         {isLoading ? (
           <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Iniciando sesion...
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Iniciando sesión…
           </>
         ) : (
           <>
-            Iniciar Sesion
-            <LogIn className="ml-2 h-4 w-4" />
+            Iniciar sesión
+            <LogIn className="h-4 w-4" />
           </>
         )}
       </Button>

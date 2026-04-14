@@ -11,8 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Building2 } from "lucide-react";
+import { Field, FormDialogHeader } from "@/components/ui/field";
+import { Building2, Loader2 } from "lucide-react";
 import type { Entity } from "@/types";
 
 const entitySchema = z.object({
@@ -56,38 +56,31 @@ export function EntityForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-primary" />
-            {entity ? "Editar Entidad" : "Nueva Entidad"}
+          <DialogTitle asChild>
+            <FormDialogHeader
+              icon={Building2}
+              title={entity ? "Editar entidad" : "Nueva entidad"}
+              description={entity ? "Actualiza el nombre de la entidad." : "Registra una nueva entidad operativa."}
+            />
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="name" className="flex items-center gap-1.5 mb-1.5">
-              <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-              Nombre
-            </Label>
-            <Input id="name" placeholder="Nombre de la entidad" {...form.register("name")} />
-            {form.formState.errors.name && (
-              <p className="text-destructive text-sm mt-1">
-                {form.formState.errors.name.message}
-              </p>
-            )}
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <Field
+            id="name"
+            label="Nombre"
+            icon={Building2}
+            required
+            error={form.formState.errors.name?.message}
+          >
+            <Input id="name" placeholder="Ej. Transportes del Norte S.A." {...form.register("name")} />
+          </Field>
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading
-                ? "Guardando..."
-                : entity
-                  ? "Actualizar"
-                  : "Crear"}
+            <Button type="submit" variant="brand" disabled={isLoading}>
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isLoading ? "Guardando..." : entity ? "Actualizar" : "Crear entidad"}
             </Button>
           </div>
         </form>

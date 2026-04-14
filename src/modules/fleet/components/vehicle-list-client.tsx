@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   InputGroup,
   InputGroupAddon,
@@ -26,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, Trash2, MoreHorizontal, Plus, Pen, Truck } from "lucide-react";
+import { Search, Trash2, MoreHorizontal, Plus, Pen, Truck, Tag, User } from "lucide-react";
 import { toast } from "sonner";
 import {
   createVehicle,
@@ -85,18 +86,13 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
     setIsSubmitting(true);
     const result = await createVehicle(data);
     setIsSubmitting(false);
-
     if (result.success) {
       setIsCreateDialogOpen(false);
-      toast.success("Vehiculo creado exitosamente", {
-        description: `${data.name || "Vehiculo"} ha sido registrado en el sistema.`,
+      toast.success("Vehículo creado exitosamente", {
+        description: `${data.name || "Vehículo"} ha sido registrado en el sistema.`,
       });
       router.refresh();
-    } else {
-      toast.error("Error al crear el vehiculo", {
-        description: result.error,
-      });
-    }
+    } else toast.error("Error al crear el vehículo", { description: result.error });
   };
 
   const handleUpdateVehicle = async (data: {
@@ -114,18 +110,11 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
       driver_id: data.driver_id ?? null,
     });
     setIsSubmitting(false);
-
     if (result.success) {
       setVehicleToEdit(null);
-      toast.success("Vehiculo actualizado exitosamente", {
-        description: `Los datos del vehiculo han sido actualizados.`,
-      });
+      toast.success("Vehículo actualizado exitosamente");
       router.refresh();
-    } else {
-      toast.error("Error al actualizar el vehiculo", {
-        description: result.error,
-      });
-    }
+    } else toast.error("Error al actualizar el vehículo", { description: result.error });
   };
 
   const handleDeleteVehicle = async () => {
@@ -133,116 +122,112 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
     setIsSubmitting(true);
     const result = await deleteVehicle(vehicleToDelete);
     setIsSubmitting(false);
-
     if (result.success) {
       setVehicleToDelete(null);
-      toast.success("Vehiculo eliminado exitosamente");
+      toast.success("Vehículo eliminado exitosamente");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   return (
-    <>
-      <div className="bg-card rounded-lg border">
-        <div className="px-4 py-3 border-b border-border">
-          <div className="flex justify-between items-center">
-            <h2 className="text-base font-medium text-foreground">
-              Lista de Vehiculos
-            </h2>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Agregar
-            </Button>
-          </div>
-          <div className="mt-4">
-            <InputGroup>
-              <InputGroupInput
-                placeholder="Buscar vehiculos..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <InputGroupAddon>
-                <Search />
-              </InputGroupAddon>
-              <InputGroupAddon align="inline-end">
-                <Badge>{filteredVehicles.length}</Badge>
-              </InputGroupAddon>
-            </InputGroup>
-          </div>
+    <div className="space-y-5">
+      <PageHeader
+        icon={Truck}
+        title="Vehículos"
+        description="Flota de vehículos con placas, documentación y conductores asignados."
+        badge={`${initialVehicles.length} vehículos`}
+      >
+        <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Nuevo vehículo
+        </Button>
+      </PageHeader>
+
+      <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-4 py-3">
+          <InputGroup className="flex-1 min-w-[240px]">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="Buscar por nombre, placa o conductor…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <InputGroupAddon align="inline-end">
+              <Badge variant="brand">{filteredVehicles.length}</Badge>
+            </InputGroupAddon>
+          </InputGroup>
         </div>
-        <div className="grid gap-4 p-4">
+
+        <div className="divide-y divide-border/60">
           {filteredVehicles.length > 0 ? (
             filteredVehicles.map((vehicle) => (
               <div
                 key={vehicle.vehicle_id}
-                className="bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors duration-200 p-4"
+                className="group flex items-start gap-4 px-5 py-4 transition-colors hover:bg-[var(--brand)]/[0.04]"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start space-x-3 flex-1 min-w-0">
-                    <div className="p-2 rounded-xl bg-muted">
-                      <Truck className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-base font-semibold text-foreground truncate">
-                        {vehicle.name || `Vehiculo #${vehicle.vehicle_id}`}
-                      </h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground mt-2">
-                        {vehicle.cuña_plate_number && (
-                          <div>
-                            <span className="font-medium">Placa Cuna:</span>{" "}
-                            {vehicle.cuña_plate_number}
-                          </div>
-                        )}
-                        {vehicle.plancha_plate_number && (
-                          <div>
-                            <span className="font-medium">Placa Plancha:</span>{" "}
-                            {vehicle.plancha_plate_number}
-                          </div>
-                        )}
-                        {vehicle.driver && (
-                          <div className="sm:col-span-2">
-                            <span className="font-medium">Conductor:</span>{" "}
-                            <Badge variant="secondary">
-                              {vehicle.driver.full_name}
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => setVehicleToEdit(vehicle)}
-                        className="flex items-center space-x-2"
-                      >
-                        <Pen className="h-4 w-4" />
-                        <span>Editar</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setVehicleToDelete(vehicle.vehicle_id)}
-                        className="flex items-center space-x-2 text-red-600 focus:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span>Eliminar</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                <div className="flex size-11 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--brand)]/20 to-[var(--brand)]/5 ring-1 ring-inset ring-[var(--brand)]/20 shrink-0">
+                  <Truck className="h-5 w-5 text-[var(--brand)]" strokeWidth={2.2} />
                 </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                    <h3 className="font-semibold text-foreground truncate">
+                      {vehicle.name || `Vehículo #${vehicle.vehicle_id}`}
+                    </h3>
+                    {vehicle.driver && (
+                      <Badge variant="info" className="gap-1">
+                        <User className="h-3 w-3" />
+                        {vehicle.driver.full_name}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.82rem] text-muted-foreground">
+                    {vehicle.cuña_plate_number && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Tag className="h-3.5 w-3.5" />
+                        <span className="font-medium">Cuña:</span> {vehicle.cuña_plate_number}
+                      </span>
+                    )}
+                    {vehicle.plancha_plate_number && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Tag className="h-3.5 w-3.5" />
+                        <span className="font-medium">Plancha:</span> {vehicle.plancha_plate_number}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-8 opacity-60 group-hover:opacity-100">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem onClick={() => setVehicleToEdit(vehicle)}>
+                      <Pen className="h-4 w-4" /> Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setVehicleToDelete(vehicle.vehicle_id)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" /> Eliminar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ))
           ) : (
-            <EmptyState
-              title="No hay vehiculos"
-              description="No se encontraron vehiculos registrados."
-            />
+            <div className="p-8">
+              <EmptyState
+                title="No hay vehículos"
+                description={
+                  searchQuery
+                    ? `No se encontraron resultados para "${searchQuery}".`
+                    : "Registra el primer vehículo para empezar."
+                }
+              />
+            </div>
           )}
         </div>
       </div>
@@ -275,29 +260,26 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
         drivers={drivers}
       />
 
-      <AlertDialog
-        open={!!vehicleToDelete}
-        onOpenChange={() => setVehicleToDelete(null)}
-      >
+      <AlertDialog open={!!vehicleToDelete} onOpenChange={() => setVehicleToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar vehículo?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion eliminara permanentemente el vehiculo.
+              Esta acción eliminará permanentemente el vehículo y no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteVehicle}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-white hover:bg-destructive/90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Eliminando..." : "Eliminar"}
+              {isSubmitting ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

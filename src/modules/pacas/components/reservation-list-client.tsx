@@ -5,17 +5,67 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { PageHeader } from "@/components/ui/page-header";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, CheckCircle, XCircle, Pen, Trash2, MoreHorizontal } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Field, FormDialogHeader } from "@/components/ui/field";
+import { FormSection } from "@/components/ui/form-section";
+import {
+  Plus,
+  Search,
+  CheckCircle,
+  XCircle,
+  Pen,
+  Trash2,
+  MoreHorizontal,
+  BookmarkCheck,
+  User,
+  Phone,
+  Mail,
+  Calendar,
+  Layers,
+  Hash,
+  DollarSign,
+  CreditCard,
+  Loader2,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { createReservation, updateReservation, deleteReservation, cancelReservation, completeReservation } from "../actions/paca-reservation-actions";
+import {
+  createReservation,
+  updateReservation,
+  deleteReservation,
+  cancelReservation,
+  completeReservation,
+} from "../actions/paca-reservation-actions";
 import { RESERVATION_STATUSES, PAYMENT_METHODS } from "@/lib/constants";
 
 interface ReservationItem {
@@ -38,10 +88,10 @@ interface CategoryOption {
   available: number;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  active: "bg-green-100 text-green-800",
-  completed: "bg-blue-100 text-blue-800",
-  cancelled: "bg-red-100 text-red-800",
+const STATUS_BADGE: Record<string, "success" | "info" | "destructive" | "warning"> = {
+  active: "success",
+  completed: "info",
+  cancelled: "destructive",
 };
 
 export function ReservationListClient({
@@ -84,8 +134,11 @@ export function ReservationListClient({
       notes: (fd.get("notes") as string) || undefined,
     });
     setIsSubmitting(false);
-    if (result.success) { setIsCreateOpen(false); toast.success("Reservacion creada"); router.refresh(); }
-    else { toast.error(result.error); }
+    if (result.success) {
+      setIsCreateOpen(false);
+      toast.success("Reservación creada");
+      router.refresh();
+    } else toast.error(result.error);
   };
 
   const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -103,8 +156,11 @@ export function ReservationListClient({
       quantity: Number(fd.get("quantity")),
     });
     setIsSubmitting(false);
-    if (result.success) { setToEdit(null); toast.success("Reservacion actualizada"); router.refresh(); }
-    else { toast.error(result.error); }
+    if (result.success) {
+      setToEdit(null);
+      toast.success("Reservación actualizada");
+      router.refresh();
+    } else toast.error(result.error);
   };
 
   const handleComplete = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -119,8 +175,11 @@ export function ReservationListClient({
       notes: (fd.get("notes") as string) || undefined,
     });
     setIsSubmitting(false);
-    if (result.success) { setToComplete(null); toast.success("Reservacion completada y venta registrada"); router.refresh(); }
-    else { toast.error(result.error); }
+    if (result.success) {
+      setToComplete(null);
+      toast.success("Reservación completada y venta registrada");
+      router.refresh();
+    } else toast.error(result.error);
   };
 
   const handleCancel = async () => {
@@ -128,8 +187,11 @@ export function ReservationListClient({
     setIsSubmitting(true);
     const result = await cancelReservation(toCancel);
     setIsSubmitting(false);
-    if (result.success) { setToCancel(null); toast.success("Reservacion cancelada"); router.refresh(); }
-    else { toast.error(result.error); }
+    if (result.success) {
+      setToCancel(null);
+      toast.success("Reservación cancelada");
+      router.refresh();
+    } else toast.error(result.error);
   };
 
   const handleDelete = async () => {
@@ -137,90 +199,162 @@ export function ReservationListClient({
     setIsSubmitting(true);
     const result = await deleteReservation(toDelete);
     setIsSubmitting(false);
-    if (result.success) { setToDelete(null); toast.success("Reservacion eliminada"); router.refresh(); }
-    else { toast.error(result.error); }
+    if (result.success) {
+      setToDelete(null);
+      toast.success("Reservación eliminada");
+      router.refresh();
+    } else toast.error(result.error);
   };
 
   return (
-    <>
-      <div className="bg-card rounded-lg border">
-        <div className="px-4 py-3 border-b">
-          <div className="flex justify-between items-center">
-            <h2 className="text-base font-medium">Reservaciones</h2>
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />Agregar
-            </Button>
-          </div>
-          <div className="mt-4">
-            <InputGroup>
-              <InputGroupInput placeholder="Buscar por cliente o categoria..." value={search} onChange={(e) => setSearch(e.target.value)} />
-              <InputGroupAddon><Search /></InputGroupAddon>
-              <InputGroupAddon align="inline-end"><Badge>{filtered.length}</Badge></InputGroupAddon>
-            </InputGroup>
-          </div>
+    <div className="space-y-5">
+      <PageHeader
+        icon={BookmarkCheck}
+        title="Reservaciones"
+        description="Gestiona reservaciones de pacas por cliente y completa ventas cuando se cierran."
+        badge={`${reservations.length} reservaciones`}
+      >
+        <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Nueva reservación
+        </Button>
+      </PageHeader>
+
+      <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-4 py-3">
+          <InputGroup className="flex-1 min-w-[240px]">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="Buscar por cliente o categoría…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            <InputGroupAddon align="inline-end">
+              <Badge variant="brand">{filtered.length}</Badge>
+            </InputGroupAddon>
+          </InputGroup>
         </div>
-        <div className="grid gap-4 p-4">
-          {filtered.length > 0 ? filtered.map((r) => (
-            <div key={r.reservationId} className="bg-card border rounded-lg p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold">{r.clientName}</span>
-                    <Badge className={STATUS_COLORS[r.status]}>{getStatusLabel(r.status)}</Badge>
-                    <Badge variant="outline">{r.quantity} pacas</Badge>
-                  </div>
-                  <div className="text-sm text-muted-foreground space-y-0.5">
-                    <p>Categoria: <span className="font-medium text-foreground">{r.category.name}</span>
-                      {r.category.classification && <span className="text-xs ml-1">({r.category.classification.name})</span>}
-                    </p>
-                    <p>Fecha: {r.reservationDate} {r.expirationDate ? `| Expira: ${r.expirationDate}` : ""}</p>
-                    {r.clientPhone && <p>Tel: {r.clientPhone}</p>}
-                    {r.notes && <p>Notas: {r.notes}</p>}
-                  </div>
-                </div>
-                <div className="flex gap-2 shrink-0">
-                  {r.status === "active" && (
-                    <Button size="sm" onClick={() => setToComplete(r)}>
-                      <CheckCircle className="h-4 w-4 mr-1" />Completar
-                    </Button>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {r.status === "active" && (
-                        <>
-                          <DropdownMenuItem onClick={() => setToEdit(r)}>
-                            <Pen className="h-4 w-4 mr-2" />Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setToCancel(r.reservationId)} className="text-orange-600">
-                            <XCircle className="h-4 w-4 mr-2" />Cancelar
-                          </DropdownMenuItem>
-                        </>
+
+        <div className="divide-y divide-border/60">
+          {filtered.length > 0 ? (
+            filtered.map((r) => (
+              <div
+                key={r.reservationId}
+                className="group px-5 py-4 transition-colors hover:bg-[var(--brand)]/[0.04]"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <span className="font-semibold text-foreground">{r.clientName}</span>
+                      <Badge variant={STATUS_BADGE[r.status] || "outline"}>
+                        {getStatusLabel(r.status)}
+                      </Badge>
+                      <Badge variant="outline" className="gap-1">
+                        <Hash className="h-3 w-3" />
+                        {r.quantity} pacas
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.82rem] text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5" />
+                        <span className="font-medium text-foreground">{r.category.name}</span>
+                        {r.category.classification && (
+                          <span className="opacity-70">· {r.category.classification.name}</span>
+                        )}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {r.reservationDate}
+                        {r.expirationDate && ` → ${r.expirationDate}`}
+                      </span>
+                      {r.clientPhone && (
+                        <span className="inline-flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5" />
+                          {r.clientPhone}
+                        </span>
                       )}
-                      <DropdownMenuItem onClick={() => setToDelete(r.reservationId)} className="text-destructive focus:text-destructive">
-                        <Trash2 className="h-4 w-4 mr-2" />Eliminar
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    </div>
+                    {r.notes && (
+                      <p className="mt-1.5 text-[0.82rem] text-muted-foreground italic line-clamp-2">
+                        “{r.notes}”
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {r.status === "active" && (
+                      <Button size="sm" variant="brand" onClick={() => setToComplete(r)}>
+                        <CheckCircle className="h-4 w-4" />
+                        Completar
+                      </Button>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="size-8 opacity-60 group-hover:opacity-100">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        {r.status === "active" && (
+                          <>
+                            <DropdownMenuItem onClick={() => setToEdit(r)}>
+                              <Pen className="h-4 w-4" /> Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setToCancel(r.reservationId)}
+                              className="text-[var(--warning)] focus:text-[var(--warning)]"
+                            >
+                              <XCircle className="h-4 w-4" /> Cancelar
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => setToDelete(r.reservationId)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" /> Eliminar
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="p-8">
+              <EmptyState
+                title="No hay reservaciones"
+                description={
+                  search
+                    ? `No se encontraron resultados para "${search}".`
+                    : "Crea la primera reservación para empezar."
+                }
+              />
             </div>
-          )) : <EmptyState title="No hay reservaciones" description="No se encontraron reservaciones." />}
+          )}
         </div>
       </div>
 
-      {/* Crear Reservacion */}
+      {/* Crear */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Nueva Reservacion</DialogTitle></DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Categoria *</Label>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle asChild>
+              <FormDialogHeader
+                icon={BookmarkCheck}
+                title="Nueva reservación"
+                description="Reserva pacas para un cliente indicando cantidad y fecha."
+              />
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreate} className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Categoría" icon={Layers} required>
                 <Select name="categoryId">
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
                   <SelectContent>
                     {availableCategories.map((c) => (
                       <SelectItem key={c.categoryId} value={String(c.categoryId)}>
@@ -229,98 +363,162 @@ export function ReservationListClient({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Cantidad *</Label>
+              </Field>
+              <Field label="Cantidad" icon={Hash} required>
                 <Input name="quantity" type="number" min="1" required />
-              </div>
+              </Field>
             </div>
-            <div className="space-y-2"><Label>Cliente *</Label><Input name="clientName" required /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Telefono</Label><Input name="clientPhone" /></div>
-              <div className="space-y-2"><Label>Email</Label><Input name="clientEmail" type="email" /></div>
+            <Field label="Cliente" icon={User} required>
+              <Input name="clientName" required placeholder="Nombre del cliente" />
+            </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Teléfono" icon={Phone}>
+                <Input name="clientPhone" />
+              </Field>
+              <Field label="Email" icon={Mail}>
+                <Input name="clientEmail" type="email" />
+              </Field>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Fecha reservacion *</Label><Input name="reservationDate" type="date" required /></div>
-              <div className="space-y-2"><Label>Fecha expiracion</Label><Input name="expirationDate" type="date" /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Fecha reservación" icon={Calendar} required>
+                <Input name="reservationDate" type="date" required />
+              </Field>
+              <Field label="Fecha expiración" icon={Calendar}>
+                <Input name="expirationDate" type="date" />
+              </Field>
             </div>
-            <div className="space-y-2"><Label>Notas</Label><Textarea name="notes" /></div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Creando..." : "Crear Reservacion"}
-            </Button>
+            <Field label="Notas">
+              <Textarea name="notes" />
+            </Field>
+            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="brand" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting ? "Creando…" : "Crear reservación"}
+              </Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Editar Reservacion */}
+      {/* Editar */}
       <Dialog open={!!toEdit} onOpenChange={(o) => !o && setToEdit(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Editar Reservacion</DialogTitle></DialogHeader>
-          <form onSubmit={handleUpdate} className="space-y-4">
-            <div className="p-3 bg-muted rounded-md text-sm">
-              <span className="font-medium">Categoria:</span> {toEdit?.category.name}
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle asChild>
+              <FormDialogHeader
+                icon={Pen}
+                title="Editar reservación"
+                description={toEdit?.clientName}
+              />
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdate} className="space-y-5">
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+              <Layers className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium">Categoría:</span> {toEdit?.category.name}
             </div>
-            <div className="space-y-2">
-              <Label>Cantidad *</Label>
+            <Field label="Cantidad" icon={Hash} required>
               <Input name="quantity" type="number" min="1" defaultValue={toEdit?.quantity} required />
+            </Field>
+            <Field label="Cliente" icon={User} required>
+              <Input name="clientName" defaultValue={toEdit?.clientName} required />
+            </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Teléfono" icon={Phone}>
+                <Input name="clientPhone" defaultValue={toEdit?.clientPhone ?? ""} />
+              </Field>
+              <Field label="Email" icon={Mail}>
+                <Input name="clientEmail" type="email" defaultValue={toEdit?.clientEmail ?? ""} />
+              </Field>
             </div>
-            <div className="space-y-2"><Label>Cliente *</Label><Input name="clientName" defaultValue={toEdit?.clientName} required /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Telefono</Label><Input name="clientPhone" defaultValue={toEdit?.clientPhone ?? ""} /></div>
-              <div className="space-y-2"><Label>Email</Label><Input name="clientEmail" type="email" defaultValue={toEdit?.clientEmail ?? ""} /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Fecha reservación" icon={Calendar} required>
+                <Input name="reservationDate" type="date" defaultValue={toEdit?.reservationDate} required />
+              </Field>
+              <Field label="Fecha expiración" icon={Calendar}>
+                <Input name="expirationDate" type="date" defaultValue={toEdit?.expirationDate ?? ""} />
+              </Field>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2"><Label>Fecha reservacion *</Label><Input name="reservationDate" type="date" defaultValue={toEdit?.reservationDate} required /></div>
-              <div className="space-y-2"><Label>Fecha expiracion</Label><Input name="expirationDate" type="date" defaultValue={toEdit?.expirationDate ?? ""} /></div>
+            <Field label="Notas">
+              <Textarea name="notes" defaultValue={toEdit?.notes ?? ""} />
+            </Field>
+            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+              <Button type="button" variant="outline" onClick={() => setToEdit(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="brand" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting ? "Actualizando…" : "Actualizar"}
+              </Button>
             </div>
-            <div className="space-y-2"><Label>Notas</Label><Textarea name="notes" defaultValue={toEdit?.notes ?? ""} /></div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Actualizando..." : "Actualizar Reservacion"}
-            </Button>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Completar Reservacion — Formulario de datos de venta */}
+      {/* Completar */}
       <Dialog open={!!toComplete} onOpenChange={(o) => !o && setToComplete(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Completar Reservacion — Datos de Venta</DialogTitle></DialogHeader>
-          <div className="p-3 bg-muted rounded-md text-sm space-y-1">
-            <p><span className="font-medium">Cliente:</span> {toComplete?.clientName}</p>
-            <p><span className="font-medium">Categoria:</span> {toComplete?.category.name}</p>
-            <p><span className="font-medium">Cantidad:</span> {toComplete?.quantity} pacas</p>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle asChild>
+              <FormDialogHeader
+                icon={CheckCircle}
+                title="Completar reservación"
+                description="Registra la venta con precio y método de pago."
+              />
+            </DialogTitle>
+          </DialogHeader>
+          <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm space-y-1.5 mb-2">
+            <p className="flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-medium">Cliente:</span> {toComplete?.clientName}
+            </p>
+            <p className="flex items-center gap-1.5">
+              <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-medium">Categoría:</span> {toComplete?.category.name}
+            </p>
+            <p className="flex items-center gap-1.5">
+              <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="font-medium">Cantidad:</span> {toComplete?.quantity} pacas
+            </p>
           </div>
-          <form onSubmit={handleComplete} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Precio de venta por unidad *</Label>
-                <Input name="salePrice" type="number" step="0.01" required placeholder="Ej: 35.00" />
+          <form onSubmit={handleComplete} className="space-y-5">
+            <FormSection icon={DollarSign} title="Datos de venta" description="Precio por unidad y fecha.">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Precio por unidad" icon={DollarSign} required>
+                  <Input name="salePrice" type="number" step="0.01" required placeholder="Ej. 35.00" />
+                </Field>
+                <Field label="Fecha de venta" icon={Calendar} required>
+                  <Input name="saleDate" type="date" required defaultValue={new Date().toISOString().split("T")[0]} />
+                </Field>
               </div>
-              <div className="space-y-2">
-                <Label>Fecha de venta *</Label>
-                <Input name="saleDate" type="date" required defaultValue={new Date().toISOString().split("T")[0]} />
-              </div>
+              <Field label="Método de pago" icon={CreditCard}>
+                <Select name="paymentMethod">
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Notas">
+                <Textarea name="notes" placeholder="Observaciones de la venta…" />
+              </Field>
+            </FormSection>
+            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+              <Button type="button" variant="outline" onClick={() => setToComplete(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="brand" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting ? "Completando…" : "Registrar venta"}
+              </Button>
             </div>
-            <div className="space-y-2">
-              <Label>Metodo de pago</Label>
-              <Select name="paymentMethod">
-                <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2"><Label>Notas</Label><Textarea name="notes" placeholder="Observaciones de la venta..." /></div>
-            {toComplete && (
-              <p className="text-sm text-muted-foreground">
-                Total estimado: <span className="font-bold text-foreground">{toComplete.quantity} pacas</span> — Completa el precio para registrar la venta
-              </p>
-            )}
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Completando..." : "Completar y Registrar Venta"}
-            </Button>
           </form>
         </DialogContent>
       </Dialog>
@@ -328,11 +526,21 @@ export function ReservationListClient({
       {/* Cancelar */}
       <AlertDialog open={!!toCancel} onOpenChange={() => setToCancel(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Cancelar reservacion?</AlertDialogTitle>
-            <AlertDialogDescription>Las pacas volveran a estar disponibles. La reservacion quedara como cancelada.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cancelar reservación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Las pacas volverán a estar disponibles. La reservación quedará marcada como cancelada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>No</AlertDialogCancel>
-            <AlertDialogAction onClick={handleCancel} className="bg-orange-600 hover:bg-orange-700" disabled={isSubmitting}>Si, Cancelar</AlertDialogAction>
+            <AlertDialogAction
+              onClick={handleCancel}
+              className="bg-[var(--warning)] text-white hover:opacity-90"
+              disabled={isSubmitting}
+            >
+              Sí, cancelar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -340,14 +548,24 @@ export function ReservationListClient({
       {/* Eliminar */}
       <AlertDialog open={!!toDelete} onOpenChange={() => setToDelete(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Eliminar reservacion?</AlertDialogTitle>
-            <AlertDialogDescription>Se eliminara permanentemente este registro. Si estaba activa, las pacas volveran a estar disponibles.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar reservación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará permanentemente este registro. Si estaba activa, las pacas volverán a estar disponibles.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isSubmitting}>Eliminar</AlertDialogAction>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={isSubmitting}
+            >
+              Eliminar
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

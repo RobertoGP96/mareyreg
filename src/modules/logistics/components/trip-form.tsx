@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -19,7 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RouteIcon, User, Calendar, MapPin, Package, DollarSign } from "lucide-react";
+import { Field, FormDialogHeader } from "@/components/ui/field";
+import { FormSection } from "@/components/ui/form-section";
+import { RouteIcon, User, Calendar, MapPin, Package, DollarSign, Clock, Loader2 } from "lucide-react";
 import { CUBAN_PROVINCES, PRODUCTS } from "@/lib/constants";
 import type { Driver } from "@/types";
 
@@ -91,124 +92,95 @@ export function TripForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <RouteIcon className="h-5 w-5 text-primary" />
-            {trip ? "Editar Viaje" : "Nuevo Viaje"}
+          <DialogTitle asChild>
+            <FormDialogHeader
+              icon={RouteIcon}
+              title={trip ? "Editar viaje" : "Nuevo viaje"}
+              description={trip ? "Actualiza los datos del viaje." : "Programa un viaje con conductor, destino y carga."}
+            />
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label className="flex items-center gap-1.5 mb-1.5">
-              <User className="h-3.5 w-3.5 text-muted-foreground" />
-              Conductor
-            </Label>
-            <Select
-              value={form.watch("driver_id")?.toString() || ""}
-              onValueChange={(value) =>
-                form.setValue("driver_id", parseInt(value, 10))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar conductor" />
-              </SelectTrigger>
-              <SelectContent>
-                {drivers.map((d) => (
-                  <SelectItem key={d.driverId} value={d.driverId.toString()}>
-                    {d.fullName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {form.formState.errors.driver_id && (
-              <p className="text-destructive text-sm mt-1">
-                {form.formState.errors.driver_id.message}
-              </p>
-            )}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="flex items-center gap-1.5 mb-1.5">
-                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                Fecha de Carga
-              </Label>
-              <Input type="date" {...form.register("load_date")} />
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <FormSection icon={User} title="Asignación" description="Conductor responsable del viaje.">
+            <Field label="Conductor" icon={User} required error={form.formState.errors.driver_id?.message}>
+              <Select
+                value={form.watch("driver_id")?.toString() || ""}
+                onValueChange={(value) => form.setValue("driver_id", parseInt(value, 10))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccionar conductor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {drivers.map((d) => (
+                    <SelectItem key={d.driverId} value={d.driverId.toString()}>
+                      {d.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </FormSection>
+
+          <FormSection icon={Calendar} title="Programación" description="Fecha y hora de carga.">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Fecha de carga" icon={Calendar}>
+                <Input type="date" {...form.register("load_date")} />
+              </Field>
+              <Field label="Hora de carga" icon={Clock}>
+                <Input type="time" {...form.register("load_time")} />
+              </Field>
             </div>
-            <div>
-              <Label className="flex items-center gap-1.5 mb-1.5">
-                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                Hora de Carga
-              </Label>
-              <Input type="time" {...form.register("load_time")} />
+          </FormSection>
+
+          <FormSection icon={MapPin} title="Destino y carga" description="Provincia de entrega y producto transportado.">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Provincia" icon={MapPin}>
+                <Select
+                  value={form.watch("province") || ""}
+                  onValueChange={(value) => form.setValue("province", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar provincia" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CUBAN_PROVINCES.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Producto" icon={Package}>
+                <Select
+                  value={form.watch("product") || ""}
+                  onValueChange={(value) => form.setValue("product", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar producto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRODUCTS.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
             </div>
-          </div>
-          <div>
-            <Label className="flex items-center gap-1.5 mb-1.5">
-              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-              Provincia
-            </Label>
-            <Select
-              value={form.watch("province") || ""}
-              onValueChange={(value) => form.setValue("province", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar provincia" />
-              </SelectTrigger>
-              <SelectContent>
-                {CUBAN_PROVINCES.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="flex items-center gap-1.5 mb-1.5">
-              <Package className="h-3.5 w-3.5 text-muted-foreground" />
-              Producto
-            </Label>
-            <Select
-              value={form.watch("product") || ""}
-              onValueChange={(value) => form.setValue("product", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar producto" />
-              </SelectTrigger>
-              <SelectContent>
-                {PRODUCTS.map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="flex items-center gap-1.5 mb-1.5">
-              <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-              Pago del Viaje
-            </Label>
-            <Input
-              placeholder="0.00"
-              {...form.register("trip_payment")}
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+
+            <Field label="Pago del viaje" icon={DollarSign} hint="Monto estimado o acordado.">
+              <Input placeholder="0.00" {...form.register("trip_payment")} />
+            </Field>
+          </FormSection>
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading
-                ? "Guardando..."
-                : trip
-                  ? "Actualizar"
-                  : "Crear"}
+            <Button type="submit" variant="brand" disabled={isLoading}>
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isLoading ? "Guardando..." : trip ? "Actualizar" : "Crear viaje"}
             </Button>
           </div>
         </form>

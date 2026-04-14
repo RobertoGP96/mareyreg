@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   InputGroup,
   InputGroupAddon,
@@ -26,14 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Search,
-  Trash2,
-  MoreHorizontal,
-  Plus,
-  Pen,
-  Building2,
-} from "lucide-react";
+import { Search, Trash2, MoreHorizontal, Plus, Pen, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createEntity,
@@ -63,14 +57,11 @@ export function EntityListClient({ initialEntities }: Props) {
     setIsSubmitting(true);
     const result = await createEntity(data);
     setIsSubmitting(false);
-
     if (result.success) {
       setIsCreateDialogOpen(false);
       toast.success("Entidad creada exitosamente");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   const handleUpdateEntity = async (data: { name: string }) => {
@@ -78,14 +69,11 @@ export function EntityListClient({ initialEntities }: Props) {
     setIsSubmitting(true);
     const result = await updateEntity(entityToEdit.entityId, data);
     setIsSubmitting(false);
-
     if (result.success) {
       setEntityToEdit(null);
       toast.success("Entidad actualizada exitosamente");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   const handleDeleteEntity = async () => {
@@ -93,92 +81,88 @@ export function EntityListClient({ initialEntities }: Props) {
     setIsSubmitting(true);
     const result = await deleteEntity(entityToDelete);
     setIsSubmitting(false);
-
     if (result.success) {
       setEntityToDelete(null);
       toast.success("Entidad eliminada exitosamente");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   return (
-    <>
-      <div className="bg-card rounded-lg border">
-        <div className="px-4 py-3 border-b border-border">
-          <div className="flex justify-between items-center">
-            <h2 className="text-base font-medium text-foreground">
-              Lista de Entidades
-            </h2>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Agregar
-            </Button>
-          </div>
-          <div className="mt-4">
-            <InputGroup>
-              <InputGroupInput
-                placeholder="Buscar entidades..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <InputGroupAddon>
-                <Search />
-              </InputGroupAddon>
-              <InputGroupAddon align="inline-end">
-                <Badge>{filteredEntities.length}</Badge>
-              </InputGroupAddon>
-            </InputGroup>
-          </div>
+    <div className="space-y-5">
+      <PageHeader
+        icon={Building2}
+        title="Entidades"
+        description="Organizaciones o empresas que operan dentro del sistema."
+        badge={`${initialEntities.length} registradas`}
+      >
+        <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
+          <Plus className="h-4 w-4" />
+          Nueva entidad
+        </Button>
+      </PageHeader>
+
+      <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-4 py-3">
+          <InputGroup className="flex-1 min-w-[240px]">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="Buscar entidades…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <InputGroupAddon align="inline-end">
+              <Badge variant="brand">{filteredEntities.length}</Badge>
+            </InputGroupAddon>
+          </InputGroup>
         </div>
-        <div className="grid gap-4 p-4">
+
+        <div className="divide-y divide-border/60">
           {filteredEntities.length > 0 ? (
             filteredEntities.map((entity) => (
               <div
                 key={entity.entityId}
-                className="bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors duration-200 p-4"
+                className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-[var(--brand)]/[0.04]"
               >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    <div className="p-2 rounded-xl bg-muted">
-                      <Building2 className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-base font-semibold text-foreground truncate">
-                      {entity.name}
-                    </h3>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => setEntityToEdit(entity)}
-                        className="flex items-center space-x-2"
-                      >
-                        <Pen className="h-4 w-4" />
-                        <span>Editar</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setEntityToDelete(entity.entityId)}
-                        className="flex items-center space-x-2 text-red-600 focus:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span>Eliminar</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                <div className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--brand)]/20 to-[var(--brand)]/5 ring-1 ring-inset ring-[var(--brand)]/20 shrink-0">
+                  <Building2 className="h-4.5 w-4.5 text-[var(--brand)]" strokeWidth={2.2} />
                 </div>
+                <h3 className="flex-1 font-semibold text-foreground truncate">
+                  {entity.name}
+                </h3>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-8 opacity-60 group-hover:opacity-100">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem onClick={() => setEntityToEdit(entity)}>
+                      <Pen className="h-4 w-4" /> Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setEntityToDelete(entity.entityId)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" /> Eliminar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ))
           ) : (
-            <EmptyState
-              title="No hay entidades"
-              description="No se encontraron entidades registradas."
-            />
+            <div className="p-8">
+              <EmptyState
+                title="No hay entidades"
+                description={
+                  searchQuery
+                    ? `No se encontraron resultados para "${searchQuery}".`
+                    : "Registra la primera entidad para empezar."
+                }
+              />
+            </div>
           )}
         </div>
       </div>
@@ -198,30 +182,26 @@ export function EntityListClient({ initialEntities }: Props) {
         entity={entityToEdit}
       />
 
-      <AlertDialog
-        open={!!entityToDelete}
-        onOpenChange={() => setEntityToDelete(null)}
-      >
+      <AlertDialog open={!!entityToDelete} onOpenChange={() => setEntityToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar entidad?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion eliminara permanentemente la entidad. No se puede
-              eliminar si tiene conductores asociados.
+              Esta acción eliminará permanentemente la entidad. No se puede eliminar si tiene conductores asociados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteEntity}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-white hover:bg-destructive/90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Eliminando..." : "Eliminar"}
+              {isSubmitting ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

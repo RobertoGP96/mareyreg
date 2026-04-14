@@ -23,21 +23,26 @@ export function Topbar() {
   const breadcrumbs = getBreadcrumbs(pathname);
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4 bg-background sticky top-0 z-40">
-      <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mr-2 !h-4" />
+    <header className="glass-panel flex h-14 shrink-0 items-center gap-2 border-b border-border/60 px-4 md:px-6 sticky top-0 z-40">
+      <SidebarTrigger className="-ml-1 size-8 rounded-md hover:bg-accent/60" />
+      <Separator orientation="vertical" className="mx-1 !h-5 bg-border/80" />
       <Breadcrumb>
-        <BreadcrumbList>
+        <BreadcrumbList className="gap-1.5 text-[0.82rem]">
           {breadcrumbs.map((crumb, index) => (
             <Fragment key={index}>
-              {index > 0 && <BreadcrumbSeparator />}
+              {index > 0 && <BreadcrumbSeparator className="[&>svg]:size-3.5 text-muted-foreground/50" />}
               <BreadcrumbItem>
                 {crumb.href ? (
-                  <BreadcrumbLink href={crumb.href}>
+                  <BreadcrumbLink
+                    href={crumb.href}
+                    className="text-muted-foreground hover:text-foreground transition-colors font-medium"
+                  >
                     {crumb.label}
                   </BreadcrumbLink>
                 ) : (
-                  <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                  <BreadcrumbPage className="text-foreground font-semibold">
+                    {crumb.label}
+                  </BreadcrumbPage>
                 )}
               </BreadcrumbItem>
             </Fragment>
@@ -45,18 +50,21 @@ export function Topbar() {
         </BreadcrumbList>
       </Breadcrumb>
       <div className="flex-1" />
-      <ThemeSwitcher />
-      <UserNav
-        user={
-          session?.user
-            ? {
-                fullName: session.user.fullName ?? session.user.name ?? "Usuario",
-                email: session.user.email ?? "",
-                role: session.user.role ?? "viewer",
-              }
-            : null
-        }
-      />
+      <div className="flex items-center gap-1">
+        <ThemeSwitcher />
+        <Separator orientation="vertical" className="mx-1 !h-5 bg-border/80" />
+        <UserNav
+          user={
+            session?.user
+              ? {
+                  fullName: session.user.fullName ?? session.user.name ?? "Usuario",
+                  email: session.user.email ?? "",
+                  role: session.user.role ?? "viewer",
+                }
+              : null
+          }
+        />
+      </div>
     </header>
   );
 }

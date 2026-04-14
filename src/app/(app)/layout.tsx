@@ -8,9 +8,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <AuthSessionProvider>
       <SidebarProvider>
         <AppSidebar />
-        <SidebarInset>
+        <SidebarInset className="bg-background">
           <Topbar />
-          <main className="flex-1 p-3 md:p-4">{children}</main>
+          <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
         </SidebarInset>
       </SidebarProvider>
     </AuthSessionProvider>

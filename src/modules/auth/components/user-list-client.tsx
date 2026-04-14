@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,12 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,7 +33,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MoreHorizontal, Pen, Trash2, UserPlus, Search } from "lucide-react";
+import { Field, FormDialogHeader } from "@/components/ui/field";
+import {
+  MoreHorizontal,
+  Pen,
+  Trash2,
+  UserPlus,
+  Search,
+  Users,
+  Shield,
+  User,
+  Mail,
+  Lock,
+  Key,
+  Loader2,
+} from "lucide-react";
 import {
   InputGroup,
   InputGroupAddon,
@@ -54,10 +64,10 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: "Observador",
 };
 
-const ROLE_COLORS: Record<string, string> = {
-  admin: "bg-red-100 text-red-800",
-  dispatcher: "bg-blue-100 text-blue-800",
-  viewer: "bg-gray-100 text-gray-800",
+const ROLE_BADGE: Record<string, "destructive" | "info" | "secondary"> = {
+  admin: "destructive",
+  dispatcher: "info",
+  viewer: "secondary",
 };
 
 const enabledModules = getEnabledModules();
@@ -82,9 +92,7 @@ export function UserListClient({ users }: Props) {
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
   const [userToEdit, setUserToEdit] = useState<UserItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [createModules, setCreateModules] = useState<string[]>(
-    enabledModules.map((m) => m.id)
-  );
+  const [createModules, setCreateModules] = useState<string[]>(enabledModules.map((m) => m.id));
   const [editModules, setEditModules] = useState<string[]>([]);
 
   const filtered = users.filter(
@@ -126,9 +134,7 @@ export function UserListClient({ users }: Props) {
       setCreateModules(enabledModules.map((m) => m.id));
       toast.success("Usuario creado");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -149,9 +155,7 @@ export function UserListClient({ users }: Props) {
       setUserToEdit(null);
       toast.success("Usuario actualizado");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   const handleDelete = async () => {
@@ -163,9 +167,7 @@ export function UserListClient({ users }: Props) {
       setUserToDelete(null);
       toast.success("Usuario eliminado");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(result.error);
   };
 
   const openEdit = (user: UserItem) => {
@@ -174,63 +176,71 @@ export function UserListClient({ users }: Props) {
   };
 
   return (
-    <>
-      <div className="bg-card rounded-lg border">
-        <div className="px-4 py-3 border-b">
-          <div className="flex justify-between items-center">
-            <h2 className="text-base font-medium">Usuarios del Sistema</h2>
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <UserPlus className="w-4 h-4 mr-2" />
-              Agregar
-            </Button>
-          </div>
-          <div className="mt-4">
-            <InputGroup>
-              <InputGroupInput
-                placeholder="Buscar usuarios..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <InputGroupAddon>
-                <Search />
-              </InputGroupAddon>
-              <InputGroupAddon align="inline-end">
-                <Badge>{filtered.length}</Badge>
-              </InputGroupAddon>
-            </InputGroup>
-          </div>
+    <div className="space-y-5">
+      <PageHeader
+        icon={Users}
+        title="Usuarios del sistema"
+        description="Gestiona accesos, roles y módulos permitidos por usuario."
+        badge={`${users.length} usuarios`}
+      >
+        <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+          <UserPlus className="h-4 w-4" />
+          Nuevo usuario
+        </Button>
+      </PageHeader>
+
+      <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
+        <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-4 py-3">
+          <InputGroup className="flex-1 min-w-[240px]">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="Buscar por nombre o email…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <InputGroupAddon align="inline-end">
+              <Badge variant="brand">{filtered.length}</Badge>
+            </InputGroupAddon>
+          </InputGroup>
         </div>
-        <div className="grid gap-4 p-4">
+
+        <div className="divide-y divide-border/60">
           {filtered.length > 0 ? (
             filtered.map((user) => (
               <div
                 key={user.userId}
-                className="bg-card border rounded-lg p-4 flex items-center justify-between"
+                className="group flex items-start gap-4 px-5 py-4 transition-colors hover:bg-[var(--brand)]/[0.04]"
               >
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                      {user.fullName
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .slice(0, 2)
-                        .toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{user.fullName}</p>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
+                <Avatar className="size-11 bg-gradient-to-br from-[var(--brand)]/20 to-[var(--brand)]/5 ring-1 ring-inset ring-[var(--brand)]/20 shrink-0">
+                  <AvatarFallback className="bg-transparent text-[var(--brand)] font-bold text-sm">
+                    {user.fullName
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <p className="font-semibold text-foreground truncate">{user.fullName}</p>
+                    <Badge variant={ROLE_BADGE[user.role] || "secondary"} className="gap-1">
+                      <Shield className="h-3 w-3" />
+                      {ROLE_LABELS[user.role]}
+                    </Badge>
                   </div>
-                  <Badge className={ROLE_COLORS[user.role]}>
-                    {ROLE_LABELS[user.role]}
-                  </Badge>
-                  {user.role !== "admin" && (
-                    <div className="flex gap-1">
+                  <p className="text-[0.82rem] text-muted-foreground mb-1.5">
+                    <Mail className="h-3 w-3 inline mr-1" />
+                    {user.email}
+                  </p>
+                  {user.role !== "admin" && user.modulePermissions.length > 0 && (
+                    <div className="flex gap-1 flex-wrap">
                       {user.modulePermissions.map((p) => {
                         const mod = enabledModules.find((m) => m.id === p.moduleId);
                         return mod ? (
-                          <Badge key={p.moduleId} variant="outline" className="text-xs">
+                          <Badge key={p.moduleId} variant="outline">
                             {mod.label}
                           </Badge>
                         ) : null;
@@ -240,55 +250,66 @@ export function UserListClient({ users }: Props) {
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Button variant="ghost" size="icon" className="size-8 opacity-60 group-hover:opacity-100">
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem onClick={() => openEdit(user)}>
-                      <Pen className="h-4 w-4 mr-2" />
-                      Editar
+                      <Pen className="h-4 w-4" /> Editar
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setUserToDelete(user.userId)}
                       className="text-destructive focus:text-destructive"
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Eliminar
+                      <Trash2 className="h-4 w-4" /> Eliminar
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
             ))
           ) : (
-            <EmptyState title="No hay usuarios" description="No se encontraron usuarios." />
+            <div className="p-8">
+              <EmptyState
+                title="No hay usuarios"
+                description={
+                  searchQuery
+                    ? `No se encontraron resultados para "${searchQuery}".`
+                    : "Crea el primer usuario para empezar."
+                }
+              />
+            </div>
           )}
         </div>
       </div>
 
-      {/* Create Dialog */}
+      {/* Create */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Crear Usuario</DialogTitle>
+            <DialogTitle asChild>
+              <FormDialogHeader
+                icon={UserPlus}
+                title="Crear usuario"
+                description="Añade un nuevo usuario con su rol y módulos asignados."
+              />
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nombre completo</Label>
-              <Input name="fullName" required />
+          <form onSubmit={handleCreate} className="space-y-5">
+            <Field label="Nombre completo" icon={User} required>
+              <Input name="fullName" required placeholder="Nombre del usuario" />
+            </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Email" icon={Mail} required>
+                <Input name="email" type="email" required />
+              </Field>
+              <Field label="Contraseña" icon={Lock} required hint="Mínimo 6 caracteres.">
+                <Input name="password" type="password" required minLength={6} />
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input name="email" type="email" required />
-            </div>
-            <div className="space-y-2">
-              <Label>Contrasena</Label>
-              <Input name="password" type="password" required minLength={6} />
-            </div>
-            <div className="space-y-2">
-              <Label>Rol</Label>
+            <Field label="Rol" icon={Shield} required>
               <Select name="role" defaultValue="viewer">
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -297,10 +318,9 @@ export function UserListClient({ users }: Props) {
                   <SelectItem value="viewer">Observador</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Modulos permitidos</Label>
-              <div className="space-y-2 rounded-md border p-3">
+            </Field>
+            <Field label="Módulos permitidos" icon={Key} hint="No aplica para administradores.">
+              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
                 {enabledModules.map((mod) => (
                   <div key={mod.id} className="flex items-center gap-2">
                     <Checkbox
@@ -308,43 +328,56 @@ export function UserListClient({ users }: Props) {
                       checked={createModules.includes(mod.id)}
                       onCheckedChange={() => toggleCreateModule(mod.id)}
                     />
-                    <Label htmlFor={`create-${mod.id}`} className="font-normal cursor-pointer">
+                    <label
+                      htmlFor={`create-${mod.id}`}
+                      className="text-sm font-medium cursor-pointer select-none"
+                    >
                       {mod.label}
-                    </Label>
+                    </label>
                   </div>
                 ))}
               </div>
+            </Field>
+            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="brand" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting ? "Creando…" : "Crear usuario"}
+              </Button>
             </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Creando..." : "Crear Usuario"}
-            </Button>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
+      {/* Edit */}
       <Dialog open={!!userToEdit} onOpenChange={(o) => !o && setUserToEdit(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Usuario</DialogTitle>
+            <DialogTitle asChild>
+              <FormDialogHeader
+                icon={Pen}
+                title="Editar usuario"
+                description={userToEdit?.fullName}
+              />
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleUpdate} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nombre completo</Label>
+          <form onSubmit={handleUpdate} className="space-y-5">
+            <Field label="Nombre completo" icon={User} required>
               <Input name="fullName" defaultValue={userToEdit?.fullName} required />
+            </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Email" icon={Mail} required>
+                <Input name="email" type="email" defaultValue={userToEdit?.email} required />
+              </Field>
+              <Field label="Nueva contraseña" icon={Lock} hint="Deja vacío para no cambiar.">
+                <Input name="password" type="password" minLength={6} />
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input name="email" type="email" defaultValue={userToEdit?.email} required />
-            </div>
-            <div className="space-y-2">
-              <Label>Nueva contrasena (dejar vacio para no cambiar)</Label>
-              <Input name="password" type="password" minLength={6} />
-            </div>
-            <div className="space-y-2">
-              <Label>Rol</Label>
+            <Field label="Rol" icon={Shield} required>
               <Select name="role" defaultValue={userToEdit?.role}>
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -353,10 +386,9 @@ export function UserListClient({ users }: Props) {
                   <SelectItem value="viewer">Observador</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Modulos permitidos</Label>
-              <div className="space-y-2 rounded-md border p-3">
+            </Field>
+            <Field label="Módulos permitidos" icon={Key}>
+              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
                 {enabledModules.map((mod) => (
                   <div key={mod.id} className="flex items-center gap-2">
                     <Checkbox
@@ -364,41 +396,47 @@ export function UserListClient({ users }: Props) {
                       checked={editModules.includes(mod.id)}
                       onCheckedChange={() => toggleEditModule(mod.id)}
                     />
-                    <Label htmlFor={`edit-${mod.id}`} className="font-normal cursor-pointer">
+                    <label
+                      htmlFor={`edit-${mod.id}`}
+                      className="text-sm font-medium cursor-pointer select-none"
+                    >
                       {mod.label}
-                    </Label>
+                    </label>
                   </div>
                 ))}
               </div>
+            </Field>
+            <div className="flex justify-end gap-2 pt-4 border-t border-border">
+              <Button type="button" variant="outline" onClick={() => setUserToEdit(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="brand" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting ? "Actualizando…" : "Actualizar"}
+              </Button>
             </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Actualizando..." : "Actualizar"}
-            </Button>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirm */}
       <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar usuario?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta accion no se puede deshacer.
-            </AlertDialogDescription>
+            <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
+            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-white hover:bg-destructive/90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Eliminando..." : "Eliminar"}
+              {isSubmitting ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

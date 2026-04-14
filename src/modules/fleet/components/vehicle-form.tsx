@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -19,7 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Truck, Tag, FileText, User } from "lucide-react";
+import { Field, FormDialogHeader } from "@/components/ui/field";
+import { FormSection } from "@/components/ui/form-section";
+import { Truck, Tag, FileText, User, Loader2 } from "lucide-react";
 import type { Driver } from "@/types";
 
 const vehicleSchema = z.object({
@@ -89,113 +90,77 @@ export function VehicleForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Truck className="h-5 w-5 text-primary" />
-            {vehicle ? "Editar Vehiculo" : "Nuevo Vehiculo"}
+          <DialogTitle asChild>
+            <FormDialogHeader
+              icon={Truck}
+              title={vehicle ? "Editar vehículo" : "Nuevo vehículo"}
+              description={vehicle ? "Actualiza los datos del vehículo." : "Registra un nuevo vehículo con sus placas y documentación."}
+            />
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="name" className="flex items-center gap-1.5 mb-1.5">
-              <Truck className="h-3.5 w-3.5 text-muted-foreground" />
-              Nombre
-            </Label>
-            <Input
-              id="name"
-              placeholder="Ej: Camion 01"
-              {...form.register("name")}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="cuña_plate_number" className="flex items-center gap-1.5 mb-1.5">
-                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
-                Placa Cuna
-              </Label>
-              <Input
-                id="cuña_plate_number"
-                {...form.register("cuña_plate_number")}
-              />
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <FormSection icon={Truck} title="Identificación" description="Información principal del vehículo y conductor asignado.">
+            <Field id="name" label="Nombre" icon={Truck}>
+              <Input id="name" placeholder="Ej. Camión 01" {...form.register("name")} />
+            </Field>
+
+            <Field label="Conductor asignado" icon={User} hint="Puede dejarse sin asignar.">
+              <Select
+                value={form.watch("driver_id")?.toString() || "none"}
+                onValueChange={(value) =>
+                  form.setValue(
+                    "driver_id",
+                    value === "none" ? undefined : parseInt(value, 10)
+                  )
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Seleccionar conductor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin conductor</SelectItem>
+                  {drivers.map((driver) => (
+                    <SelectItem key={driver.driverId} value={driver.driverId.toString()}>
+                      {driver.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </FormSection>
+
+          <FormSection icon={Tag} title="Placas" description="Placas de circulación de cuña y plancha.">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field id="cuña_plate_number" label="Placa Cuña" icon={Tag}>
+                <Input id="cuña_plate_number" placeholder="ABC-1234" {...form.register("cuña_plate_number")} />
+              </Field>
+              <Field id="plancha_plate_number" label="Placa Plancha" icon={Tag}>
+                <Input id="plancha_plate_number" placeholder="XYZ-5678" {...form.register("plancha_plate_number")} />
+              </Field>
             </div>
-            <div>
-              <Label htmlFor="plancha_plate_number" className="flex items-center gap-1.5 mb-1.5">
-                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
-                Placa Plancha
-              </Label>
-              <Input
-                id="plancha_plate_number"
-                {...form.register("plancha_plate_number")}
-              />
+          </FormSection>
+
+          <FormSection icon={FileText} title="Documentación" description="Números de circulación oficiales.">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field id="cuña_circulation_number" label="Circulación Cuña" icon={FileText}>
+                <Input id="cuña_circulation_number" {...form.register("cuña_circulation_number")} />
+              </Field>
+              <Field id="plancha_circulation_number" label="Circulación Plancha" icon={FileText}>
+                <Input id="plancha_circulation_number" {...form.register("plancha_circulation_number")} />
+              </Field>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="cuña_circulation_number" className="flex items-center gap-1.5 mb-1.5">
-                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                Circulacion Cuna
-              </Label>
-              <Input
-                id="cuña_circulation_number"
-                {...form.register("cuña_circulation_number")}
-              />
-            </div>
-            <div>
-              <Label htmlFor="plancha_circulation_number" className="flex items-center gap-1.5 mb-1.5">
-                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                Circulacion Plancha
-              </Label>
-              <Input
-                id="plancha_circulation_number"
-                {...form.register("plancha_circulation_number")}
-              />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="driver_id" className="flex items-center gap-1.5 mb-1.5">
-              <User className="h-3.5 w-3.5 text-muted-foreground" />
-              Conductor
-            </Label>
-            <Select
-              value={form.watch("driver_id")?.toString() || "none"}
-              onValueChange={(value) =>
-                form.setValue(
-                  "driver_id",
-                  value === "none" ? undefined : parseInt(value, 10)
-                )
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar conductor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sin conductor</SelectItem>
-                {drivers.map((driver) => (
-                  <SelectItem
-                    key={driver.driverId}
-                    value={driver.driverId.toString()}
-                  >
-                    {driver.fullName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+          </FormSection>
+
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading
-                ? "Guardando..."
-                : vehicle
-                  ? "Actualizar"
-                  : "Crear"}
+            <Button type="submit" variant="brand" disabled={isLoading}>
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isLoading ? "Guardando..." : vehicle ? "Actualizar" : "Crear vehículo"}
             </Button>
           </div>
         </form>

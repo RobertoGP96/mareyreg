@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   InputGroup,
   InputGroupAddon,
@@ -39,6 +40,7 @@ import {
   Eye,
   Copy,
   Building2,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -70,18 +72,10 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
   const filteredDrivers = sortedDrivers.filter(
     (driver) =>
       driver.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      driver.identificationNumber
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      driver.phoneNumber
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      driver.operativeLicense
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      driver.entity.name
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase())
+      driver.identificationNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      driver.phoneNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      driver.operativeLicense?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      driver.entity.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleCreateDriver = async (data: {
@@ -94,7 +88,6 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
     setIsSubmitting(true);
     const result = await createDriver(data);
     setIsSubmitting(false);
-
     if (result.success) {
       setIsCreateDialogOpen(false);
       toast.success("Conductor creado exitosamente", {
@@ -102,9 +95,7 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
       });
       router.refresh();
     } else {
-      toast.error("Error al crear el conductor", {
-        description: result.error,
-      });
+      toast.error("Error al crear el conductor", { description: result.error });
     }
   };
 
@@ -119,7 +110,6 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
     setIsSubmitting(true);
     const result = await updateDriver(driverToEdit.driverId, data);
     setIsSubmitting(false);
-
     if (result.success) {
       setDriverToEdit(null);
       toast.success("Conductor actualizado exitosamente", {
@@ -127,9 +117,7 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
       });
       router.refresh();
     } else {
-      toast.error("Error al actualizar el conductor", {
-        description: result.error,
-      });
+      toast.error("Error al actualizar el conductor", { description: result.error });
     }
   };
 
@@ -138,15 +126,12 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
     setIsSubmitting(true);
     const result = await deleteDriver(driverToDelete);
     setIsSubmitting(false);
-
     if (result.success) {
       setDriverToDelete(null);
       toast.success("Conductor eliminado exitosamente");
       router.refresh();
     } else {
-      toast.error("Error al eliminar el conductor", {
-        description: result.error,
-      });
+      toast.error("Error al eliminar el conductor", { description: result.error });
     }
   };
 
@@ -155,158 +140,130 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
       `Nombre: ${driver.fullName}\nTelefono: ${driver.phoneNumber}`.trim();
     try {
       await navigator.clipboard.writeText(contactInfo);
-      toast.success("Informacion de contacto copiada al portapapeles");
+      toast.success("Información de contacto copiada al portapapeles");
     } catch {
       toast.error("Error al copiar al portapapeles");
     }
   };
 
   return (
-    <>
-      <div className="bg-card rounded-lg border">
-        <div className="px-4 py-3 border-b border-border">
-          <div className="flex justify-between items-center">
-            <h2 className="text-base font-medium text-foreground">
-              Lista de Conductores
-            </h2>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
-              <UserPlus className="w-4 h-4 mr-2" />
-              Agregar
-            </Button>
-          </div>
+    <div className="space-y-5">
+      <PageHeader
+        icon={Users}
+        title="Conductores"
+        description="Gestiona los conductores asignados a tu flota y sus datos de contacto."
+        badge={`${initialDrivers.length} registrados`}
+      >
+        <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
+          <UserPlus className="h-4 w-4" />
+          Agregar conductor
+        </Button>
+      </PageHeader>
 
-          <div className="mt-4">
-            <InputGroup>
-              <InputGroupInput
-                placeholder="Buscar conductores..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <InputGroupAddon>
-                <Search />
-              </InputGroupAddon>
-              <InputGroupAddon align="inline-end">
-                <Badge>{filteredDrivers.length}</Badge>
-              </InputGroupAddon>
-            </InputGroup>
-          </div>
+      <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
+        {/* Filter bar */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-4 py-3">
+          <InputGroup className="flex-1 min-w-[240px]">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="Buscar por nombre, ID, teléfono…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <InputGroupAddon align="inline-end">
+              <Badge variant="brand">{filteredDrivers.length}</Badge>
+            </InputGroupAddon>
+          </InputGroup>
         </div>
-        <div className="grid gap-4 p-4">
+
+        {/* List */}
+        <div className="divide-y divide-border/60">
           {filteredDrivers.length > 0 ? (
             filteredDrivers.map((driver) => (
               <div
                 key={driver.driverId}
-                className="bg-card border border-border rounded-lg hover:bg-muted/50 transition-colors duration-200 p-4 overflow-hidden"
+                className="group flex items-start gap-4 px-5 py-4 transition-colors hover:bg-[var(--brand)]/[0.04]"
               >
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                  <div className="flex items-start space-x-3 flex-1 min-w-0 overflow-hidden">
-                    <Avatar className="w-10 h-10 bg-muted rounded-full flex items-center justify-center shrink-0">
-                      <AvatarFallback>
-                        <p className="text-lg uppercase font-semibold text-foreground truncate">
-                          {driver.fullName
-                            ? driver.fullName
-                                .split(" ")
-                                .map((name) => name.charAt(0))
-                                .join("")
-                                .toUpperCase()
-                                .slice(0, 2)
-                            : "?"}
-                        </p>
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0 overflow-hidden">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-base font-semibold text-foreground truncate">
-                          {driver.fullName}
-                        </h3>
-                        <Badge variant="secondary" className="shrink-0">
-                          <Building2 className="w-3 h-3 mr-1" />
-                          {driver.entity.name}
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
-                        <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
-                          <IdCardIcon className="w-4 h-4 text-muted-foreground shrink-0" />
-                          <span className="font-medium shrink-0">ID:</span>
-                          <span className="truncate">
-                            {driver.identificationNumber}
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
-                          <Phone className="w-4 h-4 text-muted-foreground shrink-0" />
-                          <span className="font-medium shrink-0">
-                            Telefono:
-                          </span>
-                          <span className="truncate">
-                            {driver.phoneNumber}
-                          </span>
-                        </div>
-                        {driver.operativeLicense && (
-                          <div className="flex items-center space-x-2 min-w-0 overflow-hidden">
-                            <IdCardLanyard className="w-4 h-4 text-muted-foreground shrink-0" />
-                            <span className="font-medium shrink-0">
-                              Licencia:
-                            </span>
-                            <Badge
-                              variant="secondary"
-                              className="truncate max-w-full"
-                            >
-                              {driver.operativeLicense}
-                            </Badge>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                <Avatar className="size-11 bg-gradient-to-br from-[var(--brand)]/20 to-[var(--brand)]/5 ring-1 ring-inset ring-[var(--brand)]/20 shrink-0">
+                  <AvatarFallback className="bg-transparent text-[var(--brand)] font-bold text-sm">
+                    {driver.fullName
+                      ? driver.fullName
+                          .split(" ")
+                          .map((n) => n.charAt(0))
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2)
+                      : "?"}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                    <h3 className="font-semibold text-foreground truncate">
+                      {driver.fullName}
+                    </h3>
+                    <Badge variant="outline" className="gap-1">
+                      <Building2 className="h-3 w-3" />
+                      {driver.entity.name}
+                    </Badge>
+                    {driver.operativeLicense && (
+                      <Badge variant="info" className="gap-1">
+                        <IdCardLanyard className="h-3 w-3" />
+                        {driver.operativeLicense}
+                      </Badge>
+                    )}
                   </div>
-                  <div className="shrink-0">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleCopyContactInfo(driver)}
-                          className="flex items-center space-x-2"
-                        >
-                          <Copy className="h-4 w-4" />
-                          <span>Copiar contacto</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            router.push(`/drivers/${driver.driverId}`)
-                          }
-                          className="flex items-center space-x-2"
-                        >
-                          <Eye className="h-4 w-4" />
-                          <span>Ver detalles</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setDriverToEdit(driver)}
-                          className="flex items-center space-x-2"
-                        >
-                          <Pen className="h-4 w-4" />
-                          <span>Editar</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => setDriverToDelete(driver.driverId)}
-                          className="flex items-center space-x-2 text-red-600 focus:text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span>Eliminar</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                  <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.82rem] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <IdCardIcon className="h-3.5 w-3.5" />
+                      {driver.identificationNumber}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5" />
+                      {driver.phoneNumber}
+                    </span>
                   </div>
                 </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-8 opacity-60 group-hover:opacity-100">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={() => handleCopyContactInfo(driver)}>
+                      <Copy className="h-4 w-4" /> Copiar contacto
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push(`/drivers/${driver.driverId}`)}>
+                      <Eye className="h-4 w-4" /> Ver detalles
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setDriverToEdit(driver)}>
+                      <Pen className="h-4 w-4" /> Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setDriverToDelete(driver.driverId)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" /> Eliminar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ))
           ) : (
-            <EmptyState
-              title="No hay conductores"
-              description="No se encontraron conductores registrados."
-            />
+            <div className="p-8">
+              <EmptyState
+                title="No hay conductores"
+                description={
+                  searchQuery
+                    ? `No se encontraron resultados para "${searchQuery}".`
+                    : "Aún no hay conductores registrados. Crea el primero para comenzar."
+                }
+              />
+            </div>
           )}
         </div>
       </div>
@@ -328,30 +285,26 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
         entities={entities}
       />
 
-      <AlertDialog
-        open={!!driverToDelete}
-        onOpenChange={() => setDriverToDelete(null)}
-      >
+      <AlertDialog open={!!driverToDelete} onOpenChange={() => setDriverToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Estas seguro?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar conductor?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta accion no se puede deshacer. Esto eliminara permanentemente el
-              conductor y removera sus datos.
+              Esta acción no se puede deshacer. Se eliminará permanentemente el conductor y todos sus datos asociados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteDriver}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-white hover:bg-destructive/90"
               disabled={isSubmitting}
             >
-              {isSubmitting ? "Eliminando..." : "Eliminar"}
+              {isSubmitting ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

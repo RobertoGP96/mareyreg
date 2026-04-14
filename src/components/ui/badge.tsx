@@ -11,12 +11,20 @@ const badgeVariants = cva(
       variant: {
         default:
           "border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
+        brand:
+          "border-transparent bg-[var(--brand)]/10 text-[var(--brand)] ring-1 ring-inset ring-[var(--brand)]/25 [a&]:hover:bg-[var(--brand)]/15",
         secondary:
           "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
         destructive:
-          "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "border-transparent bg-destructive/10 text-destructive ring-1 ring-inset ring-destructive/25 dark:bg-destructive/15 dark:text-red-300 dark:ring-destructive/30",
+        success:
+          "border-transparent bg-[var(--success)]/10 text-[var(--success)] ring-1 ring-inset ring-[var(--success)]/25 dark:bg-[var(--success)]/15",
+        warning:
+          "border-transparent bg-[var(--warning)]/10 text-[var(--warning)] ring-1 ring-inset ring-[var(--warning)]/30 dark:bg-[var(--warning)]/15",
+        info:
+          "border-transparent bg-[var(--info)]/10 text-[var(--info)] ring-1 ring-inset ring-[var(--info)]/25 dark:bg-[var(--info)]/15",
         outline:
-          "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+          "border-border text-foreground bg-background [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
       },
     },
     defaultVariants: {

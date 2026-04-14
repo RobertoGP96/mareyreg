@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -17,6 +16,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Field, FormDialogHeader } from "@/components/ui/field";
+import { FormSection } from "@/components/ui/form-section";
+import {
+  Shirt,
+  Hash,
+  Layers,
+  DollarSign,
+  Calendar,
+  Truck,
+  Globe2,
+  StickyNote,
+  Loader2,
+} from "lucide-react";
 
 interface EntryFormProps {
   open: boolean;
@@ -57,63 +69,69 @@ export function PacaEntryForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Registrar Entrada de Pacas</DialogTitle>
+          <DialogTitle asChild>
+            <FormDialogHeader
+              icon={Shirt}
+              title="Registrar entrada de pacas"
+              description="Añade pacas al inventario indicando categoría y cantidad."
+            />
+          </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Categoria *</Label>
-              <Select name="categoryId" required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.categoryId} value={String(c.categoryId)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <FormSection icon={Layers} title="Clasificación" description="Categoría y cantidad recibida.">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Categoría" icon={Layers} required>
+                <Select name="categoryId" required>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => (
+                      <SelectItem key={c.categoryId} value={String(c.categoryId)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Cantidad" icon={Hash} required>
+                <Input name="quantity" type="number" min="1" required placeholder="Ej. 10" />
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label>Cantidad *</Label>
-              <Input name="quantity" type="number" min="1" required placeholder="Ej: 10" />
-            </div>
-          </div>
+          </FormSection>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Precio de compra (unidad)</Label>
-              <Input name="purchasePrice" type="number" step="0.01" placeholder="Ej: 25.00" />
+          <FormSection icon={DollarSign} title="Datos comerciales" description="Costo y detalles de llegada.">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Precio de compra (unidad)" icon={DollarSign}>
+                <Input name="purchasePrice" type="number" step="0.01" placeholder="Ej. 25.00" />
+              </Field>
+              <Field label="Fecha de llegada" icon={Calendar}>
+                <Input name="arrivalDate" type="date" />
+              </Field>
+              <Field label="Proveedor" icon={Truck}>
+                <Input name="supplier" placeholder="Nombre del proveedor" />
+              </Field>
+              <Field label="Origen" icon={Globe2}>
+                <Input name="origin" placeholder="País o región" />
+              </Field>
             </div>
-            <div className="space-y-2">
-              <Label>Fecha de llegada</Label>
-              <Input name="arrivalDate" type="date" />
-            </div>
-          </div>
+          </FormSection>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Proveedor</Label>
-              <Input name="supplier" placeholder="Nombre del proveedor" />
-            </div>
-            <div className="space-y-2">
-              <Label>Origen</Label>
-              <Input name="origin" placeholder="Pais o region" />
-            </div>
-          </div>
+          <FormSection icon={StickyNote} title="Notas" description="Observaciones adicionales (opcional).">
+            <Textarea name="notes" placeholder="Observaciones, defectos visibles, estado general…" />
+          </FormSection>
 
-          <div className="space-y-2">
-            <Label>Notas</Label>
-            <Textarea name="notes" placeholder="Observaciones..." />
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" variant="brand" disabled={isLoading}>
+              {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isLoading ? "Registrando..." : "Registrar entrada"}
+            </Button>
           </div>
-
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Registrando..." : "Registrar Entrada"}
-          </Button>
         </form>
       </DialogContent>
     </Dialog>

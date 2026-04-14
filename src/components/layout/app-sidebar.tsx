@@ -16,7 +16,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { Home, Settings } from "lucide-react";
+import { Home, Settings, Sparkles } from "lucide-react";
 import { getEnabledModules } from "@/lib/module-registry";
 
 export function AppSidebar() {
@@ -39,25 +39,26 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar collapsible="icon" variant="sidebar">
-      <SidebarHeader>
+    <Sidebar collapsible="icon" variant="sidebar" className="border-r-0">
+      <SidebarHeader className="border-b border-sidebar-border/60 pb-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
+            <SidebarMenuButton size="lg" asChild className="hover:bg-sidebar-accent/50 data-[state=open]:bg-sidebar-accent/60">
               <Link href="/">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-muted text-primary">
+                <div className="relative flex aspect-square size-9 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-[var(--brand)] to-[color-mix(in_oklch,var(--brand)_60%,#b45309)] shadow-[0_4px_12px_-2px_color-mix(in_oklch,var(--brand)_40%,transparent)]">
                   <img
                     src="/truck-white.svg"
                     alt="MAREYreg"
-                    className="size-5"
+                    className="size-5 relative z-10"
                   />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/20" />
                 </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold roadway-font text-lg">
+                <div className="grid flex-1 text-left leading-tight">
+                  <span className="truncate font-semibold roadway-font text-[1.05rem] text-sidebar-foreground">
                     MAREYreg
                   </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    Sistema de Gestion
+                  <span className="truncate text-[0.68rem] uppercase tracking-[0.18em] text-sidebar-foreground/50">
+                    Sistema de Gestión
                   </span>
                 </div>
               </Link>
@@ -66,9 +67,9 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="gap-1 pt-2">
         {/* Home */}
-        <SidebarGroup>
+        <SidebarGroup className="pb-1">
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -76,8 +77,12 @@ export function AppSidebar() {
                   asChild
                   isActive={isActive("/")}
                   tooltip="Inicio"
+                  className="relative data-[active=true]:bg-gradient-to-r data-[active=true]:from-sidebar-accent data-[active=true]:to-sidebar-accent/40 data-[active=true]:text-white data-[active=true]:shadow-sm"
                 >
                   <Link href="/">
+                    {isActive("/") && (
+                      <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-[var(--brand)]" />
+                    )}
                     <Home />
                     <span>Inicio</span>
                   </Link>
@@ -89,41 +94,67 @@ export function AppSidebar() {
 
         {/* Dynamic Modules */}
         {modules.map((module) => (
-          <SidebarGroup key={module.id}>
-            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground tracking-wide">{module.label}</SidebarGroupLabel>
+          <SidebarGroup key={module.id} className="py-1">
+            <SidebarGroupLabel className="text-[0.68rem] font-semibold text-sidebar-foreground/40 uppercase tracking-[0.14em] px-2">
+              {module.label}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {module.routes.map((route) => (
-                  <SidebarMenuItem key={route.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive(route.href)}
-                      tooltip={route.name}
-                    >
-                      <Link href={route.href}>
-                        <route.icon />
-                        <span>{route.name}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {module.routes.map((route) => {
+                  const active = isActive(route.href);
+                  return (
+                    <SidebarMenuItem key={route.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        tooltip={route.name}
+                        className="relative data-[active=true]:bg-gradient-to-r data-[active=true]:from-sidebar-accent data-[active=true]:to-sidebar-accent/40 data-[active=true]:text-white data-[active=true]:shadow-sm"
+                      >
+                        <Link href={route.href}>
+                          {active && (
+                            <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-[var(--brand)]" />
+                          )}
+                          <route.icon />
+                          <span>{route.name}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         ))}
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="border-t border-sidebar-border/60 pt-3">
+        {/* Pro card visible cuando sidebar expandido */}
+        <div className="group-data-[collapsible=icon]:hidden mx-2 mb-2 rounded-lg bg-gradient-to-br from-[var(--brand)]/15 via-[var(--brand)]/5 to-transparent border border-[var(--brand)]/20 p-3">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Sparkles className="h-3.5 w-3.5 text-[var(--brand)]" />
+            <span className="text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--brand)]">
+              Premium Suite
+            </span>
+          </div>
+          <p className="text-xs text-sidebar-foreground/70 leading-relaxed">
+            Gestión integral de flota, inventario y logística.
+          </p>
+        </div>
+
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
               isActive={isActive("/settings")}
-              tooltip="Configuracion"
+              tooltip="Configuración"
+              className="relative data-[active=true]:bg-sidebar-accent data-[active=true]:text-white"
             >
               <Link href="/settings">
+                {isActive("/settings") && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-r-full bg-[var(--brand)]" />
+                )}
                 <Settings />
-                <span>Configuracion</span>
+                <span>Configuración</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
