@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, TriangleAlert, PackagePlus } from "lucide-react";
 import { toast } from "sonner";
-import { createStockMovement } from "../actions/stock-actions";
+import { createStockMovement, createStockTransfer } from "../actions/stock-actions";
 import { MOVEMENT_TYPES, getUnitAbbreviation } from "@/lib/constants";
 
 interface StockLevelItem {
@@ -63,21 +63,43 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
   const router = useRouter();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [movementType, setMovementType] = useState("entry");
+  const [movementType, setMovementType] = useState<"entry" | "exit" | "transfer" | "adjustment">("entry");
+  const [adjustmentSign, setAdjustmentSign] = useState<"positive" | "negative">("positive");
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     const fd = new FormData(e.currentTarget);
-    const result = await createStockMovement({
-      productId: Number(fd.get("productId")),
-      warehouseId: Number(fd.get("warehouseId")),
-      quantity: Number(fd.get("quantity")),
-      movementType: fd.get("movementType") as string,
-      unitCost: fd.get("unitCost") ? Number(fd.get("unitCost")) : undefined,
-      referenceDoc: (fd.get("referenceDoc") as string) || undefined,
-      notes: (fd.get("notes") as string) || undefined,
-    });
+
+    const productId = Number(fd.get("productId"));
+    const quantity = Number(fd.get("quantity"));
+
+    let result;
+    if (movementType === "transfer") {
+      const warehouseIdFrom = Number(fd.get("warehouseIdFrom"));
+      const warehouseIdTo = Number(fd.get("warehouseIdTo"));
+      result = await createStockTransfer({
+        productId,
+        warehouseIdFrom,
+        warehouseIdTo,
+        quantity,
+        referenceDoc: (fd.get("referenceDoc") as string) || undefined,
+        notes: (fd.get("notes") as string) || undefined,
+      });
+    } else {
+      const warehouseId = Number(fd.get("warehouseId"));
+      result = await createStockMovement({
+        productId,
+        warehouseId,
+        quantity,
+        movementType,
+        adjustmentSign: movementType === "adjustment" ? adjustmentSign : undefined,
+        unitCost: fd.get("unitCost") ? Number(fd.get("unitCost")) : undefined,
+        referenceDoc: (fd.get("referenceDoc") as string) || undefined,
+        notes: (fd.get("notes") as string) || undefined,
+      });
+    }
+
     setIsSubmitting(false);
     if (result.success) {
       setIsCreateOpen(false);
@@ -178,6 +200,22 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
           <DialogHeader><DialogTitle>Nuevo Movimiento de Stock</DialogTitle></DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="space-y-2">
+              <Label>Tipo *</Label>
+              <Select
+                name="movementType"
+                defaultValue="entry"
+                onValueChange={(v) => setMovementType(v as typeof movementType)}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {MOVEMENT_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label>Producto *</Label>
               <Select name="productId">
                 <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
@@ -190,34 +228,68 @@ export function StockPageClient({ stockLevels, movements, products, warehouses }
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Almacen *</Label>
-              <Select name="warehouseId">
-                <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                <SelectContent>
-                  {warehouses.map((w) => (
-                    <SelectItem key={w.warehouseId} value={String(w.warehouseId)}>{w.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
+            {movementType === "transfer" ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Almacen origen *</Label>
+                  <Select name="warehouseIdFrom">
+                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    <SelectContent>
+                      {warehouses.map((w) => (
+                        <SelectItem key={w.warehouseId} value={String(w.warehouseId)}>{w.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Almacen destino *</Label>
+                  <Select name="warehouseIdTo">
+                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    <SelectContent>
+                      {warehouses.map((w) => (
+                        <SelectItem key={w.warehouseId} value={String(w.warehouseId)}>{w.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Almacen *</Label>
+                <Select name="warehouseId">
+                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                  <SelectContent>
+                    {warehouses.map((w) => (
+                      <SelectItem key={w.warehouseId} value={String(w.warehouseId)}>{w.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Cantidad *</Label>
                 <Input name="quantity" type="number" step="0.01" required min="0.01" />
               </div>
-              <div className="space-y-2">
-                <Label>Tipo *</Label>
-                <Select name="movementType" defaultValue="entry" onValueChange={setMovementType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {MOVEMENT_TYPES.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {movementType === "adjustment" && (
+                <div className="space-y-2">
+                  <Label>Signo del ajuste *</Label>
+                  <Select
+                    value={adjustmentSign}
+                    onValueChange={(v) => setAdjustmentSign(v as "positive" | "negative")}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="positive">Positivo (+)</SelectItem>
+                      <SelectItem value="negative">Negativo (-)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
+
             {movementType === "entry" && (
               <div className="space-y-2">
                 <Label>Costo unitario</Label>
