@@ -296,9 +296,9 @@
 
 /* Glass panel (para topbar con blur) */
 .glass-panel {
-  background: color-mix(in oklch, var(--background) 70%, transparent);
-  backdrop-filter: saturate(180%) blur(12px);
-  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  background: color-mix(in srgb, var(--background) 80%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 /* Scrollbar refinada */
