@@ -55,6 +55,7 @@ interface EntryItem {
 interface CategoryItem {
   categoryId: number;
   name: string;
+  classification: { classificationId: number; name: string } | null;
 }
 
 interface Props {
