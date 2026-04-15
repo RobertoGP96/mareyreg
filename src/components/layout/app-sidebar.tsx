@@ -16,7 +16,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Settings2, Sparkles, PanelsTopLeft } from "lucide-react";
+import { LayoutDashboard, Settings2, PanelsTopLeft } from "lucide-react";
 import { getEnabledModules } from "@/lib/module-registry";
 
 export function AppSidebar() {
@@ -127,19 +127,6 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border/60 pt-3">
-        {/* Pro card visible cuando sidebar expandido */}
-        <div className="group-data-[collapsible=icon]:hidden mx-2 mb-2 rounded-lg bg-gradient-to-br from-[var(--brand)]/15 via-[var(--brand)]/5 to-transparent border border-[var(--brand)]/20 p-3">
-          <div className="flex items-center gap-2 mb-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-[var(--brand)]" />
-            <span className="text-[0.7rem] font-semibold uppercase tracking-wider text-[var(--brand)]">
-              Premium Suite
-            </span>
-          </div>
-          <p className="text-xs text-sidebar-foreground/70 leading-relaxed">
-            Gestión integral de flota, inventario y logística.
-          </p>
-        </div>
-
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
