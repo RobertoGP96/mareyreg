@@ -7,7 +7,9 @@
       "Bash(git add:*)",
       "Bash(npx next:*)",
       "Bash(npx tsc:*)",
-      "Bash(ls D:/Projects/mareyreg/src/lib/module-registry*)"
+      "Bash(ls D:/Projects/mareyreg/src/lib/module-registry*)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(npx prisma:*)"
     ]
   }
 }

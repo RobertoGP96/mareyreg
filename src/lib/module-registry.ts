@@ -14,6 +14,15 @@ import {
   Warehouse,
   PackageOpen,
   Building2,
+  Users,
+  ShoppingCart,
+  FileText,
+  Receipt,
+  ClipboardList,
+  BarChart3,
+  LineChart,
+  HandCoins,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 
@@ -66,6 +75,48 @@ export const modules: AppModule[] = [
       { name: "Productos", href: "/products", icon: Package },
       { name: "Almacenes", href: "/warehouses", icon: Warehouse },
       { name: "Stock", href: "/stock", icon: PackageOpen },
+    ],
+  },
+  {
+    id: "partners",
+    label: "Directorio",
+    icon: Users,
+    enabled: true,
+    routes: [
+      { name: "Proveedores", href: "/suppliers", icon: Building2 },
+      { name: "Clientes", href: "/customers", icon: Users },
+    ],
+  },
+  {
+    id: "purchasing",
+    label: "Compras",
+    icon: ShoppingCart,
+    enabled: true,
+    routes: [
+      { name: "Ordenes de compra", href: "/purchase-orders", icon: FileText },
+      { name: "Cuentas por pagar", href: "/accounts-payable", icon: HandCoins },
+    ],
+  },
+  {
+    id: "sales",
+    label: "Ventas",
+    icon: ShoppingBag,
+    enabled: true,
+    routes: [
+      { name: "POS", href: "/pos", icon: CreditCard },
+      { name: "Facturas", href: "/invoices", icon: Receipt },
+      { name: "Cuentas por cobrar", href: "/accounts-receivable", icon: ClipboardList },
+    ],
+  },
+  {
+    id: "reporting",
+    label: "Reportes",
+    icon: BarChart3,
+    enabled: true,
+    routes: [
+      { name: "Dashboard", href: "/reports/dashboard", icon: LayoutDashboard },
+      { name: "Kardex", href: "/reports/kardex", icon: LineChart },
+      { name: "Analisis ABC", href: "/reports/abc", icon: BarChart3 },
     ],
   },
   {

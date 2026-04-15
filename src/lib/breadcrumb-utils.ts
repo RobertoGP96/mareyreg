@@ -39,6 +39,22 @@ const ROUTE_LABELS: Record<string, string> = {
   stock: "Stock",
   settings: "Configuracion",
   users: "Usuarios",
+  suppliers: "Proveedores",
+  customers: "Clientes",
+  "purchase-orders": "Ordenes de compra",
+  receipts: "Recepciones",
+  receipt: "Recepcion",
+  "accounts-payable": "Cuentas por pagar",
+  "accounts-receivable": "Cuentas por cobrar",
+  invoices: "Facturas",
+  quotes: "Cotizaciones",
+  "sales-orders": "Ordenes de venta",
+  pos: "Punto de venta",
+  reports: "Reportes",
+  dashboard: "Dashboard",
+  kardex: "Kardex",
+  abc: "Analisis ABC",
+  sales: "Ventas",
 };
 
 const ROUTE_ICONS: Record<string, LucideIcon> = {
