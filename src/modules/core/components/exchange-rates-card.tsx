@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import type {
   Currency,
   ExchangeRatesResponse,
-} from "@/app/api/exchange-rates/route";
+} from "@/app/api/exchange-rates/types";
 
 type RateCardDef = {
   code: Currency;

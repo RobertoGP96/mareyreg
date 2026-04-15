@@ -1,19 +1,8 @@
 import { NextResponse } from "next/server";
+import { CURRENCIES, type Currency, type ExchangeRatesResponse } from "./types";
 
 // Cache for 1 hour — international FX doesn't need sub-hour precision for a dashboard.
 export const revalidate = 3600;
-
-export const CURRENCIES = ["EUR", "CAD", "GBP", "MXN"] as const;
-export type Currency = (typeof CURRENCIES)[number];
-
-export type ExchangeRatesResponse = {
-  rates: Partial<Record<Currency, number>>;
-  base: "USD";
-  source: string;
-  updatedAt: string | null;
-  fetchedAt: string;
-  error?: string;
-};
 
 /**
  * USD → {EUR, CAD, GBP, MXN} via open.er-api.com.
