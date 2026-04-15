@@ -308,10 +308,31 @@ enum ReservationStatus {
   cancelled
 }
 
+// Contact directory for paca-module clients (contact info only)
+model PacaClient {
+  clientId  Int      @id @default(autoincrement()) @map("client_id")
+  name      String
+  phone     String?
+  email     String?
+  notes     String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  reservations PacaReservation[]
+  sales        PacaSale[]
+
+  @@index([isActive])
+  @@index([phone])
+  @@index([email])
+  @@map("paca_clients")
+}
+
 // Reserve quantity from a category
 model PacaReservation {
   reservationId   Int               @id @default(autoincrement()) @map("reservation_id")
   categoryId      Int               @map("category_id")
+  clientId        Int?              @map("client_id")
   quantity        Int
   clientName      String            @map("client_name")
   clientPhone     String?           @map("client_phone")
@@ -323,9 +344,11 @@ model PacaReservation {
   createdAt       DateTime          @default(now()) @map("created_at")
 
   category PacaCategory @relation(fields: [categoryId], references: [categoryId])
+  client   PacaClient?  @relation(fields: [clientId], references: [clientId])
 
   @@index([categoryId])
   @@index([status])
+  @@index([clientId])
   @@map("paca_reservations")
 }
 
@@ -333,6 +356,7 @@ model PacaReservation {
 model PacaSale {
   saleId        Int      @id @default(autoincrement()) @map("sale_id")
   categoryId    Int      @map("category_id")
+  clientId      Int?     @map("client_id")
   quantity      Int
   salePrice     Decimal  @map("sale_price")
   clientName    String   @map("client_name")
@@ -343,9 +367,11 @@ model PacaSale {
   createdAt     DateTime @default(now()) @map("created_at")
 
   category PacaCategory @relation(fields: [categoryId], references: [categoryId])
+  client   PacaClient?  @relation(fields: [clientId], references: [clientId])
 
   @@index([categoryId])
   @@index([saleDate])
+  @@index([clientId])
   @@map("paca_sales")
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -66,11 +66,13 @@ import {
   cancelReservation,
   completeReservation,
 } from "../actions/paca-reservation-actions";
+import { PacaClientPicker, type PacaClientOption } from "./paca-client-picker";
 import { RESERVATION_STATUSES, PAYMENT_METHODS } from "@/lib/constants";
 
 interface ReservationItem {
   reservationId: number;
   categoryId: number;
+  clientId: number | null;
   quantity: number;
   clientName: string;
   clientPhone: string | null;
@@ -97,9 +99,11 @@ const STATUS_BADGE: Record<string, "success" | "info" | "destructive" | "warning
 export function ReservationListClient({
   reservations,
   availableCategories,
+  pacaClients,
 }: {
   reservations: ReservationItem[];
   availableCategories: CategoryOption[];
+  pacaClients: PacaClientOption[];
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -109,6 +113,27 @@ export function ReservationListClient({
   const [toDelete, setToDelete] = useState<number | null>(null);
   const [toComplete, setToComplete] = useState<ReservationItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createClient, setCreateClient] = useState<PacaClientOption | null>(null);
+  const [editClient, setEditClient] = useState<PacaClientOption | null>(null);
+
+  const editClientInitial = useMemo<PacaClientOption | null>(() => {
+    if (!toEdit) return null;
+    if (toEdit.clientId != null) {
+      return (
+        pacaClients.find((c) => c.clientId === toEdit.clientId) ?? {
+          clientId: toEdit.clientId,
+          name: toEdit.clientName,
+          phone: toEdit.clientPhone,
+          email: toEdit.clientEmail,
+        }
+      );
+    }
+    return null;
+  }, [toEdit, pacaClients]);
+
+  useEffect(() => {
+    setEditClient(editClientInitial);
+  }, [editClientInitial]);
 
   const filtered = reservations.filter(
     (r) =>
@@ -121,14 +146,19 @@ export function ReservationListClient({
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!createClient) {
+      toast.error("Selecciona o crea un cliente");
+      return;
+    }
     setIsSubmitting(true);
     const fd = new FormData(e.currentTarget);
     const result = await createReservation({
       categoryId: Number(fd.get("categoryId")),
       quantity: Number(fd.get("quantity")),
-      clientName: fd.get("clientName") as string,
-      clientPhone: (fd.get("clientPhone") as string) || undefined,
-      clientEmail: (fd.get("clientEmail") as string) || undefined,
+      clientId: createClient.clientId,
+      clientName: createClient.name,
+      clientPhone: createClient.phone ?? undefined,
+      clientEmail: createClient.email ?? undefined,
       reservationDate: fd.get("reservationDate") as string,
       expirationDate: (fd.get("expirationDate") as string) || undefined,
       notes: (fd.get("notes") as string) || undefined,
@@ -136,6 +166,7 @@ export function ReservationListClient({
     setIsSubmitting(false);
     if (result.success) {
       setIsCreateOpen(false);
+      setCreateClient(null);
       toast.success("Reservación creada");
       router.refresh();
     } else toast.error(result.error);
@@ -144,12 +175,17 @@ export function ReservationListClient({
   const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     if (!toEdit) return;
     e.preventDefault();
+    if (!editClient) {
+      toast.error("Selecciona o crea un cliente");
+      return;
+    }
     setIsSubmitting(true);
     const fd = new FormData(e.currentTarget);
     const result = await updateReservation(toEdit.reservationId, {
-      clientName: fd.get("clientName") as string,
-      clientPhone: (fd.get("clientPhone") as string) || undefined,
-      clientEmail: (fd.get("clientEmail") as string) || undefined,
+      clientId: editClient.clientId,
+      clientName: editClient.name,
+      clientPhone: editClient.phone ?? undefined,
+      clientEmail: editClient.email ?? undefined,
       reservationDate: fd.get("reservationDate") as string,
       expirationDate: (fd.get("expirationDate") as string) || undefined,
       notes: (fd.get("notes") as string) || undefined,
@@ -158,6 +194,7 @@ export function ReservationListClient({
     setIsSubmitting(false);
     if (result.success) {
       setToEdit(null);
+      setEditClient(null);
       toast.success("Reservación actualizada");
       router.refresh();
     } else toast.error(result.error);
@@ -373,16 +410,26 @@ export function ReservationListClient({
               </Field>
             </div>
             <Field label="Cliente" icon={UserRound} required>
-              <Input name="clientName" required placeholder="Nombre del cliente" />
+              <PacaClientPicker
+                clients={pacaClients}
+                value={createClient?.clientId ?? null}
+                onChange={setCreateClient}
+              />
             </Field>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Teléfono" icon={PhoneCall}>
-                <Input name="clientPhone" />
-              </Field>
-              <Field label="Email" icon={AtSign}>
-                <Input name="clientEmail" type="email" />
-              </Field>
-            </div>
+            {createClient && (createClient.phone || createClient.email) && (
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground px-1">
+                {createClient.phone && (
+                  <span className="inline-flex items-center gap-1">
+                    <PhoneCall className="h-3 w-3" /> {createClient.phone}
+                  </span>
+                )}
+                {createClient.email && (
+                  <span className="inline-flex items-center gap-1">
+                    <AtSign className="h-3 w-3" /> {createClient.email}
+                  </span>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Fecha reservación" icon={CalendarDays} required>
                 <Input name="reservationDate" type="date" required />
@@ -395,7 +442,7 @@ export function ReservationListClient({
               <Textarea name="notes" />
             </Field>
             <div className="flex justify-end gap-2 pt-4 border-t border-border">
-              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => { setIsCreateOpen(false); setCreateClient(null); }}>
                 Cancelar
               </Button>
               <Button type="submit" variant="brand" disabled={isSubmitting}>
@@ -426,16 +473,26 @@ export function ReservationListClient({
               <Input name="quantity" type="number" min="1" defaultValue={toEdit?.quantity} required />
             </Field>
             <Field label="Cliente" icon={UserRound} required>
-              <Input name="clientName" defaultValue={toEdit?.clientName} required />
+              <PacaClientPicker
+                clients={pacaClients}
+                value={editClient?.clientId ?? null}
+                onChange={setEditClient}
+              />
             </Field>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Teléfono" icon={PhoneCall}>
-                <Input name="clientPhone" defaultValue={toEdit?.clientPhone ?? ""} />
-              </Field>
-              <Field label="Email" icon={AtSign}>
-                <Input name="clientEmail" type="email" defaultValue={toEdit?.clientEmail ?? ""} />
-              </Field>
-            </div>
+            {editClient && (editClient.phone || editClient.email) && (
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground px-1">
+                {editClient.phone && (
+                  <span className="inline-flex items-center gap-1">
+                    <PhoneCall className="h-3 w-3" /> {editClient.phone}
+                  </span>
+                )}
+                {editClient.email && (
+                  <span className="inline-flex items-center gap-1">
+                    <AtSign className="h-3 w-3" /> {editClient.email}
+                  </span>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Fecha reservación" icon={CalendarDays} required>
                 <Input name="reservationDate" type="date" defaultValue={toEdit?.reservationDate} required />

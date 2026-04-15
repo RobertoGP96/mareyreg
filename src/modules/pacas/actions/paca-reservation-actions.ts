@@ -15,6 +15,7 @@ const revalidateAll = () => {
 export async function createReservation(data: {
   categoryId: number;
   quantity: number;
+  clientId?: number;
   clientName: string;
   clientPhone?: string;
   clientEmail?: string;
@@ -36,6 +37,7 @@ export async function createReservation(data: {
       const res = await tx.pacaReservation.create({
         data: {
           categoryId: data.categoryId,
+          clientId: data.clientId ?? null,
           quantity: data.quantity,
           clientName: data.clientName,
           clientPhone: data.clientPhone || null,
@@ -77,6 +79,7 @@ export async function createReservation(data: {
 export async function updateReservation(
   id: number,
   data: {
+    clientId?: number | null;
     clientName?: string;
     clientPhone?: string;
     clientEmail?: string;
@@ -108,6 +111,7 @@ export async function updateReservation(
         await tx.pacaReservation.update({
           where: { reservationId: id },
           data: {
+            ...(data.clientId !== undefined && { clientId: data.clientId }),
             ...(data.clientName !== undefined && { clientName: data.clientName }),
             ...(data.clientPhone !== undefined && { clientPhone: data.clientPhone || null }),
             ...(data.clientEmail !== undefined && { clientEmail: data.clientEmail || null }),
@@ -142,6 +146,7 @@ export async function updateReservation(
         await tx.pacaReservation.update({
           where: { reservationId: id },
           data: {
+            ...(data.clientId !== undefined && { clientId: data.clientId }),
             ...(data.clientName !== undefined && { clientName: data.clientName }),
             ...(data.clientPhone !== undefined && { clientPhone: data.clientPhone || null }),
             ...(data.clientEmail !== undefined && { clientEmail: data.clientEmail || null }),
@@ -292,6 +297,7 @@ export async function completeReservation(
       const sale = await tx.pacaSale.create({
         data: {
           categoryId: reservation.categoryId,
+          clientId: reservation.clientId,
           quantity: reservation.quantity,
           salePrice: saleData.salePrice,
           clientName: reservation.clientName,

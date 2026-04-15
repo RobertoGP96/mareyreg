@@ -9,7 +9,11 @@
       "Bash(npx tsc:*)",
       "Bash(ls D:/Projects/mareyreg/src/lib/module-registry*)",
       "Bash(echo \"EXIT=$?\")",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "Bash(head -5 D:/Projects/mareyreg/scripts/*.ts D:/Projects/mareyreg/scripts/*.js)",
+      "Bash(ls -la D:/Projects/mareyreg/.env*)",
+      "Bash(pnpm db:generate)",
+      "Bash(pnpm tsc:*)"
     ]
   }
 }

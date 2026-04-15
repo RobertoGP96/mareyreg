@@ -85,6 +85,7 @@ export const modules: AppModule[] = [
     routes: [
       { name: "Proveedores", href: "/suppliers", icon: Building2 },
       { name: "Clientes", href: "/customers", icon: Users },
+      { name: "Clientes Pacas", href: "/pacas-clientes", icon: Package2 },
     ],
   },
   {
