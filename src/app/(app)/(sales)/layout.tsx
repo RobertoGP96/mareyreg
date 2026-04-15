@@ -1,6 +1,6 @@
-import { requireAuth } from "@/lib/auth-guard";
+import { requireModule } from "@/lib/auth-guard";
 
 export default async function SalesLayout({ children }: { children: React.ReactNode }) {
-  await requireAuth();
+  await requireModule("sales");
   return <>{children}</>;
 }
