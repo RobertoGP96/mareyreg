@@ -13,7 +13,11 @@
       "Bash(head -5 D:/Projects/mareyreg/scripts/*.ts D:/Projects/mareyreg/scripts/*.js)",
       "Bash(ls -la D:/Projects/mareyreg/.env*)",
       "Bash(pnpm db:generate)",
-      "Bash(pnpm tsc:*)"
+      "Bash(pnpm tsc:*)",
+      "mcp__7b098291-0573-452b-9ca0-9a1d4ed8cc6f__list_teams",
+      "mcp__7b098291-0573-452b-9ca0-9a1d4ed8cc6f__list_projects",
+      "mcp__7b098291-0573-452b-9ca0-9a1d4ed8cc6f__get_runtime_logs",
+      "mcp__7b098291-0573-452b-9ca0-9a1d4ed8cc6f__list_deployments"
     ]
   }
 }

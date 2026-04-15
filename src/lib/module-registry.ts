@@ -64,6 +64,7 @@ export const modules: AppModule[] = [
       { name: "Reservaciones", href: "/pacas/reservaciones", icon: BookmarkCheck },
       { name: "Ventas", href: "/pacas/ventas", icon: ShoppingBag },
       { name: "Categorias", href: "/pacas/categorias", icon: Tags },
+      { name: "Clientes", href: "/pacas-clientes", icon: Users },
     ],
   },
   {
@@ -85,7 +86,6 @@ export const modules: AppModule[] = [
     routes: [
       { name: "Proveedores", href: "/suppliers", icon: Building2 },
       { name: "Clientes", href: "/customers", icon: Users },
-      { name: "Clientes Pacas", href: "/pacas-clientes", icon: Package2 },
     ],
   },
   {
