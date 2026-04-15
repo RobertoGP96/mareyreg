@@ -11,41 +11,47 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import type { ExchangeRatesResponse } from "@/app/api/exchange-rates/route";
+import type {
+  Currency,
+  ExchangeRatesResponse,
+} from "@/app/api/exchange-rates/route";
 
 type RateCardDef = {
-  key: "mxn" | "cupOfficial" | "cupInformal";
+  code: Currency;
   label: string;
   sublabel: string;
-  currency: string;
   flag: string;
-  accent: "brand" | "info" | "teal" | "amber";
+  accent: "brand" | "info" | "teal" | "amber" | "indigo";
 };
 
 const RATE_CARDS: RateCardDef[] = [
   {
-    key: "mxn",
-    label: "Peso Mexicano",
-    sublabel: "USD → MXN",
-    currency: "MXN",
-    flag: "🇲🇽",
-    accent: "teal",
-  },
-  {
-    key: "cupOfficial",
-    label: "CUP Oficial",
-    sublabel: "USD → CUP (CADECA)",
-    currency: "CUP",
-    flag: "🇨🇺",
+    code: "EUR",
+    label: "Euro",
+    sublabel: "USD → EUR",
+    flag: "🇪🇺",
     accent: "info",
   },
   {
-    key: "cupInformal",
-    label: "CUP Informal",
-    sublabel: "USD → CUP (elToque)",
-    currency: "CUP",
-    flag: "🇨🇺",
-    accent: "amber",
+    code: "GBP",
+    label: "Libra Esterlina",
+    sublabel: "USD → GBP",
+    flag: "🇬🇧",
+    accent: "indigo",
+  },
+  {
+    code: "CAD",
+    label: "Dólar Canadiense",
+    sublabel: "USD → CAD",
+    flag: "🇨🇦",
+    accent: "brand",
+  },
+  {
+    code: "MXN",
+    label: "Peso Mexicano",
+    sublabel: "USD → MXN",
+    flag: "🇲🇽",
+    accent: "teal",
   },
 ];
 
@@ -57,15 +63,16 @@ const accentStyles: Record<
   info:   { iconBg: "from-[var(--info)]/20 to-[var(--info)]/5",        iconColor: "text-[var(--info)]",    glow: "from-[var(--info)]/10",     ring: "ring-[var(--info)]/20" },
   teal:   { iconBg: "from-[var(--chart-2)]/25 to-[var(--chart-2)]/5",  iconColor: "text-[var(--chart-2)]", glow: "from-[var(--chart-2)]/10",  ring: "ring-[var(--chart-2)]/20" },
   amber:  { iconBg: "from-[var(--warning)]/25 to-[var(--warning)]/5",  iconColor: "text-[var(--warning)]", glow: "from-[var(--warning)]/10",  ring: "ring-[var(--warning)]/20" },
+  indigo: { iconBg: "from-[var(--chart-5)]/25 to-[var(--chart-5)]/5",  iconColor: "text-[var(--chart-5)]", glow: "from-[var(--chart-5)]/10",  ring: "ring-[var(--chart-5)]/20" },
 };
 
-function formatRate(value: number | null, currency: string): string {
+function formatRate(value: number | undefined, code: Currency): string {
   if (value == null) return "—";
   const digits = value >= 100 ? 2 : 4;
-  return `$${value.toLocaleString("es-MX", {
+  return `${value.toLocaleString("es-MX", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
-  })} ${currency}`;
+  })} ${code}`;
 }
 
 function formatUpdated(updatedAt: string | null): string {
@@ -93,8 +100,10 @@ export function ExchangeRatesCard() {
       const res = await fetch("/api/exchange-rates", {
         cache: force ? "no-store" : "default",
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as ExchangeRatesResponse;
+      if (!res.ok || json.error) {
+        throw new Error(json.error ?? `HTTP ${res.status}`);
+      }
       setData(json);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error desconocido");
@@ -123,7 +132,7 @@ export function ExchangeRatesCard() {
             Tipo de cambio del dólar
           </h2>
           <p className="text-xs md:text-sm text-muted-foreground">
-            Referencias de mercado actualizadas cada hora.
+            Referencias internacionales — base USD, actualizadas cada hora.
           </p>
         </div>
         <button
@@ -150,14 +159,14 @@ export function ExchangeRatesCard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {RATE_CARDS.map((card, i) => {
           const style = accentStyles[card.accent];
-          const rate = data?.[card.key];
+          const value = data?.rates[card.code];
 
           return (
             <motion.div
-              key={card.key}
+              key={card.code}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{
@@ -191,9 +200,7 @@ export function ExchangeRatesCard() {
                 <TrendingUp
                   className={cn(
                     "h-4 w-4 transition-colors",
-                    rate?.value != null
-                      ? style.iconColor
-                      : "text-muted-foreground/40",
+                    value != null ? style.iconColor : "text-muted-foreground/40",
                   )}
                 />
               </div>
@@ -215,35 +222,26 @@ export function ExchangeRatesCard() {
                     <span
                       className={cn(
                         "text-2xl md:text-3xl font-bold font-headline tabular-nums",
-                        rate?.value != null
+                        value != null
                           ? "text-foreground"
                           : "text-muted-foreground/60",
                       )}
                     >
-                      {formatRate(rate?.value ?? null, card.currency)}
+                      {formatRate(value, card.code)}
                     </span>
                   </div>
                 )}
 
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-[0.68rem] text-muted-foreground/70 truncate">
-                    {rate?.source ?? "—"}
+                    1 USD
                   </span>
-                  {rate?.updatedAt && (
+                  {data?.updatedAt && (
                     <span className="text-[0.68rem] text-muted-foreground/60 tabular-nums">
-                      {formatUpdated(rate.updatedAt)}
+                      {formatUpdated(data.updatedAt)}
                     </span>
                   )}
                 </div>
-
-                {rate?.error && (
-                  <p className="mt-1 flex items-start gap-1 text-[0.68rem] text-[var(--warning)]">
-                    <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                    <span className="truncate" title={rate.error}>
-                      {rate.error}
-                    </span>
-                  </p>
-                )}
               </div>
 
               <div className="mt-4 h-0.5 w-full overflow-hidden rounded-full bg-border/60">
@@ -251,7 +249,7 @@ export function ExchangeRatesCard() {
                   className={cn(
                     "h-full bg-gradient-to-r transition-transform duration-500 origin-left",
                     style.iconBg.replace("/5", "/80").replace("/20", ""),
-                    rate?.value != null ? "scale-x-100" : "scale-x-[0.15]",
+                    value != null ? "scale-x-100" : "scale-x-[0.15]",
                   )}
                 />
               </div>
@@ -262,8 +260,8 @@ export function ExchangeRatesCard() {
 
       <p className="px-1 text-[0.68rem] text-muted-foreground/70 flex items-center gap-1">
         <ExternalLink className="h-3 w-3" />
-        Fuentes: open.er-api.com (MXN / CUP oficial) y elToque (CUP informal).
-        Referencias informativas, no para operaciones financieras.
+        Fuente: {data?.source ?? "open.er-api.com"}. Referencias informativas,
+        no para operaciones financieras.
       </p>
     </motion.section>
   );
