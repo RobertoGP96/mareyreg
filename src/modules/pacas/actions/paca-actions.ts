@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
+import { createAuditLog, getCurrentUserId } from "@/lib/audit";
 
 export async function createPacaEntry(data: {
   categoryId: number;
@@ -19,6 +20,7 @@ export async function createPacaEntry(data: {
     }
 
     const entryCost = (data.purchasePrice ?? 0) * data.quantity;
+    const userId = await getCurrentUserId();
 
     const result = await db.$transaction(async (tx) => {
       const entry = await tx.pacaEntry.create({
@@ -48,6 +50,15 @@ export async function createPacaEntry(data: {
         },
       });
 
+      await createAuditLog(tx, {
+        action: "create",
+        entityType: "PacaEntry",
+        entityId: entry.entryId,
+        module: "pacas",
+        userId,
+        newValues: data,
+      });
+
       return entry;
     });
 
@@ -68,6 +79,7 @@ export async function deletePacaEntry(id: number): Promise<ActionResult<void>> {
     }
 
     const entryCost = Number(entry.purchasePrice ?? 0) * entry.quantity;
+    const userId = await getCurrentUserId();
 
     await db.$transaction(async (tx) => {
       await tx.pacaEntry.delete({ where: { entryId: id } });
@@ -77,6 +89,14 @@ export async function deletePacaEntry(id: number): Promise<ActionResult<void>> {
           available: { decrement: entry.quantity },
           totalCost: { decrement: entryCost },
         },
+      });
+      await createAuditLog(tx, {
+        action: "delete",
+        entityType: "PacaEntry",
+        entityId: id,
+        module: "pacas",
+        userId,
+        oldValues: entry,
       });
     });
 

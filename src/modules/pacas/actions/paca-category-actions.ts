@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
+import { createAuditLog, getCurrentUserId } from "@/lib/audit";
 
 export async function createPacaCategory(data: {
   name: string;
@@ -21,12 +22,24 @@ export async function createPacaCategory(data: {
       };
     }
 
-    const category = await db.pacaCategory.create({
-      data: {
-        name: data.name,
-        description: data.description || null,
-        classificationId,
-      },
+    const userId = await getCurrentUserId();
+    const category = await db.$transaction(async (tx) => {
+      const c = await tx.pacaCategory.create({
+        data: {
+          name: data.name,
+          description: data.description || null,
+          classificationId,
+        },
+      });
+      await createAuditLog(tx, {
+        action: "create",
+        entityType: "PacaCategory",
+        entityId: c.categoryId,
+        module: "pacas",
+        userId,
+        newValues: data,
+      });
+      return c;
     });
 
     revalidatePath("/pacas");
@@ -70,13 +83,26 @@ export async function updatePacaCategory(
       }
     }
 
-    await db.pacaCategory.update({
-      where: { categoryId: id },
-      data: {
-        ...(data.name !== undefined && { name: data.name }),
-        ...(data.description !== undefined && { description: data.description }),
-        ...(data.classificationId !== undefined && { classificationId: data.classificationId }),
-      },
+    const userId = await getCurrentUserId();
+    await db.$transaction(async (tx) => {
+      const prev = await tx.pacaCategory.findUnique({ where: { categoryId: id } });
+      await tx.pacaCategory.update({
+        where: { categoryId: id },
+        data: {
+          ...(data.name !== undefined && { name: data.name }),
+          ...(data.description !== undefined && { description: data.description }),
+          ...(data.classificationId !== undefined && { classificationId: data.classificationId }),
+        },
+      });
+      await createAuditLog(tx, {
+        action: "update",
+        entityType: "PacaCategory",
+        entityId: id,
+        module: "pacas",
+        userId,
+        oldValues: prev,
+        newValues: data,
+      });
     });
 
     revalidatePath("/pacas");
@@ -90,7 +116,19 @@ export async function updatePacaCategory(
 
 export async function deletePacaCategory(id: number): Promise<ActionResult<void>> {
   try {
-    await db.pacaCategory.delete({ where: { categoryId: id } });
+    const userId = await getCurrentUserId();
+    await db.$transaction(async (tx) => {
+      const prev = await tx.pacaCategory.findUnique({ where: { categoryId: id } });
+      await tx.pacaCategory.delete({ where: { categoryId: id } });
+      await createAuditLog(tx, {
+        action: "delete",
+        entityType: "PacaCategory",
+        entityId: id,
+        module: "pacas",
+        userId,
+        oldValues: prev,
+      });
+    });
     revalidatePath("/pacas");
     revalidatePath("/pacas/categorias");
     return { success: true, data: undefined };

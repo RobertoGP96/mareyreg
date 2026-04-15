@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
+import { createAuditLog, getCurrentUserId } from "@/lib/audit";
 
 const revalidateAll = () => {
   revalidatePath("/pacas");
@@ -30,6 +31,7 @@ export async function createReservation(data: {
       return { success: false, error: `No hay suficiente stock disponible. Disponible: ${inventory?.available ?? 0}` };
     }
 
+    const userId = await getCurrentUserId();
     const reservation = await db.$transaction(async (tx) => {
       const res = await tx.pacaReservation.create({
         data: {
@@ -50,6 +52,15 @@ export async function createReservation(data: {
           available: { decrement: data.quantity },
           reserved: { increment: data.quantity },
         },
+      });
+
+      await createAuditLog(tx, {
+        action: "create",
+        entityType: "PacaReservation",
+        entityId: res.reservationId,
+        module: "pacas",
+        userId,
+        newValues: data,
       });
 
       return res;
@@ -92,6 +103,7 @@ export async function updateReservation(
         return { success: false, error: `No hay suficiente stock. Disponible: ${inventory?.available ?? 0}` };
       }
 
+      const userId = await getCurrentUserId();
       await db.$transaction(async (tx) => {
         await tx.pacaReservation.update({
           where: { reservationId: id },
@@ -113,18 +125,40 @@ export async function updateReservation(
             reserved: { increment: diff },
           },
         });
+
+        await createAuditLog(tx, {
+          action: "update",
+          entityType: "PacaReservation",
+          entityId: id,
+          module: "pacas",
+          userId,
+          oldValues: reservation,
+          newValues: data,
+        });
       });
     } else {
-      await db.pacaReservation.update({
-        where: { reservationId: id },
-        data: {
-          ...(data.clientName !== undefined && { clientName: data.clientName }),
-          ...(data.clientPhone !== undefined && { clientPhone: data.clientPhone || null }),
-          ...(data.clientEmail !== undefined && { clientEmail: data.clientEmail || null }),
-          ...(data.reservationDate !== undefined && { reservationDate: data.reservationDate }),
-          ...(data.expirationDate !== undefined && { expirationDate: data.expirationDate || null }),
-          ...(data.notes !== undefined && { notes: data.notes || null }),
-        },
+      const userId = await getCurrentUserId();
+      await db.$transaction(async (tx) => {
+        await tx.pacaReservation.update({
+          where: { reservationId: id },
+          data: {
+            ...(data.clientName !== undefined && { clientName: data.clientName }),
+            ...(data.clientPhone !== undefined && { clientPhone: data.clientPhone || null }),
+            ...(data.clientEmail !== undefined && { clientEmail: data.clientEmail || null }),
+            ...(data.reservationDate !== undefined && { reservationDate: data.reservationDate }),
+            ...(data.expirationDate !== undefined && { expirationDate: data.expirationDate || null }),
+            ...(data.notes !== undefined && { notes: data.notes || null }),
+          },
+        });
+        await createAuditLog(tx, {
+          action: "update",
+          entityType: "PacaReservation",
+          entityId: id,
+          module: "pacas",
+          userId,
+          oldValues: reservation,
+          newValues: data,
+        });
       });
     }
 
@@ -143,6 +177,7 @@ export async function deleteReservation(id: number): Promise<ActionResult<void>>
       return { success: false, error: "Reservacion no encontrada" };
     }
 
+    const userId = await getCurrentUserId();
     await db.$transaction(async (tx) => {
       // Si estaba activa, devolver al inventario
       if (reservation.status === "active") {
@@ -156,6 +191,14 @@ export async function deleteReservation(id: number): Promise<ActionResult<void>>
       }
 
       await tx.pacaReservation.delete({ where: { reservationId: id } });
+      await createAuditLog(tx, {
+        action: "delete",
+        entityType: "PacaReservation",
+        entityId: id,
+        module: "pacas",
+        userId,
+        oldValues: reservation,
+      });
     });
 
     revalidateAll();
@@ -173,6 +216,7 @@ export async function cancelReservation(id: number): Promise<ActionResult<void>>
       return { success: false, error: "La reservacion no esta activa" };
     }
 
+    const userId = await getCurrentUserId();
     await db.$transaction(async (tx) => {
       await tx.pacaReservation.update({
         where: { reservationId: id },
@@ -185,6 +229,15 @@ export async function cancelReservation(id: number): Promise<ActionResult<void>>
           reserved: { decrement: reservation.quantity },
           available: { increment: reservation.quantity },
         },
+      });
+
+      await createAuditLog(tx, {
+        action: "cancel",
+        entityType: "PacaReservation",
+        entityId: id,
+        module: "pacas",
+        userId,
+        oldValues: reservation,
       });
     });
 
@@ -220,6 +273,7 @@ export async function completeReservation(
     const avgCost = totalInStock > 0 ? Number(inventory?.totalCost ?? 0) / totalInStock : 0;
     const costToDeduct = avgCost * reservation.quantity;
 
+    const userId = await getCurrentUserId();
     await db.$transaction(async (tx) => {
       await tx.pacaReservation.update({
         where: { reservationId: id },
@@ -235,7 +289,7 @@ export async function completeReservation(
         },
       });
 
-      await tx.pacaSale.create({
+      const sale = await tx.pacaSale.create({
         data: {
           categoryId: reservation.categoryId,
           quantity: reservation.quantity,
@@ -246,6 +300,16 @@ export async function completeReservation(
           saleDate: saleData.saleDate,
           notes: saleData.notes || `Venta desde reservacion #${reservation.reservationId}`,
         },
+      });
+
+      await createAuditLog(tx, {
+        action: "complete",
+        entityType: "PacaReservation",
+        entityId: id,
+        module: "pacas",
+        userId,
+        oldValues: reservation,
+        newValues: { saleId: sale.saleId, ...saleData, costToDeduct },
       });
     });
 

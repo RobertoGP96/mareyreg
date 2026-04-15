@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
+import { createAuditLog, getCurrentUserId } from "@/lib/audit";
 
 export async function createSale(data: {
   categoryId: number;
@@ -28,6 +29,7 @@ export async function createSale(data: {
     const avgCost = totalInStock > 0 ? Number(inventory.totalCost) / totalInStock : 0;
     const costToDeduct = avgCost * data.quantity;
 
+    const userId = await getCurrentUserId();
     const sale = await db.$transaction(async (tx) => {
       const s = await tx.pacaSale.create({
         data: {
@@ -49,6 +51,15 @@ export async function createSale(data: {
           sold: { increment: data.quantity },
           totalCost: { decrement: costToDeduct },
         },
+      });
+
+      await createAuditLog(tx, {
+        action: "create",
+        entityType: "PacaSale",
+        entityId: s.saleId,
+        module: "pacas",
+        userId,
+        newValues: { ...data, costToDeduct },
       });
 
       return s;
@@ -73,6 +84,7 @@ export async function deleteSale(id: number): Promise<ActionResult<void>> {
 
     // Recalcular costo a devolver usando el precio de compra promedio historico
     // Como no tenemos el costo exacto, usamos 0 (no afecta el totalCost al revertir)
+    const userId = await getCurrentUserId();
     await db.$transaction(async (tx) => {
       await tx.pacaSale.delete({ where: { saleId: id } });
       await tx.pacaInventory.update({
@@ -81,6 +93,14 @@ export async function deleteSale(id: number): Promise<ActionResult<void>> {
           sold: { decrement: sale.quantity },
           available: { increment: sale.quantity },
         },
+      });
+      await createAuditLog(tx, {
+        action: "delete",
+        entityType: "PacaSale",
+        entityId: id,
+        module: "pacas",
+        userId,
+        oldValues: sale,
       });
     });
 
