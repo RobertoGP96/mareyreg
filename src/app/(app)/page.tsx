@@ -13,6 +13,7 @@ import {
   DashboardStats,
   type DashboardStat,
 } from "@/modules/core/components/dashboard-stats";
+import { ExchangeRatesCard } from "@/modules/core/components/exchange-rates-card";
 
 const MODULE_STATS: Record<string, string[]> = {
   logistics: ["Entidades", "Conductores", "Vehículos", "Viajes"],
@@ -79,6 +80,8 @@ export default async function Home() {
         </div>
         <DashboardStats stats={stats} />
       </div>
+
+      <ExchangeRatesCard />
     </div>
   );
 }
