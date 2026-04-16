@@ -17,7 +17,8 @@
       "mcp__7b098291-0573-452b-9ca0-9a1d4ed8cc6f__list_teams",
       "mcp__7b098291-0573-452b-9ca0-9a1d4ed8cc6f__list_projects",
       "mcp__7b098291-0573-452b-9ca0-9a1d4ed8cc6f__get_runtime_logs",
-      "mcp__7b098291-0573-452b-9ca0-9a1d4ed8cc6f__list_deployments"
+      "mcp__7b098291-0573-452b-9ca0-9a1d4ed8cc6f__list_deployments",
+      "Bash(pnpm exec:*)"
     ]
   }
 }

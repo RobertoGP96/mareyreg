@@ -27,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Search, Trash2, MoreHorizontal, Plus, SquarePen, Truck, SquareStack, UserRound } from "lucide-react";
+import { Search, Trash2, MoreHorizontal, Plus, SquarePen, Truck, SquareStack, UserRound, Eye } from "lucide-react";
 import { toast } from "sonner";
 import {
   createVehicle,
@@ -203,7 +203,12 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem
+                      onClick={() => router.push(`/vehicles/${vehicle.vehicle_id}`)}
+                    >
+                      <Eye className="h-4 w-4" /> Ver detalles
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setVehicleToEdit(vehicle)}>
                       <SquarePen className="h-4 w-4" /> Editar
                     </DropdownMenuItem>

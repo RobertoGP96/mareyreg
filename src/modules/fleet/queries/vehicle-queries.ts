@@ -32,3 +32,41 @@ export async function getVehicles() {
 export async function getVehicle(id: number) {
   return db.vehicle.findUnique({ where: { vehicleId: id } });
 }
+
+export async function getVehicleWithDetails(id: number) {
+  const result = await db.vehicle.findUnique({
+    where: { vehicleId: id },
+    include: {
+      driver: {
+        include: {
+          entity: true,
+          trips: {
+            include: { containers: true },
+            orderBy: { loadDate: "desc" },
+            take: 20,
+          },
+        },
+      },
+    },
+  });
+
+  if (!result) return null;
+
+  const { driver, ...vehicleOnly } = result;
+  if (!driver) {
+    return {
+      vehicle: vehicleOnly,
+      driver: null,
+      entity: null,
+      trips: [],
+    };
+  }
+
+  const { entity, trips, ...driverOnly } = driver;
+  return {
+    vehicle: vehicleOnly,
+    driver: driverOnly,
+    entity,
+    trips,
+  };
+}

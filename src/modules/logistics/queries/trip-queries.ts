@@ -42,3 +42,31 @@ export async function getTripsByDriver(driverId: number) {
     orderBy: { loadDate: "desc" },
   });
 }
+
+export async function getTripWithDetails(id: number) {
+  const result = await db.trip.findUnique({
+    where: { tripId: id },
+    include: {
+      driver: {
+        include: {
+          entity: true,
+          vehicles: true,
+        },
+      },
+      containers: { orderBy: { createdAt: "asc" } },
+    },
+  });
+
+  if (!result) return null;
+
+  const { driver, containers, ...trip } = result;
+  const { entity, vehicles, ...driverOnly } = driver;
+
+  return {
+    trip,
+    driver: driverOnly,
+    entity,
+    vehicles,
+    containers,
+  };
+}

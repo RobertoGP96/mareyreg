@@ -12,6 +12,9 @@ import type {
   Warehouse,
   StockMovement,
   StockLevel,
+  TripStatus,
+  VehicleStatus,
+  DriverStatus,
 } from "@/generated/prisma";
 
 // Re-export Prisma types
@@ -29,6 +32,9 @@ export type {
   Warehouse,
   StockMovement,
   StockLevel,
+  TripStatus,
+  VehicleStatus,
+  DriverStatus,
 };
 
 // Extended types with relations
