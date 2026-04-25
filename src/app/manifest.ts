@@ -2,24 +2,26 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "MAREYway - Sistema de Gestion",
-    short_name: "MAREYway",
+    name: "GrayRegistration · Sistema de Gestión",
+    short_name: "GrayRegistration",
     description:
-      "Sistema de gestion de conductores, vehiculos, viajes, pacas e inventario",
+      "Plataforma operativa de logística, pacas, inventario y ventas — integrados en un solo sistema.",
     start_url: "/",
     display: "standalone",
-    background_color: "#f4faff",
-    theme_color: "#001e40",
+    background_color: "#f8fafc",
+    theme_color: "#1e40af",
     icons: [
       {
-        src: "/icon-192.png",
+        src: "/manifest-icon-192",
         sizes: "192x192",
         type: "image/png",
+        purpose: "any",
       },
       {
-        src: "/icon-512.png",
+        src: "/manifest-icon-512",
         sizes: "512x512",
         type: "image/png",
+        purpose: "any",
       },
     ],
   };

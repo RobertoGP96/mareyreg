@@ -1,4 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <rect width="32" height="32" rx="6" fill="#001e40"/>
-  <path d="M7 24V8L16 18L25 8V24" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="gr-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="50%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#60a5fa"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="18" fill="url(#gr-grad)"/>
+  <g stroke="white" stroke-width="7" stroke-linecap="square" stroke-linejoin="miter" fill="none">
+    <path d="M 38 26 L 22 26 Q 16 26 16 32 L 16 68 Q 16 74 22 74 L 38 74 Q 44 74 44 68 L 44 54 L 30 54"/>
+    <path d="M 36 18 L 44 26 L 36 34"/>
+    <path d="M 52 74 L 52 26 L 70 26 Q 80 26 80 37 Q 80 48 70 48 L 52 48"/>
+    <path d="M 64 48 L 80 74"/>
+    <path d="M 72 68 L 82 78 L 72 88"/>
+  </g>
 </svg>
