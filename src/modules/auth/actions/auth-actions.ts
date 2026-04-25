@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { requireRole } from "@/lib/auth-guard";
-import { signIn } from "@/lib/auth";
+import { signIn, isGoogleAuthEnabled } from "@/lib/auth";
 import { AuthError } from "next-auth";
 
 export async function loginUser(data: {
@@ -30,6 +30,13 @@ export async function loginUser(data: {
     }
     throw error;
   }
+}
+
+export async function loginWithGoogle(callbackUrl?: string): Promise<void> {
+  if (!isGoogleAuthEnabled) {
+    throw new Error("Google auth no está configurado");
+  }
+  await signIn("google", { redirectTo: callbackUrl || "/" });
 }
 
 export async function registerInitialAdmin(data: {

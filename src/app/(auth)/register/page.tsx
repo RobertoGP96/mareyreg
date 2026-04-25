@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { RegisterForm } from "@/modules/auth/components/register-form";
 import { getUserCount } from "@/modules/auth/queries/user-queries";
+import { AuthBrandPanel } from "../_components/auth-brand-panel";
+import { LogoWordmark } from "@/components/brand/logo-wordmark";
 import { Crown } from "lucide-react";
 
 export default async function RegisterPage() {
@@ -10,52 +12,44 @@ export default async function RegisterPage() {
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center p-6">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="flex flex-col items-center gap-3 mb-6">
-          <div className="relative flex size-16 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--brand)] to-amber-700 shadow-[0_12px_32px_-6px_color-mix(in_oklch,var(--brand)_55%,transparent)]">
-            <img src="/truck-white.svg" alt="MAREYway" className="size-8 relative z-10" />
-            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/25" />
-          </div>
-          <div className="text-center">
-            <h1 className="roadway-font text-2xl font-bold tracking-wider text-foreground">
-              MAREYWAY
-            </h1>
-            <p className="text-[0.68rem] uppercase tracking-[0.22em] text-muted-foreground">
-              Sistema de Gestión
+    <div className="flex flex-1 items-stretch min-h-screen w-full">
+      <AuthBrandPanel />
+
+      {/* Right · form */}
+      <div className="flex flex-1 flex-col items-center justify-center p-6 md:p-10">
+        {/* Mobile logo */}
+        <div className="lg:hidden mb-8">
+          <LogoWordmark size={44} framed />
+        </div>
+
+        <div className="w-full max-w-[420px]">
+          <div className="mb-6">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-2.5 py-0.5 mb-3.5 ring-1 ring-inset ring-[var(--brand)]/20">
+              <Crown className="h-3 w-3 text-[var(--accent-foreground)]" />
+              <span className="text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-[var(--accent-foreground)]">
+                Configuración inicial
+              </span>
+            </div>
+            <h2 className="font-headline text-[28px] font-bold leading-[1.1] tracking-tight text-foreground">
+              Crear cuenta
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Completa los datos para activar el primer acceso administrador.
             </p>
           </div>
+
+          <RegisterForm />
+
+          <p className="mt-5 text-[0.78rem] text-center text-muted-foreground">
+            ¿Ya tienes cuenta?{" "}
+            <a
+              href="/login"
+              className="font-semibold text-[var(--brand)] hover:underline"
+            >
+              Iniciar sesión
+            </a>
+          </p>
         </div>
-
-        {/* Card */}
-        <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-elevated">
-          {/* Accent wash */}
-          <div className="pointer-events-none absolute -top-20 -right-20 h-48 w-48 rounded-full bg-[var(--brand)]/15 blur-3xl" />
-
-          <div className="relative p-6 md:p-8">
-            <div className="mb-6">
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--brand)]/10 px-2.5 py-0.5 mb-3 ring-1 ring-inset ring-[var(--brand)]/20">
-                <Crown className="h-3 w-3 text-[var(--brand)]" />
-                <span className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[var(--brand)]">
-                  Configuración inicial
-                </span>
-              </div>
-              <h2 className="text-xl font-bold font-headline tracking-tight text-foreground">
-                Crear administrador
-              </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Configura el primer usuario con acceso total al sistema.
-              </p>
-            </div>
-
-            <RegisterForm />
-          </div>
-        </div>
-
-        <p className="mt-6 text-[0.72rem] text-center text-muted-foreground/70">
-          &copy; {new Date().getFullYear()} MAREYway · Sistema de Gestión
-        </p>
       </div>
     </div>
   );
