@@ -3,22 +3,22 @@ export const dynamic = "force-dynamic";
 import { requireRole } from "@/lib/auth-guard";
 import { getUsers } from "@/modules/auth/queries/user-queries";
 import { UserListClient } from "@/modules/auth/components/user-list-client";
+import { SettingsPageHeader } from "../_components/settings-page-header";
 
 export default async function UsersPage() {
   await requireRole(["admin"]);
   const users = await getUsers();
 
+  const roleCount = new Set(users.map((u) => u.role)).size;
+
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl md:text-2xl font-semibold font-headline tracking-tight text-foreground">
-          Usuarios
-        </h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">
-          Gestiona los usuarios del sistema
-        </p>
-      </div>
+    <>
+      <SettingsPageHeader
+        badge="Empresa"
+        title="Usuarios y permisos"
+        subtitle={`${users.length} usuario${users.length === 1 ? "" : "s"} activo${users.length === 1 ? "" : "s"} · ${roleCount} rol${roleCount === 1 ? "" : "es"} definido${roleCount === 1 ? "" : "s"}`}
+      />
       <UserListClient users={users} />
-    </div>
+    </>
   );
 }

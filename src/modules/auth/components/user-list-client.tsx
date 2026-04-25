@@ -4,8 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { PageHeader } from "@/components/ui/page-header";
+import { AvatarInitials } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,9 +21,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -35,23 +37,23 @@ import {
 } from "@/components/ui/select";
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import {
   MoreHorizontal,
   SquarePen,
   Trash2,
   UserRoundPlus,
   Search,
-  UsersRound,
   ShieldCheck,
   UserRound,
   AtSign,
   KeyRound,
   Loader2,
+  Filter,
 } from "lucide-react";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
 import { createUser, updateUser, deleteUser } from "../actions/auth-actions";
@@ -63,13 +65,29 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: "Observador",
 };
 
-const ROLE_BADGE: Record<string, "destructive" | "info" | "secondary"> = {
-  admin: "destructive",
+const ROLE_VARIANT: Record<
+  string,
+  "brand" | "info" | "secondary"
+> = {
+  admin: "brand",
   dispatcher: "info",
   viewer: "secondary",
 };
 
 const enabledModules = getEnabledModules();
+
+function timeAgo(d: Date): string {
+  const diff = Date.now() - d.getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "Hace instantes";
+  if (m < 60) return `Hace ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `Hace ${h} h`;
+  const days = Math.floor(h / 24);
+  if (days === 1) return "Ayer";
+  if (days < 7) return `Hace ${days} días`;
+  return d.toLocaleDateString("es-MX", { day: "numeric", month: "short" });
+}
 
 interface UserItem {
   userId: number;
@@ -88,10 +106,12 @@ export function UserListClient({ users }: Props) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState<number | null>(null);
+  const [userToDelete, setUserToDelete] = useState<UserItem | null>(null);
   const [userToEdit, setUserToEdit] = useState<UserItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [createModules, setCreateModules] = useState<string[]>(enabledModules.map((m) => m.id));
+  const [createModules, setCreateModules] = useState<string[]>(
+    enabledModules.map((m) => m.id)
+  );
   const [editModules, setEditModules] = useState<string[]>([]);
 
   const filtered = users.filter(
@@ -160,7 +180,7 @@ export function UserListClient({ users }: Props) {
   const handleDelete = async () => {
     if (!userToDelete) return;
     setIsSubmitting(true);
-    const result = await deleteUser(userToDelete);
+    const result = await deleteUser(userToDelete.userId);
     setIsSubmitting(false);
     if (result.success) {
       setUserToDelete(null);
@@ -174,133 +194,183 @@ export function UserListClient({ users }: Props) {
     setEditModules(user.modulePermissions.map((p) => p.moduleId));
   };
 
-  return (
-    <div className="space-y-5">
-      <PageHeader
-        icon={UsersRound}
-        title="Usuarios del sistema"
-        description="Gestiona accesos, roles y módulos permitidos por usuario."
-        badge={`${users.length} usuarios`}
-      >
-        <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
-          <UserRoundPlus className="h-4 w-4" />
-          Nuevo usuario
-        </Button>
-      </PageHeader>
+  const renderModulesCell = (user: UserItem) => {
+    if (user.role === "admin") {
+      return (
+        <span className="text-[12px] font-medium text-foreground">Todos</span>
+      );
+    }
+    if (user.modulePermissions.length === 0) {
+      return <span className="text-[12px] text-muted-foreground">—</span>;
+    }
+    const labels = user.modulePermissions
+      .map((p) => enabledModules.find((m) => m.id === p.moduleId)?.label)
+      .filter(Boolean);
+    return (
+      <span className="text-[12px] text-muted-foreground">
+        {labels.join(", ")}
+      </span>
+    );
+  };
 
-      <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
-        <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-4 py-3">
+  return (
+    <>
+      <div className="rounded-xl border border-border bg-card shadow-sm">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-border p-4">
           <InputGroup className="flex-1 min-w-[240px]">
             <InputGroupAddon>
               <Search />
             </InputGroupAddon>
             <InputGroupInput
-              placeholder="Buscar por nombre o email…"
+              placeholder="Buscar usuario…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             <InputGroupAddon align="inline-end">
-              <Badge variant="brand">{filtered.length}</Badge>
+              <Badge variant="secondary">{filtered.length}</Badge>
             </InputGroupAddon>
           </InputGroup>
+          <Button variant="secondary" size="sm">
+            <Filter className="size-4" />
+            Filtros
+          </Button>
+          <Button
+            variant="brand"
+            size="sm"
+            onClick={() => setIsCreateOpen(true)}
+          >
+            <UserRoundPlus className="size-4" />
+            Invitar usuario
+          </Button>
         </div>
 
-        <div className="divide-y divide-border/60">
-          {filtered.length > 0 ? (
-            filtered.map((user) => (
-              <div
-                key={user.userId}
-                className="group flex items-start gap-4 px-5 py-4 transition-colors hover:bg-[var(--brand)]/[0.04]"
-              >
-                <Avatar className="size-11 bg-gradient-to-br from-[var(--brand)]/20 to-[var(--brand)]/5 ring-1 ring-inset ring-[var(--brand)]/20 shrink-0">
-                  <AvatarFallback className="bg-transparent text-[var(--brand)] font-bold text-sm">
-                    {user.fullName
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .slice(0, 2)
-                      .toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <p className="font-semibold text-foreground truncate">{user.fullName}</p>
-                    <Badge variant={ROLE_BADGE[user.role] || "secondary"} className="gap-1">
-                      <ShieldCheck className="h-3 w-3" />
-                      {ROLE_LABELS[user.role]}
-                    </Badge>
-                  </div>
-                  <p className="text-[0.82rem] text-muted-foreground mb-1.5">
-                    <AtSign className="h-3 w-3 inline mr-1" />
-                    {user.email}
-                  </p>
-                  {user.role !== "admin" && user.modulePermissions.length > 0 && (
-                    <div className="flex gap-1 flex-wrap">
-                      {user.modulePermissions.map((p) => {
-                        const mod = enabledModules.find((m) => m.id === p.moduleId);
-                        return mod ? (
-                          <Badge key={p.moduleId} variant="outline">
-                            {mod.label}
-                          </Badge>
-                        ) : null;
-                      })}
-                    </div>
+        {filtered.length === 0 ? (
+          <div className="p-8">
+            <EmptyState
+              title="No hay usuarios"
+              description={
+                searchQuery
+                  ? `No se encontraron resultados para "${searchQuery}".`
+                  : "Crea el primer usuario para empezar."
+              }
+            />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="bg-muted/50 text-left">
+                  {["Usuario", "Rol", "Módulos", "Último acceso", "Estado", ""].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        className="px-4 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted-foreground"
+                      >
+                        {h}
+                      </th>
+                    )
                   )}
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="size-8 opacity-60 group-hover:opacity-100">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => openEdit(user)}>
-                      <SquarePen className="h-4 w-4" /> Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setUserToDelete(user.userId)}
-                      className="text-destructive focus:text-destructive"
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((user) => {
+                  const variant = ROLE_VARIANT[user.role] ?? "secondary";
+                  return (
+                    <tr
+                      key={user.userId}
+                      className="border-t border-border transition-colors hover:bg-muted/30"
                     >
-                      <Trash2 className="h-4 w-4" /> Eliminar
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))
-          ) : (
-            <div className="p-8">
-              <EmptyState
-                title="No hay usuarios"
-                description={
-                  searchQuery
-                    ? `No se encontraron resultados para "${searchQuery}".`
-                    : "Crea el primer usuario para empezar."
-                }
-              />
-            </div>
-          )}
-        </div>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <AvatarInitials name={user.fullName} size={32} />
+                          <div className="min-w-0">
+                            <div className="text-[13px] font-semibold text-foreground">
+                              {user.fullName}
+                            </div>
+                            <div className="text-[11.5px] text-muted-foreground truncate">
+                              {user.email}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={variant}>
+                          <ShieldCheck className="size-3" />
+                          {ROLE_LABELS[user.role] ?? user.role}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 max-w-[220px]">
+                        {renderModulesCell(user)}
+                      </td>
+                      <td className="px-4 py-3 text-[12px] text-muted-foreground">
+                        {timeAgo(user.createdAt)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant="success">Activa</Badge>
+                      </td>
+                      <td className="px-2 py-3 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-muted-foreground"
+                              aria-label={`Acciones para ${user.fullName}`}
+                            >
+                              <MoreHorizontal className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem onClick={() => openEdit(user)}>
+                              <SquarePen className="size-4" /> Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setUserToDelete(user)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="size-4" /> Eliminar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Create */}
+      {/* Create dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader>
             <FormDialogHeader
-                icon={UserRoundPlus}
-                title="Crear usuario"
-                description="Añade un nuevo usuario con su rol y módulos asignados."
-              />
+              icon={UserRoundPlus}
+              title="Invitar usuario"
+              description="Añade un nuevo usuario con su rol y módulos asignados."
+            />
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-5">
             <Field label="Nombre completo" icon={UserRound} required>
-              <Input name="fullName" required placeholder="Nombre del usuario" />
+              <Input
+                name="fullName"
+                required
+                placeholder="Nombre del usuario"
+              />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Email" icon={AtSign} required>
                 <Input name="email" type="email" required />
               </Field>
-              <Field label="Contraseña" icon={KeyRound} required hint="Mínimo 6 caracteres.">
+              <Field
+                label="Contraseña"
+                icon={KeyRound}
+                required
+                hint="Mínimo 6 caracteres."
+              >
                 <Input name="password" type="password" required minLength={6} />
               </Field>
             </div>
@@ -316,7 +386,11 @@ export function UserListClient({ users }: Props) {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Módulos permitidos" icon={KeyRound} hint="No aplica para administradores.">
+            <Field
+              label="Módulos permitidos"
+              icon={KeyRound}
+              hint="No aplica para administradores."
+            >
               <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
                 {enabledModules.map((mod) => (
                   <div key={mod.id} className="flex items-center gap-2">
@@ -336,11 +410,15 @@ export function UserListClient({ users }: Props) {
               </div>
             </Field>
             <div className="flex justify-end gap-2 pt-4 border-t border-border">
-              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateOpen(false)}
+              >
                 Cancelar
               </Button>
               <Button type="submit" variant="brand" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting && <Loader2 className="size-4 animate-spin" />}
                 {isSubmitting ? "Creando…" : "Crear usuario"}
               </Button>
             </div>
@@ -348,25 +426,41 @@ export function UserListClient({ users }: Props) {
         </DialogContent>
       </Dialog>
 
-      {/* Edit */}
-      <Dialog open={!!userToEdit} onOpenChange={(o) => !o && setUserToEdit(null)}>
+      {/* Edit dialog */}
+      <Dialog
+        open={!!userToEdit}
+        onOpenChange={(o) => !o && setUserToEdit(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <FormDialogHeader
-                icon={SquarePen}
-                title="Editar usuario"
-                description={userToEdit?.fullName}
-              />
+              icon={SquarePen}
+              title="Editar usuario"
+              description={userToEdit?.fullName}
+            />
           </DialogHeader>
           <form onSubmit={handleUpdate} className="space-y-5">
             <Field label="Nombre completo" icon={UserRound} required>
-              <Input name="fullName" defaultValue={userToEdit?.fullName} required />
+              <Input
+                name="fullName"
+                defaultValue={userToEdit?.fullName}
+                required
+              />
             </Field>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Email" icon={AtSign} required>
-                <Input name="email" type="email" defaultValue={userToEdit?.email} required />
+                <Input
+                  name="email"
+                  type="email"
+                  defaultValue={userToEdit?.email}
+                  required
+                />
               </Field>
-              <Field label="Nueva contraseña" icon={KeyRound} hint="Deja vacío para no cambiar.">
+              <Field
+                label="Nueva contraseña"
+                icon={KeyRound}
+                hint="Deja vacío para no cambiar."
+              >
                 <Input name="password" type="password" minLength={6} />
               </Field>
             </div>
@@ -402,11 +496,15 @@ export function UserListClient({ users }: Props) {
               </div>
             </Field>
             <div className="flex justify-end gap-2 pt-4 border-t border-border">
-              <Button type="button" variant="outline" onClick={() => setUserToEdit(null)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setUserToEdit(null)}
+              >
                 Cancelar
               </Button>
               <Button type="submit" variant="brand" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting && <Loader2 className="size-4 animate-spin" />}
                 {isSubmitting ? "Actualizando…" : "Actualizar"}
               </Button>
             </div>
@@ -414,11 +512,17 @@ export function UserListClient({ users }: Props) {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+      <AlertDialog
+        open={!!userToDelete}
+        onOpenChange={() => setUserToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar usuario?</AlertDialogTitle>
-            <AlertDialogDescription>Esta acción no se puede deshacer.</AlertDialogDescription>
+            <AlertDialogDescription>
+              Esta acción eliminará a{" "}
+              <strong>{userToDelete?.fullName}</strong> y no se puede deshacer.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -432,6 +536,6 @@ export function UserListClient({ users }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }
