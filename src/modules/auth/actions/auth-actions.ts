@@ -4,9 +4,12 @@ import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { requireRole } from "@/lib/auth-guard";
+import { requireAuth, requireRole } from "@/lib/auth-guard";
 import { signIn, isGoogleAuthEnabled } from "@/lib/auth";
 import { AuthError } from "next-auth";
+
+export type ChannelKey = "email" | "push" | "in_app";
+export type NotificationPrefs = Record<string, Record<ChannelKey, boolean>>;
 
 export async function loginUser(data: {
   email: string;
@@ -38,6 +41,100 @@ export async function loginWithGoogle(callbackUrl?: string): Promise<void> {
   }
   await signIn("google", { redirectTo: callbackUrl || "/" });
 }
+
+// ============================================================
+// PROFILE / SECURITY / PREFERENCES (current user)
+// ============================================================
+
+export async function updateUserProfile(data: {
+  fullName: string;
+}): Promise<ActionResult<void>> {
+  try {
+    const session = await requireAuth();
+    const fullName = data.fullName.trim();
+
+    if (fullName.length < 2) {
+      return { success: false, error: "El nombre debe tener al menos 2 caracteres" };
+    }
+
+    await db.user.update({
+      where: { userId: session.user.userId },
+      data: { fullName },
+    });
+
+    revalidatePath("/settings/profile");
+    revalidatePath("/", "layout");
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error("updateUserProfile error:", error);
+    return { success: false, error: "Error al actualizar el perfil" };
+  }
+}
+
+export async function updateUserPassword(data: {
+  currentPassword: string;
+  newPassword: string;
+}): Promise<ActionResult<void>> {
+  try {
+    const session = await requireAuth();
+
+    if (data.newPassword.length < 8) {
+      return {
+        success: false,
+        error: "La contraseña nueva debe tener al menos 8 caracteres",
+      };
+    }
+    if (data.currentPassword === data.newPassword) {
+      return {
+        success: false,
+        error: "La nueva contraseña no puede ser igual a la actual",
+      };
+    }
+
+    const user = await db.user.findUnique({
+      where: { userId: session.user.userId },
+      select: { passwordHash: true },
+    });
+    if (!user) return { success: false, error: "Usuario no encontrado" };
+
+    const valid = await bcrypt.compare(data.currentPassword, user.passwordHash);
+    if (!valid) {
+      return { success: false, error: "La contraseña actual es incorrecta" };
+    }
+
+    const passwordHash = await bcrypt.hash(data.newPassword, 12);
+    await db.user.update({
+      where: { userId: session.user.userId },
+      data: { passwordHash },
+    });
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error("updateUserPassword error:", error);
+    return { success: false, error: "Error al cambiar la contraseña" };
+  }
+}
+
+export async function updateNotificationPrefs(
+  prefs: NotificationPrefs
+): Promise<ActionResult<void>> {
+  try {
+    const session = await requireAuth();
+
+    await db.user.update({
+      where: { userId: session.user.userId },
+      data: { notificationPrefs: prefs },
+    });
+
+    revalidatePath("/settings/notifications");
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error("updateNotificationPrefs error:", error);
+    return { success: false, error: "Error al guardar preferencias" };
+  }
+}
+
+// Admin-only: clear database (kept where it was originally — unrelated)
 
 export async function registerInitialAdmin(data: {
   email: string;

@@ -23,3 +23,19 @@ export async function getUserByEmail(email: string) {
 export async function getUserCount() {
   return db.user.count();
 }
+
+import type { ChannelKey, NotificationPrefs } from "../actions/auth-actions";
+
+export async function getUserNotificationPrefs(
+  userId: number
+): Promise<NotificationPrefs | null> {
+  const row = await db.user.findUnique({
+    where: { userId },
+    select: { notificationPrefs: true },
+  });
+  if (!row?.notificationPrefs) return null;
+  // Prisma Json field comes through as `unknown`; we trust our own writes here.
+  return row.notificationPrefs as NotificationPrefs;
+}
+
+export type { ChannelKey, NotificationPrefs };
