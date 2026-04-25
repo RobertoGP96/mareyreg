@@ -18,19 +18,38 @@ enum UserRole {
 }
 
 model User {
-  userId       Int       @id @default(autoincrement()) @map("user_id")
-  email        String    @unique
-  passwordHash String    @map("password_hash")
-  fullName     String    @map("full_name")
-  role         UserRole  @default(viewer)
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  userId            Int       @id @default(autoincrement()) @map("user_id")
+  email             String    @unique
+  passwordHash      String    @map("password_hash")
+  fullName          String    @map("full_name")
+  role              UserRole  @default(viewer)
+  notificationPrefs Json?     @map("notification_prefs")
+  lastLoginAt       DateTime? @map("last_login_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
 
   auditLogs         AuditLog[]
   stockMovements    StockMovement[]
   modulePermissions UserModulePermission[]
 
   @@map("users")
+}
+
+// Company singleton — only row id=1 is used. Holds org-wide info shown in
+// invoices, reports and the Settings > General page.
+model Company {
+  id          Int      @id @default(1)
+  name        String
+  rfc         String?
+  phone       String?
+  address     String?
+  description String?
+  timezone    String   @default("America/Mexico_City")
+  currency    String   @default("MXN")
+  language    String   @default("es-MX")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("company")
 }
 
 model UserModulePermission {
