@@ -14,8 +14,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: var(--font-body), 'Inter', system-ui, sans-serif;
-  --font-headline: var(--font-headline), 'Manrope', system-ui, sans-serif;
+  --font-sans: var(--font-body), 'DM Sans', system-ui, sans-serif;
+  --font-headline: var(--font-headline), 'Space Grotesk', system-ui, sans-serif;
+  --font-mono: var(--font-mono), 'JetBrains Mono', ui-monospace, monospace;
 
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
@@ -69,135 +70,136 @@
 }
 
 /* ================================================
-   LIGHT — Industrial premium (warm neutrals + steel blue + orange accent)
+   LIGHT — GrayRegistration (deep blue gradient + slate neutrals)
+   Brand: #1e3a8a → #2563eb → #60a5fa
    ================================================ */
 :root {
   --radius: 0.625rem;
 
-  /* Surfaces — ligeramente cálidas para dar sensación premium/analógica */
-  --background: #fafaf7;
-  --foreground: #111214;
+  /* Surfaces — slate neutrales fríos */
+  --background: #f8fafc;
+  --foreground: #0f172a;
   --card: #ffffff;
-  --card-foreground: #111214;
+  --card-foreground: #0f172a;
   --popover: #ffffff;
-  --popover-foreground: #111214;
+  --popover-foreground: #0f172a;
 
-  /* Brand — naranja logístico profundo */
-  --brand: #ea580c;
+  /* Brand — azul profundo (mid del gradiente) */
+  --brand: #2563eb;
   --brand-foreground: #ffffff;
 
-  /* Primary — steel blue frío que contrasta con naranja */
-  --primary: #1f2937;
-  --primary-foreground: #fafaf7;
+  /* Primary — azul oscuro corporativo */
+  --primary: #1e40af;
+  --primary-foreground: #ffffff;
 
-  /* Secondary — neutro cálido */
-  --secondary: #f1ede6;
-  --secondary-foreground: #3f3a32;
+  /* Secondary — slate suave */
+  --secondary: #f1f5f9;
+  --secondary-foreground: #334155;
 
   /* Muted */
-  --muted: #f5f2ec;
-  --muted-foreground: #6b6760;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
 
-  /* Accent — naranja vivo para highlights */
-  --accent: #fff1e6;
-  --accent-foreground: #9a3412;
+  /* Accent — azul claro para highlights */
+  --accent: #dbeafe;
+  --accent-foreground: #1e3a8a;
 
   /* Semantic */
-  --destructive: #dc2626;
-  --success: #16a34a;
+  --destructive: #ef4444;
+  --success: #10b981;
   --warning: #f59e0b;
-  --info: #2563eb;
+  --info: #06b6d4;
 
   /* Borders */
-  --border: #e7e2d8;
-  --input: #e2dcd0;
-  --ring: #ea580c;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #2563eb;
 
-  /* Charts — paleta industrial */
-  --chart-1: #ea580c;  /* naranja brand */
-  --chart-2: #0f766e;  /* teal profundo */
-  --chart-3: #1f2937;  /* steel */
-  --chart-4: #b45309;  /* ámbar oscuro */
-  --chart-5: #6366f1;  /* indigo soft */
+  /* Charts — paleta azul/slate */
+  --chart-1: #2563eb;  /* brand */
+  --chart-2: #06b6d4;  /* cyan */
+  --chart-3: #1e3a8a;  /* deep navy */
+  --chart-4: #60a5fa;  /* azul claro */
+  --chart-5: #6366f1;  /* indigo */
 
-  /* Sidebar — charcoal cálido (contraste con contenido claro) */
-  --sidebar: #17181b;
-  --sidebar-foreground: #d4d0c8;
-  --sidebar-primary: #ea580c;
+  /* Sidebar — slate-950 (charcoal frío) */
+  --sidebar: #0f172a;
+  --sidebar-foreground: #cbd5e1;
+  --sidebar-primary: #2563eb;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #222428;
+  --sidebar-accent: #1e293b;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #26282d;
-  --sidebar-ring: #ea580c;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #2563eb;
 
-  --accent-orange: #ea580c;
+  --accent-orange: #2563eb; /* alias legado, reapuntado a brand */
 
-  --surface-dim: #ede8de;
+  --surface-dim: #f1f5f9;
   --surface-bright: #ffffff;
-  --surface-tint: #ea580c;
-  --primary-container: #fff1e6;
-  --on-primary-container: #9a3412;
-  --secondary-container: #f1ede6;
+  --surface-tint: #2563eb;
+  --primary-container: #dbeafe;
+  --on-primary-container: #1e3a8a;
+  --secondary-container: #f1f5f9;
 }
 
 /* ================================================
-   DARK — Carbono con acento naranja vibrante
+   DARK — Slate carbón con azul vibrante
    ================================================ */
 .dark {
-  --background: #0b0c0e;
-  --foreground: #ecebe8;
-  --card: #141618;
-  --card-foreground: #ecebe8;
-  --popover: #17191c;
-  --popover-foreground: #ecebe8;
+  --background: #020617;
+  --foreground: #f1f5f9;
+  --card: #0f172a;
+  --card-foreground: #f1f5f9;
+  --popover: #0f172a;
+  --popover-foreground: #f1f5f9;
 
-  --brand: #fb923c;
-  --brand-foreground: #1a1202;
+  --brand: #3b82f6;
+  --brand-foreground: #ffffff;
 
-  --primary: #f5f4f1;
-  --primary-foreground: #0b0c0e;
+  --primary: #60a5fa;
+  --primary-foreground: #020617;
 
-  --secondary: #1b1d20;
-  --secondary-foreground: #c7c5c0;
+  --secondary: #1e293b;
+  --secondary-foreground: #cbd5e1;
 
-  --muted: #17191c;
-  --muted-foreground: #8a8883;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
 
-  --accent: #27180a;
-  --accent-foreground: #fb923c;
+  --accent: #1e3a8a;
+  --accent-foreground: #93c5fd;
 
   --destructive: #ef4444;
   --success: #22c55e;
   --warning: #fbbf24;
-  --info: #60a5fa;
+  --info: #22d3ee;
 
-  --border: #24272b;
-  --input: #1d2024;
-  --ring: #fb923c;
+  --border: #1e293b;
+  --input: #1e293b;
+  --ring: #3b82f6;
 
-  --chart-1: #fb923c;
-  --chart-2: #2dd4bf;
-  --chart-3: #a3a3a3;
-  --chart-4: #fbbf24;
+  --chart-1: #3b82f6;
+  --chart-2: #22d3ee;
+  --chart-3: #93c5fd;
+  --chart-4: #60a5fa;
   --chart-5: #818cf8;
 
-  --sidebar: #0e0f11;
-  --sidebar-foreground: #c7c5c0;
-  --sidebar-primary: #fb923c;
-  --sidebar-primary-foreground: #0b0c0e;
-  --sidebar-accent: #1b1d20;
+  --sidebar: #020617;
+  --sidebar-foreground: #94a3b8;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #0f172a;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #1f2125;
-  --sidebar-ring: #fb923c;
+  --sidebar-border: #0f172a;
+  --sidebar-ring: #3b82f6;
 
-  --accent-orange: #fb923c;
+  --accent-orange: #3b82f6;
 
-  --surface-dim: #0e0f11;
-  --surface-bright: #1d2024;
-  --surface-tint: #fb923c;
-  --primary-container: #27180a;
-  --on-primary-container: #fb923c;
-  --secondary-container: #1b1d20;
+  --surface-dim: #0f172a;
+  --surface-bright: #1e293b;
+  --surface-tint: #3b82f6;
+  --primary-container: #1e3a8a;
+  --on-primary-container: #93c5fd;
+  --secondary-container: #1e293b;
 }
 
 /* ================================================
@@ -256,10 +258,22 @@
 
 /* Gradient text para títulos de hero */
 .text-gradient-brand {
-  background: linear-gradient(135deg, var(--brand) 0%, color-mix(in oklch, var(--brand) 60%, var(--chart-4)) 100%);
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #60a5fa 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+.dark .text-gradient-brand {
+  background: linear-gradient(135deg, #60a5fa 0%, #93c5fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Brand gradient (BG) — usado en logo containers, hero cards, etc */
+.bg-gradient-brand {
+  background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #60a5fa 100%);
 }
 
 /* Ring de foco premium */

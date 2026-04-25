@@ -49,12 +49,12 @@ export function DashboardHero({ userName, totalCount }: { userName: string; tota
             {greeting}, <span className="text-gradient-brand">{userName}</span>
           </h1>
           <p className="mt-1.5 text-sm md:text-base text-muted-foreground max-w-xl">
-            Panorama actual del sistema MAREYway — todas tus operaciones de flota, inventario y logística en un solo lugar.
+            Panorama actual de GrayRegistration — todas tus operaciones de flota, inventario y logística en un solo lugar.
           </p>
         </div>
 
         <div className="flex items-center gap-3 md:flex-col md:items-end md:text-right">
-          <div className="flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--brand)] to-[color-mix(in_oklch,var(--brand)_60%,#b45309)] shadow-[0_8px_24px_-6px_color-mix(in_oklch,var(--brand)_50%,transparent)]">
+          <div className="flex size-12 items-center justify-center rounded-xl bg-gradient-brand shadow-[0_8px_24px_-6px_rgba(37,99,235,0.5)]">
             <Activity className="h-6 w-6 text-white" />
           </div>
           <div>

@@ -1,25 +1,31 @@
 import type { Metadata } from "next";
-import { Manrope, Inter } from "next/font/google";
+import { DM_Sans, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-headline",
-  weight: ["400", "500", "600", "700", "800"],
-});
-
-const inter = Inter({
+const dmSans = DM_Sans({
   subsets: ["latin"],
   variable: "--font-body",
+  weight: ["400", "500", "600", "700"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-headline",
+  weight: ["400", "500", "600", "700"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
   weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
-  title: "MAREYway - Sistema de Gestion",
+  title: "GrayRegistration · Sistema de Gestión",
   description:
-    "Sistema de gestion de conductores, vehiculos, viajes, pacas e inventario",
+    "Plataforma operativa de logística, pacas, inventario y ventas — integrados en un solo sistema.",
 };
 
 export default function RootLayout({
@@ -29,7 +35,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" suppressHydrationWarning>
-      <body className={`${manrope.variable} ${inter.variable} min-h-screen`}>
+      <body
+        className={`${dmSans.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} min-h-screen`}
+      >
         <Providers>{children}</Providers>
         <SpeedInsights />
       </body>

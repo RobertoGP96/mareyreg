@@ -16,8 +16,9 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, Settings2, PanelsTopLeft } from "lucide-react";
+import { LayoutDashboard, Settings2 } from "lucide-react";
 import { getEnabledModules } from "@/lib/module-registry";
+import { LogoGR } from "@/components/brand/logo-gr";
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -45,18 +46,15 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild className="hover:bg-sidebar-accent/50 data-[state=open]:bg-sidebar-accent/60">
               <Link href="/">
-                <div className="relative flex aspect-square size-9 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-[var(--brand)] to-[color-mix(in_oklch,var(--brand)_60%,#b45309)] shadow-[0_4px_12px_-2px_color-mix(in_oklch,var(--brand)_40%,transparent)]">
-                  <PanelsTopLeft
-                    className="size-5 text-white relative z-10"
-                    strokeWidth={2.25}
-                  />
+                <div className="relative flex aspect-square size-9 items-center justify-center overflow-hidden rounded-lg bg-gradient-brand shadow-[0_4px_12px_-2px_rgba(37,99,235,0.5)]">
+                  <LogoGR size={22} mono dark className="relative z-10" />
                   <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/20" />
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate font-semibold roadway-font text-[1.05rem] text-sidebar-foreground">
-                    MAREYway
+                  <span className="truncate font-headline font-bold text-[1rem] tracking-tight text-sidebar-foreground">
+                    GrayRegistration
                   </span>
-                  <span className="truncate text-[0.68rem] uppercase tracking-[0.18em] text-sidebar-foreground/50">
+                  <span className="truncate text-[0.62rem] uppercase tracking-[0.18em] text-sidebar-foreground/50">
                     Sistema de Gestión
                   </span>
                 </div>
