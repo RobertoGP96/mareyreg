@@ -16,6 +16,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { updateUserPassword } from "@/modules/auth/actions/auth-actions";
 
 type Session = {
   id: string;
@@ -54,14 +55,29 @@ export function SecurityClient() {
   const [pwLoading, setPwLoading] = useState(false);
   const [sessions, setSessions] = useState(MOCK_SESSIONS);
 
-  const handlePassword = (e: React.FormEvent<HTMLFormElement>) => {
+  const handlePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const currentPassword = fd.get("current") as string;
+    const newPassword = fd.get("new") as string;
+    const confirm = fd.get("confirm") as string;
+
+    if (newPassword !== confirm) {
+      toast.error("La confirmación no coincide con la nueva contraseña");
+      return;
+    }
+
     setPwLoading(true);
-    setTimeout(() => {
-      setPwLoading(false);
+    const result = await updateUserPassword({ currentPassword, newPassword });
+    setPwLoading(false);
+
+    if (result.success) {
       toast.success("Contraseña actualizada");
-      (e.target as HTMLFormElement).reset();
-    }, 600);
+      form.reset();
+    } else {
+      toast.error(result.error);
+    }
   };
 
   const revokeSession = (id: string) => {

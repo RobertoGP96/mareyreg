@@ -3,10 +3,13 @@
 import { useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Save } from "lucide-react";
+import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
-
-type ChannelKey = "email" | "push" | "in_app";
+import {
+  updateNotificationPrefs,
+  type ChannelKey,
+  type NotificationPrefs,
+} from "@/modules/auth/actions/auth-actions";
 
 type ChannelState = Record<ChannelKey, boolean>;
 
@@ -74,12 +77,17 @@ const GROUPS: NotificationGroup[] = [
   },
 ];
 
-export function NotificationsClient() {
+type Props = {
+  initialPrefs: NotificationPrefs | null;
+};
+
+export function NotificationsClient({ initialPrefs }: Props) {
   const [state, setState] = useState<Record<string, ChannelState>>(() => {
     const initial: Record<string, ChannelState> = {};
     for (const g of GROUPS) {
       for (const it of g.items) {
-        initial[it.key] = {
+        const stored = initialPrefs?.[it.key];
+        initial[it.key] = stored ?? {
           email: true,
           push: it.key === "trip_status" || it.key === "security",
           in_app: true,
@@ -88,12 +96,21 @@ export function NotificationsClient() {
     }
     return initial;
   });
+  const [isSaving, setIsSaving] = useState(false);
 
   const toggle = (itemKey: string, channel: ChannelKey, value: boolean) => {
     setState((s) => ({
       ...s,
       [itemKey]: { ...s[itemKey], [channel]: value },
     }));
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    const result = await updateNotificationPrefs(state);
+    setIsSaving(false);
+    if (result.success) toast.success("Preferencias guardadas");
+    else toast.error(result.error);
   };
 
   return (
@@ -144,10 +161,15 @@ export function NotificationsClient() {
           <Button
             variant="brand"
             size="sm"
-            onClick={() => toast.success("Preferencias guardadas")}
+            onClick={handleSave}
+            disabled={isSaving}
           >
-            <Save className="size-4" />
-            Guardar preferencias
+            {isSaving ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Save className="size-4" />
+            )}
+            {isSaving ? "Guardando…" : "Guardar preferencias"}
           </Button>
         </div>
       </div>

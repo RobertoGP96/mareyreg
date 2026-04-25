@@ -1,7 +1,14 @@
 import { SettingsPageHeader } from "../_components/settings-page-header";
 import { NotificationsClient } from "./notifications-client";
+import { requireAuth } from "@/lib/auth-guard";
+import { getUserNotificationPrefs } from "@/modules/auth/queries/user-queries";
 
-export default function NotificationsSettingsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function NotificationsSettingsPage() {
+  const session = await requireAuth();
+  const initialPrefs = await getUserNotificationPrefs(session.user.userId);
+
   return (
     <>
       <SettingsPageHeader
@@ -9,7 +16,7 @@ export default function NotificationsSettingsPage() {
         title="Notificaciones"
         subtitle="Elige qué eventos quieres recibir y por qué canal."
       />
-      <NotificationsClient />
+      <NotificationsClient initialPrefs={initialPrefs} />
     </>
   );
 }

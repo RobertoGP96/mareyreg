@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,8 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Building2, MapPin, Globe, Save } from "lucide-react";
+import { Building2, MapPin, Globe, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { updateCompany } from "@/modules/settings/actions/company-actions";
+import type { CompanyData } from "@/modules/settings/queries/company-queries";
 
 const TIMEZONES = [
   { value: "America/Mexico_City", label: "Ciudad de México (UTC-6)" },
@@ -35,21 +38,60 @@ const LANGUAGES = [
   { value: "en-US", label: "English (US)" },
 ];
 
-export function GeneralForm() {
+type Props = {
+  initial: CompanyData;
+  canEdit: boolean;
+};
+
+export function GeneralForm({ initial, canEdit }: Props) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    name: initial.name,
+    rfc: initial.rfc ?? "",
+    phone: initial.phone ?? "",
+    address: initial.address ?? "",
+    description: initial.description ?? "",
+    timezone: initial.timezone,
+    currency: initial.currency,
+    language: initial.language,
+  });
+
+  const update = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
+    setForm((s) => ({ ...s, [key]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    const result = await updateCompany({
+      name: form.name,
+      rfc: form.rfc,
+      phone: form.phone,
+      address: form.address,
+      description: form.description,
+      timezone: form.timezone,
+      currency: form.currency,
+      language: form.language,
+    });
+    setLoading(false);
+    if (result.success) {
+      toast.success("Configuración guardada");
+      router.refresh();
+    } else {
+      toast.error(result.error);
+    }
+  };
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        setLoading(true);
-        setTimeout(() => {
-          setLoading(false);
-          toast.success("Configuración guardada");
-        }, 600);
-      }}
-      className="space-y-6"
-    >
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {!canEdit && (
+        <div className="rounded-md border border-[var(--warning)]/30 bg-[var(--warning)]/8 px-4 py-2.5 text-[12.5px] text-[var(--warning)]">
+          Solo administradores pueden modificar la configuración general. Los
+          campos están en modo lectura.
+        </div>
+      )}
+
       {/* Empresa */}
       <section className="rounded-xl border border-border bg-card shadow-sm">
         <div className="border-b border-border p-6">
@@ -67,17 +109,32 @@ export function GeneralForm() {
             <Label htmlFor="companyName">Nombre comercial</Label>
             <Input
               id="companyName"
-              defaultValue="GrayRegistration SA de CV"
+              value={form.name}
+              onChange={(e) => update("name", e.target.value)}
               placeholder="Razón social"
+              disabled={!canEdit}
+              required
             />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="rfc">RFC</Label>
-            <Input id="rfc" placeholder="AAA000000XXX" />
+            <Input
+              id="rfc"
+              value={form.rfc}
+              onChange={(e) => update("rfc", e.target.value)}
+              placeholder="AAA000000XXX"
+              disabled={!canEdit}
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="phone">Teléfono</Label>
-            <Input id="phone" placeholder="+52 55 0000 0000" />
+            <Input
+              id="phone"
+              value={form.phone}
+              onChange={(e) => update("phone", e.target.value)}
+              placeholder="+52 55 0000 0000"
+              disabled={!canEdit}
+            />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="address">
@@ -87,7 +144,10 @@ export function GeneralForm() {
             <Textarea
               id="address"
               rows={2}
+              value={form.address}
+              onChange={(e) => update("address", e.target.value)}
               placeholder="Calle, número, colonia, ciudad, estado, CP"
+              disabled={!canEdit}
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
@@ -95,8 +155,10 @@ export function GeneralForm() {
             <Textarea
               id="description"
               rows={3}
+              value={form.description}
+              onChange={(e) => update("description", e.target.value)}
               placeholder="Describe a qué se dedica la empresa"
-              defaultValue="Comercializadora especializada en pacas de ropa con red de distribución nacional."
+              disabled={!canEdit}
             />
           </div>
         </div>
@@ -117,7 +179,11 @@ export function GeneralForm() {
         <div className="grid gap-5 p-6 sm:grid-cols-3">
           <div className="space-y-1.5">
             <Label>Zona horaria</Label>
-            <Select defaultValue="America/Mexico_City">
+            <Select
+              value={form.timezone}
+              onValueChange={(v) => update("timezone", v)}
+              disabled={!canEdit}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -132,7 +198,11 @@ export function GeneralForm() {
           </div>
           <div className="space-y-1.5">
             <Label>Moneda principal</Label>
-            <Select defaultValue="MXN">
+            <Select
+              value={form.currency}
+              onValueChange={(v) => update("currency", v)}
+              disabled={!canEdit}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -147,7 +217,11 @@ export function GeneralForm() {
           </div>
           <div className="space-y-1.5">
             <Label>Idioma</Label>
-            <Select defaultValue="es-MX">
+            <Select
+              value={form.language}
+              onValueChange={(v) => update("language", v)}
+              disabled={!canEdit}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -163,15 +237,21 @@ export function GeneralForm() {
         </div>
       </section>
 
-      <div className="flex items-center justify-end gap-2">
-        <Button type="button" variant="ghost">
-          Cancelar
-        </Button>
-        <Button type="submit" variant="brand" disabled={loading}>
-          <Save className="size-4" />
-          {loading ? "Guardando…" : "Guardar cambios"}
-        </Button>
-      </div>
+      {canEdit && (
+        <div className="flex items-center justify-end gap-2">
+          <Button type="button" variant="ghost" disabled={loading}>
+            Cancelar
+          </Button>
+          <Button type="submit" variant="brand" disabled={loading}>
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Save className="size-4" />
+            )}
+            {loading ? "Guardando…" : "Guardar cambios"}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +9,7 @@ import { AvatarInitials } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Camera, AtSign, UserRound, Save, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { updateUserProfile } from "@/modules/auth/actions/auth-actions";
 
 const ROLE_LABEL: Record<string, string> = {
   admin: "Administrador",
@@ -23,13 +25,30 @@ type ProfileUser = {
 };
 
 export function ProfileForm({ user }: { user: ProfileUser }) {
+  const router = useRouter();
   const [fullName, setFullName] = useState(user.fullName);
   const [isLoading, setIsLoading] = useState(false);
+
+  const dirty = fullName.trim() !== user.fullName.trim();
 
   const since = new Date(user.createdAt).toLocaleDateString("es-MX", {
     month: "long",
     year: "numeric",
   });
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!dirty) return;
+    setIsLoading(true);
+    const result = await updateUserProfile({ fullName });
+    setIsLoading(false);
+    if (result.success) {
+      toast.success("Perfil actualizado");
+      router.refresh();
+    } else {
+      toast.error(result.error);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -67,15 +86,7 @@ export function ProfileForm({ user }: { user: ProfileUser }) {
 
       {/* Form */}
       <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          setIsLoading(true);
-          // Persistencia pendiente (action server). Por ahora UI-only.
-          setTimeout(() => {
-            setIsLoading(false);
-            toast.success("Cambios guardados");
-          }, 600);
-        }}
+        onSubmit={handleSubmit}
         className="rounded-xl border border-border bg-card shadow-sm"
       >
         <div className="border-b border-border p-6">
@@ -115,10 +126,21 @@ export function ProfileForm({ user }: { user: ProfileUser }) {
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border bg-muted/30 px-6 py-3.5">
-          <Button type="button" variant="ghost" size="sm">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={!dirty || isLoading}
+            onClick={() => setFullName(user.fullName)}
+          >
             Cancelar
           </Button>
-          <Button type="submit" variant="brand" size="sm" disabled={isLoading}>
+          <Button
+            type="submit"
+            variant="brand"
+            size="sm"
+            disabled={!dirty || isLoading}
+          >
             <Save className="size-4" />
             {isLoading ? "Guardando…" : "Guardar cambios"}
           </Button>
