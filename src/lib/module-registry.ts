@@ -59,11 +59,13 @@ export const modules: AppModule[] = [
     icon: Package2,
     enabled: true,
     routes: [
+      { name: "Dashboard", href: "/pacas/dashboard", icon: LayoutDashboard },
       { name: "Inventario", href: "/pacas", icon: Package2 },
       { name: "Disponibilidad", href: "/pacas/disponibilidad", icon: PackageCheck },
       { name: "Reservaciones", href: "/pacas/reservaciones", icon: BookmarkCheck },
       { name: "Ventas", href: "/pacas/ventas", icon: ShoppingBag },
       { name: "Categorias", href: "/pacas/categorias", icon: Tags },
+      { name: "Clasificaciones", href: "/pacas/clasificaciones", icon: Tags },
       { name: "Clientes", href: "/pacas-clientes", icon: Users },
     ],
   },
@@ -73,6 +75,7 @@ export const modules: AppModule[] = [
     icon: Package,
     enabled: true,
     routes: [
+      { name: "Dashboard", href: "/inventory/dashboard", icon: LayoutDashboard },
       { name: "Productos", href: "/products", icon: Package },
       { name: "Almacenes", href: "/warehouses", icon: Warehouse },
       { name: "Stock", href: "/stock", icon: PackageOpen },
