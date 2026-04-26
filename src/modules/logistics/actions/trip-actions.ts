@@ -6,6 +6,7 @@ import type { ActionResult } from "@/types";
 
 export async function createTrip(data: {
   driver_id: number;
+  route_id?: number | null;
   load_date?: string;
   load_time?: string;
   trip_payment?: string;
@@ -17,6 +18,7 @@ export async function createTrip(data: {
     const trip = await db.trip.create({
       data: {
         driverId: data.driver_id,
+        routeId: data.route_id ?? null,
         loadDate: data.load_date || null,
         loadTime: data.load_time || null,
         tripPayment: data.trip_payment || null,
@@ -46,11 +48,13 @@ export async function updateTrip(
   id: number,
   data: {
     driver_id?: number;
+    route_id?: number | null;
     load_date?: string;
     load_time?: string;
     trip_payment?: string;
     province?: string;
     product?: string;
+    status?: "scheduled" | "in_progress" | "completed" | "cancelled";
   }
 ): Promise<ActionResult<void>> {
   try {
@@ -58,6 +62,7 @@ export async function updateTrip(
       where: { tripId: id },
       data: {
         ...(data.driver_id !== undefined && { driverId: data.driver_id }),
+        ...(data.route_id !== undefined && { routeId: data.route_id }),
         ...(data.load_date !== undefined && { loadDate: data.load_date }),
         ...(data.load_time !== undefined && { loadTime: data.load_time }),
         ...(data.trip_payment !== undefined && {
@@ -65,10 +70,12 @@ export async function updateTrip(
         }),
         ...(data.province !== undefined && { province: data.province }),
         ...(data.product !== undefined && { product: data.product }),
+        ...(data.status !== undefined && { status: data.status }),
       },
     });
 
     revalidatePath("/trips");
+    revalidatePath(`/trips/${id}`);
     return { success: true, data: undefined };
   } catch (error) {
     console.error("Error updating trip:", error);

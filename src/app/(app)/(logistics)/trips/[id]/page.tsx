@@ -12,15 +12,11 @@ export default async function TripDetailsPage({ params }: Props) {
   const { id } = await params;
   const tripId = parseInt(id, 10);
 
-  if (isNaN(tripId)) {
-    notFound();
-  }
+  if (isNaN(tripId)) notFound();
 
   const details = await getTripWithDetails(tripId);
 
-  if (!details) {
-    notFound();
-  }
+  if (!details) notFound();
 
   return (
     <TripDetailsClient
