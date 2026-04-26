@@ -94,6 +94,23 @@ export async function updatePacaClient(
   }
 }
 
+export async function deletePacaClients(
+  ids: number[]
+): Promise<ActionResult<{ deleted: number }>> {
+  try {
+    if (!ids.length) return { success: true, data: { deleted: 0 } };
+    let deleted = 0;
+    for (const id of ids) {
+      const r = await deletePacaClient(id);
+      if (r.success) deleted++;
+    }
+    return { success: true, data: { deleted } };
+  } catch (error) {
+    console.error("Error bulk delete clients:", error);
+    return { success: false, error: "Error al desactivar clientes en lote" };
+  }
+}
+
 export async function deletePacaClient(id: number): Promise<ActionResult<void>> {
   try {
     const userId = await getCurrentUserId();

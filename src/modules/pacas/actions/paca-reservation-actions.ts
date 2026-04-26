@@ -175,6 +175,23 @@ export async function updateReservation(
   }
 }
 
+export async function deleteReservations(
+  ids: number[]
+): Promise<ActionResult<{ deleted: number }>> {
+  try {
+    if (!ids.length) return { success: true, data: { deleted: 0 } };
+    let deleted = 0;
+    for (const id of ids) {
+      const r = await deleteReservation(id);
+      if (r.success) deleted++;
+    }
+    return { success: true, data: { deleted } };
+  } catch (error) {
+    console.error("Error bulk delete reservations:", error);
+    return { success: false, error: "Error al eliminar reservaciones en lote" };
+  }
+}
+
 export async function deleteReservation(id: number): Promise<ActionResult<void>> {
   try {
     const reservation = await db.pacaReservation.findUnique({ where: { reservationId: id } });

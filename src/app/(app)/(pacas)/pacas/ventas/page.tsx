@@ -31,7 +31,7 @@ export default async function VentasPage() {
         </p>
       </div>
       <SaleListClient
-        sales={sales as Parameters<typeof SaleListClient>[0]["sales"]}
+        sales={sales}
         availableCategories={availableCategories}
         stats={stats}
       />

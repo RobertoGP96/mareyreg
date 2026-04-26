@@ -1,8 +1,32 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { PackageCheck } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
+import { MetricTile } from "@/components/ui/metric-tile";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  PackageCheck,
+  Search,
+  ListFilter,
+  CircleCheck,
+  Bookmark,
+  Package2,
+  ChevronRight,
+} from "lucide-react";
 
 interface CategoryAvailability {
   name: string;
@@ -23,129 +47,197 @@ interface Props {
   data: ClassificationGroup[];
 }
 
-export function AvailabilityView({ data }: Props) {
-  if (data.length === 0) {
-    return (
-      <EmptyState
-        title="No hay datos"
-        description="No se encontraron clasificaciones o categorias configuradas."
-      />
-    );
-  }
+const ALL = "__all__";
 
-  const totalAvailable = data.reduce(
+export function AvailabilityView({ data }: Props) {
+  const [search, setSearch] = useState("");
+  const [classFilter, setClassFilter] = useState<string>(ALL);
+  const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return data
+      .filter((g) => classFilter === ALL || g.classification === classFilter)
+      .map((g) => ({
+        ...g,
+        categories: g.categories.filter(
+          (c) => !q || c.name.toLowerCase().includes(q)
+        ),
+      }))
+      .filter((g) => g.categories.length > 0);
+  }, [data, search, classFilter]);
+
+  const totalAvailable = filtered.reduce(
     (sum, cls) => sum + cls.categories.reduce((s, c) => s + c.available, 0),
     0
   );
-  const totalReserved = data.reduce(
+  const totalReserved = filtered.reduce(
     (sum, cls) => sum + cls.categories.reduce((s, c) => s + c.reserved, 0),
     0
   );
-  const totalAll = data.reduce(
+  const totalAll = filtered.reduce(
     (sum, cls) => sum + cls.categories.reduce((s, c) => s + c.total, 0),
     0
   );
 
+  const toggleGroup = (id: number) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
-    <div className="space-y-4">
-      {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-2xl font-semibold text-green-600">{totalAvailable}</p>
-          <p className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
-            Disponibles
-          </p>
-        </div>
-        <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-2xl font-semibold text-blue-600">{totalReserved}</p>
-          <p className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
-            Reservadas
-          </p>
-        </div>
-        <div className="bg-card border rounded-lg p-4 text-center">
-          <p className="text-2xl font-semibold">{totalAll}</p>
-          <p className="text-sm text-muted-foreground uppercase tracking-wider mt-1">
-            Total
-          </p>
+    <div className="space-y-5">
+      <PageHeader
+        icon={PackageCheck}
+        title="Disponibilidad"
+        description="Stock disponible agrupado por clasificación. Solo categorías con disponibilidad &gt; 0."
+        badge={`${filtered.length} clasificaciones`}
+      />
+
+      <div className="grid grid-cols-3 gap-2">
+        <MetricTile label="Disponibles" value={totalAvailable} icon={CircleCheck} tone="success" />
+        <MetricTile label="Reservadas" value={totalReserved} icon={Bookmark} tone="active" />
+        <MetricTile label="Total stock" value={totalAll} icon={Package2} tone="track" />
+      </div>
+
+      <div className="cockpit-panel p-3 flex flex-col gap-3">
+        <InputGroup className="flex-1 min-w-[240px]">
+          <InputGroupAddon>
+            <Search />
+          </InputGroupAddon>
+          <InputGroupInput
+            placeholder="Buscar categoría…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </InputGroup>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <ListFilter className="h-3.5 w-3.5" />
+            Filtros
+          </div>
+          <Select value={classFilter} onValueChange={setClassFilter}>
+            <SelectTrigger className="h-8 w-auto min-w-[180px] text-xs">
+              <SelectValue placeholder="Clasificación" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todas</SelectItem>
+              {data.map((g) => (
+                <SelectItem key={g.classificationId} value={g.classification}>
+                  {g.classification}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {classFilter !== ALL && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setClassFilter(ALL)}
+            >
+              Limpiar
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Grouped by classification */}
-      {data.map((group) => {
-        const groupAvailable = group.categories.reduce((s, c) => s + c.available, 0);
-
-        return (
-          <div key={group.classificationId} className="bg-card border rounded-xl overflow-hidden">
-            {/* Classification header */}
-            <div className="bg-primary/5 border-b px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-1.5 rounded-md bg-primary/10">
-                  <PackageCheck className="h-4 w-4 text-primary" />
-                </div>
-                <h3 className="font-semibold text-base uppercase tracking-wider">
-                  {group.classification}
-                </h3>
-              </div>
-              <Badge variant="secondary" className="text-sm">
-                {groupAvailable} disponibles
-              </Badge>
-            </div>
-
-            {/* Categories table */}
-            <div className="divide-y">
-              {/* Table header */}
-              <div className="grid grid-cols-12 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50">
-                <div className="col-span-5">Categoria</div>
-                <div className="col-span-2 text-center">Disponible</div>
-                <div className="col-span-2 text-center">Reservada</div>
-                <div className="col-span-1 text-center">Vendida</div>
-                <div className="col-span-2 text-right">Total</div>
-              </div>
-
-              {group.categories.map((cat) => (
-                <div
-                  key={cat.categoryId}
-                  className="grid grid-cols-12 px-4 py-3 items-center hover:bg-muted/30 transition-colors"
+      {filtered.length === 0 ? (
+        <EmptyState
+          title="Sin disponibilidad"
+          description={
+            search || classFilter !== ALL
+              ? "No hay coincidencias con los filtros."
+              : "No se encontraron clasificaciones o categorias con stock."
+          }
+        />
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((group) => {
+            const groupAvailable = group.categories.reduce((s, c) => s + c.available, 0);
+            const isCollapsed = collapsed.has(group.classificationId);
+            return (
+              <div key={group.classificationId} className="cockpit-panel overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.classificationId)}
+                  className="w-full bg-[var(--ops-active)]/5 border-b border-border px-4 py-2.5 flex items-center justify-between cursor-pointer hover:bg-[var(--ops-active)]/8 transition-colors"
                 >
-                  <div className="col-span-5 font-medium">{cat.name}</div>
-                  <div className="col-span-2 text-center">
-                    <Badge
-                      className={
-                        cat.available > 0
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }
-                    >
-                      {cat.available}
+                  <div className="flex items-center gap-3">
+                    <ChevronRight
+                      className={`h-4 w-4 text-muted-foreground transition-transform ${isCollapsed ? "" : "rotate-90"}`}
+                    />
+                    <div className="grid size-7 place-items-center rounded-md bg-[var(--ops-active)]/10">
+                      <PackageCheck className="h-4 w-4 text-[var(--ops-active)]" />
+                    </div>
+                    <h3 className="font-headline font-semibold text-sm uppercase tracking-wider">
+                      {group.classification}
+                    </h3>
+                    <Badge variant="outline" className="text-xs">
+                      {group.categories.length} cat.
                     </Badge>
                   </div>
-                  <div className="col-span-2 text-center">
-                    {cat.reserved > 0 ? (
-                      <Badge className="bg-blue-100 text-blue-800">
-                        {cat.reserved}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">0</span>
-                    )}
+                  <Badge variant="success" className="font-mono tabular-nums">
+                    {groupAvailable} disp.
+                  </Badge>
+                </button>
+                {!isCollapsed && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Categoría</th>
+                          <th className="px-3 py-2 text-center">Disponible</th>
+                          <th className="px-3 py-2 text-center">Reserv.</th>
+                          <th className="px-3 py-2 text-center">Vendida</th>
+                          <th className="px-4 py-2 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {group.categories.map((cat) => (
+                          <tr
+                            key={cat.categoryId}
+                            className="border-b border-border/60 last:border-0 hover:bg-muted/40 transition-colors"
+                          >
+                            <td className="px-4 py-2.5 font-medium">{cat.name}</td>
+                            <td className="px-3 py-2.5 text-center">
+                              <Badge
+                                variant={cat.available > 0 ? "success" : "destructive"}
+                                className="font-mono tabular-nums"
+                              >
+                                {cat.available}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2.5 text-center">
+                              {cat.reserved > 0 ? (
+                                <Badge variant="info" className="font-mono tabular-nums">
+                                  {cat.reserved}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground tabular-nums">0</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 text-center text-muted-foreground tabular-nums text-sm">
+                              {cat.sold}
+                            </td>
+                            <td className="px-4 py-2.5 text-right font-mono tabular-nums font-semibold">
+                              {cat.total}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                  <div className="col-span-1 text-center text-muted-foreground">
-                    {cat.sold}
-                  </div>
-                  <div className="col-span-2 text-right font-semibold">
-                    {cat.total}
-                  </div>
-                </div>
-              ))}
-
-              {group.categories.length === 0 && (
-                <div className="px-4 py-4 text-center text-muted-foreground">
-                  Sin categorias
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

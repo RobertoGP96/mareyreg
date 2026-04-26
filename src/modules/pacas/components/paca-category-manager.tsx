@@ -1,15 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -34,9 +41,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
-import { MoreHorizontal, SquarePen, Plus, Trash2 } from "lucide-react";
+import { Field, FormDialogHeader } from "@/components/ui/field";
+import { FormSection } from "@/components/ui/form-section";
+import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { MetricTile } from "@/components/ui/metric-tile";
+import {
+  MoreHorizontal,
+  SquarePen,
+  Plus,
+  Trash2,
+  FolderTree,
+  Tags,
+  Search,
+  ListFilter,
+  FileText,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   createPacaCategory,
@@ -62,215 +82,363 @@ interface Props {
   classifications: ClassificationItem[];
 }
 
+const ALL = "__all__";
+const NONE = "none";
+
 export function PacaCategoryManager({ categories, classifications }: Props) {
   const router = useRouter();
+  const [search, setSearch] = useState("");
+  const [classFilter, setClassFilter] = useState<string>(ALL);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [catToEdit, setCatToEdit] = useState<CategoryItem | null>(null);
   const [catToDelete, setCatToDelete] = useState<number | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    const fd = new FormData(e.currentTarget);
-    const clsVal = fd.get("classificationId") as string;
-    const result = await createPacaCategory({
-      name: fd.get("name") as string,
-      description: (fd.get("description") as string) || undefined,
-      classificationId: clsVal && clsVal !== "none" ? Number(clsVal) : undefined,
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [classificationId, setClassificationId] = useState<string>(NONE);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return categories.filter((c) => {
+      if (
+        classFilter !== ALL &&
+        String(c.classificationId ?? NONE) !== classFilter
+      ) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        c.name.toLowerCase().includes(q) ||
+        (c.description?.toLowerCase().includes(q) ?? false) ||
+        (c.classification?.name?.toLowerCase().includes(q) ?? false)
+      );
     });
-    setIsSubmitting(false);
-    if (result.success) {
-      setIsCreateOpen(false);
-      toast.success("Categoria creada");
-      router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+  }, [categories, search, classFilter]);
+
+  const orphans = categories.filter((c) => !c.classification).length;
+
+  const resetForm = () => {
+    setName("");
+    setDescription("");
+    setClassificationId(NONE);
   };
 
-  const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
-    if (!catToEdit) return;
-    e.preventDefault();
-    setIsSubmitting(true);
-    const fd = new FormData(e.currentTarget);
-    const clsVal = fd.get("classificationId") as string;
-    const result = await updatePacaCategory(catToEdit.categoryId, {
-      name: fd.get("name") as string,
-      description: (fd.get("description") as string) || undefined,
-      classificationId: clsVal && clsVal !== "none" ? Number(clsVal) : null,
-    });
-    setIsSubmitting(false);
-    if (result.success) {
-      setCatToEdit(null);
-      toast.success("Categoria actualizada");
-      router.refresh();
-    } else {
-      toast.error(result.error);
+  const fillEdit = (c: CategoryItem) => {
+    setName(c.name);
+    setDescription(c.description ?? "");
+    setClassificationId(c.classificationId ? String(c.classificationId) : NONE);
+    setCatToEdit(c);
+  };
+
+  const handleCreate = async () => {
+    if (!name.trim()) {
+      toast.error("El nombre es requerido");
+      return;
     }
+    setSubmitting(true);
+    const r = await createPacaCategory({
+      name,
+      description: description || undefined,
+      classificationId: classificationId !== NONE ? Number(classificationId) : undefined,
+    });
+    setSubmitting(false);
+    if (r.success) {
+      setIsCreateOpen(false);
+      toast.success("Categoría creada");
+      resetForm();
+      router.refresh();
+    } else toast.error(r.error);
+  };
+
+  const handleUpdate = async () => {
+    if (!catToEdit) return;
+    if (!name.trim()) {
+      toast.error("El nombre es requerido");
+      return;
+    }
+    setSubmitting(true);
+    const r = await updatePacaCategory(catToEdit.categoryId, {
+      name,
+      description: description || undefined,
+      classificationId: classificationId !== NONE ? Number(classificationId) : null,
+    });
+    setSubmitting(false);
+    if (r.success) {
+      setCatToEdit(null);
+      toast.success("Categoría actualizada");
+      resetForm();
+      router.refresh();
+    } else toast.error(r.error);
   };
 
   const handleDelete = async () => {
     if (!catToDelete) return;
-    setIsSubmitting(true);
-    const result = await deletePacaCategory(catToDelete);
-    setIsSubmitting(false);
-    if (result.success) {
+    setSubmitting(true);
+    const r = await deletePacaCategory(catToDelete);
+    setSubmitting(false);
+    if (r.success) {
       setCatToDelete(null);
-      toast.success("Categoria eliminada");
+      toast.success("Categoría eliminada");
       router.refresh();
-    } else {
-      toast.error(result.error);
-    }
+    } else toast.error(r.error);
   };
 
+  const columns: DataTableColumn<CategoryItem>[] = [
+    {
+      key: "name",
+      header: "Categoría",
+      cell: (c) => (
+        <div className="flex items-center gap-2 min-w-0">
+          <FolderTree className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="font-medium text-foreground truncate">{c.name}</span>
+        </div>
+      ),
+    },
+    {
+      key: "classification",
+      header: "Clasificación",
+      cell: (c) =>
+        c.classification ? (
+          <Badge variant="outline">{c.classification.name}</Badge>
+        ) : (
+          <span className="text-muted-foreground text-xs">Sin clasificación</span>
+        ),
+    },
+    {
+      key: "description",
+      header: "Descripción",
+      cell: (c) => (
+        <span className="text-sm text-muted-foreground line-clamp-1">
+          {c.description ?? "—"}
+        </span>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      align: "right",
+      width: "w-12",
+      cell: (c) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="size-8">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => fillEdit(c)}>
+              <SquarePen className="h-4 w-4" /> Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setCatToDelete(c.categoryId)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" /> Eliminar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+    },
+  ];
+
   return (
-    <>
-      <div className="bg-card rounded-lg border">
-        <div className="px-4 py-3 border-b flex flex-wrap gap-2 justify-between items-center">
-          <h2 className="text-base font-medium">Categorias de Pacas</h2>
-          <Button onClick={() => setIsCreateOpen(true)} className="sm:w-auto">
-            <Plus className="w-4 h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Agregar</span>
-          </Button>
-        </div>
-        <div className="grid gap-3 p-4">
-          {categories.length > 0 ? (
-            categories.map((cat) => (
-              <div
-                key={cat.categoryId}
-                className="bg-card border rounded-lg p-4 flex flex-wrap items-start gap-2 justify-between"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium break-words">{cat.name}</p>
-                    {cat.classification && (
-                      <Badge variant="outline" className="text-xs">
-                        {cat.classification.name}
-                      </Badge>
-                    )}
-                  </div>
-                  {cat.description && (
-                    <p className="text-sm text-muted-foreground break-words">{cat.description}</p>
-                  )}
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setCatToEdit(cat)}>
-                      <SquarePen className="h-4 w-4 mr-2" />
-                      Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => setCatToDelete(cat.categoryId)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Eliminar
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))
-          ) : (
-            <EmptyState title="No hay categorias" description="Crea la primera categoria de pacas." />
-          )}
-        </div>
+    <div className="space-y-5">
+      <PageHeader
+        icon={Tags}
+        title="Categorías de pacas"
+        description="Catálogo de categorías SKU. Cada categoría puede agruparse bajo una clasificación."
+        badge={`${categories.length} categorías`}
+      >
+        <Button
+          variant="brand"
+          onClick={() => {
+            resetForm();
+            setIsCreateOpen(true);
+          }}
+        >
+          <Plus className="h-4 w-4" />
+          Nueva categoría
+        </Button>
+      </PageHeader>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        <MetricTile label="Categorías" value={categories.length} icon={Tags} tone="active" />
+        <MetricTile
+          label="Clasificaciones"
+          value={classifications.length}
+          icon={FolderTree}
+          tone="track"
+        />
+        <MetricTile
+          label="Sin clasificación"
+          value={orphans}
+          icon={ListFilter}
+          tone={orphans > 0 ? "warning" : "idle"}
+        />
       </div>
 
-      {/* Create */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Nueva Categoria</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nombre *</Label>
-              <Input name="name" required />
-            </div>
-            <div className="space-y-2">
-              <Label>Clasificacion</Label>
-              <Select name="classificationId" defaultValue="none">
-                <SelectTrigger><SelectValue placeholder="Sin clasificacion" /></SelectTrigger>
+      <DataTable
+        columns={columns}
+        rows={filtered}
+        rowKey={(c) => c.categoryId}
+        density="compact"
+        toolbar={
+          <div className="flex flex-col gap-3">
+            <InputGroup className="flex-1 min-w-[240px] max-w-md">
+              <InputGroupAddon>
+                <Search />
+              </InputGroupAddon>
+              <InputGroupInput
+                placeholder="Buscar por nombre, clasificación o descripción…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              <InputGroupAddon align="inline-end">
+                <Badge variant="brand">{filtered.length}</Badge>
+              </InputGroupAddon>
+            </InputGroup>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <ListFilter className="h-3.5 w-3.5" />
+                Filtros
+              </div>
+              <Select value={classFilter} onValueChange={setClassFilter}>
+                <SelectTrigger className="h-8 w-auto min-w-[180px] text-xs">
+                  <SelectValue placeholder="Clasificación" />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Sin clasificacion</SelectItem>
+                  <SelectItem value={ALL}>Todas</SelectItem>
+                  <SelectItem value={NONE}>Sin clasificación</SelectItem>
                   {classifications.map((c) => (
-                    <SelectItem key={c.classificationId} value={String(c.classificationId)}>{c.name}</SelectItem>
+                    <SelectItem key={c.classificationId} value={String(c.classificationId)}>
+                      {c.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {classFilter !== ALL && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => setClassFilter(ALL)}
+                >
+                  Limpiar
+                </Button>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label>Descripcion</Label>
-              <Input name="description" />
-            </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Creando..." : "Crear Categoria"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </div>
+        }
+        emptyState={
+          <EmptyState
+            title="Sin categorías"
+            description={
+              search || classFilter !== ALL
+                ? "No hay coincidencias."
+                : "Crea la primera categoría para empezar."
+            }
+          />
+        }
+      />
 
-      {/* Edit */}
-      <Dialog open={!!catToEdit} onOpenChange={(o) => !o && setCatToEdit(null)}>
-        <DialogContent>
+      <Dialog
+        open={isCreateOpen || !!catToEdit}
+        onOpenChange={(o) => {
+          if (!o) {
+            setIsCreateOpen(false);
+            setCatToEdit(null);
+            resetForm();
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Editar Categoria</DialogTitle>
+            <FormDialogHeader
+              icon={Tags}
+              title={catToEdit ? "Editar categoría" : "Nueva categoría"}
+              description="Una categoría representa un SKU de pacas."
+            />
           </DialogHeader>
-          <form onSubmit={handleUpdate} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Nombre *</Label>
-              <Input name="name" defaultValue={catToEdit?.name} required />
-            </div>
-            <div className="space-y-2">
-              <Label>Clasificacion</Label>
-              <Select name="classificationId" defaultValue={catToEdit?.classificationId ? String(catToEdit.classificationId) : "none"}>
-                <SelectTrigger><SelectValue placeholder="Sin clasificacion" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin clasificacion</SelectItem>
-                  {classifications.map((c) => (
-                    <SelectItem key={c.classificationId} value={String(c.classificationId)}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Descripcion</Label>
-              <Input name="description" defaultValue={catToEdit?.description ?? ""} />
-            </div>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Actualizando..." : "Actualizar"}
+          <div className="space-y-4">
+            <FormSection icon={Tags} title="Datos">
+              <Field label="Nombre" icon={Tags} required>
+                <Input
+                  placeholder="Ej. Hombre invierno premium"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </Field>
+              <Field label="Clasificación" icon={FolderTree}>
+                <Select value={classificationId} onValueChange={setClassificationId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Sin clasificación" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Sin clasificación</SelectItem>
+                    {classifications.map((c) => (
+                      <SelectItem key={c.classificationId} value={String(c.classificationId)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Descripción" icon={FileText}>
+                <Textarea
+                  rows={2}
+                  placeholder="Notas opcionales"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </Field>
+            </FormSection>
+          </div>
+          <div className="flex justify-end gap-2 pt-4 border-t border-border">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setIsCreateOpen(false);
+                setCatToEdit(null);
+                resetForm();
+              }}
+            >
+              Cancelar
             </Button>
-          </form>
+            <Button
+              type="button"
+              variant="brand"
+              onClick={catToEdit ? handleUpdate : handleCreate}
+              disabled={submitting}
+            >
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {submitting ? "Guardando…" : catToEdit ? "Actualizar" : "Crear"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
-      {/* Delete */}
       <AlertDialog open={!!catToDelete} onOpenChange={() => setCatToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Eliminar categoria?</AlertDialogTitle>
+            <AlertDialogTitle>¿Eliminar categoría?</AlertDialogTitle>
             <AlertDialogDescription>
-              Solo se puede eliminar si no tiene pacas asociadas.
+              Solo se puede eliminar si no tiene pacas asociadas en inventario, ventas o reservaciones.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={isSubmitting}
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={submitting}
             >
-              {isSubmitting ? "Eliminando..." : "Eliminar"}
+              {submitting ? "Eliminando…" : "Eliminar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }

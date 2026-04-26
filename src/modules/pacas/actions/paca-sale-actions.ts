@@ -75,6 +75,23 @@ export async function createSale(data: {
   }
 }
 
+export async function deleteSales(
+  ids: number[]
+): Promise<ActionResult<{ deleted: number }>> {
+  try {
+    if (!ids.length) return { success: true, data: { deleted: 0 } };
+    let deleted = 0;
+    for (const id of ids) {
+      const r = await deleteSale(id);
+      if (r.success) deleted++;
+    }
+    return { success: true, data: { deleted } };
+  } catch (error) {
+    console.error("Error bulk delete sales:", error);
+    return { success: false, error: "Error al eliminar ventas en lote" };
+  }
+}
+
 export async function deleteSale(id: number): Promise<ActionResult<void>> {
   try {
     const sale = await db.pacaSale.findUnique({ where: { saleId: id } });

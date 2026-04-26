@@ -71,6 +71,23 @@ export async function createPacaEntry(data: {
   }
 }
 
+export async function deletePacaEntries(
+  ids: number[]
+): Promise<ActionResult<{ deleted: number }>> {
+  try {
+    if (!ids.length) return { success: true, data: { deleted: 0 } };
+    let deleted = 0;
+    for (const id of ids) {
+      const r = await deletePacaEntry(id);
+      if (r.success) deleted++;
+    }
+    return { success: true, data: { deleted } };
+  } catch (error) {
+    console.error("Error in bulk delete entries:", error);
+    return { success: false, error: "Error al eliminar entradas en lote" };
+  }
+}
+
 export async function deletePacaEntry(id: number): Promise<ActionResult<void>> {
   try {
     const entry = await db.pacaEntry.findUnique({ where: { entryId: id } });

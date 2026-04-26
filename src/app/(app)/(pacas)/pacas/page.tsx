@@ -5,11 +5,21 @@ import { getPacaCategories } from "@/modules/pacas/queries/paca-category-queries
 import { PacaListClient } from "@/modules/pacas/components/paca-list-client";
 
 export default async function PacasPage() {
-  const [inventory, entries, categories] = await Promise.all([
+  const [inventoryRaw, entriesRaw, categories] = await Promise.all([
     getPacaInventory(),
     getPacaEntries(),
     getPacaCategories(),
   ]);
+
+  const inventory = inventoryRaw.map((i) => ({
+    ...i,
+    totalCost: Number(i.totalCost),
+  }));
+
+  const entries = entriesRaw.map((e) => ({
+    ...e,
+    purchasePrice: e.purchasePrice == null ? null : Number(e.purchasePrice),
+  }));
 
   return (
     <div className="space-y-4">
