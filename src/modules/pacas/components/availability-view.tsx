@@ -28,6 +28,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { AvailabilitySharePopover } from "./availability-share-popover";
+import { MobileFilterSheet } from "@/components/ui/mobile-filter-sheet";
 
 interface CategoryAvailability {
   name: string;
@@ -118,7 +119,7 @@ export function AvailabilityView({ data }: Props) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </InputGroup>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="hidden md:flex flex-wrap items-center gap-2">
           <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <ListFilter className="h-3.5 w-3.5" />
             Filtros
@@ -146,6 +147,31 @@ export function AvailabilityView({ data }: Props) {
               Limpiar
             </Button>
           )}
+        </div>
+        <div className="md:hidden">
+          <MobileFilterSheet
+            activeCount={classFilter !== ALL ? 1 : 0}
+            onClear={() => setClassFilter(ALL)}
+          >
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-muted-foreground">
+                Clasificación
+              </label>
+              <Select value={classFilter} onValueChange={setClassFilter}>
+                <SelectTrigger className="h-10 w-full text-sm">
+                  <SelectValue placeholder="Clasificación" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>Todas</SelectItem>
+                  {data.map((g) => (
+                    <SelectItem key={g.classificationId} value={g.classification}>
+                      {g.classification}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </MobileFilterSheet>
         </div>
       </div>
 
@@ -189,52 +215,94 @@ export function AvailabilityView({ data }: Props) {
                   </Badge>
                 </button>
                 {!isCollapsed && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        <tr>
-                          <th className="px-4 py-2 text-left">Categoría</th>
-                          <th className="px-3 py-2 text-center">Disponible</th>
-                          <th className="px-3 py-2 text-center">Reserv.</th>
-                          <th className="px-3 py-2 text-center">Vendida</th>
-                          <th className="px-4 py-2 text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {group.categories.map((cat) => (
-                          <tr
-                            key={cat.categoryId}
-                            className="border-b border-border/60 last:border-0 hover:bg-muted/40 transition-colors"
-                          >
-                            <td className="px-4 py-2.5 font-medium">{cat.name}</td>
-                            <td className="px-3 py-2.5 text-center">
+                  <>
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          <tr>
+                            <th className="px-4 py-2 text-left">Categoría</th>
+                            <th className="px-3 py-2 text-center">Disponible</th>
+                            <th className="px-3 py-2 text-center">Reserv.</th>
+                            <th className="px-3 py-2 text-center">Vendida</th>
+                            <th className="px-4 py-2 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.categories.map((cat) => (
+                            <tr
+                              key={cat.categoryId}
+                              className="border-b border-border/60 last:border-0 hover:bg-muted/40 transition-colors"
+                            >
+                              <td className="px-4 py-2.5 font-medium">{cat.name}</td>
+                              <td className="px-3 py-2.5 text-center">
+                                <Badge
+                                  variant={cat.available > 0 ? "success" : "destructive"}
+                                  className="font-mono tabular-nums"
+                                >
+                                  {cat.available}
+                                </Badge>
+                              </td>
+                              <td className="px-3 py-2.5 text-center">
+                                {cat.reserved > 0 ? (
+                                  <Badge variant="info" className="font-mono tabular-nums">
+                                    {cat.reserved}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground tabular-nums">0</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2.5 text-center text-muted-foreground tabular-nums text-sm">
+                                {cat.sold}
+                              </td>
+                              <td className="px-4 py-2.5 text-right font-mono tabular-nums font-semibold">
+                                {cat.total}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="md:hidden divide-y divide-border/60">
+                      {group.categories.map((cat) => (
+                        <div
+                          key={cat.categoryId}
+                          className="flex items-start justify-between gap-3 px-4 py-3"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium text-foreground truncate">
+                              {cat.name}
+                            </div>
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                               <Badge
                                 variant={cat.available > 0 ? "success" : "destructive"}
-                                className="font-mono tabular-nums"
+                                className="font-mono tabular-nums text-[10px]"
                               >
-                                {cat.available}
+                                {cat.available} disp.
                               </Badge>
-                            </td>
-                            <td className="px-3 py-2.5 text-center">
-                              {cat.reserved > 0 ? (
-                                <Badge variant="info" className="font-mono tabular-nums">
-                                  {cat.reserved}
+                              {cat.reserved > 0 && (
+                                <Badge variant="info" className="font-mono tabular-nums text-[10px]">
+                                  {cat.reserved} reserv.
                                 </Badge>
-                              ) : (
-                                <span className="text-muted-foreground tabular-nums">0</span>
                               )}
-                            </td>
-                            <td className="px-3 py-2.5 text-center text-muted-foreground tabular-nums text-sm">
-                              {cat.sold}
-                            </td>
-                            <td className="px-4 py-2.5 text-right font-mono tabular-nums font-semibold">
+                              {cat.sold > 0 && (
+                                <Badge variant="outline" className="font-mono tabular-nums text-[10px]">
+                                  {cat.sold} vend.
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                              Total
+                            </div>
+                            <div className="font-mono tabular-nums font-semibold text-foreground">
                               {cat.total}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             );

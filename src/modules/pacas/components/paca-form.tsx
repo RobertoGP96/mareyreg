@@ -1,11 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-} from "@/components/ui/dialog";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -131,22 +127,21 @@ export function PacaEntryForm({
   };
 
   return (
-    <Dialog
+    <ResponsiveFormDialog
       open={open}
       onOpenChange={(v) => {
         onOpenChange(v);
         if (!v) resetState();
       }}
+      a11yTitle="Registrar entrada de pacas"
+      description="Añade pacas al inventario indicando categoría y cantidad."
     >
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <FormDialogHeader
-              icon={Package2}
-              title="Registrar entrada de pacas"
-              description="Añade pacas al inventario indicando categoría y cantidad."
-            />
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6">
+      <FormDialogHeader
+        icon={Package2}
+        title="Registrar entrada de pacas"
+        description="Añade pacas al inventario indicando categoría y cantidad."
+      />
+      <form onSubmit={handleSubmit} className="space-y-6 mt-4">
           <FormSection icon={FolderTree} title="Clasificación" description="Categoría y cantidad recibida.">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Categoría" icon={FolderTree} required>
@@ -297,8 +292,7 @@ export function PacaEntryForm({
               {isLoading ? "Registrando..." : "Registrar entrada"}
             </Button>
           </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+      </form>
+    </ResponsiveFormDialog>
   );
 }

@@ -13,11 +13,10 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-} from "@/components/ui/dialog";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import { MobileListCard } from "@/components/ui/mobile-list-card";
+import { ResponsiveListView } from "@/components/ui/responsive-list-view";
+import { Fab } from "@/components/ui/fab";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,7 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { type DataTableColumn } from "@/components/ui/data-table";
 import { MetricTile } from "@/components/ui/metric-tile";
 import {
   FolderTree,
@@ -238,6 +237,7 @@ export function PacaClassificationListClient({ initialClassifications }: Props) 
             resetForm();
             setIsCreateOpen(true);
           }}
+          className="hidden md:inline-flex"
         >
           <Plus className="h-4 w-4" />
           Nueva clasificación
@@ -265,17 +265,63 @@ export function PacaClassificationListClient({ initialClassifications }: Props) 
         />
       </div>
 
-      <DataTable
+      <ResponsiveListView<PacaClassificationRow>
         columns={columns}
         rows={filtered}
         rowKey={(c) => c.classificationId}
+        mobileCard={(c) => (
+          <MobileListCard
+            key={c.classificationId}
+            title={
+              <span className="flex items-center gap-1.5">
+                <FolderTree className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                {c.name}
+              </span>
+            }
+            subtitle={c.description ?? undefined}
+            value={
+              c.categoriesCount > 0 ? (
+                <Badge variant="brand" className="text-[10px]">
+                  {c.categoriesCount} cat.
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px]">0 cat.</Badge>
+              )
+            }
+            actions={
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="size-9">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => fillEditForm(c)}>
+                    <SquarePen className="h-4 w-4" /> Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setToDelete(c)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" /> Eliminar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            }
+            meta={
+              <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
+                Orden: {c.sortOrder}
+              </span>
+            }
+          />
+        )}
         toolbar={
-          <InputGroup className="flex-1 min-w-[240px] max-w-md">
+          <InputGroup className="flex-1 min-w-[180px] max-w-md">
             <InputGroupAddon>
               <Search />
             </InputGroupAddon>
             <InputGroupInput
-              placeholder="Buscar por nombre o descripción…"
+              placeholder="Buscar nombre o descripción…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -296,7 +342,7 @@ export function PacaClassificationListClient({ initialClassifications }: Props) 
         }
       />
 
-      <Dialog
+      <ResponsiveFormDialog
         open={isCreateOpen || !!toEdit}
         onOpenChange={(o) => {
           if (!o) {
@@ -305,16 +351,16 @@ export function PacaClassificationListClient({ initialClassifications }: Props) 
             resetForm();
           }
         }}
+        a11yTitle={toEdit ? "Editar clasificación" : "Nueva clasificación"}
+        description="Las clasificaciones agrupan categorías de pacas."
+        desktopMaxWidth="sm:max-w-lg"
       >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <FormDialogHeader
-              icon={Tags}
-              title={toEdit ? "Editar clasificación" : "Nueva clasificación"}
-              description="Las clasificaciones agrupan categorías de pacas."
-            />
-          </DialogHeader>
-          <div className="space-y-4">
+        <FormDialogHeader
+          icon={Tags}
+          title={toEdit ? "Editar clasificación" : "Nueva clasificación"}
+          description="Las clasificaciones agrupan categorías de pacas."
+        />
+        <div className="space-y-4 mt-4">
             <FormSection icon={Tags} title="Datos">
               <Field label="Nombre" icon={Tags} required>
                 <Input
@@ -363,8 +409,7 @@ export function PacaClassificationListClient({ initialClassifications }: Props) 
               {submitting ? "Guardando…" : toEdit ? "Actualizar" : "Crear"}
             </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveFormDialog>
 
       <AlertDialog open={!!toDelete} onOpenChange={() => setToDelete(null)}>
         <AlertDialogContent>
@@ -388,6 +433,15 @@ export function PacaClassificationListClient({ initialClassifications }: Props) 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Fab
+        icon={Plus}
+        label="Nueva clasificación"
+        onClick={() => {
+          resetForm();
+          setIsCreateOpen(true);
+        }}
+      />
     </div>
   );
 }

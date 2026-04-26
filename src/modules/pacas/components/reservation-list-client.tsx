@@ -11,7 +11,11 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import { MobileListCard } from "@/components/ui/mobile-list-card";
+import { MobileFilterSheet } from "@/components/ui/mobile-filter-sheet";
+import { ResponsiveListView } from "@/components/ui/responsive-list-view";
+import { Fab } from "@/components/ui/fab";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +37,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { type DataTableColumn } from "@/components/ui/data-table";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { StatusPill, type OpsStatus } from "@/components/ui/status-pill";
 import {
@@ -413,7 +417,11 @@ export function ReservationListClient({
         description="Gestiona reservaciones de pacas por cliente y completa ventas cuando se cierran."
         badge={`${reservations.length} reservaciones`}
       >
-        <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+        <Button
+          variant="brand"
+          onClick={() => setIsCreateOpen(true)}
+          className="hidden md:inline-flex"
+        >
           <Plus className="h-4 w-4" />
           Nueva reservación
         </Button>
@@ -452,22 +460,95 @@ export function ReservationListClient({
         />
       </div>
 
-      <DataTable
+      <ResponsiveListView<ReservationItem>
         columns={columns}
         rows={filtered}
         rowKey={(r) => r.reservationId}
         density="compact"
         selectedKeys={selected}
         onSelectionChange={setSelected}
+        mobileCard={(r) => (
+          <MobileListCard
+            key={r.reservationId}
+            title={r.clientName}
+            subtitle={
+              <>
+                {r.category.name} · {r.quantity} pacas
+                {r.clientPhone && ` · ${r.clientPhone}`}
+              </>
+            }
+            value={<StatusPill status={STATUS_TO_OPS[r.status] ?? "idle"} size="sm" />}
+            actions={
+              <div className="flex items-center gap-1">
+                {r.status === "active" && (
+                  <Button
+                    size="icon"
+                    variant="brand"
+                    onClick={() => setToComplete(r)}
+                    className="size-9"
+                    aria-label="Completar reservación"
+                  >
+                    <CircleCheck className="h-4 w-4" />
+                  </Button>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="size-9">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    {r.status === "active" && (
+                      <>
+                        <DropdownMenuItem onClick={() => setToEdit(r)}>
+                          <SquarePen className="h-4 w-4" /> Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => setToCancel(r.reservationId)}
+                          className="text-[var(--ops-warning)] focus:text-[var(--ops-warning)]"
+                        >
+                          <X className="h-4 w-4" /> Cancelar
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    <DropdownMenuItem
+                      onClick={() => setToDelete(r.reservationId)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" /> Eliminar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            }
+            meta={
+              <>
+                <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
+                  {r.reservationDate}
+                </span>
+                {r.expirationDate && (
+                  <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
+                    → {r.expirationDate}
+                  </span>
+                )}
+                {r.category.classification && (
+                  <Badge variant="outline" className="text-[10px]">
+                    {r.category.classification.name}
+                  </Badge>
+                )}
+              </>
+            }
+          />
+        )}
         toolbar={
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 w-full">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <InputGroup className="flex-1 min-w-[240px] max-w-md">
+              <InputGroup className="flex-1 min-w-[180px] max-w-md">
                 <InputGroupAddon>
                   <Search />
                 </InputGroupAddon>
                 <InputGroupInput
-                  placeholder="Buscar por cliente, categoría o teléfono…"
+                  placeholder="Buscar cliente, categoría o teléfono…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -475,6 +556,31 @@ export function ReservationListClient({
                   <Badge variant="brand">{filtered.length}</Badge>
                 </InputGroupAddon>
               </InputGroup>
+              <div className="md:hidden">
+                <MobileFilterSheet
+                  activeCount={statusFilter !== ALL ? 1 : 0}
+                  onClear={() => setStatusFilter(ALL)}
+                >
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-muted-foreground">
+                      Estado
+                    </label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="h-10 w-full text-sm">
+                        <SelectValue placeholder="Estado" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ALL}>Todos</SelectItem>
+                        {RESERVATION_STATUSES.filter((s) => s.value !== "expired").map((s) => (
+                          <SelectItem key={s.value} value={s.value}>
+                            {getStatusLabel(s.value)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </MobileFilterSheet>
+              </div>
               {selected.size > 0 && (
                 <Button
                   variant="outline"
@@ -487,7 +593,7 @@ export function ReservationListClient({
                 </Button>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="hidden md:flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <ListFilter className="h-3.5 w-3.5" />
                 Filtros
@@ -498,9 +604,7 @@ export function ReservationListClient({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL}>Todos los estados</SelectItem>
-                  {RESERVATION_STATUSES.filter(
-                    (s) => s.value !== "expired"
-                  ).map((s) => (
+                  {RESERVATION_STATUSES.filter((s) => s.value !== "expired").map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {getStatusLabel(s.value)}
                     </SelectItem>
@@ -533,16 +637,19 @@ export function ReservationListClient({
       />
 
       {/* Crear */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <FormDialogHeader
-              icon={BookmarkCheck}
-              title="Nueva reservación"
-              description="Reserva pacas para un cliente indicando cantidad y fecha."
-            />
-          </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-5">
+      <ResponsiveFormDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        a11yTitle="Nueva reservación"
+        description="Reserva pacas para un cliente indicando cantidad y fecha."
+        desktopMaxWidth="sm:max-w-xl"
+      >
+        <FormDialogHeader
+          icon={BookmarkCheck}
+          title="Nueva reservación"
+          description="Reserva pacas para un cliente indicando cantidad y fecha."
+        />
+        <form onSubmit={handleCreate} className="space-y-5 mt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Categoría" icon={FolderTree} required>
                 <Select name="categoryId">
@@ -611,20 +718,22 @@ export function ReservationListClient({
               </Button>
             </div>
           </form>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveFormDialog>
 
       {/* Editar */}
-      <Dialog open={!!toEdit} onOpenChange={(o) => !o && setToEdit(null)}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <FormDialogHeader
-              icon={SquarePen}
-              title="Editar reservación"
-              description={toEdit?.clientName}
-            />
-          </DialogHeader>
-          <form onSubmit={handleUpdate} className="space-y-5">
+      <ResponsiveFormDialog
+        open={!!toEdit}
+        onOpenChange={(o) => !o && setToEdit(null)}
+        a11yTitle="Editar reservación"
+        description={toEdit?.clientName ?? undefined}
+        desktopMaxWidth="sm:max-w-xl"
+      >
+        <FormDialogHeader
+          icon={SquarePen}
+          title="Editar reservación"
+          description={toEdit?.clientName}
+        />
+        <form onSubmit={handleUpdate} className="space-y-5 mt-4">
             <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
               <FolderTree className="h-4 w-4 text-muted-foreground" />
               <span className="font-medium">Categoría:</span> {toEdit?.category.name}
@@ -689,20 +798,22 @@ export function ReservationListClient({
               </Button>
             </div>
           </form>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveFormDialog>
 
       {/* Completar */}
-      <Dialog open={!!toComplete} onOpenChange={(o) => !o && setToComplete(null)}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <FormDialogHeader
-              icon={CircleCheck}
-              title="Completar reservación"
-              description="Registra la venta con precio y método de pago."
-            />
-          </DialogHeader>
-          <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm space-y-1.5 mb-2">
+      <ResponsiveFormDialog
+        open={!!toComplete}
+        onOpenChange={(o) => !o && setToComplete(null)}
+        a11yTitle="Completar reservación"
+        description="Registra la venta con precio y método de pago."
+        desktopMaxWidth="sm:max-w-xl"
+      >
+        <FormDialogHeader
+          icon={CircleCheck}
+          title="Completar reservación"
+          description="Registra la venta con precio y método de pago."
+        />
+        <div className="rounded-lg border border-border bg-muted/40 p-4 text-sm space-y-1.5 mt-4 mb-2">
             <p className="flex items-center gap-1.5">
               <UserRound className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="font-medium">Cliente:</span> {toComplete?.clientName}
@@ -761,8 +872,7 @@ export function ReservationListClient({
               </Button>
             </div>
           </form>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveFormDialog>
 
       {/* Cancelar */}
       <AlertDialog open={!!toCancel} onOpenChange={() => setToCancel(null)}>
@@ -829,6 +939,8 @@ export function ReservationListClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Fab icon={Plus} label="Nueva reservación" onClick={() => setIsCreateOpen(true)} />
     </div>
   );
 }

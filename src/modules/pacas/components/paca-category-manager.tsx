@@ -13,11 +13,11 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-} from "@/components/ui/dialog";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import { MobileListCard } from "@/components/ui/mobile-list-card";
+import { MobileFilterSheet } from "@/components/ui/mobile-filter-sheet";
+import { ResponsiveListView } from "@/components/ui/responsive-list-view";
+import { Fab } from "@/components/ui/fab";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/select";
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { type DataTableColumn } from "@/components/ui/data-table";
 import { MetricTile } from "@/components/ui/metric-tile";
 import {
   MoreHorizontal,
@@ -256,6 +256,7 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
             resetForm();
             setIsCreateOpen(true);
           }}
+          className="hidden md:inline-flex"
         >
           <Plus className="h-4 w-4" />
           Nueva categoría
@@ -278,27 +279,96 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
         />
       </div>
 
-      <DataTable
+      <ResponsiveListView<CategoryItem>
         columns={columns}
         rows={filtered}
         rowKey={(c) => c.categoryId}
         density="compact"
+        mobileCard={(c) => (
+          <MobileListCard
+            key={c.categoryId}
+            title={
+              <span className="flex items-center gap-1.5">
+                <FolderTree className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                {c.name}
+              </span>
+            }
+            subtitle={c.description ?? undefined}
+            value={
+              c.classification ? (
+                <Badge variant="outline" className="text-[10px]">
+                  {c.classification.name}
+                </Badge>
+              ) : (
+                <span className="text-[10px] text-muted-foreground">Sin clasif.</span>
+              )
+            }
+            actions={
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="size-9">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => fillEdit(c)}>
+                    <SquarePen className="h-4 w-4" /> Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setCatToDelete(c.categoryId)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" /> Eliminar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            }
+          />
+        )}
         toolbar={
-          <div className="flex flex-col gap-3">
-            <InputGroup className="flex-1 min-w-[240px] max-w-md">
-              <InputGroupAddon>
-                <Search />
-              </InputGroupAddon>
-              <InputGroupInput
-                placeholder="Buscar por nombre, clasificación o descripción…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <InputGroupAddon align="inline-end">
-                <Badge variant="brand">{filtered.length}</Badge>
-              </InputGroupAddon>
-            </InputGroup>
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-3 w-full">
+            <div className="flex items-center gap-2 flex-wrap">
+              <InputGroup className="flex-1 min-w-[180px] max-w-md">
+                <InputGroupAddon>
+                  <Search />
+                </InputGroupAddon>
+                <InputGroupInput
+                  placeholder="Buscar nombre o clasificación…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                <InputGroupAddon align="inline-end">
+                  <Badge variant="brand">{filtered.length}</Badge>
+                </InputGroupAddon>
+              </InputGroup>
+              <div className="md:hidden">
+                <MobileFilterSheet
+                  activeCount={classFilter !== ALL ? 1 : 0}
+                  onClear={() => setClassFilter(ALL)}
+                >
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-muted-foreground">
+                      Clasificación
+                    </label>
+                    <Select value={classFilter} onValueChange={setClassFilter}>
+                      <SelectTrigger className="h-10 w-full text-sm">
+                        <SelectValue placeholder="Clasificación" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ALL}>Todas</SelectItem>
+                        <SelectItem value={NONE}>Sin clasificación</SelectItem>
+                        {classifications.map((c) => (
+                          <SelectItem key={c.classificationId} value={String(c.classificationId)}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </MobileFilterSheet>
+              </div>
+            </div>
+            <div className="hidden md:flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <ListFilter className="h-3.5 w-3.5" />
                 Filtros
@@ -342,7 +412,7 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
         }
       />
 
-      <Dialog
+      <ResponsiveFormDialog
         open={isCreateOpen || !!catToEdit}
         onOpenChange={(o) => {
           if (!o) {
@@ -351,16 +421,16 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
             resetForm();
           }
         }}
+        a11yTitle={catToEdit ? "Editar categoría" : "Nueva categoría"}
+        description="Una categoría representa un SKU de pacas."
+        desktopMaxWidth="sm:max-w-lg"
       >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <FormDialogHeader
-              icon={Tags}
-              title={catToEdit ? "Editar categoría" : "Nueva categoría"}
-              description="Una categoría representa un SKU de pacas."
-            />
-          </DialogHeader>
-          <div className="space-y-4">
+        <FormDialogHeader
+          icon={Tags}
+          title={catToEdit ? "Editar categoría" : "Nueva categoría"}
+          description="Una categoría representa un SKU de pacas."
+        />
+        <div className="space-y-4 mt-4">
             <FormSection icon={Tags} title="Datos">
               <Field label="Nombre" icon={Tags} required>
                 <Input
@@ -416,8 +486,7 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
               {submitting ? "Guardando…" : catToEdit ? "Actualizar" : "Crear"}
             </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveFormDialog>
 
       <AlertDialog open={!!catToDelete} onOpenChange={() => setCatToDelete(null)}>
         <AlertDialogContent>
@@ -439,6 +508,15 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Fab
+        icon={Plus}
+        label="Nueva categoría"
+        onClick={() => {
+          resetForm();
+          setIsCreateOpen(true);
+        }}
+      />
     </div>
   );
 }

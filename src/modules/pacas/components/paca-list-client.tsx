@@ -28,7 +28,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { type DataTableColumn } from "@/components/ui/data-table";
+import { ResponsiveListView } from "@/components/ui/responsive-list-view";
+import { MobileListCard } from "@/components/ui/mobile-list-card";
+import { MobileFilterSheet } from "@/components/ui/mobile-filter-sheet";
+import { Fab } from "@/components/ui/fab";
 import { MetricTile } from "@/components/ui/metric-tile";
 import {
   Plus,
@@ -332,7 +336,11 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
         title="Inventario de pacas"
         description="Stock por categoría con seguimiento de disponibles, reservadas y vendidas."
       >
-        <Button variant="brand" onClick={() => setIsEntryOpen(true)}>
+        <Button
+          variant="brand"
+          onClick={() => setIsEntryOpen(true)}
+          className="hidden md:inline-flex"
+        >
           <Plus className="h-4 w-4" />
           Registrar entrada
         </Button>
@@ -382,33 +390,122 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
         </div>
       )}
 
-      <DataTable
+      <ResponsiveListView<InventoryItem>
         columns={inventoryColumns}
         rows={filteredInventory}
         rowKey={(i) => i.categoryId}
         density="compact"
+        mobileCard={(item) => (
+          <MobileListCard
+            key={item.categoryId}
+            title={
+              <span className="flex items-center gap-1.5">
+                <Package2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                {item.category.name}
+              </span>
+            }
+            subtitle={
+              item.category.classification?.name ?? "Sin clasificación"
+            }
+            value={
+              <Badge
+                variant={
+                  item.available === 0
+                    ? "destructive"
+                    : item.available <= 5
+                      ? "warning"
+                      : "success"
+                }
+                className="font-mono tabular-nums"
+              >
+                {item.available} disp.
+              </Badge>
+            }
+            meta={
+              <>
+                {item.reserved > 0 && (
+                  <Badge variant="info" className="font-mono tabular-nums text-[10px]">
+                    {item.reserved} reserv.
+                  </Badge>
+                )}
+                {item.sold > 0 && (
+                  <Badge variant="outline" className="font-mono tabular-nums text-[10px]">
+                    {item.sold} vendidas
+                  </Badge>
+                )}
+                {Number(item.totalCost) > 0 && (
+                  <span className="text-[11px] text-muted-foreground tabular-nums">
+                    Valor: ${Number(item.totalCost).toFixed(0)}
+                  </span>
+                )}
+              </>
+            }
+          />
+        )}
         toolbar={
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 w-full">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-headline text-sm font-semibold flex-1">
                 Inventario por categoría
               </h3>
               <Badge variant="outline">{filteredInventory.length}</Badge>
             </div>
-            <InputGroup className="flex-1 min-w-[240px]">
-              <InputGroupAddon>
-                <Search />
-              </InputGroupAddon>
-              <InputGroupInput
-                placeholder="Buscar categoría o clasificación…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <InputGroupAddon align="inline-end">
-                <Badge variant="brand">{filteredInventory.length}</Badge>
-              </InputGroupAddon>
-            </InputGroup>
             <div className="flex flex-wrap items-center gap-2">
+              <InputGroup className="flex-1 min-w-[180px]">
+                <InputGroupAddon>
+                  <Search />
+                </InputGroupAddon>
+                <InputGroupInput
+                  placeholder="Buscar categoría…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </InputGroup>
+              <div className="md:hidden">
+                <MobileFilterSheet
+                  activeCount={activeFilters}
+                  onClear={() => {
+                    setClassFilter(ALL);
+                    setStockFilter(ALL);
+                  }}
+                >
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-muted-foreground">
+                        Clasificación
+                      </label>
+                      <Select value={classFilter} onValueChange={setClassFilter}>
+                        <SelectTrigger className="h-10 w-full text-sm">
+                          <SelectValue placeholder="Clasificación" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={ALL}>Todas</SelectItem>
+                          {classifications.map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-muted-foreground">
+                        Stock
+                      </label>
+                      <Select value={stockFilter} onValueChange={setStockFilter}>
+                        <SelectTrigger className="h-10 w-full text-sm">
+                          <SelectValue placeholder="Stock" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={ALL}>Todo el stock</SelectItem>
+                          <SelectItem value="low">Stock bajo (≤ 5)</SelectItem>
+                          <SelectItem value="empty">Sin stock</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </MobileFilterSheet>
+              </div>
+            </div>
+            <div className="hidden md:flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <ListFilter className="h-3.5 w-3.5" />
                 Filtros
@@ -462,15 +559,51 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
         }
       />
 
-      <DataTable
+      <ResponsiveListView<EntryItem>
         columns={entryColumns}
         rows={entries}
         rowKey={(e) => e.entryId}
         density="compact"
         selectedKeys={selectedEntries}
         onSelectionChange={setSelectedEntries}
+        mobileCard={(e) => (
+          <MobileListCard
+            key={e.entryId}
+            title={e.category.name}
+            subtitle={
+              <>
+                {e.supplier ?? "Sin proveedor"}
+                {" · "}
+                {e.arrivalDate ?? new Date(e.createdAt).toLocaleDateString("es-ES")}
+              </>
+            }
+            value={
+              <Badge variant="success" className="font-mono tabular-nums">
+                +{e.quantity}
+              </Badge>
+            }
+            actions={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-9 text-muted-foreground hover:text-destructive"
+                onClick={() => setEntryToDelete(e.entryId)}
+                aria-label="Eliminar entrada"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            }
+            meta={
+              e.purchasePrice ? (
+                <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
+                  Precio: ${String(e.purchasePrice)}
+                </span>
+              ) : undefined
+            }
+          />
+        )}
         toolbar={
-          <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center justify-between gap-2 flex-wrap w-full">
             <div className="flex items-center gap-2">
               <h3 className="font-headline text-sm font-semibold">Entradas recientes</h3>
               <Badge variant="outline">{entries.length}</Badge>
@@ -543,6 +676,8 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Fab icon={Plus} label="Registrar entrada" onClick={() => setIsEntryOpen(true)} />
     </div>
   );
 }

@@ -18,7 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import { MobileListCard } from "@/components/ui/mobile-list-card";
+import { MobileFilterSheet } from "@/components/ui/mobile-filter-sheet";
+import { ResponsiveListView } from "@/components/ui/responsive-list-view";
+import { Fab } from "@/components/ui/fab";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +36,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, FormDialogHeader } from "@/components/ui/field";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { type DataTableColumn } from "@/components/ui/data-table";
 import { MetricTile } from "@/components/ui/metric-tile";
 import {
   Plus,
@@ -283,7 +287,11 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
         description="Historial de ventas con cliente, categoría y método de pago."
         badge={`${sales.length} ventas`}
       >
-        <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+        <Button
+          variant="brand"
+          onClick={() => setIsCreateOpen(true)}
+          className="hidden md:inline-flex"
+        >
           <Plus className="h-4 w-4" />
           Registrar venta
         </Button>
@@ -316,22 +324,66 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
         />
       </div>
 
-      <DataTable
+      <ResponsiveListView<SaleItem>
         columns={columns}
         rows={filtered}
         rowKey={(s) => s.saleId}
         density="compact"
         selectedKeys={selected}
         onSelectionChange={setSelected}
+        mobileCard={(s) => {
+          const total = s.quantity * Number(s.salePrice);
+          return (
+            <MobileListCard
+              key={s.saleId}
+              title={s.clientName}
+              subtitle={
+                <>
+                  {s.category.name} · {s.quantity} pacas
+                  {s.clientPhone && ` · ${s.clientPhone}`}
+                </>
+              }
+              value={
+                <span className="font-mono tabular-nums font-semibold text-[var(--ops-success)]">
+                  ${total.toFixed(2)}
+                </span>
+              }
+              actions={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 text-muted-foreground hover:text-destructive"
+                  onClick={() => setToDelete(s.saleId)}
+                  aria-label="Eliminar venta"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              }
+              meta={
+                <>
+                  <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
+                    {s.saleDate}
+                  </span>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {getPaymentLabel(s.paymentMethod)}
+                  </Badge>
+                  <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
+                    ${s.salePrice.toFixed(2)}/u
+                  </span>
+                </>
+              }
+            />
+          );
+        }}
         toolbar={
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 w-full">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <InputGroup className="flex-1 min-w-[240px] max-w-md">
+              <InputGroup className="flex-1 min-w-[180px] max-w-md">
                 <InputGroupAddon>
                   <Search />
                 </InputGroupAddon>
                 <InputGroupInput
-                  placeholder="Buscar por cliente, categoría o teléfono…"
+                  placeholder="Buscar cliente, categoría o teléfono…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -339,6 +391,55 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
                   <Badge variant="brand">{filtered.length}</Badge>
                 </InputGroupAddon>
               </InputGroup>
+              <div className="md:hidden">
+                <MobileFilterSheet
+                  activeCount={activeFilters}
+                  onClear={() => {
+                    setMethodFilter(ALL);
+                    setDateFrom("");
+                    setDateTo("");
+                  }}
+                >
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-muted-foreground">
+                        Método de pago
+                      </label>
+                      <Select value={methodFilter} onValueChange={setMethodFilter}>
+                        <SelectTrigger className="h-10 w-full text-sm">
+                          <SelectValue placeholder="Pago" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={ALL}>Todos los métodos</SelectItem>
+                          {PAYMENT_METHODS.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-muted-foreground">Desde</label>
+                        <Input
+                          type="date"
+                          value={dateFrom}
+                          onChange={(e) => setDateFrom(e.target.value)}
+                          className="h-10"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-muted-foreground">Hasta</label>
+                        <Input
+                          type="date"
+                          value={dateTo}
+                          onChange={(e) => setDateTo(e.target.value)}
+                          className="h-10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </MobileFilterSheet>
+              </div>
               {selected.size > 0 && (
                 <Button
                   variant="outline"
@@ -351,7 +452,7 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
                 </Button>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="hidden md:flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <ListFilter className="h-3.5 w-3.5" />
                 Filtros
@@ -414,16 +515,19 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
         }
       />
 
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <FormDialogHeader
-              icon={ShoppingBag}
-              title="Registrar venta"
-              description="Crea una venta directa de pacas."
-            />
-          </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-5">
+      <ResponsiveFormDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        a11yTitle="Registrar venta"
+        description="Crea una venta directa de pacas."
+        desktopMaxWidth="sm:max-w-xl"
+      >
+        <FormDialogHeader
+          icon={ShoppingBag}
+          title="Registrar venta"
+          description="Crea una venta directa de pacas."
+        />
+        <form onSubmit={handleCreate} className="space-y-5 mt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Categoría" icon={FolderTree} required>
                 <Select name="categoryId">
@@ -489,8 +593,7 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
               </Button>
             </div>
           </form>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveFormDialog>
 
       <AlertDialog open={!!toDelete} onOpenChange={() => setToDelete(null)}>
         <AlertDialogContent>
@@ -533,6 +636,8 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Fab icon={Plus} label="Registrar venta" onClick={() => setIsCreateOpen(true)} />
     </div>
   );
 }

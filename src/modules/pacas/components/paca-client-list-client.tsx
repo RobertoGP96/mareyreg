@@ -21,11 +21,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-} from "@/components/ui/dialog";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
+import { MobileListCard } from "@/components/ui/mobile-list-card";
+import { ResponsiveListView } from "@/components/ui/responsive-list-view";
+import { Fab } from "@/components/ui/fab";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +35,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
-import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
+import { type DataTableColumn } from "@/components/ui/data-table";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { StatusPill } from "@/components/ui/status-pill";
 import {
@@ -283,6 +282,7 @@ export function PacaClientListClient({ clients }: { clients: PacaClientItem[] })
             resetForm();
             setIsCreateOpen(true);
           }}
+          className="hidden md:inline-flex"
         >
           <Plus className="h-4 w-4" />
           Nuevo cliente
@@ -296,7 +296,7 @@ export function PacaClientListClient({ clients }: { clients: PacaClientItem[] })
         <MetricTile label="Con email" value={withEmail} icon={Mail} tone="track" />
       </div>
 
-      <DataTable
+      <ResponsiveListView<PacaClientItem>
         columns={columns}
         rows={filtered}
         rowKey={(c) => c.clientId}
@@ -304,14 +304,76 @@ export function PacaClientListClient({ clients }: { clients: PacaClientItem[] })
         selectedKeys={selected}
         onSelectionChange={setSelected}
         isRowSelectable={(c) => c.isActive}
+        mobileCard={(c) => (
+          <MobileListCard
+            key={c.clientId}
+            title={
+              <span className="flex items-center gap-1.5">
+                <UserRound className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                {c.name}
+              </span>
+            }
+            subtitle={
+              <>
+                {c.phone ?? "—"}
+                {c.email && ` · ${c.email}`}
+              </>
+            }
+            value={<StatusPill status={c.isActive ? "active" : "inactive"} size="sm" />}
+            actions={
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="size-9">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => fillEdit(c)}>
+                    <SquarePen className="h-4 w-4" /> Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setToDelete(c)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" /> Desactivar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            }
+            meta={
+              <>
+                {c.phone && (
+                  <a
+                    href={`tel:${c.phone}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 text-[11px] text-[var(--brand)] hover:underline"
+                  >
+                    <Phone className="h-3 w-3" />
+                    Llamar
+                  </a>
+                )}
+                {c.email && (
+                  <a
+                    href={`mailto:${c.email}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 text-[11px] text-[var(--brand)] hover:underline"
+                  >
+                    <Mail className="h-3 w-3" />
+                    Email
+                  </a>
+                )}
+              </>
+            }
+          />
+        )}
         toolbar={
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <InputGroup className="flex-1 min-w-[240px] max-w-md">
+          <div className="flex items-center justify-between gap-2 flex-wrap w-full">
+            <InputGroup className="flex-1 min-w-[180px] max-w-md">
               <InputGroupAddon>
                 <Search />
               </InputGroupAddon>
               <InputGroupInput
-                placeholder="Buscar por nombre, teléfono o email…"
+                placeholder="Buscar nombre, teléfono o email…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -340,7 +402,7 @@ export function PacaClientListClient({ clients }: { clients: PacaClientItem[] })
         }
       />
 
-      <Dialog
+      <ResponsiveFormDialog
         open={isCreateOpen || !!toEdit}
         onOpenChange={(o) => {
           if (!o) {
@@ -349,16 +411,16 @@ export function PacaClientListClient({ clients }: { clients: PacaClientItem[] })
             resetForm();
           }
         }}
+        a11yTitle={toEdit ? "Editar cliente" : "Nuevo cliente"}
+        description="Información de contacto del cliente."
+        desktopMaxWidth="sm:max-w-lg"
       >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <FormDialogHeader
-              icon={UserRound}
-              title={toEdit ? "Editar cliente" : "Nuevo cliente"}
-              description="Información de contacto del cliente."
-            />
-          </DialogHeader>
-          <div className="space-y-4">
+        <FormDialogHeader
+          icon={UserRound}
+          title={toEdit ? "Editar cliente" : "Nuevo cliente"}
+          description="Información de contacto del cliente."
+        />
+        <div className="space-y-4 mt-4">
             <FormSection icon={UserRound} title="Datos">
               <Field label="Nombre" icon={UserRound} required>
                 <Input
@@ -411,8 +473,7 @@ export function PacaClientListClient({ clients }: { clients: PacaClientItem[] })
               {submitting ? "Guardando…" : toEdit ? "Actualizar" : "Crear"}
             </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveFormDialog>
 
       <AlertDialog open={!!toDelete} onOpenChange={() => setToDelete(null)}>
         <AlertDialogContent>
@@ -457,6 +518,15 @@ export function PacaClientListClient({ clients }: { clients: PacaClientItem[] })
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Fab
+        icon={Plus}
+        label="Nuevo cliente"
+        onClick={() => {
+          resetForm();
+          setIsCreateOpen(true);
+        }}
+      />
     </div>
   );
 }
