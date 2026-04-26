@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,11 @@ import { Sun, Moon, Monitor, Check } from "lucide-react";
 
 export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   return (
     <DropdownMenu>
@@ -26,17 +32,23 @@ export function ThemeSwitcher() {
         <DropdownMenuItem onClick={() => setTheme("light")}>
           <Sun className="mr-2 h-4 w-4" />
           Claro
-          {theme === "light" && <Check className="ml-auto h-4 w-4" />}
+          <span className="ml-auto inline-flex h-4 w-4 items-center justify-center">
+            {mounted && theme === "light" && <Check className="h-4 w-4" />}
+          </span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme("dark")}>
           <Moon className="mr-2 h-4 w-4" />
           Oscuro
-          {theme === "dark" && <Check className="ml-auto h-4 w-4" />}
+          <span className="ml-auto inline-flex h-4 w-4 items-center justify-center">
+            {mounted && theme === "dark" && <Check className="h-4 w-4" />}
+          </span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme("system")}>
           <Monitor className="mr-2 h-4 w-4" />
           Sistema
-          {theme === "system" && <Check className="ml-auto h-4 w-4" />}
+          <span className="ml-auto inline-flex h-4 w-4 items-center justify-center">
+            {mounted && theme === "system" && <Check className="h-4 w-4" />}
+          </span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
