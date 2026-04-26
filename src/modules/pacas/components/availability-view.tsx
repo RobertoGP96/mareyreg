@@ -27,6 +27,7 @@ import {
   Package2,
   ChevronRight,
 } from "lucide-react";
+import { AvailabilitySharePopover } from "./availability-share-popover";
 
 interface CategoryAvailability {
   name: string;
@@ -96,7 +97,9 @@ export function AvailabilityView({ data }: Props) {
         title="Disponibilidad"
         description="Stock disponible agrupado por clasificación. Solo categorías con disponibilidad &gt; 0."
         badge={`${filtered.length} clasificaciones`}
-      />
+      >
+        {data.length > 0 && <AvailabilitySharePopover data={data} />}
+      </PageHeader>
 
       <div className="grid grid-cols-3 gap-2">
         <MetricTile label="Disponibles" value={totalAvailable} icon={CircleCheck} tone="success" />
