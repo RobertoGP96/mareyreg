@@ -6,15 +6,20 @@ import { WarehouseListClient } from "@/modules/inventory/components/warehouse-li
 export default async function WarehousesPage() {
   const warehouses = await getWarehouses();
 
+  const serialized = warehouses.map((w) => ({
+    warehouseId: w.warehouseId,
+    name: w.name,
+    location: w.location,
+    province: w.province,
+    capacity: w.capacity != null ? Number(w.capacity) : null,
+    warehouseType: w.warehouseType,
+    contactPhone: w.contactPhone,
+    isActive: w.isActive,
+  }));
+
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold font-headline tracking-tight text-foreground">Almacenes</h1>
-        <p className="text-muted-foreground mt-1">
-          Gestiona los almacenes del inventario
-        </p>
-      </div>
-      <WarehouseListClient warehouses={warehouses as Parameters<typeof WarehouseListClient>[0]["warehouses"]} />
+      <WarehouseListClient warehouses={serialized} />
     </div>
   );
 }

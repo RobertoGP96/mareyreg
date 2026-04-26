@@ -79,9 +79,9 @@ interface ProductItem {
   barcode: string | null;
   category: string | null;
   unit: string;
-  minStock: unknown;
-  maxStock: unknown;
-  costPrice: unknown;
+  minStock: number;
+  maxStock: number | null;
+  costPrice: number | null;
   brand: string | null;
   supplier: string | null;
   supplierRef: string | null;

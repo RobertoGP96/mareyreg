@@ -13,21 +13,46 @@ export default async function StockPage() {
     getWarehouses(),
   ]);
 
+  const stockLevelsSerialized = stockLevels.map((sl) => ({
+    productId: sl.productId,
+    warehouseId: sl.warehouseId,
+    currentQuantity: Number(sl.currentQuantity),
+    product: {
+      name: sl.product.name,
+      unit: sl.product.unit,
+      minStock: Number(sl.product.minStock),
+      maxStock: sl.product.maxStock != null ? Number(sl.product.maxStock) : null,
+      costPrice: sl.product.costPrice != null ? Number(sl.product.costPrice) : null,
+    },
+    warehouse: { name: sl.warehouse.name },
+  }));
+
+  const movementsSerialized = movements.map((m) => ({
+    movementId: m.movementId,
+    quantity: Number(m.quantity),
+    movementType: m.movementType,
+    unitCost: m.unitCost != null ? Number(m.unitCost) : null,
+    referenceDoc: m.referenceDoc,
+    notes: m.notes,
+    createdAt: m.createdAt.toISOString(),
+    product: { name: m.product.name, unit: m.product.unit },
+    warehouse: { name: m.warehouse.name },
+  }));
+
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl md:text-2xl font-semibold font-headline tracking-tight text-foreground">
-          Stock
-        </h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">
-          Niveles de stock y movimientos
-        </p>
-      </div>
       <StockPageClient
-        stockLevels={stockLevels as Parameters<typeof StockPageClient>[0]["stockLevels"]}
-        movements={movements as Parameters<typeof StockPageClient>[0]["movements"]}
-        products={products}
-        warehouses={warehouses}
+        stockLevels={stockLevelsSerialized}
+        movements={movementsSerialized}
+        products={products.map((p) => ({
+          productId: p.productId,
+          name: p.name,
+          unit: p.unit,
+        }))}
+        warehouses={warehouses.map((w) => ({
+          warehouseId: w.warehouseId,
+          name: w.name,
+        }))}
       />
     </div>
   );

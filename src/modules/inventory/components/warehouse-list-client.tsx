@@ -56,7 +56,7 @@ interface WarehouseItem {
   name: string;
   location: string | null;
   province: string | null;
-  capacity: unknown;
+  capacity: number | null;
   warehouseType: string | null;
   contactPhone: string | null;
   isActive: boolean;
