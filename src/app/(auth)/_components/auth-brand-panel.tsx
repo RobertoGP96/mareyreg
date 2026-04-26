@@ -1,5 +1,5 @@
 import { Truck, Package, ShoppingBag } from "lucide-react";
-import { LogoGR } from "@/components/brand/logo-gr";
+import { LogoFull } from "@/components/brand/logo-full";
 
 const FEATURES = [
   { icon: Truck, label: "Logística" },
@@ -21,16 +21,12 @@ export function AuthBrandPanel() {
 
       <div className="relative z-10 flex w-full flex-col justify-between p-10 xl:p-14 text-white">
         {/* Logo top */}
-        <div className="flex items-center gap-3.5">
-          <LogoGR size={48} dark />
-          <div className="leading-tight">
-            <div className="font-headline text-xl font-bold tracking-tight">
-              GrayRegistration
-            </div>
-            <div className="text-[0.62rem] font-semibold uppercase tracking-[0.22em] text-white/50 mt-0.5">
-              Sistema de Gestión
-            </div>
-          </div>
+        <div className="flex items-center">
+          <LogoFull
+            size={200}
+            priority
+            className="h-auto w-[180px] xl:w-[200px] rounded-2xl ring-1 ring-white/10 drop-shadow-[0_8px_24px_rgba(37,99,235,0.35)]"
+          />
         </div>
 
         {/* Hero content */}
@@ -77,7 +73,7 @@ export function AuthBrandPanel() {
 
         {/* Footer */}
         <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.16em] text-white/40">
-          <span>© {new Date().getFullYear()} GrayRegistration</span>
+          <span>© {new Date().getFullYear()} GR Technology</span>
           <span>v2.0</span>
         </div>
       </div>

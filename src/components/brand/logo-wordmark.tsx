@@ -18,7 +18,7 @@ export function LogoWordmark({
   mono = false,
   className,
   framed = false,
-  tagline = "Sistema de Gestión",
+  tagline = "Soluciones que avanzan contigo",
 }: LogoWordmarkProps) {
   const nameSize = Math.round(size * 0.46);
   const taglineSize = Math.max(10, Math.round(size * 0.22));
@@ -45,7 +45,7 @@ export function LogoWordmark({
             letterSpacing: "-0.01em",
           }}
         >
-          GrayRegistration
+          GR Technology
         </div>
         {tagline && (
           <div

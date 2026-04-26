@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { LoginForm } from "@/modules/auth/components/login-form";
 import { AuthBrandPanel } from "../_components/auth-brand-panel";
-import { LogoWordmark } from "@/components/brand/logo-wordmark";
+import { LogoFull } from "@/components/brand/logo-full";
 import { ShieldCheck } from "lucide-react";
 import { isGoogleAuthEnabled } from "@/lib/auth";
 
@@ -14,7 +14,7 @@ export default function LoginPage() {
       <div className="flex flex-1 flex-col items-center justify-center p-6 md:p-10">
         {/* Mobile logo */}
         <div className="lg:hidden mb-8">
-          <LogoWordmark size={44} framed />
+          <LogoFull size={180} priority className="h-auto w-[160px] rounded-2xl" />
         </div>
 
         <div className="w-full max-w-[380px]">

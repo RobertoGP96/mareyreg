@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "GrayRegistration · Sistema de Gestión",
-    short_name: "GrayRegistration",
+    name: "GR Technology · Soluciones que avanzan contigo",
+    short_name: "GR Technology",
     description:
       "Plataforma operativa de logística, pacas, inventario y ventas — integrados en un solo sistema.",
     start_url: "/",
@@ -12,16 +12,22 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#1e40af",
     icons: [
       {
-        src: "/manifest-icon-192",
+        src: "/brand/gr-technology-logo.png",
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/manifest-icon-512",
+        src: "/brand/gr-technology-logo.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
+      },
+      {
+        src: "/brand/gr-technology-logo.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
       },
     ],
   };

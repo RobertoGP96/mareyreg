@@ -23,7 +23,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GrayRegistration · Sistema de Gestión",
+  title: "GR Technology · Soluciones que avanzan contigo",
   description:
     "Plataforma operativa de logística, pacas, inventario y ventas — integrados en un solo sistema.",
 };

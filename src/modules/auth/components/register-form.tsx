@@ -198,7 +198,7 @@ export function RegisterForm() {
           <a href="#" className="text-[var(--brand)] font-medium hover:underline">
             términos y condiciones
           </a>{" "}
-          y la política de privacidad de GrayRegistration.
+          y la política de privacidad de GR Technology.
         </span>
       </label>
 
