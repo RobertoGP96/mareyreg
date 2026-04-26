@@ -12,7 +12,7 @@ export type CompanyData = {
 };
 
 const DEFAULT_COMPANY: CompanyData = {
-  name: "GrayRegistration SA de CV",
+  name: "GR Technology",
   rfc: null,
   phone: null,
   address: null,

@@ -3,6 +3,8 @@ export const dynamic = "force-dynamic";
 import { db } from "@/lib/db";
 import { getKardex } from "@/modules/reporting/queries/kardex-queries";
 import { KardexClient } from "@/modules/reporting/components/kardex-client";
+import { PageHeader } from "@/components/ui/page-header";
+import { LineChart } from "lucide-react";
 
 interface Props {
   searchParams: Promise<{ productId?: string; warehouseId?: string }>;
@@ -30,13 +32,13 @@ export default async function KardexPage({ searchParams }: Props) {
   const product = productId ? products.find((p) => p.productId === productId) : null;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Kardex</h1>
-        <p className="text-muted-foreground mt-1">
-          Historico de movimientos y saldo acumulado por producto
-        </p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        icon={LineChart}
+        title="Kardex"
+        description="Histórico de movimientos y saldo acumulado por producto y almacén."
+        badge={product ? product.name : "Sin selección"}
+      />
       <KardexClient
         products={products}
         warehouses={warehouses}
