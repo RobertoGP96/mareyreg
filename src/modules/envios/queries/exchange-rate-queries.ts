@@ -13,6 +13,7 @@ export async function getExchangeRateRules(): Promise<ExchangeRateRuleRow[]> {
   return rows.map((r) => ({
     ruleId: r.ruleId,
     name: r.name,
+    kind: r.kind,
     baseCurrencyId: r.baseCurrencyId,
     quoteCurrencyId: r.quoteCurrencyId,
     active: r.active,

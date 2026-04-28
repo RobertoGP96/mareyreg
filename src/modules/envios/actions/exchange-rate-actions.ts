@@ -32,25 +32,27 @@ export async function createExchangeRateRule(
     });
     if (dup) return { success: false, error: `Ya existe una regla "${data.name}" con ese par.` };
 
+    // Tasa fija: normalizar a un único rango [0, ∞) con la tasa indicada.
+    const ranges = data.kind === "fixed"
+      ? [{ minAmount: 0, maxAmount: null, rate: data.ranges[0]?.rate ?? 0 }]
+      : data.ranges
+          .sort((a, b) => a.minAmount - b.minAmount)
+          .map((rg) => ({
+            minAmount: rg.minAmount,
+            maxAmount: rg.maxAmount ?? null,
+            rate: rg.rate,
+          }));
+
     const userId = await getCurrentUserId();
     const created = await db.$transaction(async (tx) => {
       const r = await tx.exchangeRateRule.create({
         data: {
           name: data.name,
+          kind: data.kind,
           baseCurrencyId: data.baseCurrencyId,
           quoteCurrencyId: data.quoteCurrencyId,
           active: data.active ?? true,
-          ranges: {
-            createMany: {
-              data: data.ranges
-                .sort((a, b) => a.minAmount - b.minAmount)
-                .map((rg) => ({
-                  minAmount: rg.minAmount,
-                  maxAmount: rg.maxAmount ?? null,
-                  rate: rg.rate,
-                })),
-            },
-          },
+          ranges: { createMany: { data: ranges } },
         },
       });
       await createAuditLog(tx, {
@@ -92,6 +94,7 @@ export async function updateExchangeRateRule(
         where: { ruleId: id },
         data: {
           ...(input.name !== undefined && { name: input.name.trim() }),
+          ...(input.kind !== undefined && { kind: input.kind }),
           ...(input.baseCurrencyId !== undefined && { baseCurrencyId: input.baseCurrencyId }),
           ...(input.quoteCurrencyId !== undefined && { quoteCurrencyId: input.quoteCurrencyId }),
           ...(input.active !== undefined && { active: input.active }),
@@ -99,17 +102,21 @@ export async function updateExchangeRateRule(
       });
 
       if (input.ranges) {
-        // Reemplazar todos los rangos atómicamente
+        // Reemplazar todos los rangos atómicamente. Si la regla queda como fixed,
+        // colapsar a un único rango [0, ∞) con la tasa indicada.
+        const nextKind = input.kind ?? prev.kind;
+        const ranges = nextKind === "fixed"
+          ? [{ minAmount: 0, maxAmount: null as number | null, rate: input.ranges[0]?.rate ?? 0 }]
+          : [...input.ranges]
+              .sort((a, b) => a.minAmount - b.minAmount)
+              .map((rg) => ({
+                minAmount: rg.minAmount,
+                maxAmount: rg.maxAmount ?? null,
+                rate: rg.rate,
+              }));
         await tx.exchangeRateRange.deleteMany({ where: { exchangeRateRuleId: id } });
         await tx.exchangeRateRange.createMany({
-          data: [...input.ranges]
-            .sort((a, b) => a.minAmount - b.minAmount)
-            .map((rg) => ({
-              exchangeRateRuleId: id,
-              minAmount: rg.minAmount,
-              maxAmount: rg.maxAmount ?? null,
-              rate: rg.rate,
-            })),
+          data: ranges.map((rg) => ({ exchangeRateRuleId: id, ...rg })),
         });
       }
 

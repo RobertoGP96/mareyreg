@@ -51,7 +51,7 @@ export type AccountRow = Pick<
 
 export type ExchangeRateRuleRow = Pick<
   ExchangeRateRule,
-  "ruleId" | "name" | "baseCurrencyId" | "quoteCurrencyId" | "active"
+  "ruleId" | "name" | "kind" | "baseCurrencyId" | "quoteCurrencyId" | "active"
 > & {
   baseCurrencyCode: string;
   quoteCurrencyCode: string;
@@ -96,3 +96,4 @@ export type {
   OperationType,
   OperationStatus,
 };
+export type { RateKind } from "@/generated/prisma";

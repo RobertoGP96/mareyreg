@@ -1147,6 +1147,11 @@ enum OperationStatus {
   cancelled
 }
 
+enum RateKind {
+  fixed
+  range
+}
+
 model Currency {
   currencyId    Int      @id @default(autoincrement()) @map("id")
   code          String   @unique
@@ -1213,6 +1218,7 @@ model Account {
 model ExchangeRateRule {
   ruleId          Int      @id @default(autoincrement()) @map("id")
   name            String
+  kind            RateKind @default(range)
   baseCurrencyId  Int      @map("base_currency_id")
   quoteCurrencyId Int      @map("quote_currency_id")
   active          Boolean  @default(true)

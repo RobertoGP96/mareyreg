@@ -26,8 +26,9 @@ import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
 import {
   LineChart, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2,
-  Type, Hash, Calculator, ToggleLeft, ArrowRightLeft,
+  Type, Hash, Calculator, ToggleLeft, ArrowRightLeft, Pin, BarChart3,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   createExchangeRateRule, updateExchangeRateRule, toggleExchangeRateRule, deleteExchangeRateRule,
@@ -62,11 +63,13 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
   const [submitting, setSubmitting] = useState(false);
 
   const [name, setName] = useState("");
+  const [kind, setKind] = useState<"fixed" | "range">("range");
   const [baseCurrencyId, setBaseCurrencyId] = useState<string>("");
   const [quoteCurrencyId, setQuoteCurrencyId] = useState<string>("");
   const [ranges, setRanges] = useState<RangeRow[]>([
     { minAmount: "0", maxAmount: "", rate: "" },
   ]);
+  const [fixedRate, setFixedRate] = useState<string>("");
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -83,24 +86,45 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
   const totalRanges = initialRules.reduce((acc, r) => acc + r.ranges.length, 0);
 
   const resetForm = () => {
-    setName(""); setBaseCurrencyId(""); setQuoteCurrencyId("");
+    setName(""); setKind("range"); setBaseCurrencyId(""); setQuoteCurrencyId("");
     setRanges([{ minAmount: "0", maxAmount: "", rate: "" }]);
+    setFixedRate("");
   };
 
   const fillEdit = (r: ExchangeRateRuleRow) => {
     setName(r.name);
+    setKind(r.kind);
     setBaseCurrencyId(String(r.baseCurrencyId));
     setQuoteCurrencyId(String(r.quoteCurrencyId));
-    setRanges(
-      r.ranges.length
-        ? r.ranges.map((rg) => ({
-            minAmount: String(rg.minAmount),
-            maxAmount: rg.maxAmount === null ? "" : String(rg.maxAmount),
-            rate: String(rg.rate),
-          }))
-        : [{ minAmount: "0", maxAmount: "", rate: "" }]
-    );
+    if (r.kind === "fixed") {
+      setFixedRate(r.ranges[0] ? String(r.ranges[0].rate) : "");
+      setRanges([{ minAmount: "0", maxAmount: "", rate: r.ranges[0] ? String(r.ranges[0].rate) : "" }]);
+    } else {
+      setFixedRate("");
+      setRanges(
+        r.ranges.length
+          ? r.ranges.map((rg) => ({
+              minAmount: String(rg.minAmount),
+              maxAmount: rg.maxAmount === null ? "" : String(rg.maxAmount),
+              rate: String(rg.rate),
+            }))
+          : [{ minAmount: "0", maxAmount: "", rate: "" }]
+      );
+    }
     setToEdit(r);
+  };
+
+  const switchKind = (next: "fixed" | "range") => {
+    if (next === kind) return;
+    if (next === "fixed") {
+      // Al pasar a fija, conservar la primera tasa de los rangos como punto de partida.
+      const firstRate = ranges[0]?.rate || "";
+      setFixedRate(firstRate);
+    } else {
+      // Al pasar a rangos, sembrar el primer rango con la tasa fija si existe.
+      setRanges([{ minAmount: "0", maxAmount: "", rate: fixedRate }]);
+    }
+    setKind(next);
   };
 
   const updateRange = (i: number, key: keyof RangeRow, val: string) => {
@@ -116,8 +140,9 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
     setRanges((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
   };
 
-  // Validación cliente: solapes / huecos
+  // Validación cliente solo aplica a kind=range
   const rangeIssues = useMemo(() => {
+    if (kind === "fixed") return [];
     const issues: string[] = [];
     const parsed = ranges.map((r, i) => ({
       i,
@@ -142,13 +167,18 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
       }
     }
     return issues;
-  }, [ranges]);
+  }, [ranges, kind]);
 
   const validate = () => {
     if (!name.trim()) return "Nombre requerido";
     if (!baseCurrencyId) return "Selecciona moneda base";
     if (!quoteCurrencyId) return "Selecciona moneda destino";
     if (baseCurrencyId === quoteCurrencyId) return "Base y destino deben ser distintas";
+    if (kind === "fixed") {
+      const r = Number(fixedRate);
+      if (!fixedRate || !Number.isFinite(r) || r <= 0) return "Tasa fija debe ser mayor a 0";
+      return null;
+    }
     if (rangeIssues.length) return rangeIssues[0];
     return null;
   };
@@ -159,13 +189,16 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
     setSubmitting(true);
     const payload = {
       name: name.trim(),
+      kind,
       baseCurrencyId: Number(baseCurrencyId),
       quoteCurrencyId: Number(quoteCurrencyId),
-      ranges: ranges.map((r) => ({
-        minAmount: Number(r.minAmount),
-        maxAmount: r.maxAmount === "" ? null : Number(r.maxAmount),
-        rate: Number(r.rate),
-      })),
+      ranges: kind === "fixed"
+        ? [{ minAmount: 0, maxAmount: null, rate: Number(fixedRate) }]
+        : ranges.map((r) => ({
+            minAmount: Number(r.minAmount),
+            maxAmount: r.maxAmount === "" ? null : Number(r.maxAmount),
+            rate: Number(r.rate),
+          })),
     };
     const r = toEdit
       ? await updateExchangeRateRule(toEdit.ruleId, payload)
@@ -259,6 +292,13 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-headline text-base font-semibold truncate">{r.name}</span>
                       <StatusPill status={r.active ? "active" : "inactive"} size="sm" />
+                      <Badge variant="outline" className="text-[10px] gap-1">
+                        {r.kind === "fixed" ? (
+                          <><Pin className="h-3 w-3" /> Fija</>
+                        ) : (
+                          <><BarChart3 className="h-3 w-3" /> Por rangos</>
+                        )}
+                      </Badge>
                     </div>
                     <div className="flex items-center gap-1.5 text-sm">
                       <CurrencyChip code={r.baseCurrencyCode} size="sm" />
@@ -291,6 +331,17 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
                 <div className="space-y-1.5">
                   {r.ranges.length === 0 ? (
                     <p className="text-xs text-muted-foreground">Sin rangos configurados.</p>
+                  ) : r.kind === "fixed" ? (
+                    <div className="flex items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-2 ring-1 ring-inset ring-[var(--ops-active)]/20">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <Pin className="h-3.5 w-3.5" />
+                        Cualquier monto
+                      </span>
+                      <span className="font-mono tabular-nums text-base font-semibold">
+                        {r.ranges[0].rate.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                        <span className="ml-1 text-[10px] text-muted-foreground">{r.quoteCurrencyCode}/{r.baseCurrencyCode}</span>
+                      </span>
+                    </div>
                   ) : (
                     r.ranges.map((rg, idx) => (
                       <div
@@ -367,68 +418,122 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
             </div>
           </FormSection>
 
-          <FormSection icon={Calculator} title="Rangos">
-            <p className="text-xs text-muted-foreground">
-              Cada rango define una tasa para un intervalo de monto en moneda base.
-              El último rango puede dejarse abierto (∞) para &ldquo;cualquier monto mayor&rdquo;.
-            </p>
-            <div className="space-y-2">
-              {ranges.map((r, i) => (
-                <div
-                  key={i}
-                  className={`grid grid-cols-12 gap-2 rounded-md bg-muted/20 p-2 border-l-4 ${RANGE_COLORS[i % RANGE_COLORS.length]}`}
-                >
-                  <div className="col-span-4">
-                    <label className="text-[10px] font-medium text-muted-foreground">Mínimo</label>
-                    <Input
-                      type="number"
-                      step="0.00000001"
-                      value={r.minAmount}
-                      onChange={(e) => updateRange(i, "minAmount", e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-4">
-                    <label className="text-[10px] font-medium text-muted-foreground">Máximo (vacío = ∞)</label>
-                    <Input
-                      type="number"
-                      step="0.00000001"
-                      value={r.maxAmount}
-                      onChange={(e) => updateRange(i, "maxAmount", e.target.value)}
-                      placeholder="∞"
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <label className="text-[10px] font-medium text-muted-foreground">Tasa</label>
-                    <Input
-                      type="number"
-                      step="0.00000001"
-                      value={r.rate}
-                      onChange={(e) => updateRange(i, "rate", e.target.value)}
-                    />
-                  </div>
-                  <div className="col-span-1 flex items-end justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-8"
-                      onClick={() => removeRange(i)}
-                      disabled={ranges.length === 1}
-                      aria-label="Eliminar rango"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+          <FormSection icon={Calculator} title="Tipo de tasa">
+            <div className="flex items-center gap-1 rounded-lg bg-muted/40 p-1">
+              {(
+                [
+                  { id: "fixed" as const, label: "Tasa fija", icon: Pin, hint: "Un solo valor para cualquier monto" },
+                  { id: "range" as const, label: "Por rangos", icon: BarChart3, hint: "Tasa distinta según el monto" },
+                ]
+              ).map((opt) => {
+                const Icon = opt.icon;
+                const isActive = kind === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => switchKind(opt.id)}
+                    className={cn(
+                      "flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-colors",
+                      isActive
+                        ? "bg-background shadow ring-1 ring-border text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
-            <Button type="button" variant="outline" onClick={addRange} className="w-full">
-              <Plus className="h-4 w-4" /> Añadir rango
-            </Button>
-            {rangeIssues.length > 0 && (
-              <ul className="mt-2 space-y-1 text-xs text-destructive">
-                {rangeIssues.map((msg, i) => (<li key={i}>• {msg}</li>))}
-              </ul>
+
+            {kind === "fixed" ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Una sola tasa que se aplica a cualquier monto convertido por esta regla.
+                </p>
+                <Field
+                  label={baseCurrencyId && quoteCurrencyId
+                    ? `Tasa (${currencies.find((c) => String(c.currencyId) === quoteCurrencyId)?.code} por ${currencies.find((c) => String(c.currencyId) === baseCurrencyId)?.code})`
+                    : "Tasa"}
+                  icon={Pin}
+                  required
+                >
+                  <Input
+                    type="number"
+                    step="0.00000001"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={fixedRate}
+                    onChange={(e) => setFixedRate(e.target.value)}
+                  />
+                </Field>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Cada rango define una tasa para un intervalo de monto en moneda base.
+                  El último rango puede dejarse abierto (∞) para &ldquo;cualquier monto mayor&rdquo;.
+                </p>
+                <div className="space-y-2">
+                  {ranges.map((r, i) => (
+                    <div
+                      key={i}
+                      className={`grid grid-cols-12 gap-2 rounded-md bg-muted/20 p-2 border-l-4 ${RANGE_COLORS[i % RANGE_COLORS.length]}`}
+                    >
+                      <div className="col-span-4">
+                        <label className="text-[10px] font-medium text-muted-foreground">Mínimo</label>
+                        <Input
+                          type="number"
+                          step="0.00000001"
+                          value={r.minAmount}
+                          onChange={(e) => updateRange(i, "minAmount", e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <label className="text-[10px] font-medium text-muted-foreground">Máximo (vacío = ∞)</label>
+                        <Input
+                          type="number"
+                          step="0.00000001"
+                          value={r.maxAmount}
+                          onChange={(e) => updateRange(i, "maxAmount", e.target.value)}
+                          placeholder="∞"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <label className="text-[10px] font-medium text-muted-foreground">Tasa</label>
+                        <Input
+                          type="number"
+                          step="0.00000001"
+                          value={r.rate}
+                          onChange={(e) => updateRange(i, "rate", e.target.value)}
+                        />
+                      </div>
+                      <div className="col-span-1 flex items-end justify-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8"
+                          onClick={() => removeRange(i)}
+                          disabled={ranges.length === 1}
+                          aria-label="Eliminar rango"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Button type="button" variant="outline" onClick={addRange} className="w-full">
+                  <Plus className="h-4 w-4" /> Añadir rango
+                </Button>
+                {rangeIssues.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-xs text-destructive">
+                    {rangeIssues.map((msg, i) => (<li key={i}>• {msg}</li>))}
+                  </ul>
+                )}
+              </>
             )}
           </FormSection>
         </div>

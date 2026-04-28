@@ -69,6 +69,7 @@ export const rateRangeSchema = z
 
 export const exchangeRateRuleSchema = z.object({
   name: z.string().trim().min(1, "Nombre requerido").max(80),
+  kind: z.enum(["fixed", "range"]).default("range"),
   baseCurrencyId: z.coerce.number().int().positive("Selecciona moneda base"),
   quoteCurrencyId: z.coerce.number().int().positive("Selecciona moneda destino"),
   ranges: z.array(rateRangeSchema).min(1, "Al menos un rango"),
@@ -77,6 +78,20 @@ export const exchangeRateRuleSchema = z.object({
   message: "Base y destino deben ser distintas",
   path: ["quoteCurrencyId"],
 }).superRefine((r, ctx) => {
+  // Tasa fija: un único rango cubriendo [0, ∞).
+  if (r.kind === "fixed") {
+    if (r.ranges.length !== 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Tasa fija debe tener exactamente una tasa",
+        path: ["ranges"],
+      });
+      return;
+    }
+    return;
+  }
+
+  // Por rangos: validar no-solape y monotonicidad.
   const sorted = [...r.ranges].sort((a, b) => a.minAmount - b.minAmount);
   for (let i = 0; i < sorted.length; i++) {
     const cur = sorted[i];
