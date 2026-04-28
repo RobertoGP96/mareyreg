@@ -72,6 +72,7 @@ export const batchConversionRowSchema = z.object({
   reference: z.string().trim().max(80).nullish(),
   occurredAt: z.string().datetime().nullish().or(z.string().length(0).nullish()),
   status: z.enum(["pending", "confirmed"]).default("confirmed"),
+  rateOverride: z.coerce.number().positive().nullish(),
 });
 
 export const batchRowSchema = z.discriminatedUnion("kind", [

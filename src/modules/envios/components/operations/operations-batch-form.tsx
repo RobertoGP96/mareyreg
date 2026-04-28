@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { FormDialogHeader } from "@/components/ui/field";
 import {
   Layers, Plus, Trash2, Loader2, Clock, ArrowDownLeft, ArrowUpRight,
-  Settings2, ArrowRightLeft, AlertTriangle,
+  Settings2, ArrowRightLeft, AlertTriangle, RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -36,6 +36,7 @@ type Props = {
 
 type RowKind = "regular" | "conversion";
 type RegularType = "deposit" | "withdrawal" | "adjustment";
+type Direction = "base_to_quote" | "quote_to_base";
 
 type Row = {
   kind: RowKind;
@@ -46,6 +47,8 @@ type Row = {
   // conversion
   externalCurrencyId: string;
   externalAmount: string;
+  rateInput: string;
+  convertedInput: string;
   // común
   description: string;
 };
@@ -57,6 +60,8 @@ const newRow = (presetAccountId?: number): Row => ({
   amount: "",
   externalCurrencyId: "",
   externalAmount: "",
+  rateInput: "",
+  convertedInput: "",
   description: "",
 });
 
@@ -66,11 +71,36 @@ const REGULAR_OPTIONS: { id: RegularType; label: string; icon: React.ComponentTy
   { id: "adjustment", label: "Ajuste",    icon: Settings2,     tone: "text-muted-foreground" },
 ];
 
-type RowPreview =
-  | { state: "idle" }
-  | { state: "loading" }
-  | { state: "ok"; delta: number; rate?: number; counterCode?: string }
-  | { state: "error"; message: string };
+type RowMeta = {
+  state: "idle" | "loading" | "ok" | "error";
+  defaultRate?: number;
+  direction?: Direction;
+  message?: string;
+};
+
+const num = (v: string): number | null => {
+  if (!v) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+const fmt = (n: number, decimals: number) =>
+  n.toLocaleString("es-MX", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+
+const computeConverted = (externalAmount: number, rate: number, direction: Direction) =>
+  direction === "base_to_quote" ? externalAmount * rate : externalAmount / rate;
+
+const computeRateFromConverted = (externalAmount: number, convertedAmount: number, direction: Direction) => {
+  if (direction === "base_to_quote") {
+    if (externalAmount === 0) return 0;
+    return convertedAmount / externalAmount;
+  }
+  if (convertedAmount === 0) return 0;
+  return externalAmount / convertedAmount;
+};
 
 export function OperationsBatchForm({
   open,
@@ -85,7 +115,7 @@ export function OperationsBatchForm({
   const [statusPending, setStatusPending] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorRowIndex, setErrorRowIndex] = useState<number | null>(null);
-  const [previews, setPreviews] = useState<Record<number, RowPreview>>({});
+  const [meta, setMeta] = useState<Record<number, RowMeta>>({});
 
   const eligibleAccounts = useMemo(
     () =>
@@ -99,19 +129,17 @@ export function OperationsBatchForm({
     setRows([newRow(presetAccountId)]);
     setStatusPending(false);
     setErrorRowIndex(null);
-    setPreviews({});
+    setMeta({});
   };
 
-  // Cuando cambian props del preset
+  // Preset cuando se abre
   useEffect(() => {
     if (open && presetAccountId) {
-      setRows((prev) =>
-        prev.map((r) => ({ ...r, accountId: String(presetAccountId) }))
-      );
+      setRows((prev) => prev.map((r) => ({ ...r, accountId: String(presetAccountId) })));
     }
   }, [open, presetAccountId]);
 
-  // Autoseleccionar moneda externa para filas de conversión (única contraparte posible por la regla)
+  // Autoseleccionar moneda externa para conversiones
   useEffect(() => {
     setRows((prev) => {
       let changed = false;
@@ -131,107 +159,204 @@ export function OperationsBatchForm({
     });
   }, [rows, accounts]);
 
-  const updateRow = (i: number, patch: Partial<Row>) => {
-    setRows((prev) => prev.map((r, idx) => {
-      if (idx !== i) return r;
-      const next = { ...r, ...patch };
-      // Si cambia kind, resetear los campos del otro modo
-      if (patch.kind && patch.kind !== r.kind) {
-        if (patch.kind === "regular") {
-          next.externalCurrencyId = "";
-          next.externalAmount = "";
+  // Helper para obtener dirección de conversión sin server
+  const directionFor = (row: Row): Direction | null => {
+    const acc = accounts.find((a) => String(a.accountId) === row.accountId);
+    if (!acc?.rule || !row.externalCurrencyId) return null;
+    const ext = Number(row.externalCurrencyId);
+    if (acc.rule.baseCurrencyId === ext && acc.rule.quoteCurrencyId === acc.currencyId) {
+      return "base_to_quote";
+    }
+    if (acc.rule.quoteCurrencyId === ext && acc.rule.baseCurrencyId === acc.currencyId) {
+      return "quote_to_base";
+    }
+    return null;
+  };
+
+  // Llamar previewDepositConversion para obtener tasa por defecto y poblar inputs
+  useEffect(() => {
+    const handles: NodeJS.Timeout[] = [];
+    rows.forEach((row, i) => {
+      if (row.kind !== "conversion") return;
+      const ext = num(row.externalAmount);
+      if (!row.accountId || !row.externalCurrencyId || !ext || ext <= 0) {
+        setMeta((prev) => ({ ...prev, [i]: { state: "idle" } }));
+        return;
+      }
+      setMeta((prev) =>
+        prev[i]?.state === "ok" || prev[i]?.state === "loading"
+          ? prev
+          : { ...prev, [i]: { state: "loading" } }
+      );
+      const h = setTimeout(async () => {
+        const r = await previewDepositConversion({
+          accountId: Number(row.accountId),
+          externalCurrencyId: Number(row.externalCurrencyId),
+          externalAmount: ext,
+        });
+        if (r.success) {
+          setMeta((prev) => ({
+            ...prev,
+            [i]: {
+              state: "ok",
+              defaultRate: r.data.rate,
+              direction: r.data.direction,
+            },
+          }));
+          // Sembrar rateInput si está vacío; convertedInput se deriva más abajo.
+          setRows((prev) =>
+            prev.map((rw, idx) => {
+              if (idx !== i) return rw;
+              if (rw.rateInput) return rw;
+              return { ...rw, rateInput: String(r.data.rate) };
+            })
+          );
         } else {
-          next.amount = "";
+          setMeta((prev) => ({ ...prev, [i]: { state: "error", message: r.error } }));
         }
-      }
-      // Si cambia accountId, resetear externalCurrencyId (depende de la regla)
-      if (patch.accountId !== undefined && patch.accountId !== r.accountId) {
-        next.externalCurrencyId = "";
-      }
-      return next;
-    }));
+      }, 280);
+      handles.push(h);
+    });
+    return () => handles.forEach(clearTimeout);
+  }, [rows, accounts]);
+
+  // Mantener rate↔converted coherentes: si uno cambia (o externalAmount), recalcular el otro derivable
+  // siempre y cuando sólo uno de ellos esté "vacío" o ambos estén poblados consistentemente.
+  // Implementación pragmática: cada onChange explícito recalcula el contrario inmediatamente.
+
+  const updateRow = (i: number, patch: Partial<Row>) => {
+    setRows((prev) =>
+      prev.map((r, idx) => {
+        if (idx !== i) return r;
+        const next = { ...r, ...patch };
+        if (patch.kind && patch.kind !== r.kind) {
+          if (patch.kind === "regular") {
+            next.externalCurrencyId = "";
+            next.externalAmount = "";
+            next.rateInput = "";
+            next.convertedInput = "";
+          } else {
+            next.amount = "";
+          }
+        }
+        if (patch.accountId !== undefined && patch.accountId !== r.accountId) {
+          next.externalCurrencyId = "";
+          next.rateInput = "";
+          next.convertedInput = "";
+        }
+        return next;
+      })
+    );
     setErrorRowIndex(null);
+  };
+
+  const onExternalAmountChange = (i: number, val: string) => {
+    setRows((prev) =>
+      prev.map((r, idx) => {
+        if (idx !== i) return r;
+        const next = { ...r, externalAmount: val };
+        const ext = num(val);
+        const rate = num(r.rateInput);
+        const dir = directionFor(r);
+        if (ext != null && rate != null && rate > 0 && dir) {
+          const conv = computeConverted(ext, rate, dir);
+          next.convertedInput = Number.isFinite(conv) ? String(conv) : "";
+        } else if (!val) {
+          next.convertedInput = "";
+        }
+        return next;
+      })
+    );
+    setErrorRowIndex(null);
+  };
+
+  const onRateChange = (i: number, val: string) => {
+    setRows((prev) =>
+      prev.map((r, idx) => {
+        if (idx !== i) return r;
+        const next = { ...r, rateInput: val };
+        const rate = num(val);
+        const ext = num(r.externalAmount);
+        const dir = directionFor(r);
+        if (rate != null && rate > 0 && ext != null && dir) {
+          const conv = computeConverted(ext, rate, dir);
+          next.convertedInput = Number.isFinite(conv) ? String(conv) : "";
+        }
+        return next;
+      })
+    );
+    setErrorRowIndex(null);
+  };
+
+  const onConvertedChange = (i: number, val: string) => {
+    setRows((prev) =>
+      prev.map((r, idx) => {
+        if (idx !== i) return r;
+        const next = { ...r, convertedInput: val };
+        const conv = num(val);
+        const ext = num(r.externalAmount);
+        const dir = directionFor(r);
+        if (conv != null && conv > 0 && ext != null && ext > 0 && dir) {
+          const rate = computeRateFromConverted(ext, conv, dir);
+          next.rateInput = Number.isFinite(rate) ? String(rate) : "";
+        }
+        return next;
+      })
+    );
+    setErrorRowIndex(null);
+  };
+
+  const restoreDefaultRate = (i: number) => {
+    const m = meta[i];
+    const row = rows[i];
+    if (!m?.defaultRate || !row) return;
+    const ext = num(row.externalAmount);
+    const dir = m.direction;
+    setRows((prev) =>
+      prev.map((r, idx) => {
+        if (idx !== i) return r;
+        const next = { ...r, rateInput: String(m.defaultRate) };
+        if (ext != null && dir) {
+          const conv = computeConverted(ext, m.defaultRate!, dir);
+          next.convertedInput = Number.isFinite(conv) ? String(conv) : "";
+        }
+        return next;
+      })
+    );
   };
 
   const addRow = () => setRows((prev) => [...prev, newRow(presetAccountId)]);
   const removeRow = (i: number) => {
     setRows((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
-    setPreviews((prev) => {
+    setMeta((prev) => {
       const next = { ...prev };
       delete next[i];
-      // re-indexar
       return next;
     });
   };
 
-  // Calcular delta para fila regular
-  const regularDelta = (row: Row): number | null => {
-    const n = Number(row.amount);
-    if (!Number.isFinite(n) || n === 0) return null;
-    if (row.type === "deposit") return Math.abs(n);
-    if (row.type === "withdrawal") return -Math.abs(n);
-    return n; // adjustment respeta signo
+  // Delta proyectado por fila (en moneda de cuenta)
+  const rowDelta = (row: Row, i: number): number | null => {
+    if (row.kind === "regular") {
+      const n = num(row.amount);
+      if (n === null || n === 0) return null;
+      if (row.type === "deposit") return Math.abs(n);
+      if (row.type === "withdrawal") return -Math.abs(n);
+      return n;
+    }
+    const conv = num(row.convertedInput);
+    if (conv != null && conv > 0) return conv;
+    // fallback: si rate y external están y manualConvertedInput no, computar
+    const ext = num(row.externalAmount);
+    const rate = num(row.rateInput);
+    const dir = directionFor(row);
+    if (ext != null && rate != null && rate > 0 && dir) {
+      const c = computeConverted(ext, rate, dir);
+      return Number.isFinite(c) ? c : null;
+    }
+    return null;
   };
 
-  // Preview por fila: regular es local, conversion llama al server con debounce
-  useEffect(() => {
-    rows.forEach((row, i) => {
-      if (row.kind === "regular") {
-        const delta = regularDelta(row);
-        setPreviews((prev) => {
-          if (delta === null) {
-            if (prev[i]?.state === "idle") return prev;
-            return { ...prev, [i]: { state: "idle" } };
-          }
-          const cur = prev[i];
-          if (cur?.state === "ok" && cur.delta === delta && cur.rate === undefined) return prev;
-          return { ...prev, [i]: { state: "ok", delta } };
-        });
-      }
-    });
-  }, [rows]);
-
-  // Conversiones: debounce y llamada al server
-  useEffect(() => {
-    const handles: NodeJS.Timeout[] = [];
-    rows.forEach((row, i) => {
-      if (row.kind !== "conversion") return;
-      if (!row.accountId || !row.externalCurrencyId || !row.externalAmount) {
-        setPreviews((prev) => ({ ...prev, [i]: { state: "idle" } }));
-        return;
-      }
-      const n = Number(row.externalAmount);
-      if (!Number.isFinite(n) || n <= 0) {
-        setPreviews((prev) => ({ ...prev, [i]: { state: "idle" } }));
-        return;
-      }
-      setPreviews((prev) => ({ ...prev, [i]: { state: "loading" } }));
-      const h = setTimeout(async () => {
-        const r = await previewDepositConversion({
-          accountId: Number(row.accountId),
-          externalCurrencyId: Number(row.externalCurrencyId),
-          externalAmount: n,
-        });
-        if (r.success) {
-          setPreviews((prev) => ({
-            ...prev,
-            [i]: {
-              state: "ok",
-              delta: r.data.amountInAccountCurrency,
-              rate: r.data.rate,
-              counterCode: r.data.externalCurrencyCode,
-            },
-          }));
-        } else {
-          setPreviews((prev) => ({ ...prev, [i]: { state: "error", message: r.error } }));
-        }
-      }, 300);
-      handles.push(h);
-    });
-    return () => handles.forEach(clearTimeout);
-  }, [rows]);
-
-  // Saldos proyectados por cuenta (acumulando deltas en orden)
   const projectedBalances = useMemo(() => {
     const map = new Map<
       number,
@@ -249,8 +374,7 @@ export function OperationsBatchForm({
       if (!row.accountId) return;
       const acc = accounts.find((a) => String(a.accountId) === row.accountId);
       if (!acc) return;
-      const preview = previews[i];
-      const delta = preview?.state === "ok" ? preview.delta : 0;
+      const delta = rowDelta(row, i) ?? 0;
       const prev = map.get(acc.accountId);
       if (prev) {
         prev.delta += delta;
@@ -268,29 +392,26 @@ export function OperationsBatchForm({
       }
     });
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [rows, accounts, previews]);
+  }, [rows, accounts]);
 
   const validate = (): { valid: boolean; index?: number; error?: string } => {
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
       if (!r.accountId) return { valid: false, index: i, error: `Fila ${i + 1}: selecciona una cuenta` };
       if (r.kind === "regular") {
-        const n = Number(r.amount);
-        if (!Number.isFinite(n) || n === 0) return { valid: false, index: i, error: `Fila ${i + 1}: monto inválido` };
+        const n = num(r.amount);
+        if (n === null || n === 0) return { valid: false, index: i, error: `Fila ${i + 1}: monto inválido` };
         if (r.type !== "adjustment" && n <= 0) {
           return { valid: false, index: i, error: `Fila ${i + 1}: el monto debe ser positivo` };
         }
       } else {
         if (!r.externalCurrencyId) return { valid: false, index: i, error: `Fila ${i + 1}: selecciona moneda externa` };
-        const n = Number(r.externalAmount);
-        if (!Number.isFinite(n) || n <= 0) return { valid: false, index: i, error: `Fila ${i + 1}: monto externo inválido` };
-        const preview = previews[i];
-        if (preview?.state === "error") {
-          return { valid: false, index: i, error: `Fila ${i + 1}: ${preview.message}` };
-        }
-        if (preview?.state !== "ok") {
-          return { valid: false, index: i, error: `Fila ${i + 1}: espera a que se calcule la tasa` };
-        }
+        const ext = num(r.externalAmount);
+        if (ext === null || ext <= 0) return { valid: false, index: i, error: `Fila ${i + 1}: monto externo inválido` };
+        const rate = num(r.rateInput);
+        if (rate === null || rate <= 0) return { valid: false, index: i, error: `Fila ${i + 1}: tasa inválida` };
+        const m = meta[i];
+        if (m?.state === "error") return { valid: false, index: i, error: `Fila ${i + 1}: ${m.message}` };
       }
     }
     return { valid: true };
@@ -305,7 +426,7 @@ export function OperationsBatchForm({
     }
     setSubmitting(true);
     setErrorRowIndex(null);
-    const payload: BatchRowInput[] = rows.map((row) => {
+    const payload: BatchRowInput[] = rows.map((row, i) => {
       if (row.kind === "regular") {
         return {
           kind: "regular",
@@ -316,6 +437,9 @@ export function OperationsBatchForm({
           status: statusPending ? "pending" : "confirmed",
         };
       }
+      const userRate = Number(row.rateInput);
+      const defaultRate = meta[i]?.defaultRate;
+      const overrode = defaultRate != null && Math.abs(userRate - defaultRate) > 1e-10;
       return {
         kind: "conversion",
         accountId: Number(row.accountId),
@@ -323,6 +447,7 @@ export function OperationsBatchForm({
         externalCurrencyId: Number(row.externalCurrencyId),
         description: row.description.trim() || null,
         status: statusPending ? "pending" : "confirmed",
+        rateOverride: overrode ? userRate : null,
       };
     });
     const r = await createOperationsBatch(payload);
@@ -343,7 +468,6 @@ export function OperationsBatchForm({
     }
   };
 
-  // Para fila conversion: filtrar monedas externas por la regla de la cuenta
   const counterCurrencyForAccount = (accountId: string): { currencyId: number; code: string } | null => {
     const acc = accounts.find((a) => String(a.accountId) === accountId);
     if (!acc?.rule) return null;
@@ -355,6 +479,8 @@ export function OperationsBatchForm({
     return c ? { currencyId: c.currencyId, code: c.code } : null;
   };
 
+  const isLockedAccount = !!(lockAccount && presetAccountId);
+
   return (
     <ResponsiveFormDialog
       open={open}
@@ -365,10 +491,10 @@ export function OperationsBatchForm({
     >
       <FormDialogHeader
         icon={Layers}
-        title={lockAccount && presetAccountId
+        title={isLockedAccount
           ? "Operaciones en lote en esta cuenta"
           : "Operaciones en lote"}
-        description="Registra varias operaciones a la vez. Soporta depósitos, retiros, ajustes y conversiones de moneda."
+        description="Soporta depósitos, retiros, ajustes y conversiones de moneda. Edita la tasa o el monto convertido para ajustes manuales."
       />
 
       {/* Saldos proyectados */}
@@ -387,12 +513,7 @@ export function OperationsBatchForm({
                 <span className="ml-1 text-muted-foreground">{b.currencyCode}</span>
               </span>
               <div className="flex items-center gap-2 font-mono tabular-nums">
-                <span className="text-muted-foreground">
-                  {b.initial.toLocaleString("es-MX", {
-                    minimumFractionDigits: b.currencyDecimals,
-                    maximumFractionDigits: b.currencyDecimals,
-                  })}
-                </span>
+                <span className="text-muted-foreground">{fmt(b.initial, b.currencyDecimals)}</span>
                 <span
                   className={cn(
                     "text-[10px] font-semibold",
@@ -400,22 +521,11 @@ export function OperationsBatchForm({
                   )}
                 >
                   {b.delta > 0 ? "+" : b.delta < 0 ? "−" : ""}
-                  {Math.abs(b.delta).toLocaleString("es-MX", {
-                    minimumFractionDigits: b.currencyDecimals,
-                    maximumFractionDigits: b.currencyDecimals,
-                  })}
+                  {fmt(Math.abs(b.delta), b.currencyDecimals)}
                 </span>
                 <span className="text-muted-foreground">→</span>
-                <span
-                  className={cn(
-                    "font-semibold",
-                    b.final < 0 && "text-rose-500"
-                  )}
-                >
-                  {b.final.toLocaleString("es-MX", {
-                    minimumFractionDigits: b.currencyDecimals,
-                    maximumFractionDigits: b.currencyDecimals,
-                  })}
+                <span className={cn("font-semibold", b.final < 0 && "text-rose-500")}>
+                  {fmt(b.final, b.currencyDecimals)}
                 </span>
               </div>
             </div>
@@ -426,11 +536,17 @@ export function OperationsBatchForm({
       <div className="space-y-3 mt-4">
         <div className="space-y-2">
           {rows.map((row, i) => {
-            const isLockedAccount = lockAccount && !!presetAccountId;
             const acc = accounts.find((a) => String(a.accountId) === row.accountId);
             const counter = row.kind === "conversion" ? counterCurrencyForAccount(row.accountId) : null;
-            const preview = previews[i];
+            const m = meta[i];
             const isError = errorRowIndex === i;
+            const userRate = num(row.rateInput);
+            const isOverride =
+              row.kind === "conversion" &&
+              m?.defaultRate != null &&
+              userRate != null &&
+              Math.abs(userRate - m.defaultRate) > 1e-10;
+
             return (
               <div
                 key={i}
@@ -466,13 +582,13 @@ export function OperationsBatchForm({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-12 gap-2">
-                  <div className="col-span-12 md:col-span-4">
+                {/* Selector de cuenta solo si NO está locked */}
+                {!isLockedAccount && (
+                  <div>
                     <label className="text-[10px] font-medium text-muted-foreground">Cuenta</label>
                     <Select
                       value={row.accountId}
                       onValueChange={(v) => updateRow(i, { accountId: v })}
-                      disabled={isLockedAccount}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Cuenta" />
@@ -486,73 +602,76 @@ export function OperationsBatchForm({
                       </SelectContent>
                     </Select>
                   </div>
+                )}
 
-                  {row.kind === "regular" ? (
-                    <>
-                      <div className="col-span-6 md:col-span-3">
-                        <label className="text-[10px] font-medium text-muted-foreground">Tipo</label>
-                        <Select
-                          value={row.type}
-                          onValueChange={(v) => updateRow(i, { type: v as RegularType })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {REGULAR_OPTIONS.map((t) => {
-                              const Icon = t.icon;
-                              return (
-                                <SelectItem key={t.id} value={t.id}>
-                                  <span className="flex items-center gap-2">
-                                    <Icon className={cn("h-3.5 w-3.5", t.tone)} /> {t.label}
-                                  </span>
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="col-span-6 md:col-span-2">
-                        <label className="text-[10px] font-medium text-muted-foreground">
-                          Monto {acc ? `(${acc.currencyCode})` : ""}
-                        </label>
-                        <Input
-                          type="number"
-                          step="0.00000001"
-                          inputMode="decimal"
-                          placeholder="0.00"
-                          className="text-right font-mono tabular-nums"
-                          value={row.amount}
-                          onChange={(e) => updateRow(i, { amount: e.target.value })}
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="col-span-6 md:col-span-3">
-                        <label className="text-[10px] font-medium text-muted-foreground">
-                          Moneda externa
-                        </label>
-                        <Select
-                          value={row.externalCurrencyId}
-                          onValueChange={(v) => updateRow(i, { externalCurrencyId: v })}
-                          disabled={!counter}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder={counter ? counter.code : "Sin regla"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {counter && (
-                              <SelectItem value={String(counter.currencyId)}>
-                                {counter.code}
+                {/* Body por kind */}
+                {row.kind === "regular" ? (
+                  <div className="grid grid-cols-12 gap-2">
+                    <div className="col-span-6 md:col-span-4">
+                      <label className="text-[10px] font-medium text-muted-foreground">Tipo</label>
+                      <Select
+                        value={row.type}
+                        onValueChange={(v) => updateRow(i, { type: v as RegularType })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {REGULAR_OPTIONS.map((t) => {
+                            const Icon = t.icon;
+                            return (
+                              <SelectItem key={t.id} value={t.id}>
+                                <span className="flex items-center gap-2">
+                                  <Icon className={cn("h-3.5 w-3.5", t.tone)} /> {t.label}
+                                </span>
                               </SelectItem>
-                            )}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="col-span-6 md:col-span-2">
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="col-span-6 md:col-span-3">
+                      <label className="text-[10px] font-medium text-muted-foreground">
+                        Monto {acc ? `(${acc.currencyCode})` : ""}
+                      </label>
+                      <Input
+                        type="number"
+                        step="0.00000001"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        className="text-right font-mono tabular-nums"
+                        value={row.amount}
+                        onChange={(e) => updateRow(i, { amount: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-span-11 md:col-span-4">
+                      <label className="text-[10px] font-medium text-muted-foreground">Descripción</label>
+                      <Input
+                        placeholder="Notas"
+                        value={row.description}
+                        onChange={(e) => updateRow(i, { description: e.target.value })}
+                      />
+                    </div>
+                    <div className="col-span-1 flex items-end justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        onClick={() => removeRow(i)}
+                        disabled={rows.length === 1}
+                        aria-label="Eliminar fila"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-12 gap-2">
+                      <div className="col-span-12 md:col-span-3">
                         <label className="text-[10px] font-medium text-muted-foreground">
-                          Monto {counter ? `(${counter.code})` : "externo"}
+                          Monto entrante {counter ? `(${counter.code})` : ""}
                         </label>
                         <Input
                           type="number"
@@ -561,64 +680,94 @@ export function OperationsBatchForm({
                           placeholder="0.00"
                           className="text-right font-mono tabular-nums"
                           value={row.externalAmount}
-                          onChange={(e) => updateRow(i, { externalAmount: e.target.value })}
+                          onChange={(e) => onExternalAmountChange(i, e.target.value)}
                           disabled={!counter}
                         />
                       </div>
-                    </>
-                  )}
+                      <div className="col-span-6 md:col-span-3">
+                        <label className="text-[10px] font-medium text-muted-foreground flex items-center justify-between">
+                          <span>
+                            Tasa {counter && acc ? `(${acc.currencyCode}/${counter.code})` : ""}
+                          </span>
+                          {isOverride && m?.defaultRate != null && (
+                            <button
+                              type="button"
+                              onClick={() => restoreDefaultRate(i)}
+                              className="text-[10px] text-[var(--brand)] hover:underline flex items-center gap-0.5"
+                              title={`Restaurar tasa de la regla (${m.defaultRate})`}
+                            >
+                              <RotateCcw className="h-2.5 w-2.5" /> Regla
+                            </button>
+                          )}
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.00000001"
+                          inputMode="decimal"
+                          placeholder={m?.state === "loading" ? "…" : "0.00"}
+                          className={cn(
+                            "text-right font-mono tabular-nums",
+                            isOverride && "ring-1 ring-amber-400/40"
+                          )}
+                          value={row.rateInput}
+                          onChange={(e) => onRateChange(i, e.target.value)}
+                          disabled={!counter}
+                        />
+                      </div>
+                      <div className="col-span-6 md:col-span-3">
+                        <label className="text-[10px] font-medium text-muted-foreground">
+                          Acreditará {acc ? `(${acc.currencyCode})` : ""}
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.00000001"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          className="text-right font-mono tabular-nums font-semibold"
+                          value={row.convertedInput}
+                          onChange={(e) => onConvertedChange(i, e.target.value)}
+                          disabled={!counter}
+                        />
+                      </div>
+                      <div className="col-span-11 md:col-span-2">
+                        <label className="text-[10px] font-medium text-muted-foreground">Descripción</label>
+                        <Input
+                          placeholder="Notas"
+                          value={row.description}
+                          onChange={(e) => updateRow(i, { description: e.target.value })}
+                        />
+                      </div>
+                      <div className="col-span-1 flex items-end justify-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8"
+                          onClick={() => removeRow(i)}
+                          disabled={rows.length === 1}
+                          aria-label="Eliminar fila"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
 
-                  <div className="col-span-11 md:col-span-2">
-                    <label className="text-[10px] font-medium text-muted-foreground">Descripción</label>
-                    <Input
-                      placeholder="Notas"
-                      value={row.description}
-                      onChange={(e) => updateRow(i, { description: e.target.value })}
-                    />
-                  </div>
-                  <div className="col-span-1 flex items-end justify-end">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-8"
-                      onClick={() => removeRow(i)}
-                      disabled={rows.length === 1}
-                      aria-label="Eliminar fila"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Status de preview / errores por fila */}
-                {row.kind === "conversion" && preview && preview.state !== "idle" && (
-                  <div className="text-[11px] flex items-center gap-1.5">
-                    {preview.state === "loading" && (
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <Loader2 className="h-3 w-3 animate-spin" /> Calculando tasa…
-                      </span>
-                    )}
-                    {preview.state === "error" && (
-                      <span className="text-destructive flex items-center gap-1">
-                        <AlertTriangle className="h-3 w-3" /> {preview.message}
-                      </span>
-                    )}
-                    {preview.state === "ok" && acc && (
-                      <span className="text-muted-foreground">
-                        Acreditará{" "}
-                        <span className="font-mono tabular-nums font-semibold text-foreground">
-                          {preview.delta.toLocaleString("es-MX", {
-                            minimumFractionDigits: acc.currencyDecimals,
-                            maximumFractionDigits: acc.currencyDecimals,
-                          })} {acc.currencyCode}
-                        </span>
-                        {preview.rate && (
-                          <> · tasa <span className="font-mono tabular-nums">{preview.rate.toLocaleString("es-MX", { maximumFractionDigits: 6 })}</span></>
+                    {/* Estado por fila */}
+                    {m && m.state !== "ok" && m.state !== "idle" && (
+                      <div className="text-[11px] flex items-center gap-1.5">
+                        {m.state === "loading" && (
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Cargando tasa de la regla…
+                          </span>
                         )}
-                      </span>
+                        {m.state === "error" && (
+                          <span className="text-destructive flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> {m.message}
+                          </span>
+                        )}
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
             );

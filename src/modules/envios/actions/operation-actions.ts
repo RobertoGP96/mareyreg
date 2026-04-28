@@ -255,11 +255,13 @@ export async function createOperationsBatch(
             throw new Error(`Fila ${i + 1}: la regla "${rule.name}" no convierte entre estas monedas`);
           }
 
-          const resolved = await resolveRate(tx, rule.ruleId, data.externalAmount);
+          const rate =
+            data.rateOverride ??
+            (await resolveRate(tx, rule.ruleId, data.externalAmount)).rate;
           const amountInAccountCurrency =
             direction === "base_to_quote"
-              ? data.externalAmount * resolved.rate
-              : data.externalAmount / resolved.rate;
+              ? data.externalAmount * rate
+              : data.externalAmount / rate;
 
           let balanceAfter: number;
           if (status === "confirmed") {
@@ -285,7 +287,7 @@ export async function createOperationsBatch(
               reference: data.reference?.trim() || null,
               balanceAfter,
               exchangeRateRuleId: rule.ruleId,
-              rateApplied: resolved.rate,
+              rateApplied: rate,
               counterAmount: data.externalAmount,
               counterCurrencyId: data.externalCurrencyId,
               occurredAt,
