@@ -1,11 +1,17 @@
-import { PageHeader } from "@/components/ui/page-header";
-import { ArrowRightLeft } from "lucide-react";
+import { OperationListClient } from "@/modules/envios/components/operations/operation-list-client";
+import {
+  getOperations,
+  getOperationFormData,
+} from "@/modules/envios/queries/operation-queries";
 
-export default function OperacionesPage() {
+export default async function OperacionesPage() {
+  const [operations, accounts] = await Promise.all([
+    getOperations({ limit: 200 }),
+    getOperationFormData(),
+  ]);
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <PageHeader icon={ArrowRightLeft} title="Operaciones" description="Depósitos, retiros, ajustes y transferencias" />
-      <p className="text-muted-foreground text-sm">Operaciones en construcción.</p>
+    <div className="p-4 md:p-6">
+      <OperationListClient initialOperations={operations} accounts={accounts} />
     </div>
   );
 }

@@ -15,6 +15,17 @@ export const currencySchema = z.object({
 });
 export type CurrencyInput = z.infer<typeof currencySchema>;
 
+export const operationSchema = z.object({
+  accountId: z.coerce.number().int().positive("Selecciona una cuenta"),
+  type: z.enum(["deposit", "withdrawal", "adjustment"]),
+  amount: z.coerce.number().refine((v) => Number.isFinite(v) && v !== 0, "Monto inválido"),
+  description: z.string().trim().max(500).nullish(),
+  reference: z.string().trim().max(80).nullish(),
+  occurredAt: z.string().datetime().nullish().or(z.string().length(0).nullish()),
+  status: z.enum(["pending", "confirmed"]).default("confirmed"),
+});
+export type OperationInput = z.infer<typeof operationSchema>;
+
 export const accountSchema = z.object({
   groupId: z.coerce.number().int().positive("Selecciona un grupo"),
   currencyId: z.coerce.number().int().positive("Selecciona una moneda"),
