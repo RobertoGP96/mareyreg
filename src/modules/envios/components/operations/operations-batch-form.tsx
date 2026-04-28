@@ -139,7 +139,9 @@ export function OperationsBatchForm({
     }
   }, [open, presetAccountId]);
 
-  // Autoseleccionar moneda externa para conversiones
+  // Autoseleccionar moneda destino para conversiones cuando la cuenta es la base.
+  // Si la cuenta ya es el destino (caso típico de "entradas de dinero"), no precargamos:
+  // el origen es variable y el usuario lo elige por fila.
   useEffect(() => {
     setRows((prev) => {
       let changed = false;
@@ -148,12 +150,9 @@ export function OperationsBatchForm({
         if (!r.accountId || r.externalCurrencyId) return r;
         const acc = accounts.find((a) => String(a.accountId) === r.accountId);
         if (!acc?.rule) return r;
-        const counterId =
-          acc.rule.baseCurrencyId === acc.currencyId
-            ? acc.rule.quoteCurrencyId
-            : acc.rule.baseCurrencyId;
+        if (acc.rule.quoteCurrencyId === acc.currencyId) return r;
         changed = true;
-        return { ...r, externalCurrencyId: String(counterId) };
+        return { ...r, externalCurrencyId: String(acc.rule.quoteCurrencyId) };
       });
       return changed ? next : prev;
     });
