@@ -53,6 +53,7 @@ export const accountSchema = z.object({
   exchangeRateRuleId: z.coerce.number().int().positive().nullish(),
   openingBalance: z.coerce.number().nullish(),
   active: z.boolean().optional(),
+  allowNegativeBalance: z.boolean().optional(),
 });
 export type AccountInput = z.infer<typeof accountSchema>;
 

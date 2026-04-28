@@ -7,14 +7,14 @@
 -- Required for EXCLUDE USING gist over numrange + scalar
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
--- Defensa en profundidad: balances no negativos.
--- Nota: el flujo de aplicación permite ajustes (`adjustment`) que pueden dejar
--- balance temporal por debajo si se usa con flag explícito; el CHECK aquí evita
--- corrupción accidental por bugs. Si se necesita un override puntual, levantarlo
--- con SET CONSTRAINTS o una migración admin.
+-- Defensa en profundidad: balances no negativos por cuenta.
+-- Nota: cuentas marcadas con `allow_negative_balance=true` pueden quedar en
+-- rojo (típicamente representan deuda pendiente con un grupo). Las que no,
+-- son protegidas por el CHECK. Adicionalmente operaciones type=adjustment
+-- pueden bypass el guard de aplicación, pero siguen sujetas a este CHECK.
 ALTER TABLE accounts
   DROP CONSTRAINT IF EXISTS accounts_balance_nonneg,
-  ADD  CONSTRAINT accounts_balance_nonneg CHECK (balance >= 0);
+  ADD  CONSTRAINT accounts_balance_nonneg CHECK (allow_negative_balance OR balance >= 0);
 
 -- Rangos de tasa: invariantes elementales
 ALTER TABLE exchange_rate_ranges

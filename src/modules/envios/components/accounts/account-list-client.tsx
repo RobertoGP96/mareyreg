@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -30,7 +31,7 @@ import { FormSection } from "@/components/ui/form-section";
 import { type DataTableColumn } from "@/components/ui/data-table";
 import {
   Wallet, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2,
-  Hash, Type, Users, CircleDollarSign, Calculator, ToggleLeft,
+  Hash, Type, Users, CircleDollarSign, Calculator, ToggleLeft, MinusCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -70,6 +71,7 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
   const [name, setName] = useState("");
   const [exchangeRateRuleId, setExchangeRateRuleId] = useState<string>("");
   const [openingBalance, setOpeningBalance] = useState("0");
+  const [allowNegativeBalance, setAllowNegativeBalance] = useState(false);
 
   const filtered = useMemo(() => {
     let rows = initialAccounts;
@@ -107,6 +109,7 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
   const resetForm = () => {
     setGroupId(""); setCurrencyId(""); setAccountNumber("");
     setName(""); setExchangeRateRuleId(""); setOpeningBalance("0");
+    setAllowNegativeBalance(false);
   };
 
   const fillEdit = (a: AccountRow) => {
@@ -114,6 +117,7 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
     setAccountNumber(a.accountNumber); setName(a.name);
     setExchangeRateRuleId(a.ruleId ? String(a.ruleId) : "");
     setOpeningBalance(String(a.balance));
+    setAllowNegativeBalance(a.allowNegativeBalance);
     setToEdit(a);
   };
 
@@ -148,6 +152,7 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
       name: name.trim(),
       exchangeRateRuleId: exchangeRateRuleId ? Number(exchangeRateRuleId) : null,
       openingBalance: Number(openingBalance) || 0,
+      allowNegativeBalance,
     });
     setSubmitting(false);
     if (r.success) {
@@ -164,6 +169,7 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
       name: name.trim(),
       accountNumber: accountNumber.trim().toUpperCase(),
       exchangeRateRuleId: exchangeRateRuleId ? Number(exchangeRateRuleId) : null,
+      allowNegativeBalance,
     });
     setSubmitting(false);
     if (r.success) {
@@ -219,12 +225,22 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
     {
       key: "rule",
       header: "Regla",
-      cell: (a) =>
-        a.ruleName ? (
-          <Badge variant="outline" className="text-[10px]">{a.ruleName}</Badge>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        ),
+      cell: (a) => (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {a.ruleName ? (
+            <Badge variant="outline" className="text-[10px]">{a.ruleName}</Badge>
+          ) : null}
+          {a.allowNegativeBalance ? (
+            <Badge variant="warning" className="text-[10px] gap-1">
+              <MinusCircle className="h-3 w-3" />
+              Negativo OK
+            </Badge>
+          ) : null}
+          {!a.ruleName && !a.allowNegativeBalance ? (
+            <span className="text-xs text-muted-foreground">—</span>
+          ) : null}
+        </div>
+      ),
     },
     {
       key: "status",
@@ -499,7 +515,7 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
               </Select>
             </Field>
             {!toEdit && (
-              <Field label="Saldo inicial" icon={CircleDollarSign} hint="Crea una operación de ajuste con este monto.">
+              <Field label="Saldo inicial" icon={CircleDollarSign} hint="Crea una operación de ajuste con este monto. Permitido negativo si la cuenta lo soporta.">
                 <Input
                   type="number"
                   step="0.00000001"
@@ -508,6 +524,21 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
                 />
               </Field>
             )}
+            <Field
+              label="Permitir saldo negativo"
+              icon={MinusCircle}
+              hint="Activa cuando la cuenta represente deuda pendiente y pueda quedar en rojo."
+            >
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={allowNegativeBalance}
+                  onCheckedChange={setAllowNegativeBalance}
+                />
+                <span className="text-sm text-muted-foreground">
+                  {allowNegativeBalance ? "Sí (puede ir a rojo)" : "No (saldo ≥ 0)"}
+                </span>
+              </div>
+            </Field>
           </FormSection>
         </div>
         <div className="flex justify-end gap-2 pt-4 border-t border-border">

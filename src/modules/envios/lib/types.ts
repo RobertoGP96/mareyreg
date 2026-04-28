@@ -37,7 +37,7 @@ export type AccountGroupRow = Pick<
 
 export type AccountRow = Pick<
   Account,
-  "accountId" | "groupId" | "userId" | "currencyId" | "accountNumber" | "name" | "active"
+  "accountId" | "groupId" | "userId" | "currencyId" | "accountNumber" | "name" | "active" | "allowNegativeBalance"
 > & {
   balance: number;
   groupName: string;

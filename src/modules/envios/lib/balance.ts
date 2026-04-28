@@ -22,8 +22,10 @@ type Tx = Prisma.TransactionClient;
 
 /**
  * Aplica `delta` (positivo = suma, negativo = resta) al balance de la cuenta.
- * - Lee balance + version, calcula nuevo balance.
- * - Rechaza saldo negativo a menos que `allowNegative=true` (para `adjustment`).
+ * - Lee balance + version + allowNegativeBalance, calcula nuevo balance.
+ * - Rechaza saldo negativo a menos que la cuenta tenga
+ *   `allowNegativeBalance=true` o el caller pase `forceAllowNegative=true`
+ *   (usado por `adjustment` para correcciones manuales).
  * - Update condicional por version (optimistic locking). Reintenta hasta 3
  *   veces si la version cambió entre la lectura y el update.
  *
@@ -33,16 +35,17 @@ export async function applyDelta(
   tx: Tx,
   accountId: number,
   delta: number,
-  allowNegative = false
+  forceAllowNegative = false
 ): Promise<{ newBalance: number; version: number }> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const acc = await tx.account.findUniqueOrThrow({
       where: { accountId },
-      select: { balance: true, version: true },
+      select: { balance: true, version: true, allowNegativeBalance: true },
     });
     const currentBalance = Number(acc.balance);
     const newBalance = currentBalance + delta;
-    if (!allowNegative && newBalance < 0) {
+    const negativeAllowed = forceAllowNegative || acc.allowNegativeBalance;
+    if (!negativeAllowed && newBalance < 0) {
       throw new BalanceError("Saldo insuficiente");
     }
     const updated = await tx.account.updateMany({

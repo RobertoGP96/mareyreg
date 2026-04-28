@@ -18,6 +18,7 @@ export async function getAccounts(): Promise<AccountRow[]> {
     accountNumber: a.accountNumber,
     name: a.name,
     active: a.active,
+    allowNegativeBalance: a.allowNegativeBalance,
     balance: Number(a.balance),
     groupName: a.group.name,
     groupCode: a.group.code,

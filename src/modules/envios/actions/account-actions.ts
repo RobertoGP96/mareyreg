@@ -61,6 +61,13 @@ export async function createAccount(
     }
 
     const opening = data.openingBalance ?? 0;
+    const allowNegative = data.allowNegativeBalance ?? false;
+    if (opening < 0 && !allowNegative) {
+      return {
+        success: false,
+        error: "Activa \"Permitir saldo negativo\" para crear con saldo inicial negativo.",
+      };
+    }
     const userId = await getCurrentUserId();
 
     const created = await db.$transaction(async (tx) => {
@@ -75,6 +82,7 @@ export async function createAccount(
           version: 0,
           exchangeRateRuleId: data.exchangeRateRuleId ?? null,
           active: data.active ?? true,
+          allowNegativeBalance: allowNegative,
         },
       });
       if (opening !== 0) {
@@ -114,7 +122,12 @@ export async function createAccount(
 
 export async function updateAccount(
   id: number,
-  input: { name?: string; exchangeRateRuleId?: number | null; accountNumber?: string }
+  input: {
+    name?: string;
+    exchangeRateRuleId?: number | null;
+    accountNumber?: string;
+    allowNegativeBalance?: boolean;
+  }
 ): Promise<ActionResult<void>> {
   try {
     const userId = await getCurrentUserId();
@@ -144,6 +157,18 @@ export async function updateAccount(
         }
       }
 
+      // No permitir desactivar el flag si la cuenta está actualmente en rojo:
+      // dejaría el balance por debajo del CHECK al primer movimiento.
+      if (
+        input.allowNegativeBalance === false &&
+        prev.allowNegativeBalance === true &&
+        Number(prev.balance) < 0
+      ) {
+        throw new Error(
+          "No se puede desactivar saldo negativo: la cuenta está actualmente en rojo. Compensa el saldo primero."
+        );
+      }
+
       await tx.account.update({
         where: { accountId: id },
         data: {
@@ -151,6 +176,9 @@ export async function updateAccount(
           ...(input.accountNumber !== undefined && nextNumber && { accountNumber: nextNumber }),
           ...(input.exchangeRateRuleId !== undefined && {
             exchangeRateRuleId: input.exchangeRateRuleId ?? null,
+          }),
+          ...(input.allowNegativeBalance !== undefined && {
+            allowNegativeBalance: input.allowNegativeBalance,
           }),
         },
       });
