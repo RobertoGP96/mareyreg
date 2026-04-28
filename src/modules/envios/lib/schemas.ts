@@ -120,7 +120,7 @@ export const exchangeRateRuleSchema = z.object({
   kind: z.enum(["fixed", "range"]).default("range"),
   baseCurrencyId: z.coerce.number().int().positive("Selecciona moneda base"),
   quoteCurrencyId: z.coerce.number().int().positive("Selecciona moneda destino"),
-  ranges: z.array(rateRangeSchema).min(1, "Al menos un rango"),
+  ranges: z.array(rateRangeSchema).min(1, "Al menos un rango").max(3, "Máximo 3 rangos por regla"),
   active: z.boolean().optional(),
 }).refine((r) => r.baseCurrencyId !== r.quoteCurrencyId, {
   message: "Base y destino deben ser distintas",

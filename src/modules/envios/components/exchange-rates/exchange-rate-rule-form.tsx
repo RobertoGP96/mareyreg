@@ -118,10 +118,13 @@ export function ExchangeRateRuleForm({
     setRanges((prev) => prev.map((r, idx) => (idx === i ? { ...r, [key]: val } : r)));
   };
   const addRange = () => {
-    setRanges((prev) => [
-      ...prev,
-      { minAmount: prev[prev.length - 1]?.maxAmount || "", maxAmount: "", rate: "" },
-    ]);
+    setRanges((prev) => {
+      if (prev.length >= 3) return prev;
+      return [
+        ...prev,
+        { minAmount: prev[prev.length - 1]?.maxAmount || "", maxAmount: "", rate: "" },
+      ];
+    });
   };
   const removeRange = (i: number) => {
     setRanges((prev) => (prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev));
@@ -297,7 +300,7 @@ export function ExchangeRateRuleForm({
             <>
               <p className="text-xs text-muted-foreground">
                 Cada rango define una tasa para un intervalo de monto en moneda base.
-                El último rango puede dejarse abierto (∞) para &ldquo;cualquier monto mayor&rdquo;.
+                Hasta 3 rangos por regla; el último puede dejarse abierto (∞) para &ldquo;cualquier monto mayor&rdquo;.
               </p>
               <div className="space-y-2">
                 {ranges.map((r, i) => (
@@ -349,8 +352,14 @@ export function ExchangeRateRuleForm({
                   </div>
                 ))}
               </div>
-              <Button type="button" variant="outline" onClick={addRange} className="w-full">
-                <Plus className="h-4 w-4" /> Añadir rango
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addRange}
+                className="w-full"
+                disabled={ranges.length >= 3}
+              >
+                <Plus className="h-4 w-4" /> Añadir rango ({ranges.length}/3)
               </Button>
               {rangeIssues.length > 0 && (
                 <ul className="mt-2 space-y-1 text-xs text-destructive">
