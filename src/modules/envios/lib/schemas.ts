@@ -15,6 +15,20 @@ export const currencySchema = z.object({
 });
 export type CurrencyInput = z.infer<typeof currencySchema>;
 
+export const transferSchema = z.object({
+  fromAccountId: z.coerce.number().int().positive("Selecciona cuenta origen"),
+  toAccountId: z.coerce.number().int().positive("Selecciona cuenta destino"),
+  amount: z.coerce.number().positive("Monto debe ser positivo"),
+  description: z.string().trim().max(500).nullish(),
+  occurredAt: z.string().datetime().nullish().or(z.string().length(0).nullish()),
+  status: z.enum(["pending", "confirmed"]).default("confirmed"),
+  rateOverride: z.coerce.number().positive().nullish(),
+}).refine((d) => d.fromAccountId !== d.toAccountId, {
+  message: "Origen y destino deben ser cuentas distintas",
+  path: ["toAccountId"],
+});
+export type TransferInput = z.infer<typeof transferSchema>;
+
 export const operationSchema = z.object({
   accountId: z.coerce.number().int().positive("Selecciona una cuenta"),
   type: z.enum(["deposit", "withdrawal", "adjustment"]),

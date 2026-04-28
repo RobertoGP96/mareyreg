@@ -44,6 +44,7 @@ import { CurrencyChip } from "../shared/currency-chip";
 import { AmountDisplay } from "../shared/amount-display";
 import { OpTypeBadge } from "../shared/op-type-badge";
 import { OpStatusPill } from "../shared/op-status-pill";
+import { TransferForm } from "./transfer-form";
 
 interface Props {
   initialOperations: OperationRow[];
@@ -65,6 +66,7 @@ export function OperationListClient({ initialOperations, accounts }: Props) {
   const [filterType, setFilterType] = useState<string>("");
   const [filterAccount, setFilterAccount] = useState<string>("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toCancel, setToCancel] = useState<OperationRow | null>(null);
 
@@ -285,13 +287,20 @@ export function OperationListClient({ initialOperations, accounts }: Props) {
         description="Depósitos, retiros y ajustes. Las pendientes no afectan saldo hasta confirmarse."
         badge={`${counts.total} operaciones`}
       >
-        <Button
-          variant="brand"
-          onClick={() => { resetForm(); setIsCreateOpen(true); }}
-          className="hidden md:inline-flex"
-        >
-          <Plus className="h-4 w-4" /> Nueva operación
-        </Button>
+        <div className="hidden md:flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsTransferOpen(true)}
+          >
+            <ArrowRightLeft className="h-4 w-4" /> Transferencia
+          </Button>
+          <Button
+            variant="brand"
+            onClick={() => { resetForm(); setIsCreateOpen(true); }}
+          >
+            <Plus className="h-4 w-4" /> Nueva operación
+          </Button>
+        </div>
       </PageHeader>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -584,6 +593,8 @@ export function OperationListClient({ initialOperations, accounts }: Props) {
       </AlertDialog>
 
       <Fab icon={Plus} label="Nueva operación" onClick={() => { resetForm(); setIsCreateOpen(true); }} />
+
+      <TransferForm open={isTransferOpen} onOpenChange={setIsTransferOpen} accounts={accounts} />
     </div>
   );
 }

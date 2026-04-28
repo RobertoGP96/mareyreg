@@ -1,11 +1,17 @@
-import { PageHeader } from "@/components/ui/page-header";
-import { Clock } from "lucide-react";
+import { PendingListClient } from "@/modules/envios/components/operations/pending-list-client";
+import {
+  getPendingOperations,
+  getPendingSummary,
+} from "@/modules/envios/queries/pending-queries";
 
-export default function PendientesPage() {
+export default async function PendientesPage() {
+  const [pending, summary] = await Promise.all([
+    getPendingOperations(),
+    getPendingSummary(),
+  ]);
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <PageHeader icon={Clock} title="Pendientes" description="Operaciones registradas esperando confirmación" />
-      <p className="text-muted-foreground text-sm">Cola de pendientes en construcción.</p>
+    <div className="p-4 md:p-6">
+      <PendingListClient initialPending={pending} summary={summary} />
     </div>
   );
 }
