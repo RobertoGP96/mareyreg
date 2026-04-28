@@ -234,11 +234,11 @@ export function AccountRuleDialogs({ state, onClose, rules, currencies, onChange
         {account && (
           <ExchangeRateRuleForm
             key={`create-${account.accountId}`}
-            defaultValues={{ baseCurrencyId: account.currencyId, kind: "range" }}
+            defaultValues={{ quoteCurrencyId: account.currencyId, kind: "range" }}
             currencies={currencies}
             onSubmit={handleCreate}
             onCancel={onClose}
-            lockBaseCurrency
+            lockQuoteCurrency
             submitLabel="Crear y asignar"
             headerTitle="Crear regla y asignar"
             headerDescription={`Cuenta ${account.name} · ${account.currencyCode}`}
