@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -411,9 +412,28 @@ export function OperationListClient({ initialOperations, accounts }: Props) {
             description={
               search || filterStatus || filterType || filterAccount
                 ? "No hay coincidencias con los filtros."
-                : "Registra el primer depósito, retiro o ajuste para empezar a ver el balance."
+                : accounts.length === 0
+                  ? "Primero necesitas al menos una cuenta. Cada cuenta lleva el saldo de una moneda dentro de un grupo."
+                  : "Registra el primer depósito, retiro o ajuste para empezar a ver el balance."
             }
-          />
+          >
+            {!(search || filterStatus || filterType || filterAccount) ? (
+              accounts.length === 0 ? (
+                <Button variant="brand" asChild>
+                  <Link href="/envios/cuentas">
+                    <Wallet className="h-4 w-4" /> Ir a cuentas
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  variant="brand"
+                  onClick={() => { resetForm(); setIsCreateOpen(true); }}
+                >
+                  <Plus className="h-4 w-4" /> Nueva operación
+                </Button>
+              )
+            ) : null}
+          </EmptyState>
         }
       />
 

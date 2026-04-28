@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -386,9 +387,28 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
             description={
               search || filterGroup || filterCurrency
                 ? "No hay coincidencias con los filtros."
-                : "Agrega una cuenta por cada moneda que maneje cada grupo."
+                : groups.length === 0
+                  ? "Primero crea un grupo. Cada grupo agrupa cuentas multi-moneda."
+                  : "Agrega una cuenta por cada moneda que maneje cada grupo."
             }
-          />
+          >
+            {!(search || filterGroup || filterCurrency) ? (
+              groups.length === 0 ? (
+                <Button variant="brand" asChild>
+                  <Link href="/envios/grupos">
+                    <Users className="h-4 w-4" /> Ir a grupos
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  variant="brand"
+                  onClick={() => { resetForm(); setIsCreateOpen(true); }}
+                >
+                  <Plus className="h-4 w-4" /> Crear primera cuenta
+                </Button>
+              )
+            ) : null}
+          </EmptyState>
         }
       />
 

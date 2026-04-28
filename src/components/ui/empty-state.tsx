@@ -1,5 +1,6 @@
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -12,6 +13,7 @@ interface EmptyStateProps {
   description?: string
   icon?: React.ReactNode
   className?: string
+  children?: React.ReactNode
 }
 
 export function EmptyState({
@@ -19,6 +21,7 @@ export function EmptyState({
   description = "No se encontraron elementos para mostrar.",
   icon,
   className,
+  children,
 }: EmptyStateProps) {
   return (
     <Empty className={className}>
@@ -29,6 +32,7 @@ export function EmptyState({
         <EmptyTitle>{title}</EmptyTitle>
         <EmptyDescription>{description}</EmptyDescription>
       </EmptyHeader>
+      {children ? <EmptyContent>{children}</EmptyContent> : null}
     </Empty>
   )
 }
