@@ -1,11 +1,17 @@
-import { PageHeader } from "@/components/ui/page-header";
-import { Users } from "lucide-react";
+import { AccountGroupListClient } from "@/modules/envios/components/groups/account-group-list-client";
+import {
+  getAccountGroups,
+  getAssignableUsers,
+} from "@/modules/envios/queries/account-group-queries";
 
-export default function GruposPage() {
+export default async function GruposPage() {
+  const [groups, users] = await Promise.all([
+    getAccountGroups(),
+    getAssignableUsers(),
+  ]);
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <PageHeader icon={Users} title="Grupos" description="Cada grupo agrupa cuentas por persona o tarea" />
-      <p className="text-muted-foreground text-sm">Lista de grupos en construcción.</p>
+    <div className="p-4 md:p-6">
+      <AccountGroupListClient initialGroups={groups} users={users} />
     </div>
   );
 }
