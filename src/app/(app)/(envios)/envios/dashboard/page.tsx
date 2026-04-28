@@ -1,15 +1,11 @@
-import { PageHeader } from "@/components/ui/page-header";
-import { HandCoins } from "lucide-react";
+import { EnviosDashboardClient } from "@/modules/envios/components/dashboard/envios-dashboard-client";
+import { getDashboardData } from "@/modules/envios/queries/dashboard-queries";
 
-export default function EnviosDashboardPage() {
+export default async function EnviosDashboardPage() {
+  const data = await getDashboardData();
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <PageHeader
-        icon={HandCoins}
-        title="Tesorería · Envíos"
-        description="SALDO GENERAL por moneda y movimientos recientes"
-      />
-      <p className="text-muted-foreground text-sm">Dashboard en construcción.</p>
+    <div className="p-4 md:p-6">
+      <EnviosDashboardClient data={data} />
     </div>
   );
 }
