@@ -111,6 +111,26 @@ export function OperationsBatchForm({
     }
   }, [open, presetAccountId]);
 
+  // Autoseleccionar moneda externa para filas de conversión (única contraparte posible por la regla)
+  useEffect(() => {
+    setRows((prev) => {
+      let changed = false;
+      const next = prev.map((r) => {
+        if (r.kind !== "conversion") return r;
+        if (!r.accountId || r.externalCurrencyId) return r;
+        const acc = accounts.find((a) => String(a.accountId) === r.accountId);
+        if (!acc?.rule) return r;
+        const counterId =
+          acc.rule.baseCurrencyId === acc.currencyId
+            ? acc.rule.quoteCurrencyId
+            : acc.rule.baseCurrencyId;
+        changed = true;
+        return { ...r, externalCurrencyId: String(counterId) };
+      });
+      return changed ? next : prev;
+    });
+  }, [rows, accounts]);
+
   const updateRow = (i: number, patch: Partial<Row>) => {
     setRows((prev) => prev.map((r, idx) => {
       if (idx !== i) return r;
