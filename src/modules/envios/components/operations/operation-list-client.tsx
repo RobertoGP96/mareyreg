@@ -676,6 +676,7 @@ export function OperationListClient({ initialOperations, accounts, currencies }:
         open={isBatchOpen}
         onOpenChange={setIsBatchOpen}
         accounts={accounts}
+        currencies={currencies}
       />
     </div>
   );

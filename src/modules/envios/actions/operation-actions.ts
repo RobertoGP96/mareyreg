@@ -11,6 +11,7 @@ import {
   batchOperationsSchema,
   type OperationInput,
   type DepositWithConversionInput,
+  type BatchRowInput,
 } from "../lib/schemas";
 import { resolveRate, RateNotConfiguredError } from "../lib/exchange-rate";
 
@@ -162,7 +163,7 @@ export async function confirmOperation(
 }
 
 export async function createOperationsBatch(
-  inputs: OperationInput[]
+  inputs: BatchRowInput[]
 ): Promise<
   ActionResult<{ created: number[] }>
 > {
@@ -175,7 +176,7 @@ export async function createOperationsBatch(
 
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
-      if (r.type !== "adjustment" && r.amount <= 0) {
+      if (r.kind === "regular" && r.type !== "adjustment" && r.amount <= 0) {
         return { success: false, error: `Fila ${i + 1}: el monto debe ser mayor que cero` };
       }
     }
@@ -188,7 +189,7 @@ export async function createOperationsBatch(
         const data = rows[i];
         const account = await tx.account.findUnique({
           where: { accountId: data.accountId },
-          select: { accountId: true, currencyId: true, active: true },
+          include: { exchangeRateRule: true },
         });
         if (!account) throw new Error(`Fila ${i + 1}: cuenta no encontrada`);
         if (!account.active) throw new Error(`Fila ${i + 1}: la cuenta está inactiva`);
@@ -196,53 +197,116 @@ export async function createOperationsBatch(
         const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date();
         const status = data.status ?? "confirmed";
 
-        let balanceAfter: number;
-        if (status === "confirmed") {
-          const delta = deltaFor(data.type, data.amount);
-          try {
-            const r = await applyDelta(tx, data.accountId, delta, data.type === "adjustment");
-            balanceAfter = r.newBalance;
-          } catch (e) {
-            if (e instanceof BalanceError) {
-              throw new Error(`Fila ${i + 1}: ${e.message}`);
-            }
-            throw e;
-          }
-        } else {
-          const acc = await tx.account.findUniqueOrThrow({
-            where: { accountId: data.accountId },
-            select: { balance: true },
-          });
-          balanceAfter = Number(acc.balance);
-        }
+        let opId: number;
 
-        const op = await tx.operation.create({
-          data: {
-            accountId: data.accountId,
-            currencyId: account.currencyId,
-            type: data.type,
-            status,
-            amount: Math.abs(data.amount),
-            description: data.description?.trim() || null,
-            reference: data.reference?.trim() || null,
-            balanceAfter,
-            occurredAt,
-            confirmedAt: status === "confirmed" ? new Date() : null,
-            createdById: userId ?? null,
-            confirmedById: status === "confirmed" ? userId ?? null : null,
-          },
-        });
+        if (data.kind === "regular") {
+          let balanceAfter: number;
+          if (status === "confirmed") {
+            const delta = deltaFor(data.type, data.amount);
+            try {
+              const r = await applyDelta(tx, data.accountId, delta, data.type === "adjustment");
+              balanceAfter = r.newBalance;
+            } catch (e) {
+              if (e instanceof BalanceError) throw new Error(`Fila ${i + 1}: ${e.message}`);
+              throw e;
+            }
+          } else {
+            balanceAfter = Number(account.balance);
+          }
+
+          const op = await tx.operation.create({
+            data: {
+              accountId: data.accountId,
+              currencyId: account.currencyId,
+              type: data.type,
+              status,
+              amount: Math.abs(data.amount),
+              description: data.description?.trim() || null,
+              reference: data.reference?.trim() || null,
+              balanceAfter,
+              occurredAt,
+              confirmedAt: status === "confirmed" ? new Date() : null,
+              createdById: userId ?? null,
+              confirmedById: status === "confirmed" ? userId ?? null : null,
+            },
+          });
+          opId = op.operationId;
+        } else {
+          // kind === "conversion"
+          if (data.externalCurrencyId === account.currencyId) {
+            throw new Error(`Fila ${i + 1}: la moneda externa debe ser distinta a la moneda de la cuenta`);
+          }
+          if (!account.exchangeRateRule) {
+            throw new Error(`Fila ${i + 1}: la cuenta no tiene regla de tasa asignada`);
+          }
+          const rule = account.exchangeRateRule;
+          let direction: "base_to_quote" | "quote_to_base";
+          if (
+            rule.baseCurrencyId === data.externalCurrencyId &&
+            rule.quoteCurrencyId === account.currencyId
+          ) {
+            direction = "base_to_quote";
+          } else if (
+            rule.quoteCurrencyId === data.externalCurrencyId &&
+            rule.baseCurrencyId === account.currencyId
+          ) {
+            direction = "quote_to_base";
+          } else {
+            throw new Error(`Fila ${i + 1}: la regla "${rule.name}" no convierte entre estas monedas`);
+          }
+
+          const resolved = await resolveRate(tx, rule.ruleId, data.externalAmount);
+          const amountInAccountCurrency =
+            direction === "base_to_quote"
+              ? data.externalAmount * resolved.rate
+              : data.externalAmount / resolved.rate;
+
+          let balanceAfter: number;
+          if (status === "confirmed") {
+            try {
+              const r = await applyDelta(tx, data.accountId, +amountInAccountCurrency);
+              balanceAfter = r.newBalance;
+            } catch (e) {
+              if (e instanceof BalanceError) throw new Error(`Fila ${i + 1}: ${e.message}`);
+              throw e;
+            }
+          } else {
+            balanceAfter = Number(account.balance);
+          }
+
+          const op = await tx.operation.create({
+            data: {
+              accountId: data.accountId,
+              currencyId: account.currencyId,
+              type: "deposit",
+              status,
+              amount: amountInAccountCurrency,
+              description: data.description?.trim() || null,
+              reference: data.reference?.trim() || null,
+              balanceAfter,
+              exchangeRateRuleId: rule.ruleId,
+              rateApplied: resolved.rate,
+              counterAmount: data.externalAmount,
+              counterCurrencyId: data.externalCurrencyId,
+              occurredAt,
+              confirmedAt: status === "confirmed" ? new Date() : null,
+              createdById: userId ?? null,
+              confirmedById: status === "confirmed" ? userId ?? null : null,
+            },
+          });
+          opId = op.operationId;
+        }
 
         await createAuditLog(tx, {
           action: "create",
           entityType: "Operation",
-          entityId: op.operationId,
+          entityId: opId,
           module: "envios",
           userId,
           newValues: { ...data, status, batch: true, batchIndex: i },
         });
 
-        ids.push(op.operationId);
+        ids.push(opId);
       }
       return ids;
     });
@@ -254,6 +318,7 @@ export async function createOperationsBatch(
     if (error instanceof ConcurrencyError) {
       return { success: false, error: "Conflicto de concurrencia, reintenta" };
     }
+    if (error instanceof RateNotConfiguredError) return { success: false, error: error.message };
     const msg = error instanceof Error ? error.message : "Error al registrar el lote";
     console.error("createOperationsBatch:", error);
     return { success: false, error: msg };

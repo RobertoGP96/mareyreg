@@ -18,7 +18,7 @@ import { type DataTableColumn } from "@/components/ui/data-table";
 import {
   Wallet, ArrowLeft, ArrowRightLeft, ArrowDownLeft, ArrowUpRight,
   Calculator, MoreHorizontal, MinusCircle, Pin, BarChart3, Clock,
-  CircleDollarSign, Settings2, ChevronRight,
+  CircleDollarSign, Settings2, ChevronRight, Layers,
 } from "lucide-react";
 import { CurrencyChip } from "../shared/currency-chip";
 import { AmountDisplay } from "../shared/amount-display";
@@ -26,6 +26,7 @@ import { OpTypeBadge } from "../shared/op-type-badge";
 import { OpStatusPill } from "../shared/op-status-pill";
 import { RateChip } from "../shared/rate-chip";
 import { DepositWithConversionForm } from "../operations/deposit-with-conversion-form";
+import { OperationsBatchForm } from "../operations/operations-batch-form";
 import {
   AccountRuleMenuItems,
   AccountRuleDialogs,
@@ -58,6 +59,7 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
   const router = useRouter();
   const [ruleAction, setRuleAction] = useState<RuleActionState>(null);
   const [depositOpen, setDepositOpen] = useState(false);
+  const [batchOpen, setBatchOpen] = useState(false);
 
   const formAccount: OperationFormAccount = useMemo(
     () => ({
@@ -222,6 +224,13 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
               <MinusCircle className="h-3 w-3" /> Negativo OK
             </Badge>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setBatchOpen(true)}
+          >
+            <Layers className="h-4 w-4" /> Operaciones en lote
+          </Button>
           <Button
             variant="brand"
             size="sm"
@@ -443,6 +452,15 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
         accountRules={accountRules}
         currencies={currencies}
         presetAccountId={account.accountId}
+      />
+
+      <OperationsBatchForm
+        open={batchOpen}
+        onOpenChange={setBatchOpen}
+        accounts={[formAccount]}
+        currencies={currencies}
+        presetAccountId={account.accountId}
+        lockAccount
       />
     </div>
   );

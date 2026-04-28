@@ -52,7 +52,38 @@ export const depositWithConversionSchema = z.object({
 });
 export type DepositWithConversionInput = z.infer<typeof depositWithConversionSchema>;
 
-export const batchOperationsSchema = z.array(operationSchema).min(1, "Agrega al menos una fila").max(50, "Máximo 50 filas por lote");
+export const batchRegularRowSchema = z.object({
+  kind: z.literal("regular"),
+  accountId: z.coerce.number().int().positive("Selecciona una cuenta"),
+  type: z.enum(["deposit", "withdrawal", "adjustment"]),
+  amount: z.coerce.number().refine((v) => Number.isFinite(v) && v !== 0, "Monto inválido"),
+  description: z.string().trim().max(500).nullish(),
+  reference: z.string().trim().max(80).nullish(),
+  occurredAt: z.string().datetime().nullish().or(z.string().length(0).nullish()),
+  status: z.enum(["pending", "confirmed"]).default("confirmed"),
+});
+
+export const batchConversionRowSchema = z.object({
+  kind: z.literal("conversion"),
+  accountId: z.coerce.number().int().positive("Selecciona una cuenta"),
+  externalAmount: z.coerce.number().positive("Monto debe ser positivo"),
+  externalCurrencyId: z.coerce.number().int().positive("Selecciona la moneda de origen"),
+  description: z.string().trim().max(500).nullish(),
+  reference: z.string().trim().max(80).nullish(),
+  occurredAt: z.string().datetime().nullish().or(z.string().length(0).nullish()),
+  status: z.enum(["pending", "confirmed"]).default("confirmed"),
+});
+
+export const batchRowSchema = z.discriminatedUnion("kind", [
+  batchRegularRowSchema,
+  batchConversionRowSchema,
+]);
+export type BatchRowInput = z.infer<typeof batchRowSchema>;
+
+export const batchOperationsSchema = z
+  .array(batchRowSchema)
+  .min(1, "Agrega al menos una fila")
+  .max(50, "Máximo 50 filas por lote");
 export type BatchOperationsInput = z.infer<typeof batchOperationsSchema>;
 
 export const accountSchema = z.object({
