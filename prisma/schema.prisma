@@ -31,6 +31,8 @@ model User {
   auditLogs         AuditLog[]
   stockMovements    StockMovement[]
   modulePermissions UserModulePermission[]
+  accountGroups     AccountGroup[]
+  accounts          Account[]
 
   @@map("users")
 }
@@ -66,10 +68,10 @@ model UserModulePermission {
 model AuditLog {
   logId      Int      @id @default(autoincrement()) @map("log_id")
   userId     Int?     @map("user_id")
-  action     String   // create, update, delete
+  action     String // create, update, delete
   entityType String   @map("entity_type")
   entityId   Int?     @map("entity_id")
-  module     String   // fleet, logistics, payments, inventory
+  module     String // fleet, logistics, payments, inventory
   oldValues  Json?    @map("old_values")
   newValues  Json?    @map("new_values")
   createdAt  DateTime @default(now()) @map("created_at")
@@ -163,13 +165,13 @@ enum CargoType {
 }
 
 model Route {
-  routeId              Int      @id @default(autoincrement()) @map("route_id")
-  originProvince       String   @map("origin_province")
-  destinationProvince  String   @map("destination_province")
-  distanceKm           Decimal? @map("distance_km")
-  estimatedHours       Decimal? @map("estimated_hours")
-  description          String?
-  createdAt            DateTime @default(now()) @map("created_at")
+  routeId             Int      @id @default(autoincrement()) @map("route_id")
+  originProvince      String   @map("origin_province")
+  destinationProvince String   @map("destination_province")
+  distanceKm          Decimal? @map("distance_km")
+  estimatedHours      Decimal? @map("estimated_hours")
+  description         String?
+  createdAt           DateTime @default(now()) @map("created_at")
 
   trips Trip[]
 
@@ -177,10 +179,10 @@ model Route {
 }
 
 model Trip {
-  tripId          Int        @id @default(autoincrement()) @map("trip_id")
-  driverId        Int        @map("driver_id")
-  routeId         Int?       @map("route_id")
-  loadDate        String?    @map("load_date")
+  tripId      Int        @id @default(autoincrement()) @map("trip_id")
+  driverId    Int        @map("driver_id")
+  routeId     Int?       @map("route_id")
+  loadDate    String?    @map("load_date")
   loadTime    String?    @map("load_time")
   tripPayment String?    @map("trip_payment")
   province    String?
@@ -189,11 +191,11 @@ model Trip {
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @default(now()) @updatedAt @map("updated_at")
 
-  driver     Driver      @relation(fields: [driverId], references: [driverId])
-  route      Route?      @relation(fields: [routeId], references: [routeId])
-  containers Container[]
-  cargo      Cargo[]
-  payments   Payment[]
+  driver         Driver          @relation(fields: [driverId], references: [driverId])
+  route          Route?          @relation(fields: [routeId], references: [routeId])
+  containers     Container[]
+  cargo          Cargo[]
+  payments       Payment[]
   stockMovements StockMovement[]
 
   @@index([driverId])
@@ -499,10 +501,10 @@ model StockMovement {
   createdAt       DateTime     @default(now()) @map("created_at")
   createdBy       Int?         @map("created_by")
 
-  product   Product    @relation(fields: [productId], references: [productId])
-  warehouse Warehouse  @relation(fields: [warehouseId], references: [warehouseId])
-  trip      Trip?      @relation(fields: [referenceTripId], references: [tripId])
-  user      User?      @relation(fields: [createdBy], references: [userId])
+  product   Product   @relation(fields: [productId], references: [productId])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [warehouseId])
+  trip      Trip?     @relation(fields: [referenceTripId], references: [tripId])
+  user      User?     @relation(fields: [createdBy], references: [userId])
 
   @@index([productId])
   @@index([warehouseId])
@@ -1070,15 +1072,15 @@ model ReturnLine {
 // =============================================
 
 model StockCount {
-  countId     Int      @id @default(autoincrement()) @map("count_id")
-  folio       String   @unique
-  warehouseId Int      @map("warehouse_id")
-  status      String   @default("draft")
-  scheduledAt DateTime @map("scheduled_at")
+  countId     Int       @id @default(autoincrement()) @map("count_id")
+  folio       String    @unique
+  warehouseId Int       @map("warehouse_id")
+  status      String    @default("draft")
+  scheduledAt DateTime  @map("scheduled_at")
   postedAt    DateTime? @map("posted_at")
   notes       String?
-  createdBy   Int?     @map("created_by")
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   Int?      @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   warehouse Warehouse        @relation(fields: [warehouseId], references: [warehouseId])
   lines     StockCountLine[]
@@ -1125,4 +1127,147 @@ model AccountingPeriod {
 
   @@unique([year, month])
   @@map("accounting_periods")
+}
+
+// =============================================
+// ENVIOS MODULE - Envío de efectivo / cash remittance
+// =============================================
+
+enum OperationType {
+  deposit
+  withdrawal
+  transfer_in
+  transfer_out
+  adjustment
+}
+
+enum OperationStatus {
+  pending
+  confirmed
+  cancelled
+}
+
+model Currency {
+  currencyId    Int      @id @default(autoincrement()) @map("id")
+  code          String   @unique
+  name          String
+  symbol        String
+  decimalPlaces Int      @default(2) @map("decimal_places")
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  accounts     Account[]
+  operations   Operation[]
+  rulesAsBase  ExchangeRateRule[] @relation("BaseCurrency")
+  rulesAsQuote ExchangeRateRule[] @relation("QuoteCurrency")
+
+  @@map("currencies")
+}
+
+model AccountGroup {
+  groupId     Int      @id @default(autoincrement()) @map("id")
+  userId      Int      @map("user_id")
+  code        String   @unique
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user     User      @relation(fields: [userId], references: [userId], onDelete: Restrict)
+  accounts Account[]
+
+  @@index([userId])
+  @@map("account_groups")
+}
+
+model Account {
+  accountId          Int      @id @default(autoincrement()) @map("id")
+  groupId            Int      @map("group_id")
+  userId             Int      @map("user_id")
+  currencyId         Int      @map("currency_id")
+  accountNumber      String   @unique @map("account_number")
+  name               String
+  balance            Decimal  @default(0) @db.Decimal(20, 8)
+  version            Int      @default(0)
+  exchangeRateRuleId Int?     @map("exchange_rate_rule_id")
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+
+  group            AccountGroup      @relation(fields: [groupId], references: [groupId], onDelete: Restrict)
+  user             User              @relation(fields: [userId], references: [userId], onDelete: Restrict)
+  currency         Currency          @relation(fields: [currencyId], references: [currencyId], onDelete: Restrict)
+  exchangeRateRule ExchangeRateRule? @relation(fields: [exchangeRateRuleId], references: [ruleId], onDelete: SetNull)
+  operations       Operation[]
+
+  @@unique([groupId, currencyId])
+  @@index([groupId])
+  @@index([userId])
+  @@index([currencyId])
+  @@index([active])
+  @@map("accounts")
+}
+
+model ExchangeRateRule {
+  ruleId          Int      @id @default(autoincrement()) @map("id")
+  name            String
+  baseCurrencyId  Int      @map("base_currency_id")
+  quoteCurrencyId Int      @map("quote_currency_id")
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  baseCurrency  Currency            @relation("BaseCurrency", fields: [baseCurrencyId], references: [currencyId], onDelete: Restrict)
+  quoteCurrency Currency            @relation("QuoteCurrency", fields: [quoteCurrencyId], references: [currencyId], onDelete: Restrict)
+  ranges        ExchangeRateRange[]
+  accounts      Account[]
+
+  @@unique([baseCurrencyId, quoteCurrencyId, name])
+  @@map("exchange_rate_rules")
+}
+
+model ExchangeRateRange {
+  rangeId            Int      @id @default(autoincrement()) @map("id")
+  exchangeRateRuleId Int      @map("exchange_rate_rule_id")
+  minAmount          Decimal  @map("min_amount") @db.Decimal(20, 8)
+  maxAmount          Decimal? @map("max_amount") @db.Decimal(20, 8)
+  rate               Decimal  @db.Decimal(20, 8)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+
+  rule ExchangeRateRule @relation(fields: [exchangeRateRuleId], references: [ruleId], onDelete: Cascade)
+
+  @@unique([exchangeRateRuleId, minAmount])
+  @@index([exchangeRateRuleId])
+  @@map("exchange_rate_ranges")
+}
+
+model Operation {
+  operationId   Int             @id @default(autoincrement()) @map("id")
+  accountId     Int             @map("account_id")
+  currencyId    Int             @map("currency_id")
+  type          OperationType
+  status        OperationStatus @default(confirmed)
+  amount        Decimal         @db.Decimal(20, 8)
+  description   String?
+  reference     String?
+  balanceAfter  Decimal         @map("balance_after") @db.Decimal(20, 8)
+  occurredAt    DateTime        @default(now()) @map("occurred_at")
+  confirmedAt   DateTime?       @map("confirmed_at")
+  createdById   Int?            @map("created_by_id")
+  confirmedById Int?            @map("confirmed_by_id")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @default(now()) @updatedAt @map("updated_at")
+
+  account  Account  @relation(fields: [accountId], references: [accountId], onDelete: Restrict)
+  currency Currency @relation(fields: [currencyId], references: [currencyId], onDelete: Restrict)
+
+  @@index([accountId, occurredAt])
+  @@index([status, occurredAt])
+  @@index([currencyId, status])
+  @@index([type])
+  @@index([reference])
+  @@map("operations")
 }

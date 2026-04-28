@@ -23,6 +23,9 @@ import {
   LineChart,
   HandCoins,
   CreditCard,
+  Wallet,
+  ArrowRightLeft,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 
@@ -121,6 +124,21 @@ export const modules: AppModule[] = [
       { name: "Dashboard", href: "/reports/dashboard", icon: LayoutDashboard },
       { name: "Kardex", href: "/reports/kardex", icon: LineChart },
       { name: "Analisis ABC", href: "/reports/abc", icon: BarChart3 },
+    ],
+  },
+  {
+    id: "envios",
+    label: "Envíos",
+    icon: HandCoins,
+    enabled: true,
+    routes: [
+      { name: "Dashboard", href: "/envios/dashboard", icon: LayoutDashboard },
+      { name: "Grupos", href: "/envios/grupos", icon: Users },
+      { name: "Cuentas", href: "/envios/cuentas", icon: Wallet },
+      { name: "Operaciones", href: "/envios/operaciones", icon: ArrowRightLeft },
+      { name: "Pendientes", href: "/envios/pendientes", icon: Clock },
+      { name: "Tasas de cambio", href: "/envios/tasas", icon: LineChart },
+      { name: "Monedas", href: "/envios/monedas", icon: CircleDollarSign },
     ],
   },
   {
