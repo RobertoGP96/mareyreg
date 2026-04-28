@@ -5,7 +5,14 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, getCurrentUserId } from "@/lib/audit";
 import { applyDelta, BalanceError, ConcurrencyError } from "../lib/balance";
-import { operationSchema, type OperationInput } from "../lib/schemas";
+import {
+  operationSchema,
+  depositWithConversionSchema,
+  batchOperationsSchema,
+  type OperationInput,
+  type DepositWithConversionInput,
+} from "../lib/schemas";
+import { resolveRate, RateNotConfiguredError } from "../lib/exchange-rate";
 
 const revalidateAll = () => {
   revalidatePath("/envios/operaciones");
@@ -150,6 +157,311 @@ export async function confirmOperation(
     if (error instanceof ConcurrencyError) return { success: false, error: "Conflicto de concurrencia, reintenta" };
     const msg = error instanceof Error ? error.message : "Error al confirmar";
     console.error("confirmOperation:", error);
+    return { success: false, error: msg };
+  }
+}
+
+export async function createOperationsBatch(
+  inputs: OperationInput[]
+): Promise<
+  ActionResult<{ created: number[] }>
+> {
+  try {
+    const parsed = batchOperationsSchema.safeParse(inputs);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    }
+    const rows = parsed.data;
+
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (r.type !== "adjustment" && r.amount <= 0) {
+        return { success: false, error: `Fila ${i + 1}: el monto debe ser mayor que cero` };
+      }
+    }
+
+    const userId = await getCurrentUserId();
+
+    const created = await db.$transaction(async (tx) => {
+      const ids: number[] = [];
+      for (let i = 0; i < rows.length; i++) {
+        const data = rows[i];
+        const account = await tx.account.findUnique({
+          where: { accountId: data.accountId },
+          select: { accountId: true, currencyId: true, active: true },
+        });
+        if (!account) throw new Error(`Fila ${i + 1}: cuenta no encontrada`);
+        if (!account.active) throw new Error(`Fila ${i + 1}: la cuenta está inactiva`);
+
+        const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date();
+        const status = data.status ?? "confirmed";
+
+        let balanceAfter: number;
+        if (status === "confirmed") {
+          const delta = deltaFor(data.type, data.amount);
+          try {
+            const r = await applyDelta(tx, data.accountId, delta, data.type === "adjustment");
+            balanceAfter = r.newBalance;
+          } catch (e) {
+            if (e instanceof BalanceError) {
+              throw new Error(`Fila ${i + 1}: ${e.message}`);
+            }
+            throw e;
+          }
+        } else {
+          const acc = await tx.account.findUniqueOrThrow({
+            where: { accountId: data.accountId },
+            select: { balance: true },
+          });
+          balanceAfter = Number(acc.balance);
+        }
+
+        const op = await tx.operation.create({
+          data: {
+            accountId: data.accountId,
+            currencyId: account.currencyId,
+            type: data.type,
+            status,
+            amount: Math.abs(data.amount),
+            description: data.description?.trim() || null,
+            reference: data.reference?.trim() || null,
+            balanceAfter,
+            occurredAt,
+            confirmedAt: status === "confirmed" ? new Date() : null,
+            createdById: userId ?? null,
+            confirmedById: status === "confirmed" ? userId ?? null : null,
+          },
+        });
+
+        await createAuditLog(tx, {
+          action: "create",
+          entityType: "Operation",
+          entityId: op.operationId,
+          module: "envios",
+          userId,
+          newValues: { ...data, status, batch: true, batchIndex: i },
+        });
+
+        ids.push(op.operationId);
+      }
+      return ids;
+    });
+
+    revalidateAll();
+    return { success: true, data: { created } };
+  } catch (error) {
+    if (error instanceof BalanceError) return { success: false, error: error.message };
+    if (error instanceof ConcurrencyError) {
+      return { success: false, error: "Conflicto de concurrencia, reintenta" };
+    }
+    const msg = error instanceof Error ? error.message : "Error al registrar el lote";
+    console.error("createOperationsBatch:", error);
+    return { success: false, error: msg };
+  }
+}
+
+type ConversionPreview = {
+  rate: number;
+  rangeMin: number;
+  rangeMax: number | null;
+  amountInAccountCurrency: number;
+  direction: "base_to_quote" | "quote_to_base";
+  accountCurrencyCode: string;
+  externalCurrencyCode: string;
+  ruleId: number;
+  ruleName: string;
+};
+
+export async function previewDepositConversion(input: {
+  accountId: number;
+  externalCurrencyId: number;
+  externalAmount: number;
+}): Promise<ActionResult<ConversionPreview>> {
+  try {
+    if (!input.externalAmount || input.externalAmount <= 0) {
+      return { success: false, error: "Monto inválido" };
+    }
+    const account = await db.account.findUnique({
+      where: { accountId: input.accountId },
+      include: {
+        currency: true,
+        exchangeRateRule: { include: { baseCurrency: true, quoteCurrency: true } },
+      },
+    });
+    if (!account) return { success: false, error: "Cuenta no encontrada" };
+    if (!account.exchangeRateRule) {
+      return { success: false, error: "La cuenta no tiene regla de tasa asignada" };
+    }
+    if (input.externalCurrencyId === account.currencyId) {
+      return {
+        success: false,
+        error: "La moneda externa debe ser distinta a la moneda de la cuenta",
+      };
+    }
+    const rule = account.exchangeRateRule;
+    let direction: "base_to_quote" | "quote_to_base";
+    let externalCurrencyCode: string;
+    if (rule.baseCurrencyId === input.externalCurrencyId && rule.quoteCurrencyId === account.currencyId) {
+      direction = "base_to_quote";
+      externalCurrencyCode = rule.baseCurrency.code;
+    } else if (rule.quoteCurrencyId === input.externalCurrencyId && rule.baseCurrencyId === account.currencyId) {
+      direction = "quote_to_base";
+      externalCurrencyCode = rule.quoteCurrency.code;
+    } else {
+      return {
+        success: false,
+        error: `La regla "${rule.name}" no convierte entre estas monedas`,
+      };
+    }
+
+    const resolved = await resolveRate(db, rule.ruleId, input.externalAmount);
+    const amountInAccountCurrency =
+      direction === "base_to_quote"
+        ? input.externalAmount * resolved.rate
+        : input.externalAmount / resolved.rate;
+
+    return {
+      success: true,
+      data: {
+        rate: resolved.rate,
+        rangeMin: resolved.minAmount,
+        rangeMax: resolved.maxAmount,
+        amountInAccountCurrency,
+        direction,
+        accountCurrencyCode: account.currency.code,
+        externalCurrencyCode,
+        ruleId: rule.ruleId,
+        ruleName: rule.name,
+      },
+    };
+  } catch (error) {
+    if (error instanceof RateNotConfiguredError) {
+      return { success: false, error: error.message };
+    }
+    console.error("previewDepositConversion:", error);
+    return { success: false, error: "Error al calcular la conversión" };
+  }
+}
+
+export async function createDepositWithConversion(
+  input: DepositWithConversionInput
+): Promise<
+  ActionResult<{
+    operationId: number;
+    rate: number;
+    amountInAccountCurrency: number;
+  }>
+> {
+  try {
+    const parsed = depositWithConversionSchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    }
+    const data = parsed.data;
+    const userId = await getCurrentUserId();
+    const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date();
+    const status = data.status ?? "confirmed";
+
+    const result = await db.$transaction(async (tx) => {
+      const account = await tx.account.findUniqueOrThrow({
+        where: { accountId: data.accountId },
+        include: { exchangeRateRule: true, currency: true },
+      });
+      if (!account.active) throw new Error("La cuenta está inactiva");
+      if (data.externalCurrencyId === account.currencyId) {
+        throw new Error("Para depósitos en la misma moneda usa una operación normal");
+      }
+      if (!account.exchangeRateRule) {
+        throw new Error("La cuenta no tiene regla de tasa asignada");
+      }
+
+      const rule = account.exchangeRateRule;
+      let direction: "base_to_quote" | "quote_to_base";
+      if (
+        rule.baseCurrencyId === data.externalCurrencyId &&
+        rule.quoteCurrencyId === account.currencyId
+      ) {
+        direction = "base_to_quote";
+      } else if (
+        rule.quoteCurrencyId === data.externalCurrencyId &&
+        rule.baseCurrencyId === account.currencyId
+      ) {
+        direction = "quote_to_base";
+      } else {
+        throw new Error(
+          `La regla "${rule.name}" no convierte entre estas monedas`
+        );
+      }
+
+      const rate =
+        data.rateOverride ??
+        (await resolveRate(tx, rule.ruleId, data.externalAmount)).rate;
+      const amountInAccountCurrency =
+        direction === "base_to_quote"
+          ? data.externalAmount * rate
+          : data.externalAmount / rate;
+
+      let balanceAfter: number;
+      if (status === "confirmed") {
+        const r = await applyDelta(tx, account.accountId, +amountInAccountCurrency);
+        balanceAfter = r.newBalance;
+      } else {
+        balanceAfter = Number(account.balance);
+      }
+
+      const op = await tx.operation.create({
+        data: {
+          accountId: account.accountId,
+          currencyId: account.currencyId,
+          type: "deposit",
+          status,
+          amount: amountInAccountCurrency,
+          description: data.description?.trim() || null,
+          reference: data.reference?.trim() || null,
+          balanceAfter,
+          exchangeRateRuleId: rule.ruleId,
+          rateApplied: rate,
+          counterAmount: data.externalAmount,
+          counterCurrencyId: data.externalCurrencyId,
+          occurredAt,
+          confirmedAt: status === "confirmed" ? new Date() : null,
+          createdById: userId ?? null,
+          confirmedById: status === "confirmed" ? userId ?? null : null,
+        },
+      });
+
+      await createAuditLog(tx, {
+        action: "create",
+        entityType: "Operation",
+        entityId: op.operationId,
+        module: "envios",
+        userId,
+        newValues: {
+          ...data,
+          rate,
+          amountInAccountCurrency,
+          direction,
+          ruleId: rule.ruleId,
+          status,
+          variant: "deposit_with_conversion",
+        },
+      });
+
+      return { operationId: op.operationId, rate, amountInAccountCurrency };
+    });
+
+    revalidateAll();
+    return { success: true, data: result };
+  } catch (error) {
+    if (error instanceof BalanceError) return { success: false, error: error.message };
+    if (error instanceof ConcurrencyError) {
+      return { success: false, error: "Conflicto de concurrencia, reintenta" };
+    }
+    if (error instanceof RateNotConfiguredError) {
+      return { success: false, error: error.message };
+    }
+    const msg = error instanceof Error ? error.message : "Error al registrar el depósito";
+    console.error("createDepositWithConversion:", error);
     return { success: false, error: msg };
   }
 }

@@ -40,6 +40,21 @@ export const operationSchema = z.object({
 });
 export type OperationInput = z.infer<typeof operationSchema>;
 
+export const depositWithConversionSchema = z.object({
+  accountId: z.coerce.number().int().positive("Selecciona una cuenta"),
+  externalAmount: z.coerce.number().positive("Monto debe ser positivo"),
+  externalCurrencyId: z.coerce.number().int().positive("Selecciona la moneda de origen"),
+  description: z.string().trim().max(500).nullish(),
+  reference: z.string().trim().max(80).nullish(),
+  occurredAt: z.string().datetime().nullish().or(z.string().length(0).nullish()),
+  status: z.enum(["pending", "confirmed"]).default("confirmed"),
+  rateOverride: z.coerce.number().positive().nullish(),
+});
+export type DepositWithConversionInput = z.infer<typeof depositWithConversionSchema>;
+
+export const batchOperationsSchema = z.array(operationSchema).min(1, "Agrega al menos una fila").max(50, "Máximo 50 filas por lote");
+export type BatchOperationsInput = z.infer<typeof batchOperationsSchema>;
+
 export const accountSchema = z.object({
   groupId: z.coerce.number().int().positive("Selecciona un grupo"),
   currencyId: z.coerce.number().int().positive("Selecciona una moneda"),

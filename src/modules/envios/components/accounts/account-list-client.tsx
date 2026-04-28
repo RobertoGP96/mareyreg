@@ -32,6 +32,7 @@ import { type DataTableColumn } from "@/components/ui/data-table";
 import {
   Wallet, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2,
   Hash, Type, Users, CircleDollarSign, Calculator, ToggleLeft, MinusCircle,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -40,12 +41,19 @@ import {
 import type { AccountRow } from "../../lib/types";
 import { CurrencyChip } from "../shared/currency-chip";
 import { AmountDisplay } from "../shared/amount-display";
+import {
+  AccountRuleMenuItems,
+  AccountRuleDialogs,
+  removeRuleFromAccount,
+  type RuleActionState,
+  type RuleWithRanges,
+} from "./account-rule-actions";
 
 type GroupOption = { groupId: number; code: string; name: string; userId: number };
 type CurrencyOption = { currencyId: number; code: string; symbol: string; decimalPlaces: number };
-type RuleOption = {
-  ruleId: number; name: string; baseCurrencyId: number; quoteCurrencyId: number;
-  baseCurrency: { code: string }; quoteCurrency: { code: string };
+type RuleOption = RuleWithRanges & {
+  baseCurrency: { code: string };
+  quoteCurrency: { code: string };
 };
 
 interface Props {
@@ -63,6 +71,7 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [toEdit, setToEdit] = useState<AccountRow | null>(null);
   const [toDelete, setToDelete] = useState<AccountRow | null>(null);
+  const [ruleAction, setRuleAction] = useState<RuleActionState>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const [groupId, setGroupId] = useState<string>("");
@@ -103,8 +112,19 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
 
   const compatibleRules = useMemo(() => {
     if (!currencyId) return [];
-    return rules.filter((r) => r.baseCurrencyId === Number(currencyId));
+    const cId = Number(currencyId);
+    return rules.filter(
+      (r) => r.baseCurrencyId === cId || r.quoteCurrencyId === cId
+    );
   }, [rules, currencyId]);
+
+  const handleRuleAction = (a: AccountRow, mode: "assign" | "create" | "edit" | "remove") => {
+    if (mode === "remove") {
+      void removeRuleFromAccount(a.accountId).then((ok) => { if (ok) router.refresh(); });
+      return;
+    }
+    setRuleAction({ account: a, mode });
+  };
 
   const resetForm = () => {
     setGroupId(""); setCurrencyId(""); setAccountNumber("");
@@ -256,17 +276,25 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
       cell: (a) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8">
+            <Button variant="ghost" size="icon" className="size-8" onClick={(e) => e.stopPropagation()}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={() => router.push(`/envios/cuentas/${a.accountId}`)}>
+              <Eye className="h-4 w-4" /> Ver detalles
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => fillEdit(a)}>
-              <SquarePen className="h-4 w-4" /> Editar
+              <SquarePen className="h-4 w-4" /> Editar cuenta
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleToggle(a)}>
               <ToggleLeft className="h-4 w-4" /> {a.active ? "Desactivar" : "Activar"}
             </DropdownMenuItem>
+            <AccountRuleMenuItems
+              account={a}
+              rules={rules}
+              onAction={(mode) => handleRuleAction(a, mode)}
+            />
             <DropdownMenuItem
               onClick={() => setToDelete(a)}
               className="text-destructive focus:text-destructive"
@@ -316,9 +344,11 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
         columns={columns}
         rows={filtered}
         rowKey={(a) => a.accountId}
+        onRowClick={(a) => router.push(`/envios/cuentas/${a.accountId}`)}
         mobileCard={(a) => (
           <MobileListCard
             key={a.accountId}
+            onClick={() => router.push(`/envios/cuentas/${a.accountId}`)}
             title={
               <span className="flex items-center gap-2">
                 <CurrencyChip code={a.currencyCode} size="sm" />
@@ -332,17 +362,25 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
             actions={
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-9">
+                  <Button variant="ghost" size="icon" className="size-9" onClick={(e) => e.stopPropagation()}>
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuItem onClick={() => router.push(`/envios/cuentas/${a.accountId}`)}>
+                    <Eye className="h-4 w-4" /> Ver detalles
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => fillEdit(a)}>
-                    <SquarePen className="h-4 w-4" /> Editar
+                    <SquarePen className="h-4 w-4" /> Editar cuenta
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleToggle(a)}>
                     <ToggleLeft className="h-4 w-4" /> {a.active ? "Desactivar" : "Activar"}
                   </DropdownMenuItem>
+                  <AccountRuleMenuItems
+                    account={a}
+                    rules={rules}
+                    onAction={(mode) => handleRuleAction(a, mode)}
+                  />
                   <DropdownMenuItem
                     onClick={() => setToDelete(a)}
                     className="text-destructive focus:text-destructive"
@@ -508,7 +546,7 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
                   <SelectItem value="none">Sin regla</SelectItem>
                   {compatibleRules.map((r) => (
                     <SelectItem key={r.ruleId} value={String(r.ruleId)}>
-                      {r.name} · {r.baseCurrency.code}→{r.quoteCurrency.code}
+                      {r.name} · {r.baseCurrency.code}↔{r.quoteCurrency.code}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -581,6 +619,13 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AccountRuleDialogs
+        state={ruleAction}
+        onClose={() => setRuleAction(null)}
+        rules={rules}
+        currencies={currencies}
+      />
 
       <Fab icon={Plus} label="Nueva cuenta" onClick={() => { resetForm(); setIsCreateOpen(true); }} />
     </div>

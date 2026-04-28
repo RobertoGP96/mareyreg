@@ -30,7 +30,7 @@ import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
 import { type DataTableColumn } from "@/components/ui/data-table";
 import {
-  Users, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2,
+  Users, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2, Eye,
   Hash, Type, FileText, ToggleLeft, UserCircle, Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -231,11 +231,14 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
       cell: (g) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8">
+            <Button variant="ghost" size="icon" className="size-8" onClick={(e) => e.stopPropagation()}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={() => router.push(`/envios/grupos/${g.groupId}`)}>
+              <Eye className="h-4 w-4" /> Ver detalles
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => fillEdit(g)}>
               <SquarePen className="h-4 w-4" /> Editar
             </DropdownMenuItem>
@@ -286,9 +289,11 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
         columns={columns}
         rows={filtered}
         rowKey={(g) => g.groupId}
+        onRowClick={(g) => router.push(`/envios/grupos/${g.groupId}`)}
         mobileCard={(g) => (
           <MobileListCard
             key={g.groupId}
+            onClick={() => router.push(`/envios/grupos/${g.groupId}`)}
             title={
               <span className="flex items-center gap-2">
                 <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -305,6 +310,9 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={() => router.push(`/envios/grupos/${g.groupId}`)}>
+                    <Eye className="h-4 w-4" /> Ver detalles
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => fillEdit(g)}>
                     <SquarePen className="h-4 w-4" /> Editar
                   </DropdownMenuItem>

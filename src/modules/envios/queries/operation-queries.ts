@@ -44,6 +44,8 @@ export async function getOperations(filter: OperationFilter = {}): Promise<Opera
         },
       },
       currency: { select: { code: true, symbol: true, decimalPlaces: true } },
+      exchangeRateRule: { select: { ruleId: true, name: true } },
+      counterCurrency: { select: { code: true, symbol: true, decimalPlaces: true } },
     },
   });
 
@@ -66,6 +68,14 @@ export async function getOperations(filter: OperationFilter = {}): Promise<Opera
     currencyCode: o.currency.code,
     currencySymbol: o.currency.symbol,
     currencyDecimals: o.currency.decimalPlaces,
+    exchangeRateRuleId: o.exchangeRateRuleId,
+    exchangeRateRuleName: o.exchangeRateRule?.name ?? null,
+    rateApplied: o.rateApplied !== null ? Number(o.rateApplied) : null,
+    counterAmount: o.counterAmount !== null ? Number(o.counterAmount) : null,
+    counterCurrencyId: o.counterCurrencyId,
+    counterCurrencyCode: o.counterCurrency?.code ?? null,
+    counterCurrencySymbol: o.counterCurrency?.symbol ?? null,
+    counterCurrencyDecimals: o.counterCurrency?.decimalPlaces ?? null,
   }));
 }
 
@@ -81,6 +91,13 @@ export async function getOperationFormData() {
       currencyId: true,
       group: { select: { code: true, name: true } },
       currency: { select: { code: true, symbol: true, decimalPlaces: true } },
+      exchangeRateRule: {
+        select: {
+          ruleId: true, baseCurrencyId: true, quoteCurrencyId: true,
+          baseCurrency: { select: { code: true } },
+          quoteCurrency: { select: { code: true } },
+        },
+      },
     },
     orderBy: [{ group: { name: "asc" } }, { accountNumber: "asc" }],
   });
@@ -96,6 +113,15 @@ export async function getOperationFormData() {
     currencyCode: a.currency.code,
     currencySymbol: a.currency.symbol,
     currencyDecimals: a.currency.decimalPlaces,
+    rule: a.exchangeRateRule
+      ? {
+          ruleId: a.exchangeRateRule.ruleId,
+          baseCurrencyId: a.exchangeRateRule.baseCurrencyId,
+          quoteCurrencyId: a.exchangeRateRule.quoteCurrencyId,
+          baseCurrencyCode: a.exchangeRateRule.baseCurrency.code,
+          quoteCurrencyCode: a.exchangeRateRule.quoteCurrency.code,
+        }
+      : null,
   }));
 }
 

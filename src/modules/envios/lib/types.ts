@@ -84,6 +84,14 @@ export type OperationRow = Pick<
   currencyCode: string;
   currencySymbol: string;
   currencyDecimals: number;
+  exchangeRateRuleId: number | null;
+  exchangeRateRuleName: string | null;
+  rateApplied: number | null;
+  counterAmount: number | null;
+  counterCurrencyId: number | null;
+  counterCurrencyCode: string | null;
+  counterCurrencySymbol: string | null;
+  counterCurrencyDecimals: number | null;
 };
 
 export type {

@@ -32,7 +32,7 @@ import { type DataTableColumn } from "@/components/ui/data-table";
 import {
   ArrowRightLeft, Plus, Search, MoreHorizontal, Loader2,
   Hash, Type, Calendar, FileText, Wallet, Check, Clock,
-  ArrowDownLeft, ArrowUpRight, Settings2, Ban,
+  ArrowDownLeft, ArrowUpRight, Settings2, Ban, Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -45,11 +45,15 @@ import { CurrencyChip } from "../shared/currency-chip";
 import { AmountDisplay } from "../shared/amount-display";
 import { OpTypeBadge } from "../shared/op-type-badge";
 import { OpStatusPill } from "../shared/op-status-pill";
+import { RateChip } from "../shared/rate-chip";
 import { TransferForm } from "./transfer-form";
+import { DepositWithConversionForm } from "./deposit-with-conversion-form";
+import { OperationsBatchForm } from "./operations-batch-form";
 
 interface Props {
   initialOperations: OperationRow[];
   accounts: OperationFormAccount[];
+  currencies: Array<{ currencyId: number; code: string; symbol: string }>;
 }
 
 type OpKind = "deposit" | "withdrawal" | "adjustment";
@@ -60,7 +64,7 @@ const KIND_TABS: { id: OpKind; label: string; icon: React.ComponentType<{ classN
   { id: "adjustment", label: "Ajuste",    icon: Settings2,     tone: "text-muted-foreground" },
 ];
 
-export function OperationListClient({ initialOperations, accounts }: Props) {
+export function OperationListClient({ initialOperations, accounts, currencies }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("");
@@ -68,6 +72,8 @@ export function OperationListClient({ initialOperations, accounts }: Props) {
   const [filterAccount, setFilterAccount] = useState<string>("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isDepositConvertOpen, setIsDepositConvertOpen] = useState(false);
+  const [isBatchOpen, setIsBatchOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toCancel, setToCancel] = useState<OperationRow | null>(null);
 
@@ -107,6 +113,14 @@ export function OperationListClient({ initialOperations, accounts }: Props) {
   }), [initialOperations]);
 
   const selectedAccount = accounts.find((a) => String(a.accountId) === accountId);
+
+  const accountRulesMap = useMemo(
+    () =>
+      Object.fromEntries(
+        accounts.map((a) => [a.accountId, a.rule ?? null])
+      ),
+    [accounts]
+  );
 
   const resetForm = () => {
     setAccountId(""); setAmount(""); setDescription(""); setReference("");
@@ -215,7 +229,20 @@ export function OperationListClient({ initialOperations, accounts }: Props) {
       key: "description",
       header: "Descripción",
       cell: (o) => (
-        <span className="text-xs text-muted-foreground line-clamp-1">{o.description ?? o.reference ?? "—"}</span>
+        <div className="flex flex-col gap-1 min-w-0">
+          <span className="text-xs text-muted-foreground line-clamp-1">
+            {o.description ?? o.reference ?? "—"}
+          </span>
+          {o.rateApplied != null && (
+            <RateChip
+              rate={o.rateApplied}
+              counterAmount={o.counterAmount}
+              counterCurrencyCode={o.counterCurrencyCode}
+              counterCurrencyDecimals={o.counterCurrencyDecimals}
+              ruleName={o.exchangeRateRuleName}
+            />
+          )}
+        </div>
       ),
     },
     {
@@ -291,6 +318,18 @@ export function OperationListClient({ initialOperations, accounts }: Props) {
         <div className="hidden md:flex items-center gap-2">
           <Button
             variant="outline"
+            onClick={() => setIsBatchOpen(true)}
+          >
+            <Layers className="h-4 w-4" /> Operaciones en lote
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsDepositConvertOpen(true)}
+          >
+            <ArrowDownLeft className="h-4 w-4" /> Depósito con conversión
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => setIsTransferOpen(true)}
           >
             <ArrowRightLeft className="h-4 w-4" /> Transferencia
@@ -353,6 +392,15 @@ export function OperationListClient({ initialOperations, accounts }: Props) {
             meta={
               <div className="flex items-center gap-2 flex-wrap">
                 <OpStatusPill status={o.status} />
+                {o.rateApplied != null && (
+                  <RateChip
+                    rate={o.rateApplied}
+                    counterAmount={o.counterAmount}
+                    counterCurrencyCode={o.counterCurrencyCode}
+                    counterCurrencyDecimals={o.counterCurrencyDecimals}
+                    ruleName={o.exchangeRateRuleName}
+                  />
+                )}
                 {o.description ? (
                   <span className="text-[11px] text-muted-foreground line-clamp-1">{o.description}</span>
                 ) : null}
@@ -615,6 +663,20 @@ export function OperationListClient({ initialOperations, accounts }: Props) {
       <Fab icon={Plus} label="Nueva operación" onClick={() => { resetForm(); setIsCreateOpen(true); }} />
 
       <TransferForm open={isTransferOpen} onOpenChange={setIsTransferOpen} accounts={accounts} />
+
+      <DepositWithConversionForm
+        open={isDepositConvertOpen}
+        onOpenChange={setIsDepositConvertOpen}
+        accounts={accounts}
+        accountRules={accountRulesMap}
+        currencies={currencies}
+      />
+
+      <OperationsBatchForm
+        open={isBatchOpen}
+        onOpenChange={setIsBatchOpen}
+        accounts={accounts}
+      />
     </div>
   );
 }
