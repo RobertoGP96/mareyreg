@@ -576,7 +576,7 @@ export function OperationListClient({ initialOperations, accounts }: Props) {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Cancelar pendiente?</AlertDialogTitle>
             <AlertDialogDescription>
-              La operación pasa a estado "cancelada" y no afectará el saldo. No es reversible.
+              La operación pasa a estado &ldquo;cancelada&rdquo; y no afectará el saldo. No es reversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

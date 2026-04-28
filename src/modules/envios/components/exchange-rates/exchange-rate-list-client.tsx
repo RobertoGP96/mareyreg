@@ -364,7 +364,7 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
           <FormSection icon={Calculator} title="Rangos">
             <p className="text-xs text-muted-foreground">
               Cada rango define una tasa para un intervalo de monto en moneda base.
-              El último rango puede dejarse abierto (∞) para "cualquier monto mayor".
+              El último rango puede dejarse abierto (∞) para &ldquo;cualquier monto mayor&rdquo;.
             </p>
             <div className="space-y-2">
               {ranges.map((r, i) => (
