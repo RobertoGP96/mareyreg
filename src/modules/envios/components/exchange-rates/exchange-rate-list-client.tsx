@@ -34,6 +34,7 @@ import {
 } from "../../actions/exchange-rate-actions";
 import type { ExchangeRateRuleRow } from "../../lib/types";
 import { CurrencyChip } from "../shared/currency-chip";
+import { RateCalculatorCard } from "./rate-calculator-card";
 
 type CurrencyOption = { currencyId: number; code: string; symbol: string };
 
@@ -246,7 +247,8 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
             }
           />
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
+            <div className="grid gap-3 md:grid-cols-2">
             {filtered.map((r) => (
               <div
                 key={r.ruleId}
@@ -308,6 +310,10 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
                 </div>
               </div>
             ))}
+            </div>
+            <div className="lg:sticky lg:top-4 lg:self-start">
+              <RateCalculatorCard rules={initialRules} />
+            </div>
           </div>
         )}
       </div>
