@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { MetricTile } from "@/components/ui/metric-tile";
 import { StatusPill } from "@/components/ui/status-pill";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MobileListCard } from "@/components/ui/mobile-list-card";
@@ -193,8 +193,8 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
   ];
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-2 text-sm">
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 text-xs">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/envios/cuentas">
             <ArrowLeft className="h-4 w-4" /> Cuentas
@@ -243,46 +243,46 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
         </div>
       </PageHeader>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <MetricTile
           icon={CircleDollarSign}
           label="Saldo actual"
           value={account.balance.toLocaleString("es-MX", {
             minimumFractionDigits: account.currencyDecimals,
             maximumFractionDigits: account.currencyDecimals,
           })}
-          accent={account.balance >= 0 ? "brand" : "danger"}
+          tone={account.balance >= 0 ? "active" : "critical"}
         />
-        <KpiCard
+        <MetricTile
           icon={ArrowDownLeft}
           label="Ingresos 30 días"
           value={account.kpis.inflows30d.toLocaleString("es-MX", {
             minimumFractionDigits: account.currencyDecimals,
             maximumFractionDigits: account.currencyDecimals,
           })}
-          accent="success"
+          tone="success"
         />
-        <KpiCard
+        <MetricTile
           icon={ArrowUpRight}
           label="Egresos 30 días"
           value={account.kpis.outflows30d.toLocaleString("es-MX", {
             minimumFractionDigits: account.currencyDecimals,
             maximumFractionDigits: account.currencyDecimals,
           })}
-          accent="warning"
+          tone="warning"
         />
-        <KpiCard
+        <MetricTile
           icon={Clock}
           label="Operaciones pendientes"
           value={account.kpis.pending}
-          accent={account.kpis.pending > 0 ? "info" : "slate"}
+          tone={account.kpis.pending > 0 ? "track" : "idle"}
         />
       </div>
 
-      <section className="rounded-xl border border-border bg-card p-5 shadow-panel space-y-4">
+      <section className="rounded-xl border border-border bg-card p-4 shadow-panel space-y-3">
         <header className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold font-headline flex items-center gap-2">
+            <h2 className="text-sm font-semibold font-headline flex items-center gap-2">
               <Calculator className="h-4 w-4 text-[var(--brand)]" /> Regla de tasa
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -368,9 +368,9 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
         )}
       </section>
 
-      <section className="space-y-3">
+      <section className="space-y-2.5">
         <header className="flex items-center justify-between gap-2">
-          <h2 className="text-base font-semibold font-headline flex items-center gap-2">
+          <h2 className="text-sm font-semibold font-headline flex items-center gap-2">
             <Settings2 className="h-4 w-4 text-[var(--brand)]" /> Operaciones recientes
             <Badge variant="outline" className="text-[10px]">{operations.length}</Badge>
           </h2>

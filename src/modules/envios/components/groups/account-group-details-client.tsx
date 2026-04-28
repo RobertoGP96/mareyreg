@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
-import { KpiCard } from "@/components/ui/kpi-card";
+import { MetricTile } from "@/components/ui/metric-tile";
 import { StatusPill } from "@/components/ui/status-pill";
 import { EmptyState } from "@/components/ui/empty-state";
 import { MobileListCard } from "@/components/ui/mobile-list-card";
@@ -142,8 +142,8 @@ export function AccountGroupDetailsClient({ group, operations }: Props) {
   ];
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-2 text-sm">
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 text-xs">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/envios/grupos">
             <ArrowLeft className="h-4 w-4" /> Grupos
@@ -170,65 +170,88 @@ export function AccountGroupDetailsClient({ group, operations }: Props) {
         </div>
       </PageHeader>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
-          icon={Wallet}
-          label="Cuentas activas"
-          value={activeAccounts}
-          accent="brand"
-        />
-        <KpiCard
-          icon={CircleDollarSign}
-          label="Monedas"
-          value={group.balancesByCurrency.length}
-          accent="info"
-        />
-        <KpiCard
-          icon={Calculator}
-          label="Reglas usadas"
-          value={group.rulesUsed.length}
-          accent="success"
-        />
-        <KpiCard
-          icon={Settings2}
-          label="Operaciones recientes"
-          value={operations.length}
-          accent="slate"
-        />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <MetricTile icon={Wallet} label="Cuentas activas" value={activeAccounts} tone="active" />
+        <MetricTile icon={CircleDollarSign} label="Monedas" value={group.balancesByCurrency.length} tone="track" />
+        <MetricTile icon={Calculator} label="Reglas usadas" value={group.rulesUsed.length} tone="success" />
+        <MetricTile icon={Settings2} label="Operaciones recientes" value={operations.length} tone="idle" />
       </div>
 
-      {group.balancesByCurrency.length > 0 && (
-        <section className="rounded-xl border border-border bg-card p-5 shadow-panel space-y-3">
-          <header>
-            <h2 className="text-base font-semibold font-headline flex items-center gap-2">
-              <CircleDollarSign className="h-4 w-4 text-[var(--brand)]" /> Saldos por moneda
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Suma de saldos de las cuentas activas del grupo, agrupada por moneda.
-            </p>
-          </header>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {group.balancesByCurrency.map((b) => (
-              <div
-                key={b.currencyId}
-                className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 ring-1 ring-inset ring-border"
-              >
-                <span className="flex items-center gap-2">
-                  <CurrencyChip code={b.code} size="sm" />
-                  <span className="text-xs text-muted-foreground">
-                    {b.accounts} cuenta{b.accounts !== 1 ? "s" : ""}
-                  </span>
-                </span>
-                <AmountDisplay value={b.balance} decimalPlaces={b.decimalPlaces} signed />
+      {(group.balancesByCurrency.length > 0 || group.rulesUsed.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {group.balancesByCurrency.length > 0 && (
+            <section className="rounded-xl border border-border bg-card p-4 shadow-panel space-y-2.5">
+              <header>
+                <h2 className="text-sm font-semibold font-headline flex items-center gap-2">
+                  <CircleDollarSign className="h-4 w-4 text-[var(--brand)]" /> Saldos por moneda
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Suma de saldos de las cuentas activas, agrupada por moneda.
+                </p>
+              </header>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {group.balancesByCurrency.map((b) => (
+                  <div
+                    key={b.currencyId}
+                    className="flex items-center justify-between rounded-md bg-muted/30 px-2.5 py-1.5 ring-1 ring-inset ring-border"
+                  >
+                    <span className="flex items-center gap-2">
+                      <CurrencyChip code={b.code} size="sm" />
+                      <span className="text-xs text-muted-foreground">
+                        {b.accounts} cuenta{b.accounts !== 1 ? "s" : ""}
+                      </span>
+                    </span>
+                    <AmountDisplay value={b.balance} decimalPlaces={b.decimalPlaces} signed />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
+          )}
+
+          {group.rulesUsed.length > 0 && (
+            <section className="rounded-xl border border-border bg-card p-4 shadow-panel space-y-2.5">
+              <header>
+                <h2 className="text-sm font-semibold font-headline flex items-center gap-2">
+                  <Calculator className="h-4 w-4 text-[var(--brand)]" /> Reglas usadas
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Reglas asignadas a las cuentas de este grupo.
+                </p>
+              </header>
+              <div className="grid grid-cols-1 gap-2">
+                {group.rulesUsed.map((r) => (
+                  <Link
+                    key={r.ruleId}
+                    href="/envios/tasas"
+                    className="flex items-center justify-between rounded-md bg-muted/30 px-2.5 py-1.5 ring-1 ring-inset ring-border hover:bg-muted/50 transition-colors group"
+                  >
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-sm font-medium truncate group-hover:text-[var(--brand)] transition-colors">
+                        {r.name}
+                      </span>
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <CurrencyChip code={r.baseCurrencyCode} size="sm" />
+                        <ArrowRightLeft className="h-3 w-3" />
+                        <CurrencyChip code={r.quoteCurrencyCode} size="sm" />
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px]">
+                        {r.accountsUsing} uso{r.accountsUsing !== 1 ? "s" : ""}
+                      </Badge>
+                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
       )}
 
-      <section className="space-y-3">
+      <section className="space-y-2.5">
         <header className="flex items-center justify-between">
-          <h2 className="text-base font-semibold font-headline flex items-center gap-2">
+          <h2 className="text-sm font-semibold font-headline flex items-center gap-2">
             <Wallet className="h-4 w-4 text-[var(--brand)]" /> Cuentas
             <Badge variant="outline" className="text-[10px]">{totalAccounts}</Badge>
           </h2>
@@ -274,48 +297,9 @@ export function AccountGroupDetailsClient({ group, operations }: Props) {
         />
       </section>
 
-      {group.rulesUsed.length > 0 && (
-        <section className="rounded-xl border border-border bg-card p-5 shadow-panel space-y-3">
-          <header>
-            <h2 className="text-base font-semibold font-headline flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-[var(--brand)]" /> Reglas usadas
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Reglas asignadas a las cuentas de este grupo.
-            </p>
-          </header>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {group.rulesUsed.map((r) => (
-              <Link
-                key={r.ruleId}
-                href="/envios/tasas"
-                className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 ring-1 ring-inset ring-border hover:bg-muted/50 transition-colors group"
-              >
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <span className="text-sm font-medium truncate group-hover:text-[var(--brand)] transition-colors">
-                    {r.name}
-                  </span>
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <CurrencyChip code={r.baseCurrencyCode} size="sm" />
-                    <ArrowRightLeft className="h-3 w-3" />
-                    <CurrencyChip code={r.quoteCurrencyCode} size="sm" />
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-[10px]">
-                    {r.accountsUsing} uso{r.accountsUsing !== 1 ? "s" : ""}
-                  </Badge>
-                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="space-y-3">
+      <section className="space-y-2.5">
         <header className="flex items-center justify-between gap-2">
-          <h2 className="text-base font-semibold font-headline flex items-center gap-2">
+          <h2 className="text-sm font-semibold font-headline flex items-center gap-2">
             <Settings2 className="h-4 w-4 text-[var(--brand)]" /> Operaciones recientes del grupo
             <Badge variant="outline" className="text-[10px]">{operations.length}</Badge>
           </h2>
