@@ -1,11 +1,22 @@
-import { PageHeader } from "@/components/ui/page-header";
-import { Wallet } from "lucide-react";
+import { AccountListClient } from "@/modules/envios/components/accounts/account-list-client";
+import {
+  getAccounts,
+  getAccountFormData,
+} from "@/modules/envios/queries/account-queries";
 
-export default function CuentasPage() {
+export default async function CuentasPage() {
+  const [accounts, formData] = await Promise.all([
+    getAccounts(),
+    getAccountFormData(),
+  ]);
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6">
-      <PageHeader icon={Wallet} title="Cuentas" description="Una cuenta por moneda dentro de cada grupo" />
-      <p className="text-muted-foreground text-sm">Lista de cuentas en construcción.</p>
+    <div className="p-4 md:p-6">
+      <AccountListClient
+        initialAccounts={accounts}
+        groups={formData.groups}
+        currencies={formData.currencies}
+        rules={formData.rules}
+      />
     </div>
   );
 }

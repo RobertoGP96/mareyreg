@@ -15,6 +15,67 @@ export const currencySchema = z.object({
 });
 export type CurrencyInput = z.infer<typeof currencySchema>;
 
+export const accountSchema = z.object({
+  groupId: z.coerce.number().int().positive("Selecciona un grupo"),
+  currencyId: z.coerce.number().int().positive("Selecciona una moneda"),
+  accountNumber: z
+    .string()
+    .trim()
+    .min(2, "Número mínimo 2 caracteres")
+    .max(40)
+    .regex(/^[A-Z0-9_-]+$/, "Solo mayúsculas, números, _ y -"),
+  name: z.string().trim().min(1, "Nombre requerido").max(120),
+  exchangeRateRuleId: z.coerce.number().int().positive().nullish(),
+  openingBalance: z.coerce.number().nullish(),
+  active: z.boolean().optional(),
+});
+export type AccountInput = z.infer<typeof accountSchema>;
+
+export const rateRangeSchema = z
+  .object({
+    minAmount: z.coerce.number().min(0, "Mínimo no puede ser negativo"),
+    maxAmount: z.coerce.number().nullish(),
+    rate: z.coerce.number().positive("Tasa debe ser mayor a 0"),
+  })
+  .refine(
+    (r) => r.maxAmount == null || r.maxAmount > r.minAmount,
+    { message: "Máximo debe ser mayor que mínimo", path: ["maxAmount"] }
+  );
+
+export const exchangeRateRuleSchema = z.object({
+  name: z.string().trim().min(1, "Nombre requerido").max(80),
+  baseCurrencyId: z.coerce.number().int().positive("Selecciona moneda base"),
+  quoteCurrencyId: z.coerce.number().int().positive("Selecciona moneda destino"),
+  ranges: z.array(rateRangeSchema).min(1, "Al menos un rango"),
+  active: z.boolean().optional(),
+}).refine((r) => r.baseCurrencyId !== r.quoteCurrencyId, {
+  message: "Base y destino deben ser distintas",
+  path: ["quoteCurrencyId"],
+}).superRefine((r, ctx) => {
+  const sorted = [...r.ranges].sort((a, b) => a.minAmount - b.minAmount);
+  for (let i = 0; i < sorted.length; i++) {
+    const cur = sorted[i];
+    const next = sorted[i + 1];
+    if (cur.maxAmount == null && next) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Solo el último rango puede tener máximo abierto (∞)",
+        path: ["ranges"],
+      });
+      return;
+    }
+    if (next && cur.maxAmount != null && next.minAmount < cur.maxAmount) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Rango ${i + 1} solapa con rango ${i + 2}`,
+        path: ["ranges"],
+      });
+      return;
+    }
+  }
+});
+export type ExchangeRateRuleInput = z.infer<typeof exchangeRateRuleSchema>;
+
 export const accountGroupSchema = z.object({
   code: z
     .string()
