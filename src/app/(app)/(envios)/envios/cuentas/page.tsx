@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { AccountListClient } from "@/modules/envios/components/accounts/account-list-client";
 import {
   getAccounts,

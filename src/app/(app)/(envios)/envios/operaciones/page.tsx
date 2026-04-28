@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { OperationListClient } from "@/modules/envios/components/operations/operation-list-client";
 import {
   getOperations,

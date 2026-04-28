@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { ExchangeRateListClient } from "@/modules/envios/components/exchange-rates/exchange-rate-list-client";
 import {
   getExchangeRateRules,

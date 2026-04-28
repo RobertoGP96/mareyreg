@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { CurrencyListClient } from "@/modules/envios/components/currencies/currency-list-client";
 import { getCurrencies } from "@/modules/envios/queries/currency-queries";
 

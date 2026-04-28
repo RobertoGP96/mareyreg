@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { PendingListClient } from "@/modules/envios/components/operations/pending-list-client";
 import {
   getPendingOperations,

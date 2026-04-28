@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { AccountGroupListClient } from "@/modules/envios/components/groups/account-group-list-client";
 import {
   getAccountGroups,
