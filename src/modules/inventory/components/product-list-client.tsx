@@ -251,12 +251,13 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
         title="Productos"
         description="Catálogo de productos, componentes y materiales del inventario."
         badge={`${products.length} productos`}
-      >
-        <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Nuevo producto
-        </Button>
-      </PageHeader>
+        actions={
+          <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Nuevo producto
+          </Button>
+        }
+      />
 
       <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-4 py-3">

@@ -166,12 +166,13 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
         title="Almacenes"
         description="Puntos de almacenamiento y distribución con ubicación y capacidad."
         badge={`${warehouses.length} almacenes`}
-      >
-        <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Nuevo almacén
-        </Button>
-      </PageHeader>
+        actions={
+          <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Nuevo almacén
+          </Button>
+        }
+      />
 
       <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-4 py-3">

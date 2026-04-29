@@ -217,12 +217,13 @@ export function StockPageClient({
         title="Stock"
         description="Niveles de stock por producto y almacén con histórico de movimientos."
         badge={`${stockLevels.length} niveles`}
-      >
-        <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Nuevo movimiento
-        </Button>
-      </PageHeader>
+        actions={
+          <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Nuevo movimiento
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard

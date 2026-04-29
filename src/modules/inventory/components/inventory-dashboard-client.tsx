@@ -64,14 +64,17 @@ export function InventoryDashboardClient({ data }: Props) {
         title="Cockpit de inventario"
         description="Stock, valuación y movimientos en tiempo real — control operativo de productos y almacenes."
         badge="Últimos 30 días"
-      >
-        <Button variant="outline" onClick={() => router.push("/stock")}>
-          <PackageSearch className="h-4 w-4" /> Ver stock
-        </Button>
-        <Button variant="brand" onClick={() => router.push("/products")}>
-          <Plus className="h-4 w-4" /> Nuevo producto
-        </Button>
-      </PageHeader>
+        actions={
+          <>
+            <Button variant="outline" onClick={() => router.push("/stock")}>
+              <PackageSearch className="h-4 w-4" /> Ver stock
+            </Button>
+            <Button variant="brand" onClick={() => router.push("/products")}>
+              <Plus className="h-4 w-4" /> Nuevo producto
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
