@@ -280,13 +280,28 @@ export function AccountListClient({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem onClick={() => router.push(`/envios/cuentas/${a.accountId}`)}>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setTimeout(() => router.push(`/envios/cuentas/${a.accountId}`), 0);
+              }}
+            >
               <Eye className="h-4 w-4" /> Ver detalles
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); fillEdit(a); }}>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setTimeout(() => fillEdit(a), 0);
+              }}
+            >
               <SquarePen className="h-4 w-4" /> Editar cuenta
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void handleToggle(a); }}>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setTimeout(() => void handleToggle(a), 0);
+              }}
+            >
               <ToggleLeft className="h-4 w-4" /> {a.active ? "Desactivar" : "Activar"}
             </DropdownMenuItem>
             <AccountRuleMenuItems
@@ -294,7 +309,10 @@ export function AccountListClient({
               onAction={(mode) => handleRuleAction(a, mode)}
             />
             <DropdownMenuItem
-              onSelect={(e) => { e.preventDefault(); setToDelete(a); }}
+              onSelect={(e) => {
+                e.preventDefault();
+                setTimeout(() => setToDelete(a), 0);
+              }}
               className="text-destructive focus:text-destructive"
             >
               <Trash2 className="h-4 w-4" /> Eliminar
@@ -366,13 +384,28 @@ export function AccountListClient({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuItem onClick={() => router.push(`/envios/cuentas/${a.accountId}`)}>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setTimeout(() => router.push(`/envios/cuentas/${a.accountId}`), 0);
+                    }}
+                  >
                     <Eye className="h-4 w-4" /> Ver detalles
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); fillEdit(a); }}>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setTimeout(() => fillEdit(a), 0);
+                    }}
+                  >
                     <SquarePen className="h-4 w-4" /> Editar cuenta
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void handleToggle(a); }}>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setTimeout(() => void handleToggle(a), 0);
+                    }}
+                  >
                     <ToggleLeft className="h-4 w-4" /> {a.active ? "Desactivar" : "Activar"}
                   </DropdownMenuItem>
                   <AccountRuleMenuItems
@@ -380,7 +413,10 @@ export function AccountListClient({
                     onAction={(mode) => handleRuleAction(a, mode)}
                   />
                   <DropdownMenuItem
-                    onSelect={(e) => { e.preventDefault(); setToDelete(a); }}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setTimeout(() => setToDelete(a), 0);
+                    }}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" /> Eliminar

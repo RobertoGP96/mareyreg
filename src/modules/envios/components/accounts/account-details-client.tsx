@@ -18,7 +18,7 @@ import { type DataTableColumn } from "@/components/ui/data-table";
 import {
   Wallet, ArrowLeft, ArrowRightLeft, ArrowDownLeft, ArrowUpRight,
   Calculator, MoreHorizontal, MinusCircle, Pin, BarChart3, Clock,
-  CircleDollarSign, Settings2, ChevronRight, Layers,
+  CircleDollarSign, Settings2, ChevronRight, Layers, SquarePen,
 } from "lucide-react";
 import { CurrencyChip } from "../shared/currency-chip";
 import { AmountDisplay } from "../shared/amount-display";
@@ -35,6 +35,7 @@ import {
   type RuleActionState,
   type RuleSummary,
 } from "./account-rule-actions";
+import { AccountEditDialog } from "./account-edit-dialog";
 import type { AccountDetail } from "../../queries/account-queries";
 import type { AccountRow, OperationRow } from "../../lib/types";
 import type { OperationFormAccount } from "../../queries/operation-queries";
@@ -61,6 +62,7 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
   const [ruleAction, setRuleAction] = useState<RuleActionState>(null);
   const [depositOpen, setDepositOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const accountRulesList: RuleSummary[] = useMemo(
     () => account.rules.map((r) => ({ ...r })),
@@ -212,6 +214,13 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
         }
         actions={
           <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditOpen(true)}
+            >
+              <SquarePen className="h-4 w-4" /> Editar cuenta
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -474,6 +483,23 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
         currencies={currencies}
         presetAccountId={account.accountId}
         lockAccount
+      />
+
+      <AccountEditDialog
+        account={
+          editOpen
+            ? {
+                accountId: account.accountId,
+                name: account.name,
+                accountNumber: account.accountNumber,
+                allowNegativeBalance: account.allowNegativeBalance,
+                groupName: account.groupName,
+                currencyCode: account.currencyCode,
+              }
+            : null
+        }
+        onClose={() => setEditOpen(false)}
+        onSaved={() => router.refresh()}
       />
     </div>
   );

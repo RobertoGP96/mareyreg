@@ -236,17 +236,35 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem onClick={() => router.push(`/envios/grupos/${g.groupId}`)}>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setTimeout(() => router.push(`/envios/grupos/${g.groupId}`), 0);
+              }}
+            >
               <Eye className="h-4 w-4" /> Ver detalles
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); fillEdit(g); }}>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setTimeout(() => fillEdit(g), 0);
+              }}
+            >
               <SquarePen className="h-4 w-4" /> Editar
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void handleToggle(g); }}>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setTimeout(() => void handleToggle(g), 0);
+              }}
+            >
               <ToggleLeft className="h-4 w-4" /> {g.active ? "Desactivar" : "Activar"}
             </DropdownMenuItem>
             <DropdownMenuItem
-              onSelect={(e) => { e.preventDefault(); setToDelete(g); }}
+              onSelect={(e) => {
+                e.preventDefault();
+                setTimeout(() => setToDelete(g), 0);
+              }}
               className="text-destructive focus:text-destructive"
             >
               <Trash2 className="h-4 w-4" /> Eliminar
@@ -311,17 +329,35 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem onClick={() => router.push(`/envios/grupos/${g.groupId}`)}>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setTimeout(() => router.push(`/envios/grupos/${g.groupId}`), 0);
+                    }}
+                  >
                     <Eye className="h-4 w-4" /> Ver detalles
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); fillEdit(g); }}>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setTimeout(() => fillEdit(g), 0);
+                    }}
+                  >
                     <SquarePen className="h-4 w-4" /> Editar
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void handleToggle(g); }}>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setTimeout(() => void handleToggle(g), 0);
+                    }}
+                  >
                     <ToggleLeft className="h-4 w-4" /> {g.active ? "Desactivar" : "Activar"}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={(e) => { e.preventDefault(); setToDelete(g); }}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setTimeout(() => setToDelete(g), 0);
+                    }}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" /> Eliminar
