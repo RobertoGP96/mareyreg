@@ -98,20 +98,7 @@ export function AccountGroupSection({
             <Wallet className="h-3.5 w-3.5" />
             {accounts.length}
           </span>
-          {totals.map((b) => (
-            <span
-              key={b.code}
-              className="inline-flex items-center gap-1 rounded-md bg-background px-1.5 py-0.5 ring-1 ring-inset ring-border"
-            >
-              <CurrencyChip code={b.code} size="sm" />
-              <AmountDisplay
-                value={b.total}
-                decimalPlaces={b.decimalPlaces}
-                signed
-                size="sm"
-              />
-            </span>
-          ))}
+          
         </div>
       </button>
 
