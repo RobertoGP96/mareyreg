@@ -28,7 +28,20 @@ export function MobileListCard({
   return (
     <Comp
       type={interactive ? "button" : undefined}
-      onClick={onClick}
+      onClick={
+        onClick
+          ? (e: React.MouseEvent<HTMLElement>) => {
+              const t = e.target as HTMLElement;
+              const interactive = t.closest(
+                'button, a, input, select, textarea, label, [role="menu"], [role="menuitem"], [role="dialog"], [data-no-row-click]'
+              );
+              if (interactive && interactive !== e.currentTarget) {
+                return;
+              }
+              onClick();
+            }
+          : undefined
+      }
       className={cn(
         "group relative flex w-full min-h-[64px] flex-col gap-1.5 rounded-xl border border-border bg-card p-3 text-left shadow-xs transition-colors",
         interactive && "cursor-pointer hover:border-[var(--brand)]/40 hover:bg-muted/30",

@@ -170,7 +170,21 @@ export function DataTable<Row>({
                 return (
                   <tr
                     key={k}
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    onClick={
+                      onRowClick
+                        ? (e) => {
+                            const t = e.target as HTMLElement;
+                            if (
+                              t.closest(
+                                'button, a, input, select, textarea, label, [role="menu"], [role="menuitem"], [role="dialog"], [data-no-row-click]'
+                              )
+                            ) {
+                              return;
+                            }
+                            onRowClick(row);
+                          }
+                        : undefined
+                    }
                     className={cn(
                       "border-b border-border/60 last:border-0 transition-colors",
                       onRowClick && "cursor-pointer hover:bg-muted/40",
