@@ -41,6 +41,7 @@ export interface AppModule {
   icon: LucideIcon;
   routes: ModuleRoute[];
   enabled: boolean;
+  badge?: string;
 }
 
 export const modules: AppModule[] = [
@@ -131,6 +132,7 @@ export const modules: AppModule[] = [
     label: "Envíos",
     icon: HandCoins,
     enabled: true,
+    badge: "Nuevo",
     routes: [
       { name: "Dashboard", href: "/envios/dashboard", icon: LayoutDashboard },
       { name: "Grupos", href: "/envios/grupos", icon: Users },

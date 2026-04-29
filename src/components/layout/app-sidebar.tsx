@@ -133,8 +133,13 @@ export function AppSidebar() {
                         >
                           <module.icon />
                           <span>{module.label}</span>
+                          {module.badge && (
+                            <span className="ml-auto rounded-full bg-[var(--brand)]/15 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wider text-[var(--brand)] ring-1 ring-inset ring-[var(--brand)]/30 group-data-[collapsible=icon]:hidden">
+                              {module.badge}
+                            </span>
+                          )}
                           <ChevronRight
-                            className="ml-auto size-4 text-sidebar-foreground/50 transition-transform duration-200 data-[state=open]:rotate-90"
+                            className={`size-4 text-sidebar-foreground/50 transition-transform duration-200 data-[state=open]:rotate-90 ${module.badge ? "ml-1" : "ml-auto"}`}
                             data-state={isOpen ? "open" : "closed"}
                           />
                         </SidebarMenuButton>
