@@ -1,17 +1,30 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Activity, Clock } from "lucide-react";
 
-export function DashboardHero({ userName, totalCount }: { userName: string; totalCount: number }) {
+type LocalTime = { greeting: string; today: string };
+
+function computeLocalTime(): LocalTime {
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
+  const greeting =
+    hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
   const today = new Date().toLocaleDateString("es-MX", {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
   });
+  return { greeting, today };
+}
+
+export function DashboardHero({ userName, totalCount }: { userName: string; totalCount: number }) {
+  const [local, setLocal] = useState<LocalTime | null>(null);
+
+  useEffect(() => {
+    setLocal(computeLocalTime());
+  }, []);
 
   return (
     <motion.div
@@ -39,14 +52,23 @@ export function DashboardHero({ userName, totalCount }: { userName: string; tota
               </span>
               En línea
             </span>
-            <span className="inline-flex items-center gap-1.5 text-[0.72rem] text-muted-foreground">
+            <span
+              className="inline-flex items-center gap-1.5 text-[0.72rem] text-muted-foreground"
+              suppressHydrationWarning
+            >
               <Clock className="h-3 w-3" />
-              <span className="capitalize">{today}</span>
+              <span className="capitalize min-w-[10ch]">
+                {local?.today ?? " "}
+              </span>
             </span>
           </div>
 
-          <h1 className="text-2xl md:text-[1.75rem] font-bold font-headline tracking-tight text-foreground">
-            {greeting}, <span className="text-gradient-brand">{userName}</span>
+          <h1
+            className="text-2xl md:text-[1.75rem] font-bold font-headline tracking-tight text-foreground"
+            suppressHydrationWarning
+          >
+            {local?.greeting ?? "Hola"},{" "}
+            <span className="text-gradient-brand">{userName}</span>
           </h1>
           <p className="mt-1.5 text-sm md:text-base text-muted-foreground max-w-xl">
             Panorama actual de GR Technology — todas tus operaciones de flota, inventario y logística en un solo lugar.

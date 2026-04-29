@@ -14,6 +14,8 @@ import {
   type DashboardStat,
 } from "@/modules/core/components/dashboard-stats";
 import { ExchangeRatesCard } from "@/modules/core/components/exchange-rates-card";
+import { SectionHeading } from "@/components/ui/section-heading";
+import { LayoutGrid } from "lucide-react";
 
 const MODULE_STATS: Record<string, string[]> = {
   logistics: ["Entidades", "Conductores", "Vehículos", "Viajes"],
@@ -64,20 +66,18 @@ export default async function Home() {
     <div className="space-y-5 md:space-y-6 max-w-[1600px] mx-auto">
       <DashboardHero userName={userName} totalCount={totalCount} />
 
-      <div>
-        <div className="flex items-end justify-between mb-3 px-1">
-          <div>
-            <h2 className="text-base md:text-lg font-semibold font-headline text-foreground">
-              Resumen operacional
-            </h2>
-            <p className="text-xs md:text-sm text-muted-foreground">
-              Accesos rápidos a los módulos con los que tienes permiso.
-            </p>
-          </div>
-          <span className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground hidden sm:block">
-            {stats.length} módulos
-          </span>
-        </div>
+      <div className="space-y-3.5">
+        <SectionHeading
+          eyebrow="Panorama"
+          icon={LayoutGrid}
+          title="Resumen operacional"
+          description="Accesos rápidos a los módulos con los que tienes permiso."
+          actions={
+            <span className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground hidden sm:block">
+              {stats.length} módulos
+            </span>
+          }
+        />
         <DashboardStats stats={stats} />
       </div>
 

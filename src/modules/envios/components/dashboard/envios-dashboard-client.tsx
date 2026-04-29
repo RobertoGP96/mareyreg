@@ -1,14 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { MetricTile } from "@/components/ui/metric-tile";
+import { BentoGrid, BentoCell } from "@/components/ui/bento-grid";
+import { SectionHeading } from "@/components/ui/section-heading";
+import { FadeStagger, FadeStaggerItem } from "@/components/ui/motion";
 import {
   HandCoins, Clock, Check, ArrowRightLeft, Users, Wallet,
-  CircleDollarSign, ArrowDownLeft, ArrowUpRight, Plus,
+  CircleDollarSign, ArrowDownLeft, ArrowUpRight, Plus, Activity,
 } from "lucide-react";
 import { toast } from "sonner";
 import { confirmOperation } from "../../actions/operation-actions";
@@ -36,14 +40,28 @@ export function EnviosDashboardClient({ data }: Props) {
   };
 
   const totalActiveCurrencies = data.balanceByCurrency.length;
-  const generated = data.generatedAt.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  const [generated, setGenerated] = useState<string>("");
+  useEffect(() => {
+    setGenerated(
+      data.generatedAt.toLocaleTimeString("es-MX", {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    );
+  }, [data.generatedAt]);
 
   return (
     <div className="space-y-5">
       <PageHeader
+        variant="editorial"
+        accentTitle="Envíos"
         icon={HandCoins}
         title="Tesorería · Envíos"
-        description={`SALDO GENERAL por moneda y movimientos recientes · actualizado ${generated}`}
+        description={
+          generated
+            ? `SALDO GENERAL por moneda y movimientos recientes · actualizado ${generated}`
+            : "SALDO GENERAL por moneda y movimientos recientes"
+        }
         badge={`${totalActiveCurrencies} monedas activas`}
         actions={
           <>
@@ -63,7 +81,7 @@ export function EnviosDashboardClient({ data }: Props) {
         }
       />
 
-      {/* SALDO GENERAL por moneda — KPIs grandes */}
+      {/* SALDO GENERAL por moneda — bento asimétrico (hero + secundarios) */}
       {data.balanceByCurrency.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
           <CircleDollarSign className="mx-auto h-10 w-10 text-muted-foreground/50" />
@@ -72,49 +90,83 @@ export function EnviosDashboardClient({ data }: Props) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          {data.balanceByCurrency.map((b, i) => (
-            <KpiCard
-              key={b.currencyId}
-              label={`SALDO GENERAL · ${b.code}`}
-              value={b.total.toLocaleString("es-MX", {
-                minimumFractionDigits: b.decimalPlaces,
-                maximumFractionDigits: b.decimalPlaces,
-              })}
-              icon={CircleDollarSign}
-              accent={ACCENTS[i % ACCENTS.length]}
-            />
-          ))}
-        </div>
+        <SectionHeading
+          eyebrow="Tesorería"
+          title="Saldo general por moneda"
+          description="La moneda principal se destaca; el resto se muestra en celdas secundarias."
+          icon={Activity}
+        />
+      )}
+
+      {data.balanceByCurrency.length > 0 && (
+        <BentoGrid rowMin="md">
+          {data.balanceByCurrency.map((b, i) => {
+            const isHero = i === 0;
+            const isOnly = data.balanceByCurrency.length === 1;
+            return (
+              <BentoCell
+                key={b.currencyId}
+                colSpan={
+                  isHero
+                    ? isOnly
+                      ? { md: 6, lg: 12 }
+                      : { md: 3, lg: 6 }
+                    : { md: 3, lg: 3 }
+                }
+                rowSpan={isHero && !isOnly ? { md: 2, lg: 2 } : undefined}
+              >
+                <KpiCard
+                  label={`SALDO GENERAL · ${b.code}`}
+                  value={b.total.toLocaleString("es-MX", {
+                    minimumFractionDigits: b.decimalPlaces,
+                    maximumFractionDigits: b.decimalPlaces,
+                  })}
+                  icon={CircleDollarSign}
+                  accent={ACCENTS[i % ACCENTS.length]}
+                  size={isHero ? "hero" : "default"}
+                  className="h-full"
+                />
+              </BentoCell>
+            );
+          })}
+        </BentoGrid>
       )}
 
       {/* Métricas operativas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <MetricTile
-          label="Pendientes"
-          value={data.pendingCount}
-          icon={Clock}
-          tone={data.pendingCount > 0 ? "warning" : "idle"}
-        />
-        <MetricTile
-          label="Operaciones hoy"
-          value={data.todayOpsCount}
-          icon={Check}
-          tone="active"
-        />
-        <MetricTile
-          label="Grupos activos"
-          value={data.activeGroupsCount}
-          icon={Users}
-          tone="track"
-        />
-        <MetricTile
-          label="Cuentas activas"
-          value={data.totalAccountsCount}
-          icon={Wallet}
-          tone="success"
-        />
-      </div>
+      <FadeStagger className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <FadeStaggerItem>
+          <MetricTile
+            label="Pendientes"
+            value={data.pendingCount}
+            icon={Clock}
+            tone={data.pendingCount > 0 ? "warning" : "idle"}
+          />
+        </FadeStaggerItem>
+        <FadeStaggerItem>
+          <MetricTile
+            label="Operaciones hoy"
+            value={data.todayOpsCount}
+            icon={Check}
+            tone="active"
+          />
+        </FadeStaggerItem>
+        <FadeStaggerItem>
+          <MetricTile
+            label="Grupos activos"
+            value={data.activeGroupsCount}
+            icon={Users}
+            tone="track"
+          />
+        </FadeStaggerItem>
+        <FadeStaggerItem>
+          <MetricTile
+            label="Cuentas activas"
+            value={data.totalAccountsCount}
+            icon={Wallet}
+            tone="success"
+          />
+        </FadeStaggerItem>
+      </FadeStagger>
 
       {/* Split: Pendientes + Movimientos recientes */}
       <div className="grid lg:grid-cols-3 gap-4">
@@ -203,7 +255,7 @@ function PendingPanel({
 
 function RecentActivityPanel({ recent }: { recent: DashboardData["recentOps"] }) {
   return (
-    <div className="lg:col-span-2 hidden lg:flex flex-col rounded-xl border border-border bg-card p-4 shadow-panel gap-3 min-h-0 lg:max-h-[460px]">
+    <div className="lg:col-span-2 hidden lg:flex flex-col rounded-xl border border-border bg-card p-4 shadow-elevated gap-3 min-h-0 lg:max-h-[460px]">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-headline text-sm font-semibold flex items-center gap-2">
           <ArrowRightLeft className="h-4 w-4 text-[var(--ops-active)]" />
@@ -257,8 +309,8 @@ function RecentActivityPanel({ recent }: { recent: DashboardData["recentOps"] })
 
 function FlowSection({ flow }: { flow: DashboardData["flowSeries"] }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4 shadow-panel space-y-3">
-      <h2 className="font-headline text-sm font-semibold flex items-center gap-2">
+    <div className="rounded-xl border border-border bg-card p-4 md:p-5 shadow-elevated space-y-3">
+      <h2 className="font-headline text-base md:text-lg font-semibold flex items-center gap-2 tracking-tight">
         <ArrowRightLeft className="h-4 w-4 text-[var(--ops-active)]" />
         Flujo de los últimos 30 días
       </h2>

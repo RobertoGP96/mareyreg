@@ -407,6 +407,20 @@
   .status-pulse--critical { animation: ops-pulse-critical 1.4s ease-out infinite; }
 }
 
+/* Route transition — fade + sutil slide-up al cambiar de ruta dentro de (app).
+   CSS-only para evitar mismatches de hidratación con framer-motion. */
+@keyframes route-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.route-transition {
+  animation: route-fade-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity, transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-transition { animation: none; }
+}
+
 /* Cockpit panel: card con header denso */
 .cockpit-panel {
   background: var(--card);

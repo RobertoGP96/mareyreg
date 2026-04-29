@@ -8,6 +8,8 @@ import { KpiCard } from "@/components/ui/kpi-card";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { Spark } from "@/components/ui/spark";
 import { StatusPill } from "@/components/ui/status-pill";
+import { BentoGrid, BentoCell } from "@/components/ui/bento-grid";
+import { FadeStagger, FadeStaggerItem } from "@/components/ui/motion";
 import {
   Package2,
   CircleCheck,
@@ -39,6 +41,8 @@ export function PacaDashboardClient({ data }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
+        variant="editorial"
+        accentTitle="pacas"
         icon={ShoppingBag}
         title="Cockpit de pacas"
         description="Inventario, ventas y reservaciones de pacas — vista operativa en tiempo real."
@@ -55,60 +59,81 @@ export function PacaDashboardClient({ data }: Props) {
         }
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard
-          label="Disponible"
-          value={counts.available}
-          icon={CircleCheck}
-          accent="success"
-        />
-        <KpiCard
-          label="Reservadas"
-          value={counts.reserved}
-          icon={Bookmark}
-          accent="info"
-        />
-        <KpiCard
-          label="Vendidas (30d)"
-          value={sales30.units}
-          icon={HandCoins}
-          spark={sales30.spark14}
-          accent="brand"
-        />
-        <KpiCard
-          label="Ingresos (30d)"
-          value={`$${sales30.revenue.toFixed(0)}`}
-          icon={TrendingUp}
-          accent="warning"
-        />
-      </div>
+      <BentoGrid rowMin="md">
+        <BentoCell colSpan={{ md: 3, lg: 6 }} rowSpan={{ md: 2, lg: 2 }}>
+          <KpiCard
+            label="Vendidas (30d)"
+            value={sales30.units}
+            icon={HandCoins}
+            spark={sales30.spark14}
+            accent="brand"
+            size="hero"
+            className="h-full"
+          />
+        </BentoCell>
+        <BentoCell colSpan={{ md: 3, lg: 3 }}>
+          <KpiCard
+            label="Disponible"
+            value={counts.available}
+            icon={CircleCheck}
+            accent="success"
+            className="h-full"
+          />
+        </BentoCell>
+        <BentoCell colSpan={{ md: 3, lg: 3 }}>
+          <KpiCard
+            label="Reservadas"
+            value={counts.reserved}
+            icon={Bookmark}
+            accent="info"
+            className="h-full"
+          />
+        </BentoCell>
+        <BentoCell colSpan={{ md: 6, lg: 6 }}>
+          <KpiCard
+            label="Ingresos (30d)"
+            value={`$${sales30.revenue.toFixed(0)}`}
+            icon={TrendingUp}
+            accent="warning"
+            className="h-full"
+          />
+        </BentoCell>
+      </BentoGrid>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <MetricTile
-          label="Valor stock"
-          value={`$${counts.stockValue.toFixed(0)}`}
-          icon={CircleDollarSign}
-          tone="warning"
-        />
-        <MetricTile
-          label="Categorías"
-          value={counts.categoriesCount}
-          icon={FolderTree}
-          tone="active"
-        />
-        <MetricTile
-          label="Reserv. activas"
-          value={reservations.active}
-          icon={Bookmark}
-          tone="track"
-        />
-        <MetricTile
-          label="Clientes activos"
-          value={counts.clientsActive}
-          icon={Users}
-          tone="success"
-        />
-      </div>
+      <FadeStagger className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <FadeStaggerItem>
+          <MetricTile
+            label="Valor stock"
+            value={`$${counts.stockValue.toFixed(0)}`}
+            icon={CircleDollarSign}
+            tone="warning"
+          />
+        </FadeStaggerItem>
+        <FadeStaggerItem>
+          <MetricTile
+            label="Categorías"
+            value={counts.categoriesCount}
+            icon={FolderTree}
+            tone="active"
+          />
+        </FadeStaggerItem>
+        <FadeStaggerItem>
+          <MetricTile
+            label="Reserv. activas"
+            value={reservations.active}
+            icon={Bookmark}
+            tone="track"
+          />
+        </FadeStaggerItem>
+        <FadeStaggerItem>
+          <MetricTile
+            label="Clientes activos"
+            value={counts.clientsActive}
+            icon={Users}
+            tone="success"
+          />
+        </FadeStaggerItem>
+      </FadeStagger>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Sales trend */}
