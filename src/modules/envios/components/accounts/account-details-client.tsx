@@ -57,6 +57,14 @@ const RANGE_COLORS = [
   "border-l-rose-500",
 ];
 
+const RANGE_BG_COLORS = [
+  "bg-sky-500/60 dark:bg-sky-500/50",
+  "bg-emerald-500/60 dark:bg-emerald-500/50",
+  "bg-amber-500/60 dark:bg-amber-500/50",
+  "bg-violet-500/60 dark:bg-violet-500/50",
+  "bg-rose-500/60 dark:bg-rose-500/50",
+];
+
 export function AccountDetailsClient({ account, operations, rules, currencies }: Props) {
   const router = useRouter();
   const [ruleAction, setRuleAction] = useState<RuleActionState>(null);
@@ -335,34 +343,37 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
             }
             return (
               <div className="space-y-4">
-                {[...groups.values()].map((group) => (
-                  <div
-                    key={`${group.baseCurrencyId}-${group.quoteCurrencyId}`}
-                    className="space-y-2"
-                  >
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <CurrencyChip code={group.baseCurrencyCode} size="sm" />
-                      <ArrowRightLeft className="h-3.5 w-3.5 text-muted-foreground" />
-                      <CurrencyChip code={group.quoteCurrencyCode} size="sm" />
-                      <Badge variant="outline" className="text-[10px]">
-                        {group.rules.length} {group.rules.length === 1 ? "regla" : "reglas"}
-                      </Badge>
-                    </div>
-                    <RateCoverageBar
-                      rules={group.rules.map((r) => ({
-                        ruleId: r.ruleId,
-                        name: r.name,
-                        minAmount: r.minAmount,
-                        maxAmount: r.maxAmount,
-                        rate: r.rate,
-                      }))}
-                      baseCurrencyCode={group.baseCurrencyCode}
-                      quoteCurrencyCode={group.quoteCurrencyCode}
-                    />
-                    <div className="space-y-1.5">
-                      {[...group.rules]
-                        .sort((a, b) => a.minAmount - b.minAmount)
-                        .map((rg, idx) => (
+                {[...groups.values()].map((group) => {
+                  const sortedRules = [...group.rules].sort(
+                    (a, b) => a.minAmount - b.minAmount,
+                  );
+                  return (
+                    <div
+                      key={`${group.baseCurrencyId}-${group.quoteCurrencyId}`}
+                      className="space-y-2"
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <CurrencyChip code={group.baseCurrencyCode} size="sm" />
+                        <ArrowRightLeft className="h-3.5 w-3.5 text-muted-foreground" />
+                        <CurrencyChip code={group.quoteCurrencyCode} size="sm" />
+                        <Badge variant="outline" className="text-[10px]">
+                          {sortedRules.length} {sortedRules.length === 1 ? "regla" : "reglas"}
+                        </Badge>
+                      </div>
+                      <RateCoverageBar
+                        rules={sortedRules.map((r, idx) => ({
+                          ruleId: r.ruleId,
+                          name: r.name,
+                          minAmount: r.minAmount,
+                          maxAmount: r.maxAmount,
+                          rate: r.rate,
+                          colorClass: RANGE_BG_COLORS[idx % RANGE_BG_COLORS.length],
+                        }))}
+                        baseCurrencyCode={group.baseCurrencyCode}
+                        quoteCurrencyCode={group.quoteCurrencyCode}
+                      />
+                      <div className="space-y-1.5">
+                        {sortedRules.map((rg, idx) => (
                           <div
                             key={rg.ruleId}
                             className={`flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5 border-l-4 ${RANGE_COLORS[idx % RANGE_COLORS.length]}`}
@@ -381,9 +392,10 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
                             </span>
                           </div>
                         ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })()
