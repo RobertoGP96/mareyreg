@@ -249,19 +249,20 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
         title="Categorías de pacas"
         description="Catálogo de categorías SKU. Cada categoría puede agruparse bajo una clasificación."
         badge={`${categories.length} categorías`}
-      >
-        <Button
-          variant="brand"
-          onClick={() => {
-            resetForm();
-            setIsCreateOpen(true);
-          }}
-          className="hidden md:inline-flex"
-        >
-          <Plus className="h-4 w-4" />
-          Nueva categoría
-        </Button>
-      </PageHeader>
+        actions={
+          <Button
+            variant="brand"
+            onClick={() => {
+              resetForm();
+              setIsCreateOpen(true);
+            }}
+            className="hidden md:inline-flex"
+          >
+            <Plus className="h-4 w-4" />
+            Nueva categoría
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <MetricTile label="Categorías" value={categories.length} icon={Tags} tone="active" />

@@ -98,9 +98,8 @@ export function AvailabilityView({ data }: Props) {
         title="Disponibilidad"
         description="Stock disponible agrupado por clasificación. Solo categorías con disponibilidad &gt; 0."
         badge={`${filtered.length} clasificaciones`}
-      >
-        {data.length > 0 && <AvailabilitySharePopover data={data} />}
-      </PageHeader>
+        actions={data.length > 0 ? <AvailabilitySharePopover data={data} /> : undefined}
+      />
 
       <div className="grid grid-cols-3 gap-2">
         <MetricTile label="Disponibles" value={totalAvailable} icon={CircleCheck} tone="success" />

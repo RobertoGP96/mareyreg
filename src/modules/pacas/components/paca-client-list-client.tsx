@@ -275,19 +275,20 @@ export function PacaClientListClient({ clients }: { clients: PacaClientItem[] })
         title="Clientes de pacas"
         description="Directorio de clientes para reservaciones y ventas. La eliminación es lógica."
         badge={`${clients.length} clientes`}
-      >
-        <Button
-          variant="brand"
-          onClick={() => {
-            resetForm();
-            setIsCreateOpen(true);
-          }}
-          className="hidden md:inline-flex"
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo cliente
-        </Button>
-      </PageHeader>
+        actions={
+          <Button
+            variant="brand"
+            onClick={() => {
+              resetForm();
+              setIsCreateOpen(true);
+            }}
+            className="hidden md:inline-flex"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo cliente
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <MetricTile label="Activos" value={activeCount} icon={Users} tone="success" />

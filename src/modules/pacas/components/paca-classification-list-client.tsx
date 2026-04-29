@@ -230,19 +230,20 @@ export function PacaClassificationListClient({ initialClassifications }: Props) 
         title="Clasificaciones"
         description="Agrupadores padres de las categorías de pacas (p. ej. Hombre, Mujer, Mixto)."
         badge={`${initialClassifications.length} clasificaciones`}
-      >
-        <Button
-          variant="brand"
-          onClick={() => {
-            resetForm();
-            setIsCreateOpen(true);
-          }}
-          className="hidden md:inline-flex"
-        >
-          <Plus className="h-4 w-4" />
-          Nueva clasificación
-        </Button>
-      </PageHeader>
+        actions={
+          <Button
+            variant="brand"
+            onClick={() => {
+              resetForm();
+              setIsCreateOpen(true);
+            }}
+            className="hidden md:inline-flex"
+          >
+            <Plus className="h-4 w-4" />
+            Nueva clasificación
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <MetricTile

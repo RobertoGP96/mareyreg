@@ -416,16 +416,17 @@ export function ReservationListClient({
         title="Reservaciones"
         description="Gestiona reservaciones de pacas por cliente y completa ventas cuando se cierran."
         badge={`${reservations.length} reservaciones`}
-      >
-        <Button
-          variant="brand"
-          onClick={() => setIsCreateOpen(true)}
-          className="hidden md:inline-flex"
-        >
-          <Plus className="h-4 w-4" />
-          Nueva reservación
-        </Button>
-      </PageHeader>
+        actions={
+          <Button
+            variant="brand"
+            onClick={() => setIsCreateOpen(true)}
+            className="hidden md:inline-flex"
+          >
+            <Plus className="h-4 w-4" />
+            Nueva reservación
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <MetricTile

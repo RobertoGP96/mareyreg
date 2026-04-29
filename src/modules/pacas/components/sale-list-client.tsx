@@ -286,16 +286,17 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
         title="Ventas de pacas"
         description="Historial de ventas con cliente, categoría y método de pago."
         badge={`${sales.length} ventas`}
-      >
-        <Button
-          variant="brand"
-          onClick={() => setIsCreateOpen(true)}
-          className="hidden md:inline-flex"
-        >
-          <Plus className="h-4 w-4" />
-          Registrar venta
-        </Button>
-      </PageHeader>
+        actions={
+          <Button
+            variant="brand"
+            onClick={() => setIsCreateOpen(true)}
+            className="hidden md:inline-flex"
+          >
+            <Plus className="h-4 w-4" />
+            Registrar venta
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <MetricTile

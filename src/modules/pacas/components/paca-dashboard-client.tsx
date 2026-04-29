@@ -43,14 +43,17 @@ export function PacaDashboardClient({ data }: Props) {
         title="Cockpit de pacas"
         description="Inventario, ventas y reservaciones de pacas — vista operativa en tiempo real."
         badge="Últimos 30 días"
-      >
-        <Button variant="outline" onClick={() => router.push("/pacas/disponibilidad")}>
-          <CircleCheck className="h-4 w-4" /> Disponibilidad
-        </Button>
-        <Button variant="brand" onClick={() => router.push("/pacas")}>
-          <Plus className="h-4 w-4" /> Registrar entrada
-        </Button>
-      </PageHeader>
+        actions={
+          <>
+            <Button variant="outline" onClick={() => router.push("/pacas/disponibilidad")}>
+              <CircleCheck className="h-4 w-4" /> Disponibilidad
+            </Button>
+            <Button variant="brand" onClick={() => router.push("/pacas")}>
+              <Plus className="h-4 w-4" /> Registrar entrada
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard

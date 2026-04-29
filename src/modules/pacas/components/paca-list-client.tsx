@@ -335,16 +335,17 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
         icon={Package2}
         title="Inventario de pacas"
         description="Stock por categoría con seguimiento de disponibles, reservadas y vendidas."
-      >
-        <Button
-          variant="brand"
-          onClick={() => setIsEntryOpen(true)}
-          className="hidden md:inline-flex"
-        >
-          <Plus className="h-4 w-4" />
-          Registrar entrada
-        </Button>
-      </PageHeader>
+        actions={
+          <Button
+            variant="brand"
+            onClick={() => setIsEntryOpen(true)}
+            className="hidden md:inline-flex"
+          >
+            <Plus className="h-4 w-4" />
+            Registrar entrada
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <MetricTile
