@@ -190,11 +190,12 @@ export function TripDetailsClient({
         title={`Viaje #${trip.tripId}`}
         description={driver.fullName}
         badge={statusMeta.label}
-      >
-        <Badge variant={statusMeta.variant} className="h-7 px-3">
-          {statusMeta.label}
-        </Badge>
-      </PageHeader>
+        meta={
+          <Badge variant={statusMeta.variant} className="h-7 px-3">
+            {statusMeta.label}
+          </Badge>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Informacion del viaje */}

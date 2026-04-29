@@ -38,14 +38,17 @@ export function LogisticsDashboardClient({ data }: Props) {
         title="Cockpit logístico"
         description="Estado en vivo de la operación: viajes activos, flota y pagos."
         badge="Últimos 30 días"
-      >
-        <Button variant="outline" onClick={() => router.push("/routes")}>
-          <RouteIcon className="h-4 w-4" /> Rutas
-        </Button>
-        <Button variant="brand" onClick={() => router.push("/trips")}>
-          <Plus className="h-4 w-4" /> Nuevo viaje
-        </Button>
-      </PageHeader>
+        actions={
+          <>
+            <Button variant="outline" onClick={() => router.push("/routes")}>
+              <RouteIcon className="h-4 w-4" /> Rutas
+            </Button>
+            <Button variant="brand" onClick={() => router.push("/trips")}>
+              <Plus className="h-4 w-4" /> Nuevo viaje
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard

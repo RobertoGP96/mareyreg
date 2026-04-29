@@ -136,12 +136,13 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
         title="Vehículos"
         description="Flota de vehículos con placas, documentación y conductores asignados."
         badge={`${initialVehicles.length} vehículos`}
-      >
-        <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Nuevo vehículo
-        </Button>
-      </PageHeader>
+        actions={
+          <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Nuevo vehículo
+          </Button>
+        }
+      />
 
       <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-4 py-3">

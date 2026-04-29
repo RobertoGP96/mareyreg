@@ -365,12 +365,13 @@ export function TripListClient({ initialTrips, drivers, routes = [] }: Props) {
         title="Viajes"
         description="Programación y seguimiento de viajes con conductor, ruta y carga."
         badge={`${initialTrips.length} viajes`}
-      >
-        <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Nuevo viaje
-        </Button>
-      </PageHeader>
+        actions={
+          <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Nuevo viaje
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <MetricTile

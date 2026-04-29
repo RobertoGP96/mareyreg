@@ -214,12 +214,13 @@ export function RouteListClient({ initialRoutes }: Props) {
         title="Rutas"
         description="Catálogo de rutas operativas con distancia y duración estimada."
         badge={`${initialRoutes.length} rutas`}
-      >
-        <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Nueva ruta
-        </Button>
-      </PageHeader>
+        actions={
+          <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Nueva ruta
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <MetricTile label="Rutas" value={initialRoutes.length} icon={RouteIcon} tone="active" />

@@ -95,12 +95,13 @@ export function EntityListClient({ initialEntities }: Props) {
         title="Entidades"
         description="Organizaciones o empresas que operan dentro del sistema."
         badge={`${initialEntities.length} registradas`}
-      >
-        <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Nueva entidad
-        </Button>
-      </PageHeader>
+        actions={
+          <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Nueva entidad
+          </Button>
+        }
+      />
 
       <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted/30 px-4 py-3">

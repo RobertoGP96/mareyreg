@@ -153,12 +153,13 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
         title="Conductores"
         description="Gestiona los conductores asignados a tu flota y sus datos de contacto."
         badge={`${initialDrivers.length} registrados`}
-      >
-        <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
-          <UserRoundPlus className="h-4 w-4" />
-          Agregar conductor
-        </Button>
-      </PageHeader>
+        actions={
+          <Button variant="brand" onClick={() => setIsCreateDialogOpen(true)}>
+            <UserRoundPlus className="h-4 w-4" />
+            Agregar conductor
+          </Button>
+        }
+      />
 
       <div className="rounded-xl border border-border bg-card shadow-panel overflow-hidden">
         {/* Filter bar */}
