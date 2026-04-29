@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Sans, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -26,6 +26,13 @@ export const metadata: Metadata = {
   title: "GR Technology · Soluciones que avanzan contigo",
   description:
     "Plataforma operativa de logística, pacas, inventario y ventas — integrados en un solo sistema.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#1e40af",
 };
 
 export default function RootLayout({

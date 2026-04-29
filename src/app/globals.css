@@ -75,6 +75,7 @@
    ================================================ */
 :root {
   --radius: 0.625rem;
+  --mobile-nav-h: 3.5rem;
 
   /* Surfaces — slate neutrales fríos */
   --background: #f8fafc;
