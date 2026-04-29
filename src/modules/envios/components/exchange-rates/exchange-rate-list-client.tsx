@@ -29,6 +29,7 @@ import {
 import type { ExchangeRateRuleInput } from "../../lib/schemas";
 import type { ExchangeRateRuleRow } from "../../lib/types";
 import { formatBounds } from "../../lib/exchange-rate";
+import { cn } from "@/lib/utils";
 import { CurrencyChip } from "../shared/currency-chip";
 import { RateCalculatorCard } from "./rate-calculator-card";
 import { ExchangeRateRuleForm } from "./exchange-rate-rule-form";
@@ -55,6 +56,7 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
   const [toEdit, setToEdit] = useState<ExchangeRateRuleRow | null>(null);
   const [toDelete, setToDelete] = useState<ExchangeRateRuleRow | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedRuleId, setSelectedRuleId] = useState<number | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -154,12 +156,30 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
             }
           />
         ) : (
-          <div className="grid gap-3 xl:grid-cols-[1fr_320px]">
-            <div className="grid gap-3 md:grid-cols-2">
-            {filtered.map((r) => (
+          <div className="grid gap-3 xl:grid-cols-[1fr_340px]">
+            <div className="grid gap-3">
+            {filtered.map((r) => {
+              const isSelected = selectedRuleId === r.ruleId;
+              return (
               <div
                 key={r.ruleId}
-                className="rounded-xl border border-border bg-card p-4 shadow-panel space-y-3"
+                role="button"
+                tabIndex={0}
+                onClick={() => r.active && setSelectedRuleId(r.ruleId)}
+                onKeyDown={(e) => {
+                  if ((e.key === "Enter" || e.key === " ") && r.active) {
+                    e.preventDefault();
+                    setSelectedRuleId(r.ruleId);
+                  }
+                }}
+                className={cn(
+                  "rounded-xl border bg-card p-4 shadow-panel space-y-3 transition-colors outline-none",
+                  r.active ? "cursor-pointer hover:border-[var(--ops-active)]/60" : "opacity-70 cursor-not-allowed",
+                  isSelected
+                    ? "border-[var(--ops-active)] ring-2 ring-[var(--ops-active)]/30"
+                    : "border-border focus-visible:border-[var(--ops-active)]/60"
+                )}
+                aria-pressed={isSelected}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex flex-col gap-1 min-w-0">
@@ -179,7 +199,12 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="size-8">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -209,10 +234,11 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
                   </span>
                 </div>
               </div>
-            ))}
+              );
+            })}
             </div>
             <div className="xl:sticky xl:top-4 xl:self-start">
-              <RateCalculatorCard rules={initialRules} />
+              <RateCalculatorCard rules={initialRules} selectedRuleId={selectedRuleId} />
             </div>
           </div>
         )}

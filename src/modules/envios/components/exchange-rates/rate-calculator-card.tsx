@@ -6,27 +6,55 @@ import { Field } from "@/components/ui/field";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Calculator, ArrowRightLeft, Loader2 } from "lucide-react";
+import { Calculator, ArrowRightLeft, Loader2, AlertTriangle, Wand2, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ExchangeRateRuleRow } from "../../lib/types";
-import { isAmountInRule } from "../../lib/exchange-rate";
+import { formatBounds, isAmountInRule } from "../../lib/exchange-rate";
 import { CurrencyChip } from "../shared/currency-chip";
 
 type Props = {
   rules: ExchangeRateRuleRow[];
+  /**
+   * Regla seleccionada externamente (p. ej. al hacer click en una tarjeta).
+   * Cuando se establece, la calculadora cambia a modo manual con esa regla
+   * y ajusta el par automáticamente.
+   */
+  selectedRuleId?: number | null;
+};
+
+type SelectionMode = "auto" | "manual";
+
+type ResolvedRule = {
+  ruleId: number;
+  name: string;
+  rate: number;
+  minAmount: number;
+  maxAmount: number | null;
+  minInclusive: boolean;
+  maxInclusive: boolean;
 };
 
 type Result =
   | { state: "idle" }
-  | { state: "no-rule" }
+  | { state: "no-pair" }
   | { state: "no-amount" }
-  | { state: "no-rate"; rangeIssue: string }
-  | { state: "ok"; rate: number; min: number; max: number | null; result: number; baseCode: string; quoteCode: string };
+  | { state: "no-rule-auto"; amount: number }
+  | { state: "no-rule-manual" }
+  | {
+      state: "ok";
+      rule: ResolvedRule;
+      amount: number;
+      result: number;
+      baseCode: string;
+      quoteCode: string;
+      outOfRange: boolean;
+    };
 
-export function RateCalculatorCard({ rules }: Props) {
+const fmtNum = (n: number) => n.toLocaleString("es-MX");
+
+export function RateCalculatorCard({ rules, selectedRuleId }: Props) {
   const activeRules = useMemo(() => rules.filter((r) => r.active), [rules]);
-  // Agrupar reglas por par para que la calculadora opere sobre el conjunto
-  // (varias reglas pueden cubrir distintos rangos del mismo par).
+
   const pairs = useMemo(() => {
     const map = new Map<
       string,
@@ -36,7 +64,7 @@ export function RateCalculatorCard({ rules }: Props) {
         quoteCurrencyId: number;
         baseCurrencyCode: string;
         quoteCurrencyCode: string;
-        rules: typeof activeRules;
+        rules: ExchangeRateRuleRow[];
       }
     >();
     for (const r of activeRules) {
@@ -53,40 +81,81 @@ export function RateCalculatorCard({ rules }: Props) {
           rules: [r],
         });
     }
-    return [...map.values()];
+    return [...map.values()].map((p) => ({
+      ...p,
+      rules: [...p.rules].sort((a, b) => a.minAmount - b.minAmount),
+    }));
   }, [activeRules]);
 
   const [pairKey, setPairKey] = useState<string>(pairs[0]?.key ?? "");
   const [amount, setAmount] = useState("");
   const [direction, setDirection] = useState<"base_to_quote" | "quote_to_base">("base_to_quote");
+  const [mode, setMode] = useState<SelectionMode>("auto");
+  const [manualRuleId, setManualRuleId] = useState<number | null>(null);
 
   const pair = pairs.find((p) => p.key === pairKey);
-
-  const result: Result = useMemo(() => {
-    if (!pair) return { state: "no-rule" };
-    const n = Number(amount);
-    if (!amount || !Number.isFinite(n) || n <= 0) return { state: "no-amount" };
-
-    const sorted = [...pair.rules].sort((a, b) => a.minAmount - b.minAmount);
-    const match = sorted.find((r) => isAmountInRule(n, r));
-    if (!match) {
-      return { state: "no-rate", rangeIssue: `Sin rango para ${n}` };
-    }
-    const result = direction === "base_to_quote" ? n * match.rate : n / match.rate;
-    return {
-      state: "ok",
-      rate: match.rate,
-      min: match.minAmount,
-      max: match.maxAmount,
-      result,
-      baseCode: pair.baseCurrencyCode,
-      quoteCode: pair.quoteCurrencyCode,
-    };
-  }, [pair, amount, direction]);
 
   useEffect(() => {
     if (!pairKey && pairs[0]) setPairKey(pairs[0].key);
   }, [pairs, pairKey]);
+
+  // Reacciona a selección externa: ajusta par, cambia a modo manual y fija la regla.
+  useEffect(() => {
+    if (!selectedRuleId) return;
+    const target = activeRules.find((r) => r.ruleId === selectedRuleId);
+    if (!target) return;
+    const targetKey = `${target.baseCurrencyId}-${target.quoteCurrencyId}`;
+    setPairKey(targetKey);
+    setMode("manual");
+    setManualRuleId(target.ruleId);
+  }, [selectedRuleId, activeRules]);
+
+  // Si cambia el par o las reglas disponibles, asegurar que la regla manual
+  // siga siendo válida. Si no, limpiar.
+  useEffect(() => {
+    if (!pair) {
+      if (manualRuleId !== null) setManualRuleId(null);
+      return;
+    }
+    const stillExists = pair.rules.some((r) => r.ruleId === manualRuleId);
+    if (!stillExists) {
+      setManualRuleId(pair.rules[0]?.ruleId ?? null);
+    }
+  }, [pair, manualRuleId]);
+
+  const result: Result = useMemo(() => {
+    if (!pair) return { state: "no-pair" };
+    const n = Number(amount);
+    const hasAmount = !!amount && Number.isFinite(n) && n > 0;
+
+    let chosen: ResolvedRule | undefined;
+    if (mode === "auto") {
+      if (!hasAmount) return { state: "no-amount" };
+      const match = pair.rules.find((r) => isAmountInRule(n, r));
+      if (!match) return { state: "no-rule-auto", amount: n };
+      chosen = match;
+    } else {
+      const m = pair.rules.find((r) => r.ruleId === manualRuleId);
+      if (!m) return { state: "no-rule-manual" };
+      chosen = m;
+      if (!hasAmount) return { state: "no-amount" };
+    }
+
+    if (!chosen) return { state: "no-rule-manual" };
+
+    const computed = direction === "base_to_quote" ? n * chosen.rate : n / chosen.rate;
+    const outOfRange = !isAmountInRule(n, chosen);
+
+    return {
+      state: "ok",
+      rule: chosen,
+      amount: n,
+      result: computed,
+      baseCode: pair.baseCurrencyCode,
+      quoteCode: pair.quoteCurrencyCode,
+      outOfRange,
+    };
+  }, [pair, amount, direction, mode, manualRuleId]);
 
   if (pairs.length === 0) {
     return (
@@ -131,6 +200,57 @@ export function RateCalculatorCard({ rules }: Props) {
         </Select>
       </Field>
 
+      <div className="flex items-center gap-1 rounded-lg bg-muted/40 p-1">
+        {(
+          [
+            { id: "auto", label: "Automática", icon: Wand2 },
+            { id: "manual", label: "Elegir regla", icon: ListChecks },
+          ] as const
+        ).map((t) => {
+          const isActive = mode === t.id;
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setMode(t.id)}
+              className={cn(
+                "flex-1 px-2 py-1.5 rounded-md text-[11px] font-medium transition-colors flex items-center justify-center gap-1.5",
+                isActive
+                  ? "bg-background shadow ring-1 ring-border text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className="h-3 w-3" />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {mode === "manual" && pair ? (
+        <Field label="Regla a aplicar" icon={ListChecks}>
+          <Select
+            value={manualRuleId ? String(manualRuleId) : ""}
+            onValueChange={(v) => setManualRuleId(Number(v))}
+          >
+            <SelectTrigger><SelectValue placeholder="Selecciona una regla" /></SelectTrigger>
+            <SelectContent>
+              {pair.rules.map((r) => (
+                <SelectItem key={r.ruleId} value={String(r.ruleId)}>
+                  <span className="flex items-center justify-between gap-3 w-full">
+                    <span className="truncate">{r.name}</span>
+                    <span className="font-mono tabular-nums text-[11px] text-muted-foreground">
+                      {formatBounds(r, fmtNum)} · {r.rate.toLocaleString("es-MX", { maximumFractionDigits: 6 })}
+                    </span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      ) : null}
+
       {pair ? (
         <div className="flex items-center gap-1 rounded-lg bg-muted/40 p-1">
           {(
@@ -171,13 +291,21 @@ export function RateCalculatorCard({ rules }: Props) {
       </Field>
 
       <div className="rounded-md bg-muted/30 px-3 py-3 ring-1 ring-inset ring-border space-y-2 min-h-[88px]">
-        {result.state === "no-rule" || result.state === "no-amount" ? (
+        {result.state === "no-pair" || result.state === "no-amount" ? (
           <p className="text-xs text-muted-foreground flex items-center gap-1.5">
             <Loader2 className="h-3 w-3 opacity-40" />
             Ingresa un monto para calcular.
           </p>
-        ) : result.state === "no-rate" ? (
-          <p className="text-xs text-destructive">⚠ {result.rangeIssue}. Revisa los rangos definidos.</p>
+        ) : result.state === "no-rule-auto" ? (
+          <p className="text-xs text-destructive flex items-start gap-1.5">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>
+              Sin regla activa que cubra <span className="font-mono tabular-nums">{fmtNum(result.amount)}</span>.
+              Cambia a modo <strong>Elegir regla</strong> o ajusta los rangos.
+            </span>
+          </p>
+        ) : result.state === "no-rule-manual" ? (
+          <p className="text-xs text-muted-foreground">Selecciona una regla para aplicar.</p>
         ) : (
           <>
             <div className="flex items-center justify-between">
@@ -188,17 +316,31 @@ export function RateCalculatorCard({ rules }: Props) {
               </span>
             </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Regla</span>
+              <span className="font-medium text-foreground/80 truncate max-w-[60%]" title={result.rule.name}>
+                {result.rule.name}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Tasa</span>
               <span className="font-mono tabular-nums">
-                {result.rate.toLocaleString("es-MX", { maximumFractionDigits: 6 })}
+                {result.rule.rate.toLocaleString("es-MX", { maximumFractionDigits: 6 })}
               </span>
             </div>
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>Rango aplicable (en {result.baseCode})</span>
+              <span>Rango (en {result.baseCode})</span>
               <span className="font-mono tabular-nums">
-                {result.min.toLocaleString("es-MX")} – {result.max === null ? "∞" : result.max.toLocaleString("es-MX")}
+                {formatBounds(result.rule, fmtNum)}
               </span>
             </div>
+            {result.outOfRange ? (
+              <div className="flex items-start gap-1.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-400 px-2 py-1.5 text-[11px] ring-1 ring-amber-500/20">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>
+                  El monto <span className="font-mono tabular-nums">{fmtNum(result.amount)}</span> está fuera del rango de esta regla. El cálculo se muestra de forma informativa.
+                </span>
+              </div>
+            ) : null}
           </>
         )}
       </div>
