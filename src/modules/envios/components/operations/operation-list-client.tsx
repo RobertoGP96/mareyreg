@@ -311,34 +311,36 @@ export function OperationListClient({ initialOperations, accounts, currencies }:
         title="Operaciones"
         description="Depósitos, retiros y ajustes. Las pendientes no afectan saldo hasta confirmarse."
         badge={`${counts.total} operaciones`}
-      >
-        <div className="hidden md:flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setIsBatchOpen(true)}
-          >
-            <Layers className="h-4 w-4" /> Operaciones en lote
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setIsDepositConvertOpen(true)}
-          >
-            <ArrowDownLeft className="h-4 w-4" /> Depósito con conversión
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setIsTransferOpen(true)}
-          >
-            <ArrowRightLeft className="h-4 w-4" /> Transferencia
-          </Button>
-          <Button
-            variant="brand"
-            onClick={() => { resetForm(); setIsCreateOpen(true); }}
-          >
-            <Plus className="h-4 w-4" /> Nueva operación
-          </Button>
-        </div>
-      </PageHeader>
+        actions={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setIsBatchOpen(true)}
+            >
+              <Layers className="h-4 w-4" /> Operaciones en lote
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setIsDepositConvertOpen(true)}
+            >
+              <ArrowDownLeft className="h-4 w-4" /> Depósito con conversión
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setIsTransferOpen(true)}
+            >
+              <ArrowRightLeft className="h-4 w-4" /> Transferencia
+            </Button>
+            <Button
+              variant="brand"
+              className="hidden md:inline-flex"
+              onClick={() => { resetForm(); setIsCreateOpen(true); }}
+            >
+              <Plus className="h-4 w-4" /> Nueva operación
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <MetricTile label="Pendientes" value={counts.pending} icon={Clock} tone={counts.pending > 0 ? "warning" : "idle"} />

@@ -264,15 +264,16 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
         title="Grupos"
         description="Cada grupo agrupa cuentas multi-moneda por persona o tarea (equivalente a una hoja del Excel)."
         badge={`${initialGroups.length} grupos`}
-      >
-        <Button
-          variant="brand"
-          onClick={() => { resetForm(); setIsCreateOpen(true); }}
-          className="hidden md:inline-flex"
-        >
-          <Plus className="h-4 w-4" /> Nuevo grupo
-        </Button>
-      </PageHeader>
+        actions={
+          <Button
+            variant="brand"
+            onClick={() => { resetForm(); setIsCreateOpen(true); }}
+            className="hidden md:inline-flex"
+          >
+            <Plus className="h-4 w-4" /> Nuevo grupo
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <MetricTile label="Activos" value={totalActive} icon={Users} tone="active" />

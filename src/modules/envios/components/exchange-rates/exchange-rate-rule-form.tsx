@@ -140,7 +140,7 @@ export function ExchangeRateRuleForm({
               onChange={(e) => setName(e.target.value)}
             />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Moneda base" icon={Hash} required>
               <Select
                 value={baseCurrencyId}
@@ -177,7 +177,7 @@ export function ExchangeRateRuleForm({
             La regla aplica para montos entre el mínimo (incluido) y el máximo (excluido). Deja máximo vacío para
             indicar &ldquo;cualquier monto mayor&rdquo; (∞).
           </p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Mínimo" required>
               <Input
                 type="number"

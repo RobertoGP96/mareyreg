@@ -45,22 +45,23 @@ export function EnviosDashboardClient({ data }: Props) {
         title="Tesorería · Envíos"
         description={`SALDO GENERAL por moneda y movimientos recientes · actualizado ${generated}`}
         badge={`${totalActiveCurrencies} monedas activas`}
-      >
-        <div className="hidden md:flex items-center gap-2">
-          {data.pendingCount > 0 ? (
-            <Button variant="outline" asChild>
-              <Link href="/envios/pendientes">
-                <Clock className="h-4 w-4" /> Pendientes ({data.pendingCount})
+        actions={
+          <>
+            {data.pendingCount > 0 ? (
+              <Button variant="outline" asChild>
+                <Link href="/envios/pendientes">
+                  <Clock className="h-4 w-4" /> Pendientes ({data.pendingCount})
+                </Link>
+              </Button>
+            ) : null}
+            <Button variant="brand" asChild>
+              <Link href="/envios/operaciones">
+                <Plus className="h-4 w-4" /> Nueva operación
               </Link>
             </Button>
-          ) : null}
-          <Button variant="brand" asChild>
-            <Link href="/envios/operaciones">
-              <Plus className="h-4 w-4" /> Nueva operación
-            </Link>
-          </Button>
-        </div>
-      </PageHeader>
+          </>
+        }
+      />
 
       {/* SALDO GENERAL por moneda — KPIs grandes */}
       {data.balanceByCurrency.length === 0 ? (

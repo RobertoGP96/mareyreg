@@ -180,17 +180,17 @@ export function PendingListClient({ initialPending, summary }: Props) {
         title="Pendientes"
         description="Operaciones registradas que aún no afectan el saldo. Confírmalas individualmente o en lote."
         badge={`${initialPending.length} pendientes`}
-      >
-        {selected.size > 0 ? (
-          <Button
-            variant="brand"
-            onClick={() => setShowBulkConfirm(true)}
-            className="hidden md:inline-flex"
-          >
-            <Check className="h-4 w-4" /> Confirmar {selected.size}
-          </Button>
-        ) : null}
-      </PageHeader>
+        actions={
+          selected.size > 0 ? (
+            <Button
+              variant="brand"
+              onClick={() => setShowBulkConfirm(true)}
+            >
+              <Check className="h-4 w-4" /> Confirmar {selected.size}
+            </Button>
+          ) : null
+        }
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <MetricTile label="Total" value={initialPending.length} icon={Clock} tone="warning" />

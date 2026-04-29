@@ -200,38 +200,43 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
         title={account.name}
         description={`${account.groupName} · ${account.accountNumber}`}
         badge={account.currencyCode}
-      >
-        <div className="flex items-center gap-2 flex-wrap">
-          <StatusPill status={account.active ? "active" : "inactive"} size="sm" />
-          {account.allowNegativeBalance && (
-            <Badge variant="warning" className="text-[10px] gap-1">
-              <MinusCircle className="h-3 w-3" /> Negativo OK
-            </Badge>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setBatchOpen(true)}
-          >
-            <Layers className="h-4 w-4" /> Operaciones en lote
-          </Button>
-          <Button
-            variant="brand"
-            size="sm"
-            onClick={() => setDepositOpen(true)}
-            disabled={accountRulesList.length === 0}
-            title={
-              accountRulesList.length === 0
-                ? "Asigna al menos una regla a la cuenta para habilitar el depósito con conversión"
-                : undefined
-            }
-          >
-            <ArrowDownLeft className="h-4 w-4" /> Depósito con conversión
-          </Button>
-        </div>
-      </PageHeader>
+        meta={
+          <>
+            <StatusPill status={account.active ? "active" : "inactive"} size="sm" />
+            {account.allowNegativeBalance && (
+              <Badge variant="warning" className="text-[10px] gap-1">
+                <MinusCircle className="h-3 w-3" /> Negativo OK
+              </Badge>
+            )}
+          </>
+        }
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBatchOpen(true)}
+            >
+              <Layers className="h-4 w-4" /> Operaciones en lote
+            </Button>
+            <Button
+              variant="brand"
+              size="sm"
+              onClick={() => setDepositOpen(true)}
+              disabled={accountRulesList.length === 0}
+              title={
+                accountRulesList.length === 0
+                  ? "Asigna al menos una regla a la cuenta para habilitar el depósito con conversión"
+                  : undefined
+              }
+            >
+              <ArrowDownLeft className="h-4 w-4" /> Depósito con conversión
+            </Button>
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
         <MetricTile
           icon={CircleDollarSign}
           label="Saldo actual"

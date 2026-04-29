@@ -16,6 +16,7 @@ import { ResponsiveListView } from "@/components/ui/responsive-list-view";
 import { Fab } from "@/components/ui/fab";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { StatusPill } from "@/components/ui/status-pill";
+import { MobileFilterSheet } from "@/components/ui/mobile-filter-sheet";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -311,15 +312,16 @@ export function AccountListClient({
         title="Cuentas"
         description="Una cuenta por moneda dentro de cada grupo. El saldo cambia con depósitos, retiros y transferencias confirmadas."
         badge={`${initialAccounts.length} cuentas`}
-      >
-        <Button
-          variant="brand"
-          onClick={() => { resetForm(); setIsCreateOpen(true); }}
-          className="hidden md:inline-flex"
-        >
-          <Plus className="h-4 w-4" /> Nueva cuenta
-        </Button>
-      </PageHeader>
+        actions={
+          <Button
+            variant="brand"
+            onClick={() => { resetForm(); setIsCreateOpen(true); }}
+            className="hidden md:inline-flex"
+          >
+            <Plus className="h-4 w-4" /> Nueva cuenta
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <MetricTile label="Cuentas activas" value={totalActive} icon={Wallet} tone="active" />
@@ -359,7 +361,7 @@ export function AccountListClient({
             actions={
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-9" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="size-10" onClick={(e) => e.stopPropagation()} aria-label={`Acciones de la cuenta ${a.name}`}>
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -399,8 +401,8 @@ export function AccountListClient({
           />
         )}
         toolbar={
-          <div className="flex flex-wrap items-center gap-2 flex-1">
-            <InputGroup className="flex-1 min-w-[180px] max-w-md">
+          <div className="flex w-full items-center gap-2 flex-1 min-w-0">
+            <InputGroup className="flex-1 min-w-0 sm:min-w-[180px] sm:max-w-md">
               <InputGroupAddon><Search /></InputGroupAddon>
               <InputGroupInput
                 placeholder="Buscar cuenta, grupo, número…"
@@ -411,28 +413,65 @@ export function AccountListClient({
                 <Badge variant="brand">{filtered.length}</Badge>
               </InputGroupAddon>
             </InputGroup>
-            <Select value={filterGroup || "all"} onValueChange={(v) => setFilterGroup(v === "all" ? "" : v)}>
-              <SelectTrigger className="min-w-[140px] w-auto">
-                <SelectValue placeholder="Grupo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los grupos</SelectItem>
-                {groups.map((g) => (
-                  <SelectItem key={g.groupId} value={String(g.groupId)}>{g.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterCurrency || "all"} onValueChange={(v) => setFilterCurrency(v === "all" ? "" : v)}>
-              <SelectTrigger className="min-w-[110px] w-auto">
-                <SelectValue placeholder="Moneda" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                {currencies.map((c) => (
-                  <SelectItem key={c.currencyId} value={String(c.currencyId)}>{c.code}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="hidden sm:flex sm:items-center sm:gap-2">
+              <Select value={filterGroup || "all"} onValueChange={(v) => setFilterGroup(v === "all" ? "" : v)}>
+                <SelectTrigger className="min-w-[140px] w-auto">
+                  <SelectValue placeholder="Grupo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los grupos</SelectItem>
+                  {groups.map((g) => (
+                    <SelectItem key={g.groupId} value={String(g.groupId)}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterCurrency || "all"} onValueChange={(v) => setFilterCurrency(v === "all" ? "" : v)}>
+                <SelectTrigger className="min-w-[110px] w-auto">
+                  <SelectValue placeholder="Moneda" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {currencies.map((c) => (
+                    <SelectItem key={c.currencyId} value={String(c.currencyId)}>{c.code}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="sm:hidden">
+              <MobileFilterSheet
+                activeCount={(filterGroup ? 1 : 0) + (filterCurrency ? 1 : 0)}
+                onClear={() => { setFilterGroup(""); setFilterCurrency(""); }}
+              >
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">Grupo</label>
+                  <Select value={filterGroup || "all"} onValueChange={(v) => setFilterGroup(v === "all" ? "" : v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Grupo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los grupos</SelectItem>
+                      {groups.map((g) => (
+                        <SelectItem key={g.groupId} value={String(g.groupId)}>{g.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">Moneda</label>
+                  <Select value={filterCurrency || "all"} onValueChange={(v) => setFilterCurrency(v === "all" ? "" : v)}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Moneda" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {currencies.map((c) => (
+                        <SelectItem key={c.currencyId} value={String(c.currencyId)}>{c.code}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </MobileFilterSheet>
+            </div>
           </div>
         }
         emptyState={

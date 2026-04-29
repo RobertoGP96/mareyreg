@@ -331,31 +331,30 @@ export function AccountRuleDialogs({
                 />
                 <div className="space-y-2 mt-4">
                   {assignedRules.map((r) => (
-                    <button
+                    <div
                       key={r.ruleId}
-                      type="button"
-                      onClick={() => setEditingRuleId(r.ruleId)}
-                      className="w-full flex items-center justify-between rounded-md border p-3 hover:bg-muted/40 text-left"
+                      className="w-full flex items-center justify-between gap-2 rounded-md border p-2 hover:bg-muted/40 transition-colors"
                     >
-                      <div>
-                        <div className="font-medium text-sm">{r.name}</div>
-                        <div className="text-xs font-mono tabular-nums text-muted-foreground">
+                      <button
+                        type="button"
+                        onClick={() => setEditingRuleId(r.ruleId)}
+                        className="flex-1 min-w-0 text-left rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]/40 cursor-pointer p-1"
+                      >
+                        <div className="font-medium text-sm truncate">{r.name}</div>
+                        <div className="text-xs font-mono tabular-nums text-muted-foreground truncate">
                           [{r.minAmount} – {r.maxAmount === null ? "∞" : r.maxAmount}) @ {r.rate}
                         </div>
-                      </div>
+                      </button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="size-8"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void handleQuickRemove(r.ruleId);
-                        }}
-                        aria-label="Quitar regla"
+                        className="size-9 shrink-0"
+                        onClick={() => void handleQuickRemove(r.ruleId)}
+                        aria-label={`Quitar regla ${r.name}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </>

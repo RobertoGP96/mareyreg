@@ -163,16 +163,17 @@ export function AccountGroupDetailsClient({ group, operations }: Props) {
           `Responsable: ${group.ownerName ?? group.ownerEmail ?? "—"}`
         }
         badge={group.code}
-      >
-        <div className="flex items-center gap-2 flex-wrap">
-          <StatusPill status={group.active ? "active" : "inactive"} size="sm" />
-          <Badge variant="outline" className="text-[10px]">
-            {totalAccounts} cuenta{totalAccounts !== 1 ? "s" : ""}
-          </Badge>
-        </div>
-      </PageHeader>
+        meta={
+          <>
+            <StatusPill status={group.active ? "active" : "inactive"} size="sm" />
+            <Badge variant="outline" className="text-[10px]">
+              {totalAccounts} cuenta{totalAccounts !== 1 ? "s" : ""}
+            </Badge>
+          </>
+        }
+      />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
         <MetricTile icon={Wallet} label="Cuentas activas" value={activeAccounts} tone="active" />
         <MetricTile icon={CircleDollarSign} label="Monedas" value={group.balancesByCurrency.length} tone="track" />
         <MetricTile icon={Calculator} label="Reglas usadas" value={group.rulesUsed.length} tone="success" />

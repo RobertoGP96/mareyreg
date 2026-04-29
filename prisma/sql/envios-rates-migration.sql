@@ -151,7 +151,7 @@ UPDATE operations op
    AND COALESCE(bm.matched_rule_id, bm.fallback_rule_id) IS NOT NULL;
 
 -- 7. Auditar las operaciones que se cayeron al fallback (rateApplied fuera de todo rango).
-INSERT INTO audit_logs (action, entity_type, entity_id, module, user_id, new_values, created_at)
+INSERT INTO audit_log (action, entity_type, entity_id, module, user_id, new_values, created_at)
 SELECT 'rate_remapped_fallback',
        'Operation',
        op.id,

@@ -113,15 +113,16 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
         title="Tasas de cambio"
         description="Reglas con rangos por par de monedas. Solapes bloqueados a nivel base de datos."
         badge={`${initialRules.length} reglas`}
-      >
-        <Button
-          variant="brand"
-          onClick={() => setIsCreateOpen(true)}
-          className="hidden md:inline-flex"
-        >
-          <Plus className="h-4 w-4" /> Nueva regla
-        </Button>
-      </PageHeader>
+        actions={
+          <Button
+            variant="brand"
+            onClick={() => setIsCreateOpen(true)}
+            className="hidden md:inline-flex"
+          >
+            <Plus className="h-4 w-4" /> Nueva regla
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <MetricTile label="Reglas activas" value={totalActive} icon={LineChart} tone="active" />
@@ -152,7 +153,7 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
             }
           />
         ) : (
-          <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
+          <div className="grid gap-3 xl:grid-cols-[1fr_320px]">
             <div className="grid gap-3 md:grid-cols-2">
             {filtered.map((r) => (
               <div
@@ -209,7 +210,7 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
               </div>
             ))}
             </div>
-            <div className="lg:sticky lg:top-4 lg:self-start">
+            <div className="xl:sticky xl:top-4 xl:self-start">
               <RateCalculatorCard rules={initialRules} />
             </div>
           </div>

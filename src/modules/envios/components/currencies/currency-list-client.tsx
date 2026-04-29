@@ -215,15 +215,16 @@ export function CurrencyListClient({ initialCurrencies }: Props) {
         title="Monedas"
         description="Catálogo de divisas con código, símbolo y precisión decimal."
         badge={`${initialCurrencies.length} monedas`}
-      >
-        <Button
-          variant="brand"
-          onClick={() => { resetForm(); setIsCreateOpen(true); }}
-          className="hidden md:inline-flex"
-        >
-          <Plus className="h-4 w-4" /> Nueva moneda
-        </Button>
-      </PageHeader>
+        actions={
+          <Button
+            variant="brand"
+            onClick={() => { resetForm(); setIsCreateOpen(true); }}
+            className="hidden md:inline-flex"
+          >
+            <Plus className="h-4 w-4" /> Nueva moneda
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <MetricTile label="Activas" value={totalActive} icon={CircleDollarSign} tone="active" />
