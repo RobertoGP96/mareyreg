@@ -25,6 +25,27 @@ ALTER TABLE exchange_rate_rules
   ADD  CONSTRAINT err_rate_pos   CHECK (rate > 0),
   ADD  CONSTRAINT err_max_gt_min CHECK (max_amount IS NULL OR max_amount > min_amount);
 
+-- Helper: construye el numrange de una regla considerando la inclusión configurable
+-- de cada extremo. Cuando max_amount es NULL se usa 'infinity' con extremo exclusivo
+-- (la flag de PG ignora la inclusión sobre infinito de todas formas).
+CREATE OR REPLACE FUNCTION rule_range(
+  p_min numeric,
+  p_max numeric,
+  p_min_inc boolean,
+  p_max_inc boolean
+) RETURNS numrange AS $$
+  SELECT numrange(
+    p_min,
+    COALESCE(p_max, 'infinity'::numeric),
+    CASE
+      WHEN p_min_inc AND p_max IS NOT NULL AND p_max_inc THEN '[]'
+      WHEN p_min_inc                                       THEN '[)'
+      WHEN p_max IS NOT NULL AND p_max_inc                 THEN '(]'
+      ELSE                                                       '()'
+    END
+  );
+$$ LANGUAGE sql IMMUTABLE;
+
 -- Anti-solapamiento de reglas asignadas a una misma cuenta para el mismo par.
 -- No se puede expresar en EXCLUDE puro (requiere join con la pivot), por lo que se
 -- valida vía función + triggers. La validación a nivel app es la primaria (mensajes ES);
@@ -35,8 +56,8 @@ DECLARE
   conflict_record record;
 BEGIN
   SELECT r1.id AS rule_a, r2.id AS rule_b,
-         numrange(r1.min_amount, COALESCE(r1.max_amount, 'infinity'::numeric), '[)') AS range_a,
-         numrange(r2.min_amount, COALESCE(r2.max_amount, 'infinity'::numeric), '[)') AS range_b
+         rule_range(r1.min_amount, r1.max_amount, r1.min_inclusive, r1.max_inclusive) AS range_a,
+         rule_range(r2.min_amount, r2.max_amount, r2.min_inclusive, r2.max_inclusive) AS range_b
     INTO conflict_record
     FROM account_exchange_rate_rules p1
     JOIN exchange_rate_rules r1 ON r1.id = p1.rule_id AND r1.active
@@ -48,8 +69,8 @@ BEGIN
      AND r2.base_currency_id = r1.base_currency_id
      AND r2.quote_currency_id = r1.quote_currency_id
    WHERE p1.account_id = p_account_id
-     AND numrange(r1.min_amount, COALESCE(r1.max_amount, 'infinity'::numeric), '[)')
-      && numrange(r2.min_amount, COALESCE(r2.max_amount, 'infinity'::numeric), '[)')
+     AND rule_range(r1.min_amount, r1.max_amount, r1.min_inclusive, r1.max_inclusive)
+      && rule_range(r2.min_amount, r2.max_amount, r2.min_inclusive, r2.max_inclusive)
    LIMIT 1;
 
   IF FOUND THEN
@@ -93,7 +114,8 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trg_exchange_rate_rules_overlap ON exchange_rate_rules;
 CREATE CONSTRAINT TRIGGER trg_exchange_rate_rules_overlap
-  AFTER UPDATE OF min_amount, max_amount, base_currency_id, quote_currency_id, active
+  AFTER UPDATE OF min_amount, max_amount, min_inclusive, max_inclusive,
+                  base_currency_id, quote_currency_id, active
   ON exchange_rate_rules
   DEFERRABLE INITIALLY IMMEDIATE
   FOR EACH ROW EXECUTE FUNCTION trg_exchange_rate_rule_change_check();

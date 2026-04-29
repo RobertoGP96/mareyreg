@@ -20,6 +20,7 @@ import {
   Calculator, MoreHorizontal, MinusCircle, Pin, BarChart3, Clock,
   CircleDollarSign, Settings2, ChevronRight, Layers, SquarePen,
 } from "lucide-react";
+import { formatBounds } from "../../lib/exchange-rate";
 import { CurrencyChip } from "../shared/currency-chip";
 import { AmountDisplay } from "../shared/amount-display";
 import { OpTypeBadge } from "../shared/op-type-badge";
@@ -234,7 +235,7 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
               size="sm"
               onClick={() => setBatchOpen(true)}
             >
-              <Layers className="h-4 w-4" /> Operaciones en lote
+              <Layers className="h-4 w-4" /> Operaciones múltiples
             </Button>
             <Button
               variant="brand"
@@ -366,6 +367,8 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
                           name: r.name,
                           minAmount: r.minAmount,
                           maxAmount: r.maxAmount,
+                          minInclusive: r.minInclusive,
+                          maxInclusive: r.maxInclusive,
                           rate: r.rate,
                           colorClass: RANGE_BG_COLORS[idx % RANGE_BG_COLORS.length],
                         }))}
@@ -381,7 +384,7 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
                             <div className="min-w-0">
                               <div className="text-xs font-medium truncate">{rg.name}</div>
                               <div className="text-[10px] font-mono tabular-nums text-muted-foreground">
-                                [{rg.minAmount.toLocaleString("es-MX")} – {rg.maxAmount === null ? "∞" : rg.maxAmount.toLocaleString("es-MX")})
+                                {formatBounds(rg, (n) => n.toLocaleString("es-MX"))}
                               </div>
                             </div>
                             <span className="font-mono tabular-nums text-sm font-semibold whitespace-nowrap">

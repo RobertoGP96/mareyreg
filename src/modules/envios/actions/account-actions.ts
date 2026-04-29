@@ -251,6 +251,8 @@ export async function createRuleAndAssign(
           quoteCurrencyId: data.quoteCurrencyId,
           minAmount: data.minAmount,
           maxAmount: data.maxAmount ?? null,
+          minInclusive: data.minInclusive ?? true,
+          maxInclusive: data.maxInclusive ?? false,
           rate: data.rate,
           active: data.active ?? true,
         },

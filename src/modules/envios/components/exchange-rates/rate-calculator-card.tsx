@@ -9,6 +9,7 @@ import {
 import { Calculator, ArrowRightLeft, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ExchangeRateRuleRow } from "../../lib/types";
+import { isAmountInRule } from "../../lib/exchange-rate";
 import { CurrencyChip } from "../shared/currency-chip";
 
 type Props = {
@@ -67,9 +68,7 @@ export function RateCalculatorCard({ rules }: Props) {
     if (!amount || !Number.isFinite(n) || n <= 0) return { state: "no-amount" };
 
     const sorted = [...pair.rules].sort((a, b) => a.minAmount - b.minAmount);
-    const match = sorted.find(
-      (r) => n >= r.minAmount && (r.maxAmount === null || n < r.maxAmount),
-    );
+    const match = sorted.find((r) => isAmountInRule(n, r));
     if (!match) {
       return { state: "no-rate", rangeIssue: `Sin rango para ${n}` };
     }

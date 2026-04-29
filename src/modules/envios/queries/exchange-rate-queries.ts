@@ -25,6 +25,8 @@ export async function getExchangeRateRules(): Promise<ExchangeRateRuleRow[]> {
     quoteCurrencyCode: r.quoteCurrency.code,
     minAmount: Number(r.minAmount),
     maxAmount: r.maxAmount === null ? null : Number(r.maxAmount),
+    minInclusive: r.minInclusive,
+    maxInclusive: r.maxInclusive,
     rate: Number(r.rate),
     accountsCount: r._count.accounts,
   }));

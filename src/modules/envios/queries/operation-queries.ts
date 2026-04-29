@@ -102,6 +102,8 @@ export async function getOperationFormData() {
               quoteCurrencyId: true,
               minAmount: true,
               maxAmount: true,
+              minInclusive: true,
+              maxInclusive: true,
               rate: true,
               baseCurrency: { select: { code: true } },
               quoteCurrency: { select: { code: true } },
@@ -133,6 +135,8 @@ export async function getOperationFormData() {
       quoteCurrencyCode: l.rule.quoteCurrency.code,
       minAmount: Number(l.rule.minAmount),
       maxAmount: l.rule.maxAmount === null ? null : Number(l.rule.maxAmount),
+      minInclusive: l.rule.minInclusive,
+      maxInclusive: l.rule.maxInclusive,
       rate: Number(l.rule.rate),
     })),
   }));

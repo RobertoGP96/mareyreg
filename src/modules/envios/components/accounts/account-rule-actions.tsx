@@ -10,6 +10,7 @@ import {
   Plus, Trash2, SquarePen, Loader2, Link as LinkIcon, Check,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatBounds } from "../../lib/exchange-rate";
 import {
   createRuleAndAssign,
 } from "../../actions/account-actions";
@@ -32,6 +33,8 @@ export type RuleSummary = {
   quoteCurrencyCode: string;
   minAmount: number;
   maxAmount: number | null;
+  minInclusive: boolean;
+  maxInclusive: boolean;
   rate: number;
 };
 
@@ -262,7 +265,7 @@ export function AccountRuleDialogs({
                           </span>
                         </div>
                         <div className="text-xs font-mono tabular-nums text-muted-foreground mt-0.5">
-                          [{r.minAmount} – {r.maxAmount === null ? "∞" : r.maxAmount}) @ {r.rate}
+                          {formatBounds(r)} @ {r.rate}
                         </div>
                       </div>
                     </button>
@@ -342,7 +345,7 @@ export function AccountRuleDialogs({
                       >
                         <div className="font-medium text-sm truncate">{r.name}</div>
                         <div className="text-xs font-mono tabular-nums text-muted-foreground truncate">
-                          [{r.minAmount} – {r.maxAmount === null ? "∞" : r.maxAmount}) @ {r.rate}
+                          {formatBounds(r)} @ {r.rate}
                         </div>
                       </button>
                       <Button

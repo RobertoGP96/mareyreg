@@ -1218,6 +1218,8 @@ model ExchangeRateRule {
   quoteCurrencyId Int      @map("quote_currency_id")
   minAmount       Decimal  @map("min_amount") @db.Decimal(20, 8)
   maxAmount       Decimal? @map("max_amount") @db.Decimal(20, 8)
+  minInclusive    Boolean  @default(true) @map("min_inclusive")
+  maxInclusive    Boolean  @default(false) @map("max_inclusive")
   rate            Decimal  @db.Decimal(20, 8)
   active          Boolean  @default(true)
   version         Int      @default(0)

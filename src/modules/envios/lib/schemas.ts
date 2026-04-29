@@ -110,6 +110,8 @@ export const exchangeRateRuleSchema = z
     quoteCurrencyId: z.coerce.number().int().positive("Selecciona moneda destino"),
     minAmount: z.coerce.number().min(0, "Mínimo no puede ser negativo"),
     maxAmount: z.coerce.number().nullish(),
+    minInclusive: z.boolean().optional(),
+    maxInclusive: z.boolean().optional(),
     rate: z.coerce.number().positive("Tasa debe ser mayor a 0"),
     active: z.boolean().optional(),
   })

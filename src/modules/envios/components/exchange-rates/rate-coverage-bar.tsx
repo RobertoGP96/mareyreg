@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { CheckCircle2, AlertTriangle, Layers, Infinity as InfinityIcon } from "lucide-react";
+import { formatBounds } from "../../lib/exchange-rate";
 
 const DEFAULT_COLOR = "bg-emerald-500/60 dark:bg-emerald-500/50";
 const OVERLAP_RING = "ring-1 ring-amber-500/70";
@@ -12,6 +13,8 @@ export type CoverageRule = {
   name: string;
   minAmount: number;
   maxAmount: number | null;
+  minInclusive: boolean;
+  maxInclusive: boolean;
   rate: number;
   colorClass?: string;
 };
@@ -31,6 +34,8 @@ type CoveredSegment = {
   rate: number;
   from: number;
   to: number | null;
+  minInclusive: boolean;
+  maxInclusive: boolean;
   colorClass: string;
   overlap: boolean;
 };
@@ -71,6 +76,8 @@ function computeSegments(rules: CoverageRule[]): ComputeResult {
       rate: r.rate,
       from: r.minAmount,
       to: r.maxAmount,
+      minInclusive: r.minInclusive,
+      maxInclusive: r.maxInclusive,
       colorClass: r.colorClass ?? DEFAULT_COLOR,
       overlap,
     });
@@ -215,7 +222,15 @@ export function RateCoverageBar({
           const z = overlap ? "z-20" : isGap ? "z-0" : "z-10";
           const title = isGap
             ? `Sin cobertura: [${fmt(seg.from)}, ${seg.to === null ? "∞" : fmt(seg.to)})`
-            : `${seg.name}${overlap ? " (solapado)" : ""}: [${fmt(seg.from)}, ${seg.to === null ? "∞" : fmt(seg.to)}) @ ${fmtRate(seg.rate)}`;
+            : `${seg.name}${overlap ? " (solapado)" : ""}: ${formatBounds(
+                {
+                  minAmount: seg.from,
+                  maxAmount: seg.to,
+                  minInclusive: seg.minInclusive,
+                  maxInclusive: seg.maxInclusive,
+                },
+                fmt,
+              )} @ ${fmtRate(seg.rate)}`;
           return (
             <div
               key={`${seg.kind}-${i}`}

@@ -111,6 +111,8 @@ export async function getAccountDetail(id: number) {
       quoteCurrencyCode: rule.quoteCurrency.code,
       minAmount: Number(rule.minAmount),
       maxAmount: rule.maxAmount === null ? null : Number(rule.maxAmount),
+      minInclusive: rule.minInclusive,
+      maxInclusive: rule.maxInclusive,
       rate: Number(rule.rate),
     }));
 
@@ -162,6 +164,8 @@ export async function getAccountFormData() {
         quoteCurrencyId: true,
         minAmount: true,
         maxAmount: true,
+        minInclusive: true,
+        maxInclusive: true,
         rate: true,
         baseCurrency: { select: { code: true } },
         quoteCurrency: { select: { code: true } },
@@ -181,6 +185,8 @@ export async function getAccountFormData() {
     quoteCurrencyCode: r.quoteCurrency.code,
     minAmount: Number(r.minAmount),
     maxAmount: r.maxAmount === null ? null : Number(r.maxAmount),
+    minInclusive: r.minInclusive,
+    maxInclusive: r.maxInclusive,
     rate: Number(r.rate),
   }));
   return { groups, currencies, rules: rulesSerialized };

@@ -61,6 +61,8 @@ export async function createExchangeRateRule(
           quoteCurrencyId: data.quoteCurrencyId,
           minAmount: data.minAmount,
           maxAmount: data.maxAmount ?? null,
+          minInclusive: data.minInclusive ?? true,
+          maxInclusive: data.maxInclusive ?? false,
           rate: data.rate,
           active: data.active ?? true,
         },
@@ -100,6 +102,8 @@ export async function updateExchangeRateRule(
       if (input.quoteCurrencyId !== undefined) data.quoteCurrencyId = input.quoteCurrencyId;
       if (input.minAmount !== undefined) data.minAmount = input.minAmount;
       if (input.maxAmount !== undefined) data.maxAmount = input.maxAmount ?? null;
+      if (input.minInclusive !== undefined) data.minInclusive = input.minInclusive;
+      if (input.maxInclusive !== undefined) data.maxInclusive = input.maxInclusive;
       if (input.rate !== undefined) data.rate = input.rate;
       if (input.active !== undefined) data.active = input.active;
 

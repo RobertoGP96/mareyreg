@@ -28,6 +28,7 @@ import {
 } from "../../actions/exchange-rate-actions";
 import type { ExchangeRateRuleInput } from "../../lib/schemas";
 import type { ExchangeRateRuleRow } from "../../lib/types";
+import { formatBounds } from "../../lib/exchange-rate";
 import { CurrencyChip } from "../shared/currency-chip";
 import { RateCalculatorCard } from "./rate-calculator-card";
 import { ExchangeRateRuleForm } from "./exchange-rate-rule-form";
@@ -200,7 +201,7 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
                 </div>
                 <div className={`flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5 border-l-4 ${RANGE_COLORS[r.ruleId % RANGE_COLORS.length]}`}>
                   <span className="font-mono tabular-nums text-xs text-muted-foreground">
-                    [{r.minAmount.toLocaleString("es-MX")} – {r.maxAmount === null ? "∞" : r.maxAmount.toLocaleString("es-MX")})
+                    {formatBounds(r, (n) => n.toLocaleString("es-MX"))}
                   </span>
                   <span className="font-mono tabular-nums text-sm font-semibold">
                     {r.rate.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 6 })}

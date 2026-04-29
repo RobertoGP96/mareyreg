@@ -56,6 +56,8 @@ export type ExchangeRateRuleRow = Pick<
   quoteCurrencyCode: string;
   minAmount: number;
   maxAmount: number | null;
+  minInclusive: boolean;
+  maxInclusive: boolean;
   rate: number;
   accountsCount: number;
 };

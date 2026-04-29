@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/select";
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
+import { Checkbox } from "@/components/ui/checkbox";
 import { LineChart, Type, Hash, Pin, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { ExchangeRateRuleInput } from "../../lib/schemas";
@@ -58,6 +59,12 @@ export function ExchangeRateRuleForm({
   const [rate, setRate] = useState(
     defaultValues?.rate !== undefined ? String(defaultValues.rate) : "",
   );
+  const [minInclusive, setMinInclusive] = useState<boolean>(
+    defaultValues?.minInclusive ?? true,
+  );
+  const [maxInclusive, setMaxInclusive] = useState<boolean>(
+    defaultValues?.maxInclusive ?? false,
+  );
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -78,6 +85,8 @@ export function ExchangeRateRuleForm({
         : String(defaultValues.maxAmount),
     );
     setRate(defaultValues.rate !== undefined ? String(defaultValues.rate) : "");
+    setMinInclusive(defaultValues.minInclusive ?? true);
+    setMaxInclusive(defaultValues.maxInclusive ?? false);
   }, [defaultValues]);
 
   const validate = (): string | null => {
@@ -109,6 +118,8 @@ export function ExchangeRateRuleForm({
       quoteCurrencyId: Number(quoteCurrencyId),
       minAmount: Number(minAmount),
       maxAmount: maxAmount === "" ? null : Number(maxAmount),
+      minInclusive,
+      maxInclusive: maxAmount === "" ? false : maxInclusive,
       rate: Number(rate),
     };
     const result = await onSubmit(payload);
@@ -174,8 +185,8 @@ export function ExchangeRateRuleForm({
 
         <FormSection icon={Pin} title="Rango y tasa">
           <p className="text-xs text-muted-foreground">
-            La regla aplica para montos entre el mínimo (incluido) y el máximo (excluido). Deja máximo vacío para
-            indicar &ldquo;cualquier monto mayor&rdquo; (∞).
+            Define el rango de monto que cubre la regla y si cada extremo es inclusivo o
+            exclusivo. Por defecto, mínimo incluido y máximo excluido — la convención estándar.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Mínimo" required>
@@ -186,6 +197,13 @@ export function ExchangeRateRuleForm({
                 value={minAmount}
                 onChange={(e) => setMinAmount(e.target.value)}
               />
+              <label className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                <Checkbox
+                  checked={minInclusive}
+                  onCheckedChange={(v) => setMinInclusive(v === true)}
+                />
+                Incluir mínimo (cierre por izquierda)
+              </label>
             </Field>
             <Field label="Máximo (vacío = ∞)">
               <Input
@@ -196,7 +214,27 @@ export function ExchangeRateRuleForm({
                 value={maxAmount}
                 onChange={(e) => setMaxAmount(e.target.value)}
               />
+              <label
+                className={`mt-1.5 flex items-center gap-2 text-xs cursor-pointer ${
+                  maxAmount === "" ? "text-muted-foreground/40" : "text-muted-foreground"
+                }`}
+              >
+                <Checkbox
+                  checked={maxAmount !== "" && maxInclusive}
+                  onCheckedChange={(v) => setMaxInclusive(v === true)}
+                  disabled={maxAmount === ""}
+                />
+                Incluir máximo (cierre por derecha)
+              </label>
             </Field>
+          </div>
+          <div className="rounded-md bg-muted/40 px-2.5 py-1.5 text-xs font-mono tabular-nums text-muted-foreground">
+            Intervalo: <span className="text-foreground">
+              {minInclusive ? "[" : "("}
+              {minAmount === "" ? "?" : minAmount}
+              , {maxAmount === "" ? "∞" : maxAmount}
+              {maxAmount !== "" && maxInclusive ? "]" : ")"}
+            </span>
           </div>
           <Field
             label={baseCode && quoteCode ? `Tasa (${quoteCode} por ${baseCode})` : "Tasa"}

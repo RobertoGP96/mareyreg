@@ -34,11 +34,46 @@ export class RateOverlapError extends Error {
 
 type Tx = Prisma.TransactionClient | typeof db;
 
+export type RuleBounds = {
+  minAmount: number;
+  maxAmount: number | null;
+  minInclusive: boolean;
+  maxInclusive: boolean;
+};
+
+/**
+ * Devuelve true si `amount` cae dentro del rango configurado por la regla,
+ * respetando la inclusión/exclusión de cada extremo.
+ */
+export function isAmountInRule(amount: number, rule: RuleBounds): boolean {
+  const lower = rule.minInclusive ? amount >= rule.minAmount : amount > rule.minAmount;
+  if (!lower) return false;
+  if (rule.maxAmount === null) return true;
+  return rule.maxInclusive ? amount <= rule.maxAmount : amount < rule.maxAmount;
+}
+
+/**
+ * Formatea el rango como notación matemática: `[min, max)`, `(min, max]`, etc.
+ * `formatNumber` permite localizar (es-MX) sin acoplar la lib a Intl.
+ */
+export function formatBounds(
+  rule: RuleBounds,
+  formatNumber: (n: number) => string = (n) => String(n),
+): string {
+  const left = rule.minInclusive ? "[" : "(";
+  const right = rule.maxInclusive && rule.maxAmount !== null ? "]" : ")";
+  const min = formatNumber(rule.minAmount);
+  const max = rule.maxAmount === null ? "∞" : formatNumber(rule.maxAmount);
+  return `${left}${min}, ${max}${right}`;
+}
+
 export type ResolvedRate = {
   rate: number;
   ruleId: number;
   minAmount: number;
   maxAmount: number | null;
+  minInclusive: boolean;
+  maxInclusive: boolean;
 };
 
 export type ResolveRateInput = {
@@ -71,11 +106,14 @@ export async function resolveRate(
     orderBy: { rule: { minAmount: "asc" } },
   });
 
-  const matches = links.filter((link) => {
-    const min = Number(link.rule.minAmount);
-    const max = link.rule.maxAmount === null ? null : Number(link.rule.maxAmount);
-    return input.amount >= min && (max === null || input.amount < max);
-  });
+  const matches = links.filter((link) =>
+    isAmountInRule(input.amount, {
+      minAmount: Number(link.rule.minAmount),
+      maxAmount: link.rule.maxAmount === null ? null : Number(link.rule.maxAmount),
+      minInclusive: link.rule.minInclusive,
+      maxInclusive: link.rule.maxInclusive,
+    }),
+  );
 
   if (matches.length === 0) {
     throw new RateNotConfiguredError({
@@ -97,6 +135,8 @@ export async function resolveRate(
     ruleId: rule.ruleId,
     minAmount: Number(rule.minAmount),
     maxAmount: rule.maxAmount === null ? null : Number(rule.maxAmount),
+    minInclusive: rule.minInclusive,
+    maxInclusive: rule.maxInclusive,
   };
 }
 
@@ -114,6 +154,16 @@ export type ResolvedConversion = ResolvedRate & {
   baseCurrencyCode: string;
   quoteCurrencyCode: string;
   amountInAccountCurrency: number;
+};
+
+export type CoverageSegment = {
+  ruleId: number;
+  name: string;
+  from: string;
+  to: string | null;
+  rate: string;
+  minInclusive: boolean;
+  maxInclusive: boolean;
 };
 
 /**
@@ -161,11 +211,14 @@ export async function resolveAccountConversion(
     });
   }
 
-  const matches = links.filter((link) => {
-    const min = Number(link.rule.minAmount);
-    const max = link.rule.maxAmount === null ? null : Number(link.rule.maxAmount);
-    return args.externalAmount >= min && (max === null || args.externalAmount < max);
-  });
+  const matches = links.filter((link) =>
+    isAmountInRule(args.externalAmount, {
+      minAmount: Number(link.rule.minAmount),
+      maxAmount: link.rule.maxAmount === null ? null : Number(link.rule.maxAmount),
+      minInclusive: link.rule.minInclusive,
+      maxInclusive: link.rule.maxInclusive,
+    }),
+  );
 
   if (matches.length === 0) {
     throw new RateNotConfiguredError({
@@ -193,6 +246,8 @@ export async function resolveAccountConversion(
     ruleId: rule.ruleId,
     minAmount: Number(rule.minAmount),
     maxAmount: rule.maxAmount === null ? null : Number(rule.maxAmount),
+    minInclusive: rule.minInclusive,
+    maxInclusive: rule.maxInclusive,
     direction,
     baseCurrencyId: rule.baseCurrencyId,
     quoteCurrencyId: rule.quoteCurrencyId,
@@ -208,7 +263,7 @@ export type CoverageGap = { from: string; to: string | null };
 export type CoverageReport = {
   covered: boolean;
   gaps: CoverageGap[];
-  segments: Array<{ ruleId: number; from: string; to: string | null; rate: string; name: string }>;
+  segments: CoverageSegment[];
 };
 
 /**
@@ -232,12 +287,14 @@ export async function computeAccountRateCoverage(
     orderBy: { rule: { minAmount: "asc" } },
   });
 
-  const segments = links.map((l) => ({
+  const segments: CoverageSegment[] = links.map((l) => ({
     ruleId: l.rule.ruleId,
     name: l.rule.name,
     from: l.rule.minAmount.toString(),
     to: l.rule.maxAmount === null ? null : l.rule.maxAmount.toString(),
     rate: l.rule.rate.toString(),
+    minInclusive: l.rule.minInclusive,
+    maxInclusive: l.rule.maxInclusive,
   }));
 
   if (segments.length === 0) {
