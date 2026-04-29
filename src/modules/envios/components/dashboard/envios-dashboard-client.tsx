@@ -203,7 +203,7 @@ function PendingPanel({
 
 function RecentActivityPanel({ recent }: { recent: DashboardData["recentOps"] }) {
   return (
-    <div className="lg:col-span-2 flex flex-col rounded-xl border border-border bg-card p-4 shadow-panel gap-3 min-h-0 max-h-[420px] lg:max-h-[460px]">
+    <div className="lg:col-span-2 hidden lg:flex flex-col rounded-xl border border-border bg-card p-4 shadow-panel gap-3 min-h-0 lg:max-h-[460px]">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-headline text-sm font-semibold flex items-center gap-2">
           <ArrowRightLeft className="h-4 w-4 text-[var(--ops-active)]" />

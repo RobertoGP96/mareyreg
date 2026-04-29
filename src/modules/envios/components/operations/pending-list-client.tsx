@@ -267,7 +267,7 @@ export function PendingListClient({ initialPending, summary }: Props) {
       {selected.size > 0 ? (
         <div
           className={cn(
-            "fixed left-1/2 -translate-x-1/2 z-30 bottom-4 md:bottom-6",
+            "fixed left-1/2 -translate-x-1/2 z-30 bottom-[calc(var(--mobile-nav-h)+env(safe-area-inset-bottom)+1rem)] md:bottom-6",
             "flex items-center gap-3 px-4 py-2.5 rounded-xl",
             "bg-[var(--brand)] text-[var(--brand-foreground)] shadow-lg ring-1 ring-[var(--brand)]/40"
           )}

@@ -26,7 +26,8 @@ export function Fab({
       onClick={onClick}
       aria-label={label}
       className={cn(
-        "fixed bottom-5 right-5 z-40 grid place-items-center size-14 rounded-full",
+        "fixed right-5 z-40 grid place-items-center size-14 rounded-full",
+        "bottom-[calc(var(--mobile-nav-h)+env(safe-area-inset-bottom)+0.75rem)] md:bottom-5",
         "bg-[linear-gradient(135deg,#1e3a8a_0%,#2563eb_50%,#60a5fa_100%)] text-white",
         "shadow-[0_12px_32px_-8px_rgba(37,99,235,0.55)] ring-1 ring-inset ring-white/15",
         "transition-all duration-200 hover:brightness-[1.05] hover:shadow-[0_16px_40px_-8px_rgba(37,99,235,0.65)]",
