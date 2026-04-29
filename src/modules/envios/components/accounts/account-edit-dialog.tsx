@@ -9,10 +9,17 @@ import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
 import {
-  Wallet, Hash, Type, MinusCircle, Loader2,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import {
+  Wallet, Hash, Type, MinusCircle, Loader2, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateAccount } from "../../actions/account-actions";
+import { generateUniqueAccountName } from "../../lib/account-name";
 
 export type AccountEditTarget = {
   accountId: number;
@@ -98,11 +105,27 @@ export function AccountEditDialog({ account, onClose, onSaved }: Props) {
                 />
               </Field>
               <Field label="Nombre" icon={Type} required>
-                <Input
-                  placeholder="Cuenta principal USD"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
+                <InputGroup>
+                  <InputGroupInput
+                    placeholder="Cuenta principal USD"
+                    value={name}
+                    maxLength={120}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                  <InputGroupAddon align="inline-end">
+                    <InputGroupButton
+                      type="button"
+                      size="icon-xs"
+                      aria-label="Generar nombre único"
+                      title="Generar nombre único"
+                      onClick={() => {
+                        setName(generateUniqueAccountName(account.currencyCode));
+                      }}
+                    >
+                      <Sparkles className="size-3.5" />
+                    </InputGroupButton>
+                  </InputGroupAddon>
+                </InputGroup>
               </Field>
               <Field
                 label="Permitir saldo negativo"

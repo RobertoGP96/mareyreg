@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { MobileListCard } from "@/components/ui/mobile-list-card";
 import { ResponsiveListView } from "@/components/ui/responsive-list-view";
@@ -33,13 +33,14 @@ import { type DataTableColumn } from "@/components/ui/data-table";
 import {
   Wallet, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2,
   Hash, Type, Users, CircleDollarSign, Calculator, ToggleLeft, MinusCircle,
-  Eye,
+  Eye, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createAccount, updateAccount, toggleAccountActive, deleteAccount,
 } from "../../actions/account-actions";
 import type { AccountRow } from "../../lib/types";
+import { generateUniqueAccountName } from "../../lib/account-name";
 import { CurrencyChip } from "../shared/currency-chip";
 import { AmountDisplay } from "../shared/amount-display";
 import {
@@ -602,11 +603,36 @@ export function AccountListClient({
               />
             </Field>
             <Field label="Nombre" icon={Type} required>
-              <Input
-                placeholder="Cuenta principal USD"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
+              <InputGroup>
+                <InputGroupInput
+                  placeholder="Cuenta principal USD"
+                  value={name}
+                  maxLength={120}
+                  onChange={(e) => setName(e.target.value)}
+                />
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    type="button"
+                    size="icon-xs"
+                    aria-label="Generar nombre único"
+                    title={
+                      currencyId
+                        ? "Generar nombre único"
+                        : "Selecciona una moneda primero"
+                    }
+                    disabled={!currencyId}
+                    onClick={() => {
+                      const code = currencies.find(
+                        (c) => String(c.currencyId) === currencyId,
+                      )?.code;
+                      if (!code) return;
+                      setName(generateUniqueAccountName(code));
+                    }}
+                  >
+                    <Sparkles className="size-3.5" />
+                  </InputGroupButton>
+                </InputGroupAddon>
+              </InputGroup>
             </Field>
             {!toEdit && (
               <Field label="Saldo inicial" icon={CircleDollarSign} hint="Crea una operación de ajuste con este monto. Permitido negativo si la cuenta lo soporta.">
