@@ -78,7 +78,10 @@
       "Bash(git -C \"D:/Projects/mareyreg\" add src/modules/pacas/components/availability-view.tsx src/modules/pacas/components/paca-category-manager.tsx src/modules/pacas/components/paca-classification-list-client.tsx src/modules/pacas/components/paca-client-list-client.tsx src/modules/pacas/components/paca-form.tsx src/modules/pacas/components/paca-list-client.tsx src/modules/pacas/components/reservation-list-client.tsx src/modules/pacas/components/sale-list-client.tsx)",
       "Bash(DATABASE_URL='postgresql://placeholder' pnpm prisma format)",
       "Bash(DATABASE_URL='postgresql://placeholder' pnpm prisma validate)",
-      "Bash(DATABASE_URL='postgresql://placeholder' pnpm prisma generate)"
+      "Bash(DATABASE_URL='postgresql://placeholder' pnpm prisma generate)",
+      "Bash(DATABASE_URL='postgresql://neondb_owner:npg_OTFSL53bhjZM@ep-still-voice-ahm8uz2w-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require' pnpm db:push)",
+      "Bash(node -e ' *)",
+      "Bash(pnpm prisma *)"
     ]
   }
 }
