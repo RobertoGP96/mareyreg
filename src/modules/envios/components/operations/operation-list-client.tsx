@@ -115,11 +115,8 @@ export function OperationListClient({ initialOperations, accounts, currencies }:
   const selectedAccount = accounts.find((a) => String(a.accountId) === accountId);
 
   const accountRulesMap = useMemo(
-    () =>
-      Object.fromEntries(
-        accounts.map((a) => [a.accountId, a.rule ?? null])
-      ),
-    [accounts]
+    () => Object.fromEntries(accounts.map((a) => [a.accountId, a.rules])),
+    [accounts],
   );
 
   const resetForm = () => {
@@ -668,7 +665,6 @@ export function OperationListClient({ initialOperations, accounts, currencies }:
         open={isDepositConvertOpen}
         onOpenChange={setIsDepositConvertOpen}
         accounts={accounts}
-        accountRules={accountRulesMap}
         currencies={currencies}
       />
 

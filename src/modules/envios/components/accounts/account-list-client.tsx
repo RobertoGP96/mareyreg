@@ -44,14 +44,14 @@ import { AmountDisplay } from "../shared/amount-display";
 import {
   AccountRuleMenuItems,
   AccountRuleDialogs,
-  removeRuleFromAccount,
   type RuleActionState,
-  type RuleWithRanges,
+  type RuleActionMode,
+  type RuleSummary,
 } from "./account-rule-actions";
 
 type GroupOption = { groupId: number; code: string; name: string; userId: number };
 type CurrencyOption = { currencyId: number; code: string; symbol: string; decimalPlaces: number };
-type RuleOption = RuleWithRanges & {
+type RuleOption = RuleSummary & {
   baseCurrency: { code: string };
   quoteCurrency: { code: string };
 };
@@ -61,9 +61,16 @@ interface Props {
   groups: GroupOption[];
   currencies: CurrencyOption[];
   rules: RuleOption[];
+  assignedByAccount?: Record<number, RuleSummary[]>;
 }
 
-export function AccountListClient({ initialAccounts, groups, currencies, rules }: Props) {
+export function AccountListClient({
+  initialAccounts,
+  groups,
+  currencies,
+  rules,
+  assignedByAccount = {},
+}: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [filterGroup, setFilterGroup] = useState<string>("");
@@ -78,7 +85,6 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
   const [currencyId, setCurrencyId] = useState<string>("");
   const [accountNumber, setAccountNumber] = useState("");
   const [name, setName] = useState("");
-  const [exchangeRateRuleId, setExchangeRateRuleId] = useState<string>("");
   const [openingBalance, setOpeningBalance] = useState("0");
   const [allowNegativeBalance, setAllowNegativeBalance] = useState(false);
 
@@ -110,32 +116,24 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
     return Array.from(map.values()).sort((a, b) => a.code.localeCompare(b.code));
   }, [initialAccounts]);
 
-  const compatibleRules = useMemo(() => {
-    if (!currencyId) return [];
-    const cId = Number(currencyId);
-    return rules.filter(
-      (r) => r.baseCurrencyId === cId || r.quoteCurrencyId === cId
-    );
-  }, [rules, currencyId]);
-
-  const handleRuleAction = (a: AccountRow, mode: "assign" | "create" | "edit" | "remove") => {
-    if (mode === "remove") {
-      void removeRuleFromAccount(a.accountId).then((ok) => { if (ok) router.refresh(); });
-      return;
-    }
+  const handleRuleAction = (a: AccountRow, mode: RuleActionMode) => {
     setRuleAction({ account: a, mode });
   };
 
   const resetForm = () => {
-    setGroupId(""); setCurrencyId(""); setAccountNumber("");
-    setName(""); setExchangeRateRuleId(""); setOpeningBalance("0");
+    setGroupId("");
+    setCurrencyId("");
+    setAccountNumber("");
+    setName("");
+    setOpeningBalance("0");
     setAllowNegativeBalance(false);
   };
 
   const fillEdit = (a: AccountRow) => {
-    setGroupId(String(a.groupId)); setCurrencyId(String(a.currencyId));
-    setAccountNumber(a.accountNumber); setName(a.name);
-    setExchangeRateRuleId(a.ruleId ? String(a.ruleId) : "");
+    setGroupId(String(a.groupId));
+    setCurrencyId(String(a.currencyId));
+    setAccountNumber(a.accountNumber);
+    setName(a.name);
     setOpeningBalance(String(a.balance));
     setAllowNegativeBalance(a.allowNegativeBalance);
     setToEdit(a);
@@ -170,7 +168,6 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
       currencyId: Number(currencyId),
       accountNumber: accountNumber.trim().toUpperCase(),
       name: name.trim(),
-      exchangeRateRuleId: exchangeRateRuleId ? Number(exchangeRateRuleId) : null,
       openingBalance: Number(openingBalance) || 0,
       allowNegativeBalance,
     });
@@ -188,7 +185,6 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
     const r = await updateAccount(toEdit.accountId, {
       name: name.trim(),
       accountNumber: accountNumber.trim().toUpperCase(),
-      exchangeRateRuleId: exchangeRateRuleId ? Number(exchangeRateRuleId) : null,
       allowNegativeBalance,
     });
     setSubmitting(false);
@@ -244,11 +240,13 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
     },
     {
       key: "rule",
-      header: "Regla",
+      header: "Reglas",
       cell: (a) => (
         <div className="flex items-center gap-1.5 flex-wrap">
-          {a.ruleName ? (
-            <Badge variant="outline" className="text-[10px]">{a.ruleName}</Badge>
+          {a.rulesCount > 0 ? (
+            <Badge variant="outline" className="text-[10px]">
+              {a.rulesCount} {a.rulesCount === 1 ? "regla" : "reglas"}
+            </Badge>
           ) : null}
           {a.allowNegativeBalance ? (
             <Badge variant="warning" className="text-[10px] gap-1">
@@ -256,7 +254,7 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
               Negativo OK
             </Badge>
           ) : null}
-          {!a.ruleName && !a.allowNegativeBalance ? (
+          {a.rulesCount === 0 && !a.allowNegativeBalance ? (
             <span className="text-xs text-muted-foreground">—</span>
           ) : null}
         </div>
@@ -292,7 +290,6 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
             </DropdownMenuItem>
             <AccountRuleMenuItems
               account={a}
-              rules={rules}
               onAction={(mode) => handleRuleAction(a, mode)}
             />
             <DropdownMenuItem
@@ -378,7 +375,6 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
                   </DropdownMenuItem>
                   <AccountRuleMenuItems
                     account={a}
-                    rules={rules}
                     onAction={(mode) => handleRuleAction(a, mode)}
                   />
                   <DropdownMenuItem
@@ -393,7 +389,11 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
             meta={
               <div className="flex items-center gap-2 flex-wrap">
                 <StatusPill status={a.active ? "active" : "inactive"} size="sm" />
-                {a.ruleName ? <Badge variant="outline" className="text-[10px]">{a.ruleName}</Badge> : null}
+                {a.rulesCount > 0 ? (
+                  <Badge variant="outline" className="text-[10px]">
+                    {a.rulesCount} {a.rulesCount === 1 ? "regla" : "reglas"}
+                  </Badge>
+                ) : null}
               </div>
             }
           />
@@ -503,7 +503,7 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
             <Field label="Moneda" icon={CircleDollarSign} required>
               <Select
                 value={currencyId}
-                onValueChange={(v) => { setCurrencyId(v); onPickGroupOrCurrency(groupId, v); setExchangeRateRuleId(""); }}
+                onValueChange={(v) => { setCurrencyId(v); onPickGroupOrCurrency(groupId, v); }}
                 disabled={!!toEdit}
               >
                 <SelectTrigger>
@@ -532,25 +532,6 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
-            </Field>
-            <Field label="Regla de tasa" icon={Calculator} hint="Opcional. Aplica a transferencias salientes desde esta cuenta.">
-              <Select
-                value={exchangeRateRuleId || "none"}
-                onValueChange={(v) => setExchangeRateRuleId(v === "none" ? "" : v)}
-                disabled={!currencyId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={currencyId ? "Sin regla" : "Selecciona moneda primero"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin regla</SelectItem>
-                  {compatibleRules.map((r) => (
-                    <SelectItem key={r.ruleId} value={String(r.ruleId)}>
-                      {r.name} · {r.baseCurrency.code}↔{r.quoteCurrency.code}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </Field>
             {!toEdit && (
               <Field label="Saldo inicial" icon={CircleDollarSign} hint="Crea una operación de ajuste con este monto. Permitido negativo si la cuenta lo soporta.">
@@ -624,6 +605,7 @@ export function AccountListClient({ initialAccounts, groups, currencies, rules }
         state={ruleAction}
         onClose={() => setRuleAction(null)}
         rules={rules}
+        assignedByAccount={assignedByAccount}
         currencies={currencies}
       />
 

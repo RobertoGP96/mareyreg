@@ -3,28 +3,30 @@ import type { ExchangeRateRuleRow } from "../lib/types";
 
 export async function getExchangeRateRules(): Promise<ExchangeRateRuleRow[]> {
   const rows = await db.exchangeRateRule.findMany({
-    orderBy: [{ active: "desc" }, { name: "asc" }],
+    orderBy: [
+      { active: "desc" },
+      { baseCurrencyId: "asc" },
+      { quoteCurrencyId: "asc" },
+      { minAmount: "asc" },
+    ],
     include: {
       baseCurrency: { select: { code: true } },
       quoteCurrency: { select: { code: true } },
-      ranges: { orderBy: { minAmount: "asc" } },
+      _count: { select: { accounts: true } },
     },
   });
   return rows.map((r) => ({
     ruleId: r.ruleId,
     name: r.name,
-    kind: r.kind,
     baseCurrencyId: r.baseCurrencyId,
     quoteCurrencyId: r.quoteCurrencyId,
     active: r.active,
     baseCurrencyCode: r.baseCurrency.code,
     quoteCurrencyCode: r.quoteCurrency.code,
-    ranges: r.ranges.map((rg) => ({
-      rangeId: rg.rangeId,
-      minAmount: Number(rg.minAmount),
-      maxAmount: rg.maxAmount === null ? null : Number(rg.maxAmount),
-      rate: Number(rg.rate),
-    })),
+    minAmount: Number(r.minAmount),
+    maxAmount: r.maxAmount === null ? null : Number(r.maxAmount),
+    rate: Number(r.rate),
+    accountsCount: r._count.accounts,
   }));
 }
 

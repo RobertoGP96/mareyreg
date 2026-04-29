@@ -58,11 +58,13 @@ export function AccountGroupDetailsClient({ group, operations }: Props) {
     },
     {
       key: "rule",
-      header: "Regla",
+      header: "Reglas",
       cell: (a) => (
         <div className="flex items-center gap-1.5 flex-wrap">
-          {a.ruleName ? (
-            <Badge variant="outline" className="text-[10px]">{a.ruleName}</Badge>
+          {a.rulesCount > 0 ? (
+            <Badge variant="outline" className="text-[10px]">
+              {a.rulesCount} {a.rulesCount === 1 ? "regla" : "reglas"}
+            </Badge>
           ) : (
             <span className="text-xs text-muted-foreground">—</span>
           )}
@@ -277,7 +279,11 @@ export function AccountGroupDetailsClient({ group, operations }: Props) {
               meta={
                 <div className="flex items-center gap-2 flex-wrap">
                   <StatusPill status={a.active ? "active" : "inactive"} size="sm" />
-                  {a.ruleName && <Badge variant="outline" className="text-[10px]">{a.ruleName}</Badge>}
+                  {a.rulesCount > 0 && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {a.rulesCount} {a.rulesCount === 1 ? "regla" : "reglas"}
+                    </Badge>
+                  )}
                 </div>
               }
             />

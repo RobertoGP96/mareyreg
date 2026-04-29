@@ -23,26 +23,55 @@ type Result =
   | { state: "ok"; rate: number; min: number; max: number | null; result: number; baseCode: string; quoteCode: string };
 
 export function RateCalculatorCard({ rules }: Props) {
-  const activeRules = useMemo(() => rules.filter((r) => r.active && r.ranges.length > 0), [rules]);
-  const [ruleId, setRuleId] = useState<string>(activeRules[0]?.ruleId ? String(activeRules[0].ruleId) : "");
+  const activeRules = useMemo(() => rules.filter((r) => r.active), [rules]);
+  // Agrupar reglas por par para que la calculadora opere sobre el conjunto
+  // (varias reglas pueden cubrir distintos rangos del mismo par).
+  const pairs = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        key: string;
+        baseCurrencyId: number;
+        quoteCurrencyId: number;
+        baseCurrencyCode: string;
+        quoteCurrencyCode: string;
+        rules: typeof activeRules;
+      }
+    >();
+    for (const r of activeRules) {
+      const key = `${r.baseCurrencyId}-${r.quoteCurrencyId}`;
+      const prev = map.get(key);
+      if (prev) prev.rules.push(r);
+      else
+        map.set(key, {
+          key,
+          baseCurrencyId: r.baseCurrencyId,
+          quoteCurrencyId: r.quoteCurrencyId,
+          baseCurrencyCode: r.baseCurrencyCode,
+          quoteCurrencyCode: r.quoteCurrencyCode,
+          rules: [r],
+        });
+    }
+    return [...map.values()];
+  }, [activeRules]);
+
+  const [pairKey, setPairKey] = useState<string>(pairs[0]?.key ?? "");
   const [amount, setAmount] = useState("");
   const [direction, setDirection] = useState<"base_to_quote" | "quote_to_base">("base_to_quote");
 
-  const rule = activeRules.find((r) => String(r.ruleId) === ruleId);
+  const pair = pairs.find((p) => p.key === pairKey);
 
   const result: Result = useMemo(() => {
-    if (!rule) return { state: "no-rule" };
+    if (!pair) return { state: "no-rule" };
     const n = Number(amount);
     if (!amount || !Number.isFinite(n) || n <= 0) return { state: "no-amount" };
 
-    // El rango se evalúa siempre en moneda base de la regla.
-    const amountInBase = direction === "base_to_quote" ? n : n; // simétrico — el amount es el monto de origen
-    const sorted = [...rule.ranges].sort((a, b) => a.minAmount - b.minAmount);
+    const sorted = [...pair.rules].sort((a, b) => a.minAmount - b.minAmount);
     const match = sorted.find(
-      (r) => amountInBase >= r.minAmount && (r.maxAmount === null || amountInBase < r.maxAmount)
+      (r) => n >= r.minAmount && (r.maxAmount === null || n < r.maxAmount),
     );
     if (!match) {
-      return { state: "no-rate", rangeIssue: `Sin rango para ${amountInBase}` };
+      return { state: "no-rate", rangeIssue: `Sin rango para ${n}` };
     }
     const result = direction === "base_to_quote" ? n * match.rate : n / match.rate;
     return {
@@ -51,17 +80,16 @@ export function RateCalculatorCard({ rules }: Props) {
       min: match.minAmount,
       max: match.maxAmount,
       result,
-      baseCode: rule.baseCurrencyCode,
-      quoteCode: rule.quoteCurrencyCode,
+      baseCode: pair.baseCurrencyCode,
+      quoteCode: pair.quoteCurrencyCode,
     };
-  }, [rule, amount, direction]);
+  }, [pair, amount, direction]);
 
-  // Si cambia la regla activa y quedó vacío, seleccionar la primera disponible
   useEffect(() => {
-    if (!ruleId && activeRules[0]) setRuleId(String(activeRules[0].ruleId));
-  }, [activeRules, ruleId]);
+    if (!pairKey && pairs[0]) setPairKey(pairs[0].key);
+  }, [pairs, pairKey]);
 
-  if (activeRules.length === 0) {
+  if (pairs.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-card/50 p-4 space-y-1">
         <h3 className="font-headline text-sm font-semibold flex items-center gap-2">
@@ -69,17 +97,17 @@ export function RateCalculatorCard({ rules }: Props) {
           Calculadora rápida
         </h3>
         <p className="text-xs text-muted-foreground">
-          Crea una regla con al menos un rango activo para empezar a calcular.
+          Crea una regla activa para empezar a calcular.
         </p>
       </div>
     );
   }
 
-  const fromCode = rule
-    ? direction === "base_to_quote" ? rule.baseCurrencyCode : rule.quoteCurrencyCode
+  const fromCode = pair
+    ? direction === "base_to_quote" ? pair.baseCurrencyCode : pair.quoteCurrencyCode
     : "";
-  const toCode = rule
-    ? direction === "base_to_quote" ? rule.quoteCurrencyCode : rule.baseCurrencyCode
+  const toCode = pair
+    ? direction === "base_to_quote" ? pair.quoteCurrencyCode : pair.baseCurrencyCode
     : "";
 
   return (
@@ -91,25 +119,25 @@ export function RateCalculatorCard({ rules }: Props) {
         </h3>
       </div>
 
-      <Field label="Regla" icon={ArrowRightLeft}>
-        <Select value={ruleId} onValueChange={setRuleId}>
-          <SelectTrigger><SelectValue placeholder="Regla" /></SelectTrigger>
+      <Field label="Par de monedas" icon={ArrowRightLeft}>
+        <Select value={pairKey} onValueChange={setPairKey}>
+          <SelectTrigger><SelectValue placeholder="Par" /></SelectTrigger>
           <SelectContent>
-            {activeRules.map((r) => (
-              <SelectItem key={r.ruleId} value={String(r.ruleId)}>
-                {r.name} · {r.baseCurrencyCode}→{r.quoteCurrencyCode}
+            {pairs.map((p) => (
+              <SelectItem key={p.key} value={p.key}>
+                {p.baseCurrencyCode}↔{p.quoteCurrencyCode} · {p.rules.length} {p.rules.length === 1 ? "regla" : "reglas"}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </Field>
 
-      {rule ? (
+      {pair ? (
         <div className="flex items-center gap-1 rounded-lg bg-muted/40 p-1">
           {(
             [
-              { id: "base_to_quote", label: `${rule.baseCurrencyCode} → ${rule.quoteCurrencyCode}` },
-              { id: "quote_to_base", label: `${rule.quoteCurrencyCode} → ${rule.baseCurrencyCode}` },
+              { id: "base_to_quote", label: `${pair.baseCurrencyCode} → ${pair.quoteCurrencyCode}` },
+              { id: "quote_to_base", label: `${pair.quoteCurrencyCode} → ${pair.baseCurrencyCode}` },
             ] as const
           ).map((t) => {
             const isActive = direction === t.id;

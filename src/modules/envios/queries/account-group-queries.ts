@@ -67,15 +67,19 @@ export async function getGroupDetail(id: number) {
         orderBy: [{ active: "desc" }, { accountNumber: "asc" }],
         include: {
           currency: { select: { currencyId: true, code: true, symbol: true, decimalPlaces: true } },
-          exchangeRateRule: {
-            select: {
-              ruleId: true,
-              name: true,
-              kind: true,
-              baseCurrencyId: true,
-              quoteCurrencyId: true,
-              baseCurrency: { select: { code: true } },
-              quoteCurrency: { select: { code: true } },
+          rateRules: {
+            include: {
+              rule: {
+                select: {
+                  ruleId: true,
+                  name: true,
+                  active: true,
+                  baseCurrencyId: true,
+                  quoteCurrencyId: true,
+                  baseCurrency: { select: { code: true } },
+                  quoteCurrency: { select: { code: true } },
+                },
+              },
             },
           },
         },
@@ -110,18 +114,20 @@ export async function getGroupDetail(id: number) {
 
   const ruleMap = new Map<number, { ruleId: number; name: string; baseCurrencyCode: string; quoteCurrencyCode: string; accountsUsing: number }>();
   for (const a of group.accounts) {
-    if (!a.exchangeRateRule) continue;
-    const r = a.exchangeRateRule;
-    const prev = ruleMap.get(r.ruleId);
-    if (prev) prev.accountsUsing += 1;
-    else
-      ruleMap.set(r.ruleId, {
-        ruleId: r.ruleId,
-        name: r.name,
-        baseCurrencyCode: r.baseCurrency.code,
-        quoteCurrencyCode: r.quoteCurrency.code,
-        accountsUsing: 1,
-      });
+    for (const link of a.rateRules) {
+      const r = link.rule;
+      if (!r.active) continue;
+      const prev = ruleMap.get(r.ruleId);
+      if (prev) prev.accountsUsing += 1;
+      else
+        ruleMap.set(r.ruleId, {
+          ruleId: r.ruleId,
+          name: r.name,
+          baseCurrencyCode: r.baseCurrency.code,
+          quoteCurrencyCode: r.quoteCurrency.code,
+          accountsUsing: 1,
+        });
+    }
   }
 
   return {
@@ -143,8 +149,10 @@ export async function getGroupDetail(id: number) {
       currencyCode: a.currency.code,
       currencySymbol: a.currency.symbol,
       currencyDecimals: a.currency.decimalPlaces,
-      ruleId: a.exchangeRateRule?.ruleId ?? null,
-      ruleName: a.exchangeRateRule?.name ?? null,
+      rulesCount: a.rateRules.filter((l) => l.rule.active).length,
+      ruleNames: a.rateRules
+        .filter((l) => l.rule.active)
+        .map((l) => l.rule.name),
     })),
     balancesByCurrency: Array.from(totals.values()).sort((a, b) => a.code.localeCompare(b.code)),
     rulesUsed: Array.from(ruleMap.values()).sort((a, b) => a.name.localeCompare(b.name)),

@@ -5,7 +5,71 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, getCurrentUserId } from "@/lib/audit";
 import { applyDelta, BalanceError, ConcurrencyError } from "../lib/balance";
-import { resolveRate, RateNotConfiguredError } from "../lib/exchange-rate";
+import { RateNotConfiguredError } from "../lib/exchange-rate";
+import type { Prisma } from "@/generated/prisma";
+
+type Tx = Prisma.TransactionClient | typeof db;
+
+async function resolveTransferRate(
+  client: Tx,
+  args: {
+    fromAccountId: number;
+    fromCurrencyId: number;
+    toCurrencyId: number;
+    amount: number;
+  },
+) {
+  const links = await client.accountExchangeRateRule.findMany({
+    where: {
+      accountId: args.fromAccountId,
+      rule: {
+        active: true,
+        OR: [
+          { baseCurrencyId: args.fromCurrencyId, quoteCurrencyId: args.toCurrencyId },
+          { baseCurrencyId: args.toCurrencyId, quoteCurrencyId: args.fromCurrencyId },
+        ],
+      },
+    },
+    include: { rule: true },
+    orderBy: { rule: { minAmount: "asc" } },
+  });
+
+  if (links.length === 0) {
+    throw new RateNotConfiguredError({
+      accountId: args.fromAccountId,
+      baseCurrencyId: args.fromCurrencyId,
+      quoteCurrencyId: args.toCurrencyId,
+      amount: args.amount,
+      message: "La cuenta origen no tiene reglas para convertir entre estas monedas",
+    });
+  }
+
+  const matches = links.filter((l) => {
+    const min = Number(l.rule.minAmount);
+    const max = l.rule.maxAmount === null ? null : Number(l.rule.maxAmount);
+    return args.amount >= min && (max === null || args.amount < max);
+  });
+  if (matches.length === 0) {
+    throw new RateNotConfiguredError({
+      accountId: args.fromAccountId,
+      baseCurrencyId: args.fromCurrencyId,
+      quoteCurrencyId: args.toCurrencyId,
+      amount: args.amount,
+    });
+  }
+  const rule = matches[0].rule;
+  const direction: "base_to_quote" | "quote_to_base" =
+    rule.baseCurrencyId === args.fromCurrencyId ? "base_to_quote" : "quote_to_base";
+  const rate = Number(rule.rate);
+  return {
+    rate,
+    ruleId: rule.ruleId,
+    ruleName: rule.name,
+    minAmount: Number(rule.minAmount),
+    maxAmount: rule.maxAmount === null ? null : Number(rule.maxAmount),
+    direction,
+  };
+}
 import { transferSchema, type TransferInput } from "../lib/schemas";
 
 const revalidateAll = () => {
@@ -47,10 +111,7 @@ export async function previewTransferRate(input: {
     const [from, to] = await Promise.all([
       db.account.findUnique({
         where: { accountId: input.fromAccountId },
-        include: {
-          exchangeRateRule: { include: { baseCurrency: true, quoteCurrency: true } },
-          currency: true,
-        },
+        include: { currency: true },
       }),
       db.account.findUnique({
         where: { accountId: input.toAccountId },
@@ -58,29 +119,15 @@ export async function previewTransferRate(input: {
       }),
     ]);
     if (!from || !to) return { success: false, error: "Cuenta no encontrada" };
-    if (!from.exchangeRateRule) {
-      return { success: false, error: "La cuenta origen no tiene regla de tasa asignada" };
-    }
 
-    const rule = from.exchangeRateRule;
-    let direction: "base_to_quote" | "quote_to_base";
-    if (rule.baseCurrencyId === from.currencyId && rule.quoteCurrencyId === to.currencyId) {
-      direction = "base_to_quote";
-    } else if (rule.quoteCurrencyId === from.currencyId && rule.baseCurrencyId === to.currencyId) {
-      direction = "quote_to_base";
-    } else {
-      return {
-        success: false,
-        error: `La regla "${rule.name}" no convierte ${from.currency.code} → ${to.currency.code}`,
-      };
-    }
-
-    // El rango se evalúa en moneda BASE de la regla
-    const amountInBase =
-      direction === "base_to_quote" ? input.amount : input.amount; // si es quote→base, el amount sigue siendo el del lado origen
-    const resolved = await resolveRate(db, rule.ruleId, amountInBase);
+    const resolved = await resolveTransferRate(db, {
+      fromAccountId: from.accountId,
+      fromCurrencyId: from.currencyId,
+      toCurrencyId: to.currencyId,
+      amount: input.amount,
+    });
     const amountTo =
-      direction === "base_to_quote"
+      resolved.direction === "base_to_quote"
         ? input.amount * resolved.rate
         : input.amount / resolved.rate;
 
@@ -91,7 +138,7 @@ export async function previewTransferRate(input: {
         rangeMin: resolved.minAmount,
         rangeMax: resolved.maxAmount,
         amountTo,
-        direction,
+        direction: resolved.direction,
         quoteCurrencyCode: to.currency.code,
       },
     };
@@ -121,10 +168,7 @@ export async function createTransfer(
     const result = await db.$transaction(async (tx) => {
       const from = await tx.account.findUniqueOrThrow({
         where: { accountId: data.fromAccountId },
-        include: {
-          exchangeRateRule: true,
-          currency: true,
-        },
+        include: { currency: true },
       });
       const to = await tx.account.findUniqueOrThrow({
         where: { accountId: data.toAccountId },
@@ -132,21 +176,16 @@ export async function createTransfer(
       });
       if (!from.active) throw new Error("La cuenta origen está inactiva");
       if (!to.active) throw new Error("La cuenta destino está inactiva");
-      if (!from.exchangeRateRule) throw new Error("La cuenta origen no tiene regla de tasa");
 
-      const rule = from.exchangeRateRule;
-      let direction: "base_to_quote" | "quote_to_base";
-      if (rule.baseCurrencyId === from.currencyId && rule.quoteCurrencyId === to.currencyId) {
-        direction = "base_to_quote";
-      } else if (rule.quoteCurrencyId === from.currencyId && rule.baseCurrencyId === to.currencyId) {
-        direction = "quote_to_base";
-      } else {
-        throw new Error(
-          `La regla "${rule.name}" no convierte ${from.currency.code} → ${to.currency.code}`
-        );
-      }
-
-      const rate = data.rateOverride ?? (await resolveRate(tx, rule.ruleId, data.amount)).rate;
+      const resolved = await resolveTransferRate(tx, {
+        fromAccountId: from.accountId,
+        fromCurrencyId: from.currencyId,
+        toCurrencyId: to.currencyId,
+        amount: data.amount,
+      });
+      const ruleId = resolved.ruleId;
+      const direction = resolved.direction;
+      const rate = data.rateOverride ?? resolved.rate;
       const amountTo =
         direction === "base_to_quote" ? data.amount * rate : data.amount / rate;
 
@@ -173,7 +212,7 @@ export async function createTransfer(
           description: data.description?.trim() || description,
           reference,
           balanceAfter: outBalance,
-          exchangeRateRuleId: rule.ruleId,
+          exchangeRateRuleId: ruleId,
           rateApplied: rate,
           counterAmount: amountTo,
           counterCurrencyId: to.currencyId,
@@ -193,7 +232,7 @@ export async function createTransfer(
           description: data.description?.trim() || description,
           reference,
           balanceAfter: inBalance,
-          exchangeRateRuleId: rule.ruleId,
+          exchangeRateRuleId: ruleId,
           rateApplied: rate,
           counterAmount: data.amount,
           counterCurrencyId: from.currencyId,

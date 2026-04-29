@@ -5,7 +5,6 @@ import type {
   AccountGroup,
   Account,
   ExchangeRateRule,
-  ExchangeRateRange,
   Operation,
   OperationType,
   OperationStatus,
@@ -45,22 +44,20 @@ export type AccountRow = Pick<
   currencyCode: string;
   currencySymbol: string;
   currencyDecimals: number;
-  ruleId: number | null;
-  ruleName: string | null;
+  rulesCount: number;
+  ruleNames: string[];
 };
 
 export type ExchangeRateRuleRow = Pick<
   ExchangeRateRule,
-  "ruleId" | "name" | "kind" | "baseCurrencyId" | "quoteCurrencyId" | "active"
+  "ruleId" | "name" | "baseCurrencyId" | "quoteCurrencyId" | "active"
 > & {
   baseCurrencyCode: string;
   quoteCurrencyCode: string;
-  ranges: Array<{
-    rangeId: number;
-    minAmount: number;
-    maxAmount: number | null;
-    rate: number;
-  }>;
+  minAmount: number;
+  maxAmount: number | null;
+  rate: number;
+  accountsCount: number;
 };
 
 export type OperationRow = Pick<
@@ -99,9 +96,7 @@ export type {
   AccountGroup,
   Account,
   ExchangeRateRule,
-  ExchangeRateRange,
   Operation,
   OperationType,
   OperationStatus,
 };
-export type { RateKind } from "@/generated/prisma";

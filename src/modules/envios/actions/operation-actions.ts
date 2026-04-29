@@ -13,7 +13,10 @@ import {
   type DepositWithConversionInput,
   type BatchRowInput,
 } from "../lib/schemas";
-import { resolveRate, RateNotConfiguredError } from "../lib/exchange-rate";
+import {
+  resolveAccountConversion,
+  RateNotConfiguredError,
+} from "../lib/exchange-rate";
 
 const revalidateAll = () => {
   revalidatePath("/envios/operaciones");
@@ -189,7 +192,6 @@ export async function createOperationsBatch(
         const data = rows[i];
         const account = await tx.account.findUnique({
           where: { accountId: data.accountId },
-          include: { exchangeRateRule: true },
         });
         if (!account) throw new Error(`Fila ${i + 1}: cuenta no encontrada`);
         if (!account.active) throw new Error(`Fila ${i + 1}: la cuenta está inactiva`);
@@ -236,32 +238,30 @@ export async function createOperationsBatch(
           if (data.externalCurrencyId === account.currencyId) {
             throw new Error(`Fila ${i + 1}: la moneda externa debe ser distinta a la moneda de la cuenta`);
           }
-          if (!account.exchangeRateRule) {
-            throw new Error(`Fila ${i + 1}: la cuenta no tiene regla de tasa asignada`);
-          }
-          const rule = account.exchangeRateRule;
-          let direction: "base_to_quote" | "quote_to_base";
-          if (
-            rule.baseCurrencyId === data.externalCurrencyId &&
-            rule.quoteCurrencyId === account.currencyId
-          ) {
-            direction = "base_to_quote";
-          } else if (
-            rule.quoteCurrencyId === data.externalCurrencyId &&
-            rule.baseCurrencyId === account.currencyId
-          ) {
-            direction = "quote_to_base";
-          } else {
-            throw new Error(`Fila ${i + 1}: la regla "${rule.name}" no convierte entre estas monedas`);
-          }
 
-          const rate =
-            data.rateOverride ??
-            (await resolveRate(tx, rule.ruleId, data.externalAmount)).rate;
-          const amountInAccountCurrency =
-            direction === "base_to_quote"
-              ? data.externalAmount * rate
-              : data.externalAmount / rate;
+          let rate: number;
+          let ruleId: number;
+          let amountInAccountCurrency: number;
+
+          try {
+            const resolved = await resolveAccountConversion(tx, {
+              accountId: data.accountId,
+              accountCurrencyId: account.currencyId,
+              externalCurrencyId: data.externalCurrencyId,
+              externalAmount: data.externalAmount,
+            });
+            ruleId = resolved.ruleId;
+            rate = data.rateOverride ?? resolved.rate;
+            amountInAccountCurrency =
+              resolved.direction === "base_to_quote"
+                ? data.externalAmount * rate
+                : data.externalAmount / rate;
+          } catch (e) {
+            if (e instanceof RateNotConfiguredError) {
+              throw new Error(`Fila ${i + 1}: ${e.message}`);
+            }
+            throw e;
+          }
 
           let balanceAfter: number;
           if (status === "confirmed") {
@@ -286,7 +286,7 @@ export async function createOperationsBatch(
               description: data.description?.trim() || null,
               reference: data.reference?.trim() || null,
               balanceAfter,
-              exchangeRateRuleId: rule.ruleId,
+              exchangeRateRuleId: ruleId,
               rateApplied: rate,
               counterAmount: data.externalAmount,
               counterCurrencyId: data.externalCurrencyId,
@@ -350,42 +350,27 @@ export async function previewDepositConversion(input: {
     }
     const account = await db.account.findUnique({
       where: { accountId: input.accountId },
-      include: {
-        currency: true,
-        exchangeRateRule: { include: { baseCurrency: true, quoteCurrency: true } },
-      },
+      include: { currency: true },
     });
     if (!account) return { success: false, error: "Cuenta no encontrada" };
-    if (!account.exchangeRateRule) {
-      return { success: false, error: "La cuenta no tiene regla de tasa asignada" };
-    }
     if (input.externalCurrencyId === account.currencyId) {
       return {
         success: false,
         error: "La moneda externa debe ser distinta a la moneda de la cuenta",
       };
     }
-    const rule = account.exchangeRateRule;
-    let direction: "base_to_quote" | "quote_to_base";
-    let externalCurrencyCode: string;
-    if (rule.baseCurrencyId === input.externalCurrencyId && rule.quoteCurrencyId === account.currencyId) {
-      direction = "base_to_quote";
-      externalCurrencyCode = rule.baseCurrency.code;
-    } else if (rule.quoteCurrencyId === input.externalCurrencyId && rule.baseCurrencyId === account.currencyId) {
-      direction = "quote_to_base";
-      externalCurrencyCode = rule.quoteCurrency.code;
-    } else {
-      return {
-        success: false,
-        error: `La regla "${rule.name}" no convierte entre estas monedas`,
-      };
-    }
 
-    const resolved = await resolveRate(db, rule.ruleId, input.externalAmount);
-    const amountInAccountCurrency =
-      direction === "base_to_quote"
-        ? input.externalAmount * resolved.rate
-        : input.externalAmount / resolved.rate;
+    const resolved = await resolveAccountConversion(db, {
+      accountId: input.accountId,
+      accountCurrencyId: account.currencyId,
+      externalCurrencyId: input.externalCurrencyId,
+      externalAmount: input.externalAmount,
+    });
+
+    const externalCurrencyCode =
+      resolved.direction === "base_to_quote"
+        ? resolved.baseCurrencyCode
+        : resolved.quoteCurrencyCode;
 
     return {
       success: true,
@@ -393,12 +378,12 @@ export async function previewDepositConversion(input: {
         rate: resolved.rate,
         rangeMin: resolved.minAmount,
         rangeMax: resolved.maxAmount,
-        amountInAccountCurrency,
-        direction,
+        amountInAccountCurrency: resolved.amountInAccountCurrency,
+        direction: resolved.direction,
         accountCurrencyCode: account.currency.code,
         externalCurrencyCode,
-        ruleId: rule.ruleId,
-        ruleName: rule.name,
+        ruleId: resolved.ruleId,
+        ruleName: resolved.ruleName,
       },
     };
   } catch (error) {
@@ -432,37 +417,22 @@ export async function createDepositWithConversion(
     const result = await db.$transaction(async (tx) => {
       const account = await tx.account.findUniqueOrThrow({
         where: { accountId: data.accountId },
-        include: { exchangeRateRule: true, currency: true },
+        include: { currency: true },
       });
       if (!account.active) throw new Error("La cuenta está inactiva");
       if (data.externalCurrencyId === account.currencyId) {
         throw new Error("Para depósitos en la misma moneda usa una operación normal");
       }
-      if (!account.exchangeRateRule) {
-        throw new Error("La cuenta no tiene regla de tasa asignada");
-      }
 
-      const rule = account.exchangeRateRule;
-      let direction: "base_to_quote" | "quote_to_base";
-      if (
-        rule.baseCurrencyId === data.externalCurrencyId &&
-        rule.quoteCurrencyId === account.currencyId
-      ) {
-        direction = "base_to_quote";
-      } else if (
-        rule.quoteCurrencyId === data.externalCurrencyId &&
-        rule.baseCurrencyId === account.currencyId
-      ) {
-        direction = "quote_to_base";
-      } else {
-        throw new Error(
-          `La regla "${rule.name}" no convierte entre estas monedas`
-        );
-      }
-
-      const rate =
-        data.rateOverride ??
-        (await resolveRate(tx, rule.ruleId, data.externalAmount)).rate;
+      const resolved = await resolveAccountConversion(tx, {
+        accountId: account.accountId,
+        accountCurrencyId: account.currencyId,
+        externalCurrencyId: data.externalCurrencyId,
+        externalAmount: data.externalAmount,
+      });
+      const ruleId = resolved.ruleId;
+      const direction = resolved.direction;
+      const rate = data.rateOverride ?? resolved.rate;
       const amountInAccountCurrency =
         direction === "base_to_quote"
           ? data.externalAmount * rate
@@ -486,7 +456,7 @@ export async function createDepositWithConversion(
           description: data.description?.trim() || null,
           reference: data.reference?.trim() || null,
           balanceAfter,
-          exchangeRateRuleId: rule.ruleId,
+          exchangeRateRuleId: ruleId,
           rateApplied: rate,
           counterAmount: data.externalAmount,
           counterCurrencyId: data.externalCurrencyId,
@@ -508,7 +478,7 @@ export async function createDepositWithConversion(
           rate,
           amountInAccountCurrency,
           direction,
-          ruleId: rule.ruleId,
+          ruleId,
           status,
           variant: "deposit_with_conversion",
         },

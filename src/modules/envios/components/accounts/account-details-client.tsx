@@ -27,12 +27,13 @@ import { OpStatusPill } from "../shared/op-status-pill";
 import { RateChip } from "../shared/rate-chip";
 import { DepositWithConversionForm } from "../operations/deposit-with-conversion-form";
 import { OperationsBatchForm } from "../operations/operations-batch-form";
+import { RateCoverageBar } from "../exchange-rates/rate-coverage-bar";
 import {
   AccountRuleMenuItems,
   AccountRuleDialogs,
-  removeRuleFromAccount,
+  type RuleActionMode,
   type RuleActionState,
-  type RuleWithRanges,
+  type RuleSummary,
 } from "./account-rule-actions";
 import type { AccountDetail } from "../../queries/account-queries";
 import type { AccountRow, OperationRow } from "../../lib/types";
@@ -43,7 +44,7 @@ type CurrencyOption = { currencyId: number; code: string; symbol: string };
 interface Props {
   account: AccountDetail;
   operations: OperationRow[];
-  rules: RuleWithRanges[];
+  rules: RuleSummary[];
   currencies: CurrencyOption[];
 }
 
@@ -61,6 +62,11 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
   const [depositOpen, setDepositOpen] = useState(false);
   const [batchOpen, setBatchOpen] = useState(false);
 
+  const accountRulesList: RuleSummary[] = useMemo(
+    () => account.rules.map((r) => ({ ...r })),
+    [account.rules],
+  );
+
   const formAccount: OperationFormAccount = useMemo(
     () => ({
       accountId: account.accountId,
@@ -74,32 +80,14 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
       currencyCode: account.currencyCode,
       currencySymbol: account.currencySymbol,
       currencyDecimals: account.currencyDecimals,
-      rule: account.rule
-        ? {
-            ruleId: account.rule.ruleId,
-            baseCurrencyId: account.rule.baseCurrencyId,
-            quoteCurrencyId: account.rule.quoteCurrencyId,
-            baseCurrencyCode: account.rule.baseCurrencyCode,
-            quoteCurrencyCode: account.rule.quoteCurrencyCode,
-          }
-        : null,
+      rules: accountRulesList,
     }),
-    [account]
+    [account, accountRulesList],
   );
 
-  const accountRules = useMemo(
-    () => ({
-      [account.accountId]: account.rule
-        ? {
-            ruleId: account.rule.ruleId,
-            baseCurrencyId: account.rule.baseCurrencyId,
-            quoteCurrencyId: account.rule.quoteCurrencyId,
-            baseCurrencyCode: account.rule.baseCurrencyCode,
-            quoteCurrencyCode: account.rule.quoteCurrencyCode,
-          }
-        : null,
-    }),
-    [account]
+  const assignedByAccount = useMemo(
+    () => ({ [account.accountId]: accountRulesList }),
+    [account.accountId, accountRulesList],
   );
 
   const accountRow: AccountRow = useMemo(
@@ -118,17 +106,13 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
       currencyCode: account.currencyCode,
       currencySymbol: account.currencySymbol,
       currencyDecimals: account.currencyDecimals,
-      ruleId: account.rule?.ruleId ?? null,
-      ruleName: account.rule?.name ?? null,
+      rulesCount: accountRulesList.length,
+      ruleNames: accountRulesList.map((r) => r.name),
     }),
-    [account]
+    [account, accountRulesList],
   );
 
-  const handleRuleAction = (mode: "assign" | "create" | "edit" | "remove") => {
-    if (mode === "remove") {
-      void removeRuleFromAccount(account.accountId).then((ok) => { if (ok) router.refresh(); });
-      return;
-    }
+  const handleRuleAction = (mode: RuleActionMode) => {
     setRuleAction({ account: accountRow, mode });
   };
 
@@ -235,8 +219,12 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
             variant="brand"
             size="sm"
             onClick={() => setDepositOpen(true)}
-            disabled={!account.rule}
-            title={account.rule ? undefined : "Asigna una regla a la cuenta para habilitar el depósito con conversión"}
+            disabled={accountRulesList.length === 0}
+            title={
+              accountRulesList.length === 0
+                ? "Asigna al menos una regla a la cuenta para habilitar el depósito con conversión"
+                : undefined
+            }
           >
             <ArrowDownLeft className="h-4 w-4" /> Depósito con conversión
           </Button>
@@ -296,75 +284,95 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
-              <AccountRuleMenuItems
-                account={accountRow}
-                rules={rules}
-                onAction={handleRuleAction}
-              />
+              <AccountRuleMenuItems account={accountRow} onAction={handleRuleAction} />
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
 
-        {account.rule ? (
+        {accountRulesList.length === 0 ? (
+          <EmptyState
+            title="Sin reglas asignadas"
+            description="Asigna o crea reglas para habilitar conversiones automáticas en transferencias y depósitos."
+          />
+        ) : (
           (() => {
-            const rule = account.rule;
+            const groups = new Map<
+              string,
+              {
+                baseCurrencyId: number;
+                quoteCurrencyId: number;
+                baseCurrencyCode: string;
+                quoteCurrencyCode: string;
+                rules: typeof accountRulesList;
+              }
+            >();
+            for (const r of accountRulesList) {
+              const key = `${r.baseCurrencyId}-${r.quoteCurrencyId}`;
+              const prev = groups.get(key);
+              if (prev) prev.rules.push(r);
+              else
+                groups.set(key, {
+                  baseCurrencyId: r.baseCurrencyId,
+                  quoteCurrencyId: r.quoteCurrencyId,
+                  baseCurrencyCode: r.baseCurrencyCode,
+                  quoteCurrencyCode: r.quoteCurrencyCode,
+                  rules: [r],
+                });
+            }
             return (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold">{rule.name}</span>
-                  <Badge variant="outline" className="text-[10px] gap-1">
-                    {rule.kind === "fixed" ? (
-                      <><Pin className="h-3 w-3" /> Fija</>
-                    ) : (
-                      <><BarChart3 className="h-3 w-3" /> Por rangos</>
-                    )}
-                  </Badge>
-                  <div className="flex items-center gap-1 text-sm">
-                    <CurrencyChip code={rule.baseCurrencyCode} size="sm" />
-                    <ArrowRightLeft className="h-3.5 w-3.5 text-muted-foreground" />
-                    <CurrencyChip code={rule.quoteCurrencyCode} size="sm" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  {rule.kind === "fixed" ? (
-                    <div className="flex items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-2 ring-1 ring-inset ring-[var(--ops-active)]/20">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                        <Pin className="h-3.5 w-3.5" /> Cualquier monto
-                      </span>
-                      <span className="font-mono tabular-nums text-base font-semibold">
-                        {rule.ranges[0]?.rate.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
-                        <span className="ml-1 text-[10px] text-muted-foreground">
-                          {rule.quoteCurrencyCode}/{rule.baseCurrencyCode}
-                        </span>
-                      </span>
+              <div className="space-y-4">
+                {[...groups.values()].map((group) => (
+                  <div
+                    key={`${group.baseCurrencyId}-${group.quoteCurrencyId}`}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CurrencyChip code={group.baseCurrencyCode} size="sm" />
+                      <ArrowRightLeft className="h-3.5 w-3.5 text-muted-foreground" />
+                      <CurrencyChip code={group.quoteCurrencyCode} size="sm" />
+                      <Badge variant="outline" className="text-[10px]">
+                        {group.rules.length} {group.rules.length === 1 ? "regla" : "reglas"}
+                      </Badge>
                     </div>
-                  ) : (
-                    rule.ranges.map((rg, idx) => (
-                      <div
-                        key={rg.rangeId}
-                        className={`flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5 border-l-4 ${RANGE_COLORS[idx % RANGE_COLORS.length]}`}
-                      >
-                        <span className="font-mono tabular-nums text-xs text-muted-foreground">
-                          {rg.minAmount.toLocaleString("es-MX")} – {rg.maxAmount === null ? "∞" : rg.maxAmount.toLocaleString("es-MX")}
-                        </span>
-                        <span className="font-mono tabular-nums text-sm font-semibold">
-                          {rg.rate.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
-                          <span className="ml-1 text-[10px] text-muted-foreground">
-                            {rule.quoteCurrencyCode}/{rule.baseCurrencyCode}
-                          </span>
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
+                    <RateCoverageBar
+                      rules={group.rules.map((r) => ({
+                        ruleId: r.ruleId,
+                        name: r.name,
+                        minAmount: r.minAmount,
+                        maxAmount: r.maxAmount,
+                        rate: r.rate,
+                      }))}
+                      baseCurrencyCode={group.baseCurrencyCode}
+                      quoteCurrencyCode={group.quoteCurrencyCode}
+                    />
+                    <div className="space-y-1.5">
+                      {[...group.rules]
+                        .sort((a, b) => a.minAmount - b.minAmount)
+                        .map((rg, idx) => (
+                          <div
+                            key={rg.ruleId}
+                            className={`flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5 border-l-4 ${RANGE_COLORS[idx % RANGE_COLORS.length]}`}
+                          >
+                            <div className="min-w-0">
+                              <div className="text-xs font-medium truncate">{rg.name}</div>
+                              <div className="text-[10px] font-mono tabular-nums text-muted-foreground">
+                                [{rg.minAmount.toLocaleString("es-MX")} – {rg.maxAmount === null ? "∞" : rg.maxAmount.toLocaleString("es-MX")})
+                              </div>
+                            </div>
+                            <span className="font-mono tabular-nums text-sm font-semibold whitespace-nowrap">
+                              {rg.rate.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                              <span className="ml-1 text-[10px] text-muted-foreground">
+                                {group.quoteCurrencyCode}/{group.baseCurrencyCode}
+                              </span>
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             );
           })()
-        ) : (
-          <EmptyState
-            title="Sin regla asignada"
-            description="Asigna una regla existente o crea una nueva para habilitar conversiones automáticas en transferencias y depósitos."
-          />
         )}
       </section>
 
@@ -442,6 +450,7 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
         state={ruleAction}
         onClose={() => setRuleAction(null)}
         rules={rules}
+        assignedByAccount={assignedByAccount}
         currencies={currencies}
       />
 
@@ -449,7 +458,6 @@ export function AccountDetailsClient({ account, operations, rules, currencies }:
         open={depositOpen}
         onOpenChange={setDepositOpen}
         accounts={[formAccount]}
-        accountRules={accountRules}
         currencies={currencies}
         presetAccountId={account.accountId}
       />

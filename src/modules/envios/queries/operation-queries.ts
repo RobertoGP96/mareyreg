@@ -91,11 +91,22 @@ export async function getOperationFormData() {
       currencyId: true,
       group: { select: { code: true, name: true } },
       currency: { select: { code: true, symbol: true, decimalPlaces: true } },
-      exchangeRateRule: {
-        select: {
-          ruleId: true, baseCurrencyId: true, quoteCurrencyId: true,
-          baseCurrency: { select: { code: true } },
-          quoteCurrency: { select: { code: true } },
+      rateRules: {
+        where: { rule: { active: true } },
+        include: {
+          rule: {
+            select: {
+              ruleId: true,
+              name: true,
+              baseCurrencyId: true,
+              quoteCurrencyId: true,
+              minAmount: true,
+              maxAmount: true,
+              rate: true,
+              baseCurrency: { select: { code: true } },
+              quoteCurrency: { select: { code: true } },
+            },
+          },
         },
       },
     },
@@ -113,15 +124,17 @@ export async function getOperationFormData() {
     currencyCode: a.currency.code,
     currencySymbol: a.currency.symbol,
     currencyDecimals: a.currency.decimalPlaces,
-    rule: a.exchangeRateRule
-      ? {
-          ruleId: a.exchangeRateRule.ruleId,
-          baseCurrencyId: a.exchangeRateRule.baseCurrencyId,
-          quoteCurrencyId: a.exchangeRateRule.quoteCurrencyId,
-          baseCurrencyCode: a.exchangeRateRule.baseCurrency.code,
-          quoteCurrencyCode: a.exchangeRateRule.quoteCurrency.code,
-        }
-      : null,
+    rules: a.rateRules.map((l) => ({
+      ruleId: l.rule.ruleId,
+      name: l.rule.name,
+      baseCurrencyId: l.rule.baseCurrencyId,
+      quoteCurrencyId: l.rule.quoteCurrencyId,
+      baseCurrencyCode: l.rule.baseCurrency.code,
+      quoteCurrencyCode: l.rule.quoteCurrency.code,
+      minAmount: Number(l.rule.minAmount),
+      maxAmount: l.rule.maxAmount === null ? null : Number(l.rule.maxAmount),
+      rate: Number(l.rule.rate),
+    })),
   }));
 }
 

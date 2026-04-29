@@ -7,27 +7,32 @@ export async function getAccounts(): Promise<AccountRow[]> {
     include: {
       group: { select: { name: true, code: true } },
       currency: { select: { code: true, symbol: true, decimalPlaces: true } },
-      exchangeRateRule: { select: { ruleId: true, name: true } },
+      rateRules: {
+        include: { rule: { select: { ruleId: true, name: true, active: true } } },
+      },
     },
   });
-  return rows.map((a) => ({
-    accountId: a.accountId,
-    groupId: a.groupId,
-    userId: a.userId,
-    currencyId: a.currencyId,
-    accountNumber: a.accountNumber,
-    name: a.name,
-    active: a.active,
-    allowNegativeBalance: a.allowNegativeBalance,
-    balance: Number(a.balance),
-    groupName: a.group.name,
-    groupCode: a.group.code,
-    currencyCode: a.currency.code,
-    currencySymbol: a.currency.symbol,
-    currencyDecimals: a.currency.decimalPlaces,
-    ruleId: a.exchangeRateRule?.ruleId ?? null,
-    ruleName: a.exchangeRateRule?.name ?? null,
-  }));
+  return rows.map((a) => {
+    const activeRules = a.rateRules.filter((l) => l.rule.active);
+    return {
+      accountId: a.accountId,
+      groupId: a.groupId,
+      userId: a.userId,
+      currencyId: a.currencyId,
+      accountNumber: a.accountNumber,
+      name: a.name,
+      active: a.active,
+      allowNegativeBalance: a.allowNegativeBalance,
+      balance: Number(a.balance),
+      groupName: a.group.name,
+      groupCode: a.group.code,
+      currencyCode: a.currency.code,
+      currencySymbol: a.currency.symbol,
+      currencyDecimals: a.currency.decimalPlaces,
+      rulesCount: activeRules.length,
+      ruleNames: activeRules.map((l) => l.rule.name),
+    };
+  });
 }
 
 export async function getAccountById(id: number) {
@@ -36,7 +41,16 @@ export async function getAccountById(id: number) {
     include: {
       group: true,
       currency: true,
-      exchangeRateRule: { include: { ranges: { orderBy: { minAmount: "asc" } } } },
+      rateRules: {
+        include: {
+          rule: {
+            include: {
+              baseCurrency: { select: { code: true } },
+              quoteCurrency: { select: { code: true } },
+            },
+          },
+        },
+      },
     },
   });
 }
@@ -47,11 +61,14 @@ export async function getAccountDetail(id: number) {
     include: {
       group: { select: { groupId: true, code: true, name: true } },
       currency: { select: { currencyId: true, code: true, symbol: true, decimalPlaces: true } },
-      exchangeRateRule: {
+      rateRules: {
         include: {
-          baseCurrency: { select: { code: true } },
-          quoteCurrency: { select: { code: true } },
-          ranges: { orderBy: { minAmount: "asc" } },
+          rule: {
+            include: {
+              baseCurrency: { select: { code: true } },
+              quoteCurrency: { select: { code: true } },
+            },
+          },
         },
       },
     },
@@ -81,6 +98,22 @@ export async function getAccountDetail(id: number) {
     db.operation.count({ where: { accountId: id, status: "pending" } }),
   ]);
 
+  const rules = account.rateRules
+    .map((l) => l.rule)
+    .sort((a, b) => Number(a.minAmount) - Number(b.minAmount))
+    .map((rule) => ({
+      ruleId: rule.ruleId,
+      name: rule.name,
+      active: rule.active,
+      baseCurrencyId: rule.baseCurrencyId,
+      quoteCurrencyId: rule.quoteCurrencyId,
+      baseCurrencyCode: rule.baseCurrency.code,
+      quoteCurrencyCode: rule.quoteCurrency.code,
+      minAmount: Number(rule.minAmount),
+      maxAmount: rule.maxAmount === null ? null : Number(rule.maxAmount),
+      rate: Number(rule.rate),
+    }));
+
   return {
     accountId: account.accountId,
     groupId: account.groupId,
@@ -95,24 +128,7 @@ export async function getAccountDetail(id: number) {
     active: account.active,
     allowNegativeBalance: account.allowNegativeBalance,
     balance: Number(account.balance),
-    rule: account.exchangeRateRule
-      ? {
-          ruleId: account.exchangeRateRule.ruleId,
-          name: account.exchangeRateRule.name,
-          kind: account.exchangeRateRule.kind,
-          active: account.exchangeRateRule.active,
-          baseCurrencyId: account.exchangeRateRule.baseCurrencyId,
-          quoteCurrencyId: account.exchangeRateRule.quoteCurrencyId,
-          baseCurrencyCode: account.exchangeRateRule.baseCurrency.code,
-          quoteCurrencyCode: account.exchangeRateRule.quoteCurrency.code,
-          ranges: account.exchangeRateRule.ranges.map((rg) => ({
-            rangeId: rg.rangeId,
-            minAmount: Number(rg.minAmount),
-            maxAmount: rg.maxAmount === null ? null : Number(rg.maxAmount),
-            rate: Number(rg.rate),
-          })),
-        }
-      : null,
+    rules,
     kpis: {
       balance: Number(account.balance),
       inflows30d: Number(inflows._sum.amount ?? 0),
@@ -139,22 +155,23 @@ export async function getAccountFormData() {
     db.exchangeRateRule.findMany({
       where: { active: true },
       select: {
-        ruleId: true, name: true, kind: true, active: true,
-        baseCurrencyId: true, quoteCurrencyId: true,
+        ruleId: true,
+        name: true,
+        active: true,
+        baseCurrencyId: true,
+        quoteCurrencyId: true,
+        minAmount: true,
+        maxAmount: true,
+        rate: true,
         baseCurrency: { select: { code: true } },
         quoteCurrency: { select: { code: true } },
-        ranges: {
-          orderBy: { minAmount: "asc" },
-          select: { rangeId: true, minAmount: true, maxAmount: true, rate: true },
-        },
       },
-      orderBy: { name: "asc" },
+      orderBy: [{ baseCurrencyId: "asc" }, { quoteCurrencyId: "asc" }, { minAmount: "asc" }],
     }),
   ]);
   const rulesSerialized = rules.map((r) => ({
     ruleId: r.ruleId,
     name: r.name,
-    kind: r.kind,
     active: r.active,
     baseCurrencyId: r.baseCurrencyId,
     quoteCurrencyId: r.quoteCurrencyId,
@@ -162,12 +179,9 @@ export async function getAccountFormData() {
     quoteCurrency: r.quoteCurrency,
     baseCurrencyCode: r.baseCurrency.code,
     quoteCurrencyCode: r.quoteCurrency.code,
-    ranges: r.ranges.map((rg) => ({
-      rangeId: rg.rangeId,
-      minAmount: Number(rg.minAmount),
-      maxAmount: rg.maxAmount === null ? null : Number(rg.maxAmount),
-      rate: Number(rg.rate),
-    })),
+    minAmount: Number(r.minAmount),
+    maxAmount: r.maxAmount === null ? null : Number(r.maxAmount),
+    rate: Number(r.rate),
   }));
   return { groups, currencies, rules: rulesSerialized };
 }

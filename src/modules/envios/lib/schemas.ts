@@ -97,72 +97,37 @@ export const accountSchema = z.object({
     .max(40)
     .regex(/^[A-Z0-9_-]+$/, "Solo mayúsculas, números, _ y -"),
   name: z.string().trim().min(1, "Nombre requerido").max(120),
-  exchangeRateRuleId: z.coerce.number().int().positive().nullish(),
   openingBalance: z.coerce.number().nullish(),
   active: z.boolean().optional(),
   allowNegativeBalance: z.boolean().optional(),
 });
 export type AccountInput = z.infer<typeof accountSchema>;
 
-export const rateRangeSchema = z
+export const exchangeRateRuleSchema = z
   .object({
+    name: z.string().trim().min(1, "Nombre requerido").max(80),
+    baseCurrencyId: z.coerce.number().int().positive("Selecciona moneda base"),
+    quoteCurrencyId: z.coerce.number().int().positive("Selecciona moneda destino"),
     minAmount: z.coerce.number().min(0, "Mínimo no puede ser negativo"),
     maxAmount: z.coerce.number().nullish(),
     rate: z.coerce.number().positive("Tasa debe ser mayor a 0"),
+    active: z.boolean().optional(),
   })
-  .refine(
-    (r) => r.maxAmount == null || r.maxAmount > r.minAmount,
-    { message: "Máximo debe ser mayor que mínimo", path: ["maxAmount"] }
-  );
-
-export const exchangeRateRuleSchema = z.object({
-  name: z.string().trim().min(1, "Nombre requerido").max(80),
-  kind: z.enum(["fixed", "range"]).default("range"),
-  baseCurrencyId: z.coerce.number().int().positive("Selecciona moneda base"),
-  quoteCurrencyId: z.coerce.number().int().positive("Selecciona moneda destino"),
-  ranges: z.array(rateRangeSchema).min(1, "Al menos un rango").max(3, "Máximo 3 rangos por regla"),
-  active: z.boolean().optional(),
-}).refine((r) => r.baseCurrencyId !== r.quoteCurrencyId, {
-  message: "Base y destino deben ser distintas",
-  path: ["quoteCurrencyId"],
-}).superRefine((r, ctx) => {
-  // Tasa fija: un único rango cubriendo [0, ∞).
-  if (r.kind === "fixed") {
-    if (r.ranges.length !== 1) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Tasa fija debe tener exactamente una tasa",
-        path: ["ranges"],
-      });
-      return;
-    }
-    return;
-  }
-
-  // Por rangos: validar no-solape y monotonicidad.
-  const sorted = [...r.ranges].sort((a, b) => a.minAmount - b.minAmount);
-  for (let i = 0; i < sorted.length; i++) {
-    const cur = sorted[i];
-    const next = sorted[i + 1];
-    if (cur.maxAmount == null && next) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Solo el último rango puede tener máximo abierto (∞)",
-        path: ["ranges"],
-      });
-      return;
-    }
-    if (next && cur.maxAmount != null && next.minAmount < cur.maxAmount) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Rango ${i + 1} solapa con rango ${i + 2}`,
-        path: ["ranges"],
-      });
-      return;
-    }
-  }
-});
+  .refine((r) => r.baseCurrencyId !== r.quoteCurrencyId, {
+    message: "Base y destino deben ser distintas",
+    path: ["quoteCurrencyId"],
+  })
+  .refine((r) => r.maxAmount == null || r.maxAmount > r.minAmount, {
+    message: "Máximo debe ser mayor que mínimo",
+    path: ["maxAmount"],
+  });
 export type ExchangeRateRuleInput = z.infer<typeof exchangeRateRuleSchema>;
+
+export const assignAccountRulesSchema = z.object({
+  accountId: z.coerce.number().int().positive(),
+  ruleIds: z.array(z.coerce.number().int().positive()).default([]),
+});
+export type AssignAccountRulesInput = z.infer<typeof assignAccountRulesSchema>;
 
 export const accountGroupSchema = z.object({
   code: z

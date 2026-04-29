@@ -139,9 +139,8 @@ export function OperationsBatchForm({
     }
   }, [open, presetAccountId]);
 
-  // Autoseleccionar moneda destino para conversiones cuando la cuenta es la base.
-  // Si la cuenta ya es el destino (caso típico de "entradas de dinero"), no precargamos:
-  // el origen es variable y el usuario lo elige por fila.
+  // Autoseleccionar moneda externa para conversiones cuando la cuenta tiene
+  // exactamente un par de monedas alterno disponible en sus reglas.
   useEffect(() => {
     setRows((prev) => {
       let changed = false;
@@ -149,26 +148,41 @@ export function OperationsBatchForm({
         if (r.kind !== "conversion") return r;
         if (!r.accountId || r.externalCurrencyId) return r;
         const acc = accounts.find((a) => String(a.accountId) === r.accountId);
-        if (!acc?.rule) return r;
-        if (acc.rule.quoteCurrencyId === acc.currencyId) return r;
+        if (!acc || acc.rules.length === 0) return r;
+        const others = new Set<number>();
+        for (const rule of acc.rules) {
+          const other =
+            rule.baseCurrencyId === acc.currencyId
+              ? rule.quoteCurrencyId
+              : rule.quoteCurrencyId === acc.currencyId
+                ? rule.baseCurrencyId
+                : null;
+          if (other !== null) others.add(other);
+        }
+        if (others.size !== 1) return r;
+        const [only] = [...others];
         changed = true;
-        return { ...r, externalCurrencyId: String(acc.rule.quoteCurrencyId) };
+        return { ...r, externalCurrencyId: String(only) };
       });
       return changed ? next : prev;
     });
   }, [rows, accounts]);
 
-  // Helper para obtener dirección de conversión sin server
+  // Helper para obtener dirección de conversión sin server.
+  // Busca entre las reglas asignadas a la cuenta una que cubra el par
+  // (acc.currencyId, externalCurrencyId) en alguna dirección.
   const directionFor = (row: Row): Direction | null => {
     const acc = accounts.find((a) => String(a.accountId) === row.accountId);
-    if (!acc?.rule || !row.externalCurrencyId) return null;
+    if (!acc || acc.rules.length === 0 || !row.externalCurrencyId) return null;
     const ext = Number(row.externalCurrencyId);
-    if (acc.rule.baseCurrencyId === ext && acc.rule.quoteCurrencyId === acc.currencyId) {
-      return "base_to_quote";
-    }
-    if (acc.rule.quoteCurrencyId === ext && acc.rule.baseCurrencyId === acc.currencyId) {
-      return "quote_to_base";
-    }
+    const matchBQ = acc.rules.find(
+      (rule) => rule.baseCurrencyId === ext && rule.quoteCurrencyId === acc.currencyId,
+    );
+    if (matchBQ) return "base_to_quote";
+    const matchQB = acc.rules.find(
+      (rule) => rule.baseCurrencyId === acc.currencyId && rule.quoteCurrencyId === ext,
+    );
+    if (matchQB) return "quote_to_base";
     return null;
   };
 
@@ -467,14 +481,19 @@ export function OperationsBatchForm({
     }
   };
 
-  const counterCurrencyForAccount = (accountId: string): { currencyId: number; code: string } | null => {
+  const counterCurrencyForAccount = (
+    accountId: string,
+  ): { currencyId: number; code: string } | null => {
     const acc = accounts.find((a) => String(a.accountId) === accountId);
-    if (!acc?.rule) return null;
-    const counterId =
-      acc.rule.baseCurrencyId === acc.currencyId
-        ? acc.rule.quoteCurrencyId
-        : acc.rule.baseCurrencyId;
-    const c = currencies.find((c) => c.currencyId === counterId);
+    if (!acc || acc.rules.length === 0) return null;
+    const others = new Set<number>();
+    for (const rule of acc.rules) {
+      if (rule.baseCurrencyId === acc.currencyId) others.add(rule.quoteCurrencyId);
+      else if (rule.quoteCurrencyId === acc.currencyId) others.add(rule.baseCurrencyId);
+    }
+    if (others.size !== 1) return null;
+    const [only] = [...others];
+    const c = currencies.find((c) => c.currencyId === only);
     return c ? { currencyId: c.currencyId, code: c.code } : null;
   };
 

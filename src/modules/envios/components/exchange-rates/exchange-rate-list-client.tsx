@@ -67,7 +67,7 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
   }, [initialRules, search]);
 
   const totalActive = initialRules.filter((r) => r.active).length;
-  const totalRanges = initialRules.reduce((acc, r) => acc + r.ranges.length, 0);
+  const openRules = initialRules.filter((r) => r.maxAmount === null).length;
 
   const closeDialog = () => {
     setIsCreateOpen(false);
@@ -125,13 +125,8 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
         <MetricTile label="Reglas activas" value={totalActive} icon={LineChart} tone="active" />
-        <MetricTile label="Rangos totales" value={totalRanges} icon={Calculator} tone="track" />
-        <MetricTile
-          label="Sin rangos"
-          value={initialRules.filter((r) => !r.ranges.length).length}
-          icon={Calculator}
-          tone="warning"
-        />
+        <MetricTile label="Reglas totales" value={initialRules.length} icon={Calculator} tone="track" />
+        <MetricTile label="Cubren hasta ∞" value={openRules} icon={Calculator} tone="success" />
       </div>
 
       <div className="space-y-2">
@@ -170,11 +165,8 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
                       <span className="font-headline text-base font-semibold truncate">{r.name}</span>
                       <StatusPill status={r.active ? "active" : "inactive"} size="sm" />
                       <Badge variant="outline" className="text-[10px] gap-1">
-                        {r.kind === "fixed" ? (
-                          <><Pin className="h-3 w-3" /> Fija</>
-                        ) : (
-                          <><BarChart3 className="h-3 w-3" /> Por rangos</>
-                        )}
+                        <Pin className="h-3 w-3" />
+                        {r.accountsCount} {r.accountsCount === 1 ? "cuenta" : "cuentas"}
                       </Badge>
                     </div>
                     <div className="flex items-center gap-1.5 text-sm">
@@ -205,36 +197,14 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-                <div className="space-y-1.5">
-                  {r.ranges.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Sin rangos configurados.</p>
-                  ) : r.kind === "fixed" ? (
-                    <div className="flex items-center justify-between gap-3 rounded-md bg-muted/40 px-3 py-2 ring-1 ring-inset ring-[var(--ops-active)]/20">
-                      <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                        <Pin className="h-3.5 w-3.5" />
-                        Cualquier monto
-                      </span>
-                      <span className="font-mono tabular-nums text-base font-semibold">
-                        {r.ranges[0].rate.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
-                        <span className="ml-1 text-[10px] text-muted-foreground">{r.quoteCurrencyCode}/{r.baseCurrencyCode}</span>
-                      </span>
-                    </div>
-                  ) : (
-                    r.ranges.map((rg, idx) => (
-                      <div
-                        key={rg.rangeId}
-                        className={`flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5 border-l-4 ${RANGE_COLORS[idx % RANGE_COLORS.length]}`}
-                      >
-                        <span className="font-mono tabular-nums text-xs text-muted-foreground">
-                          {rg.minAmount.toLocaleString("es-MX")} – {rg.maxAmount === null ? "∞" : rg.maxAmount.toLocaleString("es-MX")}
-                        </span>
-                        <span className="font-mono tabular-nums text-sm font-semibold">
-                          {rg.rate.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
-                          <span className="ml-1 text-[10px] text-muted-foreground">{r.quoteCurrencyCode}/{r.baseCurrencyCode}</span>
-                        </span>
-                      </div>
-                    ))
-                  )}
+                <div className={`flex items-center justify-between gap-3 rounded-md bg-muted/30 px-2.5 py-1.5 border-l-4 ${RANGE_COLORS[r.ruleId % RANGE_COLORS.length]}`}>
+                  <span className="font-mono tabular-nums text-xs text-muted-foreground">
+                    [{r.minAmount.toLocaleString("es-MX")} – {r.maxAmount === null ? "∞" : r.maxAmount.toLocaleString("es-MX")})
+                  </span>
+                  <span className="font-mono tabular-nums text-sm font-semibold">
+                    {r.rate.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                    <span className="ml-1 text-[10px] text-muted-foreground">{r.quoteCurrencyCode}/{r.baseCurrencyCode}</span>
+                  </span>
                 </div>
               </div>
             ))}

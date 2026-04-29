@@ -24,20 +24,10 @@ import {
 import { CurrencyChip } from "../shared/currency-chip";
 import type { OperationFormAccount } from "../../queries/operation-queries";
 
-type RuleSummary = {
-  ruleId: number;
-  baseCurrencyId: number;
-  quoteCurrencyId: number;
-  baseCurrencyCode: string;
-  quoteCurrencyCode: string;
-};
-
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accounts: OperationFormAccount[];
-  /** Reglas activas para resolver la moneda contraparte de cada cuenta. */
-  accountRules: Record<number, RuleSummary | null>;
   currencies: Array<{ currencyId: number; code: string; symbol: string }>;
   /** Cuenta a preseleccionar (por ejemplo desde el detalle). */
   presetAccountId?: number;
@@ -62,7 +52,6 @@ export function DepositWithConversionForm({
   open,
   onOpenChange,
   accounts,
-  accountRules,
   currencies,
   presetAccountId,
 }: Props) {
@@ -78,27 +67,30 @@ export function DepositWithConversionForm({
   const [statusPending, setStatusPending] = useState(false);
   const [preview, setPreview] = useState<Preview>({ state: "idle" });
 
-  // Cuentas con regla asignada (única manera de hacer un depósito con conversión)
+  // Cuentas con al menos una regla asignada (requisito para depósito con conversión).
   const eligibleAccounts = useMemo(
-    () => accounts.filter((a) => accountRules[a.accountId]),
-    [accounts, accountRules]
+    () => accounts.filter((a) => a.rules.length > 0),
+    [accounts],
   );
 
   const account = useMemo(
     () => accounts.find((a) => String(a.accountId) === accountId) ?? null,
-    [accounts, accountId]
+    [accounts, accountId],
   );
-  const rule = account ? accountRules[account.accountId] ?? null : null;
 
-  // Moneda contraparte forzada por la regla
+  // Si todas las reglas asignadas a la cuenta apuntan a la misma moneda externa,
+  // autoseleccionarla. Si hay varias monedas externas, dejar que el usuario elija.
   const counterCurrency = useMemo(() => {
-    if (!account || !rule) return null;
-    const counterId =
-      rule.baseCurrencyId === account.currencyId
-        ? rule.quoteCurrencyId
-        : rule.baseCurrencyId;
-    return currencies.find((c) => c.currencyId === counterId) ?? null;
-  }, [account, rule, currencies]);
+    if (!account || account.rules.length === 0) return null;
+    const others = new Set<number>();
+    for (const r of account.rules) {
+      if (r.baseCurrencyId === account.currencyId) others.add(r.quoteCurrencyId);
+      else if (r.quoteCurrencyId === account.currencyId) others.add(r.baseCurrencyId);
+    }
+    if (others.size !== 1) return null;
+    const [only] = [...others];
+    return currencies.find((c) => c.currencyId === only) ?? null;
+  }, [account, currencies]);
 
   // Si la cuenta cambia, autosetear externalCurrency a la contraparte
   useEffect(() => {
@@ -218,12 +210,12 @@ export function DepositWithConversionForm({
               </SelectContent>
             </Select>
           </Field>
-          {account && !rule && (
+          {account && account.rules.length === 0 && (
             <p className="text-xs text-destructive">
-              Esta cuenta no tiene regla asignada. Asigna una desde la lista o el detalle.
+              Esta cuenta no tiene reglas asignadas. Asigna al menos una desde la lista o el detalle.
             </p>
           )}
-          {account && rule && counterCurrency && (
+          {account && account.rules.length > 0 && counterCurrency && (
             <div className="rounded-md bg-muted/30 px-3 py-2 ring-1 ring-inset ring-border text-xs space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Saldo</span>

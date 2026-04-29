@@ -53,22 +53,6 @@ export async function createAccount(
       };
     }
 
-    if (data.exchangeRateRuleId != null) {
-      const rule = await db.exchangeRateRule.findUnique({
-        where: { ruleId: data.exchangeRateRuleId },
-      });
-      if (!rule) return { success: false, error: "Regla de tasa no encontrada" };
-      if (
-        rule.baseCurrencyId !== data.currencyId &&
-        rule.quoteCurrencyId !== data.currencyId
-      ) {
-        return {
-          success: false,
-          error: "La regla debe involucrar la moneda de la cuenta (como base o destino).",
-        };
-      }
-    }
-
     const opening = data.openingBalance ?? 0;
     const allowNegative = data.allowNegativeBalance ?? false;
     if (opening < 0 && !allowNegative) {
@@ -89,7 +73,6 @@ export async function createAccount(
           name: data.name,
           balance: opening,
           version: 0,
-          exchangeRateRuleId: data.exchangeRateRuleId ?? null,
           active: data.active ?? true,
           allowNegativeBalance: allowNegative,
         },
@@ -133,7 +116,6 @@ export async function updateAccount(
   id: number,
   input: {
     name?: string;
-    exchangeRateRuleId?: number | null;
     accountNumber?: string;
     allowNegativeBalance?: boolean;
   }
@@ -156,19 +138,6 @@ export async function updateAccount(
         if (dup) throw new Error(`Ya existe la cuenta "${nextNumber}"`);
       }
 
-      if (input.exchangeRateRuleId != null) {
-        const rule = await tx.exchangeRateRule.findUnique({
-          where: { ruleId: input.exchangeRateRuleId },
-        });
-        if (!rule) throw new Error("Regla de tasa no encontrada");
-        if (
-          rule.baseCurrencyId !== prev.currencyId &&
-          rule.quoteCurrencyId !== prev.currencyId
-        ) {
-          throw new Error("La regla debe involucrar la moneda de la cuenta (como base o destino)");
-        }
-      }
-
       // No permitir desactivar el flag si la cuenta está actualmente en rojo:
       // dejaría el balance por debajo del CHECK al primer movimiento.
       if (
@@ -186,9 +155,6 @@ export async function updateAccount(
         data: {
           ...(input.name !== undefined && { name: input.name.trim() }),
           ...(input.accountNumber !== undefined && nextNumber && { accountNumber: nextNumber }),
-          ...(input.exchangeRateRuleId !== undefined && {
-            exchangeRateRuleId: input.exchangeRateRuleId ?? null,
-          }),
           ...(input.allowNegativeBalance !== undefined && {
             allowNegativeBalance: input.allowNegativeBalance,
           }),
@@ -245,55 +211,9 @@ export async function toggleAccountActive(
   }
 }
 
-export async function assignRuleToAccount(
-  accountId: number,
-  ruleId: number | null
-): Promise<ActionResult<void>> {
-  try {
-    const userId = await getCurrentUserId();
-    await db.$transaction(async (tx) => {
-      const acc = await tx.account.findUnique({ where: { accountId } });
-      if (!acc) throw new Error("Cuenta no encontrada");
-
-      if (ruleId !== null) {
-        const rule = await tx.exchangeRateRule.findUnique({ where: { ruleId } });
-        if (!rule) throw new Error("Regla no encontrada");
-        if (
-          rule.baseCurrencyId !== acc.currencyId &&
-          rule.quoteCurrencyId !== acc.currencyId
-        ) {
-          throw new Error(
-            "La regla debe involucrar la moneda de la cuenta (como base o destino)"
-          );
-        }
-      }
-
-      await tx.account.update({
-        where: { accountId },
-        data: { exchangeRateRuleId: ruleId },
-      });
-      await createAuditLog(tx, {
-        action: "update",
-        entityType: "Account",
-        entityId: accountId,
-        module: "envios",
-        userId,
-        oldValues: { exchangeRateRuleId: acc.exchangeRateRuleId },
-        newValues: { exchangeRateRuleId: ruleId },
-      });
-    });
-    revalidateAll();
-    return { success: true, data: undefined };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : "Error al asignar la regla";
-    console.error("assignRuleToAccount:", error);
-    return { success: false, error: msg };
-  }
-}
-
 export async function createRuleAndAssign(
   accountId: number,
-  ruleInput: ExchangeRateRuleInput
+  ruleInput: ExchangeRateRuleInput,
 ): Promise<ActionResult<{ ruleId: number }>> {
   try {
     const parsed = exchangeRateRuleSchema.safeParse(ruleInput);
@@ -311,7 +231,7 @@ export async function createRuleAndAssign(
         data.quoteCurrencyId !== acc.currencyId
       ) {
         throw new Error(
-          "La regla debe involucrar la moneda de la cuenta (como base o destino)"
+          "La regla debe involucrar la moneda de la cuenta (como base o destino)",
         );
       }
 
@@ -324,30 +244,20 @@ export async function createRuleAndAssign(
       });
       if (dup) throw new Error(`Ya existe una regla "${data.name}" con ese par.`);
 
-      const ranges = data.kind === "fixed"
-        ? [{ minAmount: 0, maxAmount: null as number | null, rate: data.ranges[0]?.rate ?? 0 }]
-        : data.ranges
-            .sort((a, b) => a.minAmount - b.minAmount)
-            .map((rg) => ({
-              minAmount: rg.minAmount,
-              maxAmount: rg.maxAmount ?? null,
-              rate: rg.rate,
-            }));
-
       const rule = await tx.exchangeRateRule.create({
         data: {
           name: data.name,
-          kind: data.kind,
           baseCurrencyId: data.baseCurrencyId,
           quoteCurrencyId: data.quoteCurrencyId,
+          minAmount: data.minAmount,
+          maxAmount: data.maxAmount ?? null,
+          rate: data.rate,
           active: data.active ?? true,
-          ranges: { createMany: { data: ranges } },
         },
       });
 
-      await tx.account.update({
-        where: { accountId },
-        data: { exchangeRateRuleId: rule.ruleId },
+      await tx.accountExchangeRateRule.create({
+        data: { accountId, ruleId: rule.ruleId },
       });
 
       await createAuditLog(tx, {
@@ -358,15 +268,6 @@ export async function createRuleAndAssign(
         userId,
         newValues: { ...data, assignedToAccountId: accountId },
       });
-      await createAuditLog(tx, {
-        action: "update",
-        entityType: "Account",
-        entityId: accountId,
-        module: "envios",
-        userId,
-        oldValues: { exchangeRateRuleId: acc.exchangeRateRuleId },
-        newValues: { exchangeRateRuleId: rule.ruleId },
-      });
 
       return { ruleId: rule.ruleId };
     });
@@ -374,7 +275,11 @@ export async function createRuleAndAssign(
     revalidateAll();
     return { success: true, data: result };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Error al crear y asignar la regla";
+    const msg = error instanceof Error
+      ? error.message.includes("err_account_rates_overlap")
+        ? "La nueva regla se solapa con otras reglas asignadas a la cuenta"
+        : error.message
+      : "Error al crear y asignar la regla";
     console.error("createRuleAndAssign:", error);
     return { success: false, error: msg };
   }

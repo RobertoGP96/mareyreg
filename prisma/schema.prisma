@@ -1147,11 +1147,6 @@ enum OperationStatus {
   cancelled
 }
 
-enum RateKind {
-  fixed
-  range
-}
-
 model Currency {
   currencyId    Int      @id @default(autoincrement()) @map("id")
   code          String   @unique
@@ -1197,17 +1192,16 @@ model Account {
   name                 String
   balance              Decimal  @default(0) @db.Decimal(20, 8)
   version              Int      @default(0)
-  exchangeRateRuleId   Int?     @map("exchange_rate_rule_id")
   active               Boolean  @default(true)
   allowNegativeBalance Boolean  @default(false) @map("allow_negative_balance")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
 
-  group            AccountGroup      @relation(fields: [groupId], references: [groupId], onDelete: Restrict)
-  user             User              @relation(fields: [userId], references: [userId], onDelete: Restrict)
-  currency         Currency          @relation(fields: [currencyId], references: [currencyId], onDelete: Restrict)
-  exchangeRateRule ExchangeRateRule? @relation(fields: [exchangeRateRuleId], references: [ruleId], onDelete: SetNull)
-  operations       Operation[]
+  group         AccountGroup               @relation(fields: [groupId], references: [groupId], onDelete: Restrict)
+  user          User                       @relation(fields: [userId], references: [userId], onDelete: Restrict)
+  currency      Currency                   @relation(fields: [currencyId], references: [currencyId], onDelete: Restrict)
+  rateRules     AccountExchangeRateRule[]
+  operations    Operation[]
 
   @@unique([groupId, currencyId])
   @@index([groupId])
@@ -1220,37 +1214,38 @@ model Account {
 model ExchangeRateRule {
   ruleId          Int      @id @default(autoincrement()) @map("id")
   name            String
-  kind            RateKind @default(range)
   baseCurrencyId  Int      @map("base_currency_id")
   quoteCurrencyId Int      @map("quote_currency_id")
+  minAmount       Decimal  @map("min_amount") @db.Decimal(20, 8)
+  maxAmount       Decimal? @map("max_amount") @db.Decimal(20, 8)
+  rate            Decimal  @db.Decimal(20, 8)
   active          Boolean  @default(true)
+  version         Int      @default(0)
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
 
-  baseCurrency  Currency            @relation("BaseCurrency", fields: [baseCurrencyId], references: [currencyId], onDelete: Restrict)
-  quoteCurrency Currency            @relation("QuoteCurrency", fields: [quoteCurrencyId], references: [currencyId], onDelete: Restrict)
-  ranges        ExchangeRateRange[]
-  accounts      Account[]
+  baseCurrency  Currency                  @relation("BaseCurrency", fields: [baseCurrencyId], references: [currencyId], onDelete: Restrict)
+  quoteCurrency Currency                  @relation("QuoteCurrency", fields: [quoteCurrencyId], references: [currencyId], onDelete: Restrict)
+  accounts      AccountExchangeRateRule[]
   operations    Operation[]
 
   @@unique([baseCurrencyId, quoteCurrencyId, name])
+  @@index([baseCurrencyId, quoteCurrencyId, active])
   @@map("exchange_rate_rules")
 }
 
-model ExchangeRateRange {
-  rangeId            Int      @id @default(autoincrement()) @map("id")
-  exchangeRateRuleId Int      @map("exchange_rate_rule_id")
-  minAmount          Decimal  @map("min_amount") @db.Decimal(20, 8)
-  maxAmount          Decimal? @map("max_amount") @db.Decimal(20, 8)
-  rate               Decimal  @db.Decimal(20, 8)
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+model AccountExchangeRateRule {
+  accountId Int      @map("account_id")
+  ruleId    Int      @map("rule_id")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  rule ExchangeRateRule @relation(fields: [exchangeRateRuleId], references: [ruleId], onDelete: Cascade)
+  account Account          @relation(fields: [accountId], references: [accountId], onDelete: Restrict)
+  rule    ExchangeRateRule @relation(fields: [ruleId], references: [ruleId], onDelete: Restrict)
 
-  @@unique([exchangeRateRuleId, minAmount])
-  @@index([exchangeRateRuleId])
-  @@map("exchange_rate_ranges")
+  @@id([accountId, ruleId])
+  @@index([ruleId])
+  @@index([accountId])
+  @@map("account_exchange_rate_rules")
 }
 
 model Operation {
