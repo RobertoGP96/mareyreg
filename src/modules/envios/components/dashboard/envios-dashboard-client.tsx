@@ -72,7 +72,7 @@ export function EnviosDashboardClient({ data }: Props) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {data.balanceByCurrency.map((b, i) => (
             <KpiCard
               key={b.currencyId}
@@ -144,7 +144,7 @@ function PendingPanel({
   onConfirm: (id: number) => void;
 }) {
   return (
-    <div className="lg:col-span-1 rounded-xl border border-border bg-card p-4 shadow-panel space-y-3">
+    <div className="lg:col-span-1 flex flex-col rounded-xl border border-border bg-card p-4 shadow-panel gap-3 min-h-0 max-h-[420px] lg:max-h-[460px]">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-headline text-sm font-semibold flex items-center gap-2">
           <Clock className="h-4 w-4 text-[var(--ops-warning)]" />
@@ -162,7 +162,7 @@ function PendingPanel({
           <p className="mt-1.5 text-xs text-muted-foreground">Todo confirmado.</p>
         </div>
       ) : (
-        <ul className="space-y-1.5">
+        <ul className="space-y-1.5 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
           {pending.map((o) => {
             const sign = o.type === "withdrawal" || o.type === "transfer_out"
               ? -o.amount
@@ -203,7 +203,7 @@ function PendingPanel({
 
 function RecentActivityPanel({ recent }: { recent: DashboardData["recentOps"] }) {
   return (
-    <div className="lg:col-span-2 rounded-xl border border-border bg-card p-4 shadow-panel space-y-3">
+    <div className="lg:col-span-2 flex flex-col rounded-xl border border-border bg-card p-4 shadow-panel gap-3 min-h-0 max-h-[420px] lg:max-h-[460px]">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-headline text-sm font-semibold flex items-center gap-2">
           <ArrowRightLeft className="h-4 w-4 text-[var(--ops-active)]" />
@@ -219,7 +219,7 @@ function RecentActivityPanel({ recent }: { recent: DashboardData["recentOps"] })
           <p className="mt-1.5 text-xs text-muted-foreground">Aún sin movimientos confirmados.</p>
         </div>
       ) : (
-        <ul className="space-y-1.5">
+        <ul className="space-y-1.5 overflow-y-auto pr-1 -mr-1 flex-1 min-h-0">
           {recent.map((o) => {
             const sign = o.type === "withdrawal" || o.type === "transfer_out"
               ? -o.amount

@@ -11,11 +11,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
-import { MobileListCard } from "@/components/ui/mobile-list-card";
-import { ResponsiveListView } from "@/components/ui/responsive-list-view";
 import { Fab } from "@/components/ui/fab";
 import { MetricTile } from "@/components/ui/metric-tile";
-import { StatusPill } from "@/components/ui/status-pill";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -23,14 +20,10 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
-import { type DataTableColumn } from "@/components/ui/data-table";
 import {
-  Users, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2, Eye,
+  Users, Plus, Search, Loader2,
   Hash, Type, FileText, ToggleLeft, UserCircle, Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -38,8 +31,7 @@ import {
   createAccountGroup, updateAccountGroup, toggleAccountGroup, deleteAccountGroup,
 } from "../../actions/account-group-actions";
 import type { AccountGroupRow } from "../../lib/types";
-import { CurrencyChip } from "../shared/currency-chip";
-import { AmountDisplay } from "../shared/amount-display";
+import { GroupAccountCard } from "./group-account-card";
 
 type AssignableUser = {
   userId: number;
@@ -158,123 +150,6 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
     } else toast.error(r.error);
   };
 
-  const renderBalances = (g: AccountGroupRow) => {
-    if (!g.balancesByCurrency.length) {
-      return <span className="text-xs text-muted-foreground">Sin saldos</span>;
-    }
-    return (
-      <div className="flex flex-wrap items-center gap-1.5">
-        {g.balancesByCurrency.map((b) => (
-          <span
-            key={b.currencyId}
-            className="inline-flex items-center gap-1 rounded-md bg-muted/40 px-1.5 py-0.5 ring-1 ring-inset ring-border"
-          >
-            <CurrencyChip code={b.code} size="sm" />
-            <AmountDisplay value={b.balance} decimalPlaces={b.decimalPlaces} signed size="sm" />
-          </span>
-        ))}
-      </div>
-    );
-  };
-
-  const columns: DataTableColumn<AccountGroupRow>[] = [
-    {
-      key: "name",
-      header: "Grupo",
-      cell: (g) => (
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <span className="font-medium text-foreground truncate flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground shrink-0" />
-            {g.name}
-          </span>
-          <span className="text-[11px] font-mono tabular-nums text-muted-foreground">{g.code}</span>
-        </div>
-      ),
-    },
-    {
-      key: "owner",
-      header: "Responsable",
-      cell: (g) => (
-        <span className="text-sm flex items-center gap-1.5 min-w-0">
-          <UserCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <span className="truncate">{g.ownerName ?? g.ownerEmail ?? "—"}</span>
-        </span>
-      ),
-    },
-    {
-      key: "balances",
-      header: "Saldos",
-      cell: renderBalances,
-    },
-    {
-      key: "accounts",
-      header: "Cuentas",
-      align: "right",
-      cell: (g) =>
-        g.accountsCount > 0 ? (
-          <Badge variant="brand">{g.accountsCount}</Badge>
-        ) : (
-          <Badge variant="outline">0</Badge>
-        ),
-    },
-    {
-      key: "status",
-      header: "Estado",
-      align: "right",
-      cell: (g) => <StatusPill status={g.active ? "active" : "inactive"} size="sm" />,
-    },
-    {
-      key: "actions",
-      header: "",
-      align: "right",
-      width: "w-12",
-      cell: (g) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" onClick={(e) => e.stopPropagation()}>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                setTimeout(() => router.push(`/envios/grupos/${g.groupId}`), 0);
-              }}
-            >
-              <Eye className="h-4 w-4" /> Ver detalles
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                setTimeout(() => fillEdit(g), 0);
-              }}
-            >
-              <SquarePen className="h-4 w-4" /> Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                setTimeout(() => void handleToggle(g), 0);
-              }}
-            >
-              <ToggleLeft className="h-4 w-4" /> {g.active ? "Desactivar" : "Activar"}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                setTimeout(() => setToDelete(g), 0);
-              }}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" /> Eliminar
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
-
   return (
     <div className="space-y-5">
       <PageHeader
@@ -304,84 +179,22 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
         />
       </div>
 
-      <ResponsiveListView<AccountGroupRow>
-        columns={columns}
-        rows={filtered}
-        rowKey={(g) => g.groupId}
-        onRowClick={(g) => router.push(`/envios/grupos/${g.groupId}`)}
-        mobileCard={(g) => (
-          <MobileListCard
-            key={g.groupId}
-            onClick={() => router.push(`/envios/grupos/${g.groupId}`)}
-            title={
-              <span className="flex items-center gap-2">
-                <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <span className="truncate font-medium">{g.name}</span>
-              </span>
-            }
-            subtitle={`${g.code} · ${g.ownerName ?? "—"}`}
-            value={<StatusPill status={g.active ? "active" : "inactive"} size="sm" />}
-            actions={
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-9" onClick={(e) => e.stopPropagation()} aria-label={`Acciones del grupo ${g.name}`}>
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setTimeout(() => router.push(`/envios/grupos/${g.groupId}`), 0);
-                    }}
-                  >
-                    <Eye className="h-4 w-4" /> Ver detalles
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setTimeout(() => fillEdit(g), 0);
-                    }}
-                  >
-                    <SquarePen className="h-4 w-4" /> Editar
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setTimeout(() => void handleToggle(g), 0);
-                    }}
-                  >
-                    <ToggleLeft className="h-4 w-4" /> {g.active ? "Desactivar" : "Activar"}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setTimeout(() => setToDelete(g), 0);
-                    }}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" /> Eliminar
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            }
-            meta={renderBalances(g)}
+      <div className="flex w-full items-center gap-2">
+        <InputGroup className="flex-1 min-w-0 max-w-md">
+          <InputGroupAddon><Search /></InputGroupAddon>
+          <InputGroupInput
+            placeholder="Buscar nombre, código, responsable…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
-        )}
-        toolbar={
-          <InputGroup className="flex-1 min-w-[180px] max-w-md">
-            <InputGroupAddon><Search /></InputGroupAddon>
-            <InputGroupInput
-              placeholder="Buscar nombre, código, responsable…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <InputGroupAddon align="inline-end">
-              <Badge variant="brand">{filtered.length}</Badge>
-            </InputGroupAddon>
-          </InputGroup>
-        }
-        emptyState={
+          <InputGroupAddon align="inline-end">
+            <Badge variant="brand">{filtered.length}</Badge>
+          </InputGroupAddon>
+        </InputGroup>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-8">
           <EmptyState
             title="Sin grupos aún"
             description={
@@ -390,8 +203,20 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
                 : "Cada grupo es como una hoja de tu Excel — agrupa cuentas por persona o tarea."
             }
           />
-        }
-      />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 pb-24">
+          {filtered.map((g) => (
+            <GroupAccountCard
+              key={g.groupId}
+              group={g}
+              onEdit={() => fillEdit(g)}
+              onToggle={() => void handleToggle(g)}
+              onDelete={() => setToDelete(g)}
+            />
+          ))}
+        </div>
+      )}
 
       <ResponsiveFormDialog
         open={isCreateOpen || !!toEdit}

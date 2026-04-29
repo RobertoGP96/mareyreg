@@ -12,7 +12,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { MobileListCard } from "@/components/ui/mobile-list-card";
-import { ResponsiveListView } from "@/components/ui/responsive-list-view";
 import { Fab } from "@/components/ui/fab";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -50,6 +49,7 @@ import {
   type RuleActionMode,
   type RuleSummary,
 } from "./account-rule-actions";
+import { AccountGroupSection } from "./account-group-section";
 
 type GroupOption = { groupId: number; code: string; name: string; userId: number };
 type CurrencyOption = { currencyId: number; code: string; symbol: string; decimalPlaces: number };
@@ -105,6 +105,24 @@ export function AccountListClient({
     }
     return rows;
   }, [initialAccounts, search, filterGroup, filterCurrency]);
+
+  const groupedFiltered = useMemo(() => {
+    const map = new Map<number, { groupId: number; groupName: string; groupCode: string; accounts: AccountRow[] }>();
+    for (const a of filtered) {
+      const prev = map.get(a.groupId);
+      if (prev) prev.accounts.push(a);
+      else
+        map.set(a.groupId, {
+          groupId: a.groupId,
+          groupName: a.groupName,
+          groupCode: a.groupCode,
+          accounts: [a],
+        });
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.groupName.localeCompare(b.groupName)
+    );
+  }, [filtered]);
 
   const totalActive = initialAccounts.filter((a) => a.active).length;
   const balancesByCurrency = useMemo(() => {
@@ -324,6 +342,83 @@ export function AccountListClient({
     },
   ];
 
+  const sectionColumns = columns.filter((c) => c.key !== "group");
+
+  const renderAccountMobileCard = (a: AccountRow) => (
+    <MobileListCard
+      key={a.accountId}
+      onClick={() => router.push(`/envios/cuentas/${a.accountId}`)}
+      title={
+        <span className="flex items-center gap-2">
+          <CurrencyChip code={a.currencyCode} size="sm" />
+          <span className="truncate font-medium">{a.name}</span>
+        </span>
+      }
+      subtitle={a.accountNumber}
+      value={
+        <AmountDisplay value={a.balance} decimalPlaces={a.currencyDecimals} signed />
+      }
+      actions={
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="size-10" onClick={(e) => e.stopPropagation()} aria-label={`Acciones de la cuenta ${a.name}`}>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setTimeout(() => router.push(`/envios/cuentas/${a.accountId}`), 0);
+              }}
+            >
+              <Eye className="h-4 w-4" /> Ver detalles
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setTimeout(() => fillEdit(a), 0);
+              }}
+            >
+              <SquarePen className="h-4 w-4" /> Editar cuenta
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setTimeout(() => void handleToggle(a), 0);
+              }}
+            >
+              <ToggleLeft className="h-4 w-4" /> {a.active ? "Desactivar" : "Activar"}
+            </DropdownMenuItem>
+            <AccountRuleMenuItems
+              account={a}
+              onAction={(mode) => handleRuleAction(a, mode)}
+            />
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                setTimeout(() => setToDelete(a), 0);
+              }}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" /> Eliminar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      }
+      meta={
+        <div className="flex items-center gap-2 flex-wrap">
+          <StatusPill status={a.active ? "active" : "inactive"} size="sm" />
+          {a.rulesCount > 0 ? (
+            <Badge variant="outline" className="text-[10px]">
+              {a.rulesCount} {a.rulesCount === 1 ? "regla" : "reglas"}
+            </Badge>
+          ) : null}
+        </div>
+      }
+    />
+  );
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -358,101 +453,51 @@ export function AccountListClient({
         ))}
       </div>
 
-      <ResponsiveListView<AccountRow>
-        columns={columns}
-        rows={filtered}
-        rowKey={(a) => a.accountId}
-        onRowClick={(a) => router.push(`/envios/cuentas/${a.accountId}`)}
-        mobileCard={(a) => (
-          <MobileListCard
-            key={a.accountId}
-            onClick={() => router.push(`/envios/cuentas/${a.accountId}`)}
-            title={
-              <span className="flex items-center gap-2">
-                <CurrencyChip code={a.currencyCode} size="sm" />
-                <span className="truncate font-medium">{a.name}</span>
-              </span>
-            }
-            subtitle={`${a.groupName} · ${a.accountNumber}`}
-            value={
-              <AmountDisplay value={a.balance} decimalPlaces={a.currencyDecimals} signed />
-            }
-            actions={
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-10" onClick={(e) => e.stopPropagation()} aria-label={`Acciones de la cuenta ${a.name}`}>
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setTimeout(() => router.push(`/envios/cuentas/${a.accountId}`), 0);
-                    }}
-                  >
-                    <Eye className="h-4 w-4" /> Ver detalles
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setTimeout(() => fillEdit(a), 0);
-                    }}
-                  >
-                    <SquarePen className="h-4 w-4" /> Editar cuenta
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setTimeout(() => void handleToggle(a), 0);
-                    }}
-                  >
-                    <ToggleLeft className="h-4 w-4" /> {a.active ? "Desactivar" : "Activar"}
-                  </DropdownMenuItem>
-                  <AccountRuleMenuItems
-                    account={a}
-                    onAction={(mode) => handleRuleAction(a, mode)}
-                  />
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      setTimeout(() => setToDelete(a), 0);
-                    }}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" /> Eliminar
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            }
-            meta={
-              <div className="flex items-center gap-2 flex-wrap">
-                <StatusPill status={a.active ? "active" : "inactive"} size="sm" />
-                {a.rulesCount > 0 ? (
-                  <Badge variant="outline" className="text-[10px]">
-                    {a.rulesCount} {a.rulesCount === 1 ? "regla" : "reglas"}
-                  </Badge>
-                ) : null}
-              </div>
-            }
+      <div className="flex w-full items-center gap-2">
+        <InputGroup className="flex-1 min-w-0 sm:min-w-[180px] sm:max-w-md">
+          <InputGroupAddon><Search /></InputGroupAddon>
+          <InputGroupInput
+            placeholder="Buscar cuenta, grupo, número…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
-        )}
-        toolbar={
-          <div className="flex w-full items-center gap-2 flex-1 min-w-0">
-            <InputGroup className="flex-1 min-w-0 sm:min-w-[180px] sm:max-w-md">
-              <InputGroupAddon><Search /></InputGroupAddon>
-              <InputGroupInput
-                placeholder="Buscar cuenta, grupo, número…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              <InputGroupAddon align="inline-end">
-                <Badge variant="brand">{filtered.length}</Badge>
-              </InputGroupAddon>
-            </InputGroup>
-            <div className="hidden sm:flex sm:items-center sm:gap-2">
+          <InputGroupAddon align="inline-end">
+            <Badge variant="brand">{filtered.length}</Badge>
+          </InputGroupAddon>
+        </InputGroup>
+        <div className="hidden sm:flex sm:items-center sm:gap-2">
+          <Select value={filterGroup || "all"} onValueChange={(v) => setFilterGroup(v === "all" ? "" : v)}>
+            <SelectTrigger className="min-w-[140px] w-auto">
+              <SelectValue placeholder="Grupo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los grupos</SelectItem>
+              {groups.map((g) => (
+                <SelectItem key={g.groupId} value={String(g.groupId)}>{g.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterCurrency || "all"} onValueChange={(v) => setFilterCurrency(v === "all" ? "" : v)}>
+            <SelectTrigger className="min-w-[110px] w-auto">
+              <SelectValue placeholder="Moneda" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {currencies.map((c) => (
+                <SelectItem key={c.currencyId} value={String(c.currencyId)}>{c.code}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="sm:hidden">
+          <MobileFilterSheet
+            activeCount={(filterGroup ? 1 : 0) + (filterCurrency ? 1 : 0)}
+            onClear={() => { setFilterGroup(""); setFilterCurrency(""); }}
+          >
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Grupo</label>
               <Select value={filterGroup || "all"} onValueChange={(v) => setFilterGroup(v === "all" ? "" : v)}>
-                <SelectTrigger className="min-w-[140px] w-auto">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Grupo" />
                 </SelectTrigger>
                 <SelectContent>
@@ -462,8 +507,11 @@ export function AccountListClient({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Moneda</label>
               <Select value={filterCurrency || "all"} onValueChange={(v) => setFilterCurrency(v === "all" ? "" : v)}>
-                <SelectTrigger className="min-w-[110px] w-auto">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Moneda" />
                 </SelectTrigger>
                 <SelectContent>
@@ -474,44 +522,12 @@ export function AccountListClient({
                 </SelectContent>
               </Select>
             </div>
-            <div className="sm:hidden">
-              <MobileFilterSheet
-                activeCount={(filterGroup ? 1 : 0) + (filterCurrency ? 1 : 0)}
-                onClear={() => { setFilterGroup(""); setFilterCurrency(""); }}
-              >
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">Grupo</label>
-                  <Select value={filterGroup || "all"} onValueChange={(v) => setFilterGroup(v === "all" ? "" : v)}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Grupo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los grupos</SelectItem>
-                      {groups.map((g) => (
-                        <SelectItem key={g.groupId} value={String(g.groupId)}>{g.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">Moneda</label>
-                  <Select value={filterCurrency || "all"} onValueChange={(v) => setFilterCurrency(v === "all" ? "" : v)}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Moneda" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      {currencies.map((c) => (
-                        <SelectItem key={c.currencyId} value={String(c.currencyId)}>{c.code}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </MobileFilterSheet>
-            </div>
-          </div>
-        }
-        emptyState={
+          </MobileFilterSheet>
+        </div>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card p-8">
           <EmptyState
             title="Sin cuentas"
             description={
@@ -539,8 +555,24 @@ export function AccountListClient({
               )
             ) : null}
           </EmptyState>
-        }
-      />
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3 pb-24">
+          {groupedFiltered.map(({ groupId: gId, groupName, groupCode, accounts }) => (
+            <AccountGroupSection
+              key={gId}
+              groupId={gId}
+              groupName={groupName}
+              groupCode={groupCode}
+              accounts={accounts}
+              columns={sectionColumns}
+              mobileCard={renderAccountMobileCard}
+              onRowClick={(a) => router.push(`/envios/cuentas/${a.accountId}`)}
+              defaultExpanded={groupedFiltered.length <= 5 || !!filterGroup || !!search}
+            />
+          ))}
+        </div>
+      )}
 
       <ResponsiveFormDialog
         open={isCreateOpen || !!toEdit}

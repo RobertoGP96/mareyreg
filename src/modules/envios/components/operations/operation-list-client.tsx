@@ -317,7 +317,7 @@ export function OperationListClient({ initialOperations, accounts, currencies }:
               variant="outline"
               onClick={() => setIsBatchOpen(true)}
             >
-              <Layers className="h-4 w-4" /> Operaciones en lote
+              <Layers className="h-4 w-4" /> Operaciones múltiples
             </Button>
             <Button
               variant="outline"

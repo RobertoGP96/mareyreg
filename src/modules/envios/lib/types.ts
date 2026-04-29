@@ -18,6 +18,19 @@ export type CurrencyRow = Pick<
   rulesCount: number;
 };
 
+export type AccountInGroup = {
+  accountId: number;
+  accountNumber: string;
+  name: string;
+  active: boolean;
+  allowNegativeBalance: boolean;
+  balance: number;
+  currencyId: number;
+  currencyCode: string;
+  currencySymbol: string;
+  currencyDecimals: number;
+};
+
 export type AccountGroupRow = Pick<
   AccountGroup,
   "groupId" | "code" | "name" | "description" | "active"
@@ -32,6 +45,7 @@ export type AccountGroupRow = Pick<
     decimalPlaces: number;
     balance: number;
   }>;
+  accounts: AccountInGroup[];
 };
 
 export type AccountRow = Pick<

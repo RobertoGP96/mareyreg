@@ -502,16 +502,21 @@ export function OperationsBatchForm({
   return (
     <ResponsiveFormDialog
       open={open}
-      onOpenChange={(o) => { if (!o) reset(); onOpenChange(o); }}
-      a11yTitle="Operaciones en lote"
+      onOpenChange={(o) => {
+        if (!o) reset();
+        onOpenChange(o);
+      }}
+      a11yTitle="Operaciones múltiples"
       description="Registra varias operaciones a la vez. Si una falla, ninguna se persiste."
       desktopMaxWidth="sm:max-w-4xl"
     >
       <FormDialogHeader
         icon={Layers}
-        title={isLockedAccount
-          ? "Operaciones en lote en esta cuenta"
-          : "Operaciones en lote"}
+        title={
+          isLockedAccount
+            ? "Operaciones múltiples en esta cuenta"
+            : "Operaciones múltiples"
+        }
         description="Soporta depósitos, retiros, ajustes y conversiones de moneda. Edita la tasa o el monto convertido para ajustes manuales."
       />
 
@@ -528,21 +533,34 @@ export function OperationsBatchForm({
             >
               <span className="truncate">
                 <span className="font-medium">{b.name}</span>
-                <span className="ml-1 text-muted-foreground">{b.currencyCode}</span>
+                <span className="ml-1 text-muted-foreground">
+                  {b.currencyCode}
+                </span>
               </span>
               <div className="flex items-center gap-2 font-mono tabular-nums">
-                <span className="text-muted-foreground">{fmt(b.initial, b.currencyDecimals)}</span>
+                <span className="text-muted-foreground">
+                  {fmt(b.initial, b.currencyDecimals)}
+                </span>
                 <span
                   className={cn(
                     "text-[10px] font-semibold",
-                    b.delta > 0 ? "text-[var(--ops-success)]" : b.delta < 0 ? "text-rose-500" : "text-muted-foreground"
+                    b.delta > 0
+                      ? "text-[var(--ops-success)]"
+                      : b.delta < 0
+                        ? "text-rose-500"
+                        : "text-muted-foreground",
                   )}
                 >
                   {b.delta > 0 ? "+" : b.delta < 0 ? "−" : ""}
                   {fmt(Math.abs(b.delta), b.currencyDecimals)}
                 </span>
                 <span className="text-muted-foreground">→</span>
-                <span className={cn("font-semibold", b.final < 0 && "text-rose-500")}>
+                <span
+                  className={cn(
+                    "font-semibold",
+                    b.final < 0 && "text-rose-500",
+                  )}
+                >
                   {fmt(b.final, b.currencyDecimals)}
                 </span>
               </div>
@@ -554,8 +572,13 @@ export function OperationsBatchForm({
       <div className="space-y-3 mt-4">
         <div className="space-y-2">
           {rows.map((row, i) => {
-            const acc = accounts.find((a) => String(a.accountId) === row.accountId);
-            const counter = row.kind === "conversion" ? counterCurrencyForAccount(row.accountId) : null;
+            const acc = accounts.find(
+              (a) => String(a.accountId) === row.accountId,
+            );
+            const counter =
+              row.kind === "conversion"
+                ? counterCurrencyForAccount(row.accountId)
+                : null;
             const m = meta[i];
             const isError = errorRowIndex === i;
             const userRate = num(row.rateInput);
@@ -570,7 +593,7 @@ export function OperationsBatchForm({
                 key={i}
                 className={cn(
                   "rounded-md bg-muted/20 p-3 ring-1 ring-inset space-y-2",
-                  isError ? "ring-destructive/50" : "ring-border"
+                  isError ? "ring-destructive/50" : "ring-border",
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -587,13 +610,17 @@ export function OperationsBatchForm({
                           "px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-1",
                           row.kind === k
                             ? "bg-[var(--brand)] text-white"
-                            : "text-muted-foreground hover:text-foreground"
+                            : "text-muted-foreground hover:text-foreground",
                         )}
                       >
                         {k === "regular" ? (
-                          <><Settings2 className="h-3 w-3" /> Operación</>
+                          <>
+                            <Settings2 className="h-3 w-3" /> Operación
+                          </>
                         ) : (
-                          <><ArrowRightLeft className="h-3 w-3" /> Conversión</>
+                          <>
+                            <ArrowRightLeft className="h-3 w-3" /> Conversión
+                          </>
                         )}
                       </button>
                     ))}
@@ -603,7 +630,9 @@ export function OperationsBatchForm({
                 {/* Selector de cuenta solo si NO está locked */}
                 {!isLockedAccount && (
                   <div>
-                    <label className="text-[10px] font-medium text-muted-foreground">Cuenta</label>
+                    <label className="text-[10px] font-medium text-muted-foreground">
+                      Cuenta
+                    </label>
                     <Select
                       value={row.accountId}
                       onValueChange={(v) => updateRow(i, { accountId: v })}
@@ -613,7 +642,10 @@ export function OperationsBatchForm({
                       </SelectTrigger>
                       <SelectContent>
                         {eligibleAccounts.map((a) => (
-                          <SelectItem key={a.accountId} value={String(a.accountId)}>
+                          <SelectItem
+                            key={a.accountId}
+                            value={String(a.accountId)}
+                          >
                             {a.groupCode}-{a.currencyCode} · {a.name}
                           </SelectItem>
                         ))}
@@ -626,10 +658,14 @@ export function OperationsBatchForm({
                 {row.kind === "regular" ? (
                   <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-6 md:col-span-4">
-                      <label className="text-[10px] font-medium text-muted-foreground">Tipo</label>
+                      <label className="text-[10px] font-medium text-muted-foreground">
+                        Tipo
+                      </label>
                       <Select
                         value={row.type}
-                        onValueChange={(v) => updateRow(i, { type: v as RegularType })}
+                        onValueChange={(v) =>
+                          updateRow(i, { type: v as RegularType })
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -640,7 +676,8 @@ export function OperationsBatchForm({
                             return (
                               <SelectItem key={t.id} value={t.id}>
                                 <span className="flex items-center gap-2">
-                                  <Icon className={cn("h-3.5 w-3.5", t.tone)} /> {t.label}
+                                  <Icon className={cn("h-3.5 w-3.5", t.tone)} />{" "}
+                                  {t.label}
                                 </span>
                               </SelectItem>
                             );
@@ -659,15 +696,21 @@ export function OperationsBatchForm({
                         placeholder="0.00"
                         className="text-right font-mono tabular-nums"
                         value={row.amount}
-                        onChange={(e) => updateRow(i, { amount: e.target.value })}
+                        onChange={(e) =>
+                          updateRow(i, { amount: e.target.value })
+                        }
                       />
                     </div>
                     <div className="col-span-11 md:col-span-4">
-                      <label className="text-[10px] font-medium text-muted-foreground">Descripción</label>
+                      <label className="text-[10px] font-medium text-muted-foreground">
+                        Descripción
+                      </label>
                       <Input
                         placeholder="Notas"
                         value={row.description}
-                        onChange={(e) => updateRow(i, { description: e.target.value })}
+                        onChange={(e) =>
+                          updateRow(i, { description: e.target.value })
+                        }
                       />
                     </div>
                     <div className="col-span-1 flex items-end justify-end">
@@ -698,14 +741,19 @@ export function OperationsBatchForm({
                           placeholder="0.00"
                           className="text-right font-mono tabular-nums"
                           value={row.externalAmount}
-                          onChange={(e) => onExternalAmountChange(i, e.target.value)}
+                          onChange={(e) =>
+                            onExternalAmountChange(i, e.target.value)
+                          }
                           disabled={!counter}
                         />
                       </div>
                       <div className="col-span-6 md:col-span-3">
                         <label className="text-[10px] font-medium text-muted-foreground flex items-center justify-between">
                           <span>
-                            Tasa {counter && acc ? `(${acc.currencyCode}/${counter.code})` : ""}
+                            Tasa{" "}
+                            {counter && acc
+                              ? `(${acc.currencyCode}/${counter.code})`
+                              : ""}
                           </span>
                           {isOverride && m?.defaultRate != null && (
                             <button
@@ -725,7 +773,7 @@ export function OperationsBatchForm({
                           placeholder={m?.state === "loading" ? "…" : "0.00"}
                           className={cn(
                             "text-right font-mono tabular-nums",
-                            isOverride && "ring-1 ring-amber-400/40"
+                            isOverride && "ring-1 ring-amber-400/40",
                           )}
                           value={row.rateInput}
                           onChange={(e) => onRateChange(i, e.target.value)}
@@ -748,11 +796,15 @@ export function OperationsBatchForm({
                         />
                       </div>
                       <div className="col-span-11 md:col-span-2">
-                        <label className="text-[10px] font-medium text-muted-foreground">Descripción</label>
+                        <label className="text-[10px] font-medium text-muted-foreground">
+                          Descripción
+                        </label>
                         <Input
                           placeholder="Notas"
                           value={row.description}
-                          onChange={(e) => updateRow(i, { description: e.target.value })}
+                          onChange={(e) =>
+                            updateRow(i, { description: e.target.value })
+                          }
                         />
                       </div>
                       <div className="col-span-1 flex items-end justify-end">
@@ -775,7 +827,8 @@ export function OperationsBatchForm({
                       <div className="text-[11px] flex items-center gap-1.5">
                         {m.state === "loading" && (
                           <span className="text-muted-foreground flex items-center gap-1">
-                            <Loader2 className="h-3 w-3 animate-spin" /> Cargando tasa de la regla…
+                            <Loader2 className="h-3 w-3 animate-spin" />{" "}
+                            Cargando tasa de la regla…
                           </span>
                         )}
                         {m.state === "error" && (
@@ -807,14 +860,23 @@ export function OperationsBatchForm({
             <Clock className="h-3.5 w-3.5" /> Guardar como pendientes
           </span>
           <div className="flex items-center gap-2">
-            <Switch checked={statusPending} onCheckedChange={setStatusPending} />
-            <span className="text-xs text-muted-foreground">{statusPending ? "Sí" : "No"}</span>
+            <Switch
+              checked={statusPending}
+              onCheckedChange={setStatusPending}
+            />
+            <span className="text-xs text-muted-foreground">
+              {statusPending ? "Sí" : "No"}
+            </span>
           </div>
         </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
-        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => onOpenChange(false)}
+        >
           Cancelar
         </Button>
         <Button
@@ -822,7 +884,10 @@ export function OperationsBatchForm({
           variant="brand"
           onClick={handleSubmit}
           disabled={submitting}
-          className={cn(statusPending && "bg-[var(--ops-warning)] hover:bg-[var(--ops-warning)]/90 text-white")}
+          className={cn(
+            statusPending &&
+              "bg-[var(--ops-warning)] hover:bg-[var(--ops-warning)]/90 text-white",
+          )}
         >
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {submitting

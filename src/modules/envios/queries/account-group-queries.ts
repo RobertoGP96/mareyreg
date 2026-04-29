@@ -7,8 +7,13 @@ export async function getAccountGroups(): Promise<AccountGroupRow[]> {
     include: {
       user: { select: { fullName: true, email: true } },
       accounts: {
-        where: { active: true },
+        orderBy: [{ active: "desc" }, { accountNumber: "asc" }],
         select: {
+          accountId: true,
+          accountNumber: true,
+          name: true,
+          active: true,
+          allowNegativeBalance: true,
           balance: true,
           currency: {
             select: { currencyId: true, code: true, symbol: true, decimalPlaces: true },
@@ -25,6 +30,7 @@ export async function getAccountGroups(): Promise<AccountGroupRow[]> {
       { currencyId: number; code: string; symbol: string; decimalPlaces: number; balance: number }
     >();
     for (const a of g.accounts) {
+      if (!a.active) continue;
       const c = a.currency;
       const prev = map.get(c.currencyId);
       const amount = Number(a.balance);
@@ -50,6 +56,18 @@ export async function getAccountGroups(): Promise<AccountGroupRow[]> {
       ownerEmail: g.user.email,
       accountsCount: g._count.accounts,
       balancesByCurrency: Array.from(map.values()).sort((a, b) => a.code.localeCompare(b.code)),
+      accounts: g.accounts.map((a) => ({
+        accountId: a.accountId,
+        accountNumber: a.accountNumber,
+        name: a.name,
+        active: a.active,
+        allowNegativeBalance: a.allowNegativeBalance,
+        balance: Number(a.balance),
+        currencyId: a.currency.currencyId,
+        currencyCode: a.currency.code,
+        currencySymbol: a.currency.symbol,
+        currencyDecimals: a.currency.decimalPlaces,
+      })),
     };
   });
 }
