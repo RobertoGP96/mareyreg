@@ -239,14 +239,14 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
             <DropdownMenuItem onClick={() => router.push(`/envios/grupos/${g.groupId}`)}>
               <Eye className="h-4 w-4" /> Ver detalles
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => fillEdit(g)}>
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); fillEdit(g); }}>
               <SquarePen className="h-4 w-4" /> Editar
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleToggle(g)}>
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void handleToggle(g); }}>
               <ToggleLeft className="h-4 w-4" /> {g.active ? "Desactivar" : "Activar"}
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() => setToDelete(g)}
+              onSelect={(e) => { e.preventDefault(); setToDelete(g); }}
               className="text-destructive focus:text-destructive"
             >
               <Trash2 className="h-4 w-4" /> Eliminar
@@ -306,7 +306,7 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
             actions={
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-9">
+                  <Button variant="ghost" size="icon" className="size-9" onClick={(e) => e.stopPropagation()} aria-label={`Acciones del grupo ${g.name}`}>
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -314,14 +314,14 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
                   <DropdownMenuItem onClick={() => router.push(`/envios/grupos/${g.groupId}`)}>
                     <Eye className="h-4 w-4" /> Ver detalles
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => fillEdit(g)}>
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); fillEdit(g); }}>
                     <SquarePen className="h-4 w-4" /> Editar
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleToggle(g)}>
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void handleToggle(g); }}>
                     <ToggleLeft className="h-4 w-4" /> {g.active ? "Desactivar" : "Activar"}
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => setToDelete(g)}
+                    onSelect={(e) => { e.preventDefault(); setToDelete(g); }}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" /> Eliminar

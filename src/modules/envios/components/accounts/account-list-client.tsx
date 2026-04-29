@@ -283,10 +283,10 @@ export function AccountListClient({
             <DropdownMenuItem onClick={() => router.push(`/envios/cuentas/${a.accountId}`)}>
               <Eye className="h-4 w-4" /> Ver detalles
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => fillEdit(a)}>
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); fillEdit(a); }}>
               <SquarePen className="h-4 w-4" /> Editar cuenta
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleToggle(a)}>
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void handleToggle(a); }}>
               <ToggleLeft className="h-4 w-4" /> {a.active ? "Desactivar" : "Activar"}
             </DropdownMenuItem>
             <AccountRuleMenuItems
@@ -294,7 +294,7 @@ export function AccountListClient({
               onAction={(mode) => handleRuleAction(a, mode)}
             />
             <DropdownMenuItem
-              onClick={() => setToDelete(a)}
+              onSelect={(e) => { e.preventDefault(); setToDelete(a); }}
               className="text-destructive focus:text-destructive"
             >
               <Trash2 className="h-4 w-4" /> Eliminar
@@ -369,10 +369,10 @@ export function AccountListClient({
                   <DropdownMenuItem onClick={() => router.push(`/envios/cuentas/${a.accountId}`)}>
                     <Eye className="h-4 w-4" /> Ver detalles
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => fillEdit(a)}>
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); fillEdit(a); }}>
                     <SquarePen className="h-4 w-4" /> Editar cuenta
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleToggle(a)}>
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void handleToggle(a); }}>
                     <ToggleLeft className="h-4 w-4" /> {a.active ? "Desactivar" : "Activar"}
                   </DropdownMenuItem>
                   <AccountRuleMenuItems
@@ -380,7 +380,7 @@ export function AccountListClient({
                     onAction={(mode) => handleRuleAction(a, mode)}
                   />
                   <DropdownMenuItem
-                    onClick={() => setToDelete(a)}
+                    onSelect={(e) => { e.preventDefault(); setToDelete(a); }}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" /> Eliminar
