@@ -6,7 +6,10 @@ import {
   getAccountDetail,
   getAccountFormData,
 } from "@/modules/envios/queries/account-queries";
-import { getOperations } from "@/modules/envios/queries/operation-queries";
+import {
+  getOperations,
+  getOperationFormData,
+} from "@/modules/envios/queries/operation-queries";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -17,10 +20,11 @@ export default async function CuentaDetallePage({ params }: Props) {
   const accountId = Number(id);
   if (!Number.isFinite(accountId) || accountId <= 0) notFound();
 
-  const [account, operations, formData] = await Promise.all([
+  const [account, operations, formData, allAccounts] = await Promise.all([
     getAccountDetail(accountId),
     getOperations({ accountId, limit: 100 }),
     getAccountFormData(),
+    getOperationFormData(),
   ]);
   if (!account) notFound();
 
@@ -31,6 +35,7 @@ export default async function CuentaDetallePage({ params }: Props) {
         operations={operations}
         rules={formData.rules}
         currencies={formData.currencies}
+        allAccounts={allAccounts}
       />
     </div>
   );
