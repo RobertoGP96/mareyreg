@@ -13,6 +13,7 @@ Este archivo lo lee Claude Code automáticamente al iniciar sesión en el repo. 
 - **next-auth 5 beta** (sesiones)
 - Idioma de la UI: **español** (México). Identificadores y nombres de archivo en inglés.
 
+
 ## Estructura
 
 ```
