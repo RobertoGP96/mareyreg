@@ -355,7 +355,7 @@ export function DepositWithConversionForm({
                     <AlertTriangle className="h-3.5 w-3.5 mt-px shrink-0" />
                     <div className="flex-1">
                       {debitInsufficient.blocking ? (
-                        <span>Saldo insuficiente. Activa "saldo negativo" en la cuenta para permitirlo.</span>
+                        <span>Saldo insuficiente. Activa &quot;saldo negativo&quot; en la cuenta para permitirlo.</span>
                       ) : (
                         <span>
                           Quedará en negativo:{" "}
