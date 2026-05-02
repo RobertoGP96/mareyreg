@@ -7,9 +7,11 @@ import { createAuditLog, getCurrentUserId } from "@/lib/audit";
 import { applyDelta, BalanceError, ConcurrencyError } from "../lib/balance";
 import {
   operationSchema,
-  depositWithConversionSchema,
+  conversionOperationSchema,
   batchOperationsSchema,
   type OperationInput,
+  type ConversionOperationInput,
+  type ConversionDirection,
   type DepositWithConversionInput,
   type BatchRowInput,
 } from "../lib/schemas";
@@ -263,10 +265,14 @@ export async function createOperationsBatch(
             throw e;
           }
 
+          const isCredit = data.direction === "credit";
+          const delta = isCredit ? +amountInAccountCurrency : -amountInAccountCurrency;
+          const opType = isCredit ? "deposit" : "withdrawal";
+
           let balanceAfter: number;
           if (status === "confirmed") {
             try {
-              const r = await applyDelta(tx, data.accountId, +amountInAccountCurrency);
+              const r = await applyDelta(tx, data.accountId, delta);
               balanceAfter = r.newBalance;
             } catch (e) {
               if (e instanceof BalanceError) throw new Error(`Fila ${i + 1}: ${e.message}`);
@@ -280,7 +286,7 @@ export async function createOperationsBatch(
             data: {
               accountId: data.accountId,
               currencyId: account.currencyId,
-              type: "deposit",
+              type: opType,
               status,
               amount: amountInAccountCurrency,
               description: data.description?.trim() || null,
@@ -395,17 +401,18 @@ export async function previewDepositConversion(input: {
   }
 }
 
-export async function createDepositWithConversion(
-  input: DepositWithConversionInput
+export async function createConversionOperation(
+  input: ConversionOperationInput
 ): Promise<
   ActionResult<{
     operationId: number;
     rate: number;
     amountInAccountCurrency: number;
+    direction: ConversionDirection;
   }>
 > {
   try {
-    const parsed = depositWithConversionSchema.safeParse(input);
+    const parsed = conversionOperationSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     }
@@ -413,6 +420,7 @@ export async function createDepositWithConversion(
     const userId = await getCurrentUserId();
     const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date();
     const status = data.status ?? "confirmed";
+    const isCredit = data.direction === "credit";
 
     const result = await db.$transaction(async (tx) => {
       const account = await tx.account.findUniqueOrThrow({
@@ -421,7 +429,7 @@ export async function createDepositWithConversion(
       });
       if (!account.active) throw new Error("La cuenta está inactiva");
       if (data.externalCurrencyId === account.currencyId) {
-        throw new Error("Para depósitos en la misma moneda usa una operación normal");
+        throw new Error("La moneda externa debe ser distinta a la moneda de la cuenta");
       }
 
       const resolved = await resolveAccountConversion(tx, {
@@ -431,16 +439,19 @@ export async function createDepositWithConversion(
         externalAmount: data.externalAmount,
       });
       const ruleId = resolved.ruleId;
-      const direction = resolved.direction;
+      const ruleDirection = resolved.direction;
       const rate = data.rateOverride ?? resolved.rate;
       const amountInAccountCurrency =
-        direction === "base_to_quote"
+        ruleDirection === "base_to_quote"
           ? data.externalAmount * rate
           : data.externalAmount / rate;
 
+      const delta = isCredit ? +amountInAccountCurrency : -amountInAccountCurrency;
+      const opType = isCredit ? "deposit" : "withdrawal";
+
       let balanceAfter: number;
       if (status === "confirmed") {
-        const r = await applyDelta(tx, account.accountId, +amountInAccountCurrency);
+        const r = await applyDelta(tx, account.accountId, delta);
         balanceAfter = r.newBalance;
       } else {
         balanceAfter = Number(account.balance);
@@ -450,7 +461,7 @@ export async function createDepositWithConversion(
         data: {
           accountId: account.accountId,
           currencyId: account.currencyId,
-          type: "deposit",
+          type: opType,
           status,
           amount: amountInAccountCurrency,
           description: data.description?.trim() || null,
@@ -477,10 +488,10 @@ export async function createDepositWithConversion(
           ...data,
           rate,
           amountInAccountCurrency,
-          direction,
+          ruleDirection,
           ruleId,
           status,
-          variant: "deposit_with_conversion",
+          variant: isCredit ? "conversion_credit" : "conversion_debit",
         },
       });
 
@@ -488,7 +499,7 @@ export async function createDepositWithConversion(
     });
 
     revalidateAll();
-    return { success: true, data: result };
+    return { success: true, data: { ...result, direction: data.direction } };
   } catch (error) {
     if (error instanceof BalanceError) return { success: false, error: error.message };
     if (error instanceof ConcurrencyError) {
@@ -497,10 +508,16 @@ export async function createDepositWithConversion(
     if (error instanceof RateNotConfiguredError) {
       return { success: false, error: error.message };
     }
-    const msg = error instanceof Error ? error.message : "Error al registrar el depósito";
-    console.error("createDepositWithConversion:", error);
+    const msg = error instanceof Error ? error.message : "Error al registrar la conversión";
+    console.error("createConversionOperation:", error);
     return { success: false, error: msg };
   }
+}
+
+export async function createDepositWithConversion(
+  input: Omit<DepositWithConversionInput, "direction"> & { direction?: ConversionDirection }
+) {
+  return createConversionOperation({ ...input, direction: input.direction ?? "credit" });
 }
 
 export async function cancelOperation(operationId: number): Promise<ActionResult<void>> {

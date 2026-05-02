@@ -40,7 +40,11 @@ export const operationSchema = z.object({
 });
 export type OperationInput = z.infer<typeof operationSchema>;
 
-export const depositWithConversionSchema = z.object({
+export const conversionDirectionSchema = z.enum(["credit", "debit"]);
+export type ConversionDirection = z.infer<typeof conversionDirectionSchema>;
+
+export const conversionOperationSchema = z.object({
+  direction: conversionDirectionSchema.default("credit"),
   accountId: z.coerce.number().int().positive("Selecciona una cuenta"),
   externalAmount: z.coerce.number().positive("Monto debe ser positivo"),
   externalCurrencyId: z.coerce.number().int().positive("Selecciona la moneda de origen"),
@@ -50,7 +54,10 @@ export const depositWithConversionSchema = z.object({
   status: z.enum(["pending", "confirmed"]).default("confirmed"),
   rateOverride: z.coerce.number().positive().nullish(),
 });
-export type DepositWithConversionInput = z.infer<typeof depositWithConversionSchema>;
+export type ConversionOperationInput = z.infer<typeof conversionOperationSchema>;
+
+export const depositWithConversionSchema = conversionOperationSchema;
+export type DepositWithConversionInput = ConversionOperationInput;
 
 export const batchRegularRowSchema = z.object({
   kind: z.literal("regular"),
@@ -65,6 +72,7 @@ export const batchRegularRowSchema = z.object({
 
 export const batchConversionRowSchema = z.object({
   kind: z.literal("conversion"),
+  direction: conversionDirectionSchema.default("credit"),
   accountId: z.coerce.number().int().positive("Selecciona una cuenta"),
   externalAmount: z.coerce.number().positive("Monto debe ser positivo"),
   externalCurrencyId: z.coerce.number().int().positive("Selecciona la moneda de origen"),

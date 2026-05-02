@@ -108,6 +108,7 @@ export function AccountDetailsClient({ account, operations, rules, currencies, a
       accountNumber: account.accountNumber,
       name: account.name,
       balance: account.balance,
+      allowNegativeBalance: account.allowNegativeBalance,
       groupId: account.groupId,
       currencyId: account.currencyId,
       groupCode: account.groupCode,
@@ -286,7 +287,7 @@ export function AccountDetailsClient({ account, operations, rules, currencies, a
                   onSelect={(e) => {
                     e.preventDefault();
                     if (!hasRules) {
-                      toast.error("Asigna al menos una regla para habilitar el depósito con conversión.");
+                      toast.error("Asigna al menos una regla para habilitar la conversión.");
                       return;
                     }
                     setDepositOpen(true);
@@ -294,7 +295,7 @@ export function AccountDetailsClient({ account, operations, rules, currencies, a
                   disabled={!hasRules}
                 >
                   <ArrowDownLeft className="h-4 w-4 text-[var(--brand)]" />
-                  <span>Depósito con conversión</span>
+                  <span>Conversión</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={(e) => {
@@ -365,7 +366,7 @@ export function AccountDetailsClient({ account, operations, rules, currencies, a
               <Calculator className="h-4 w-4 text-[var(--brand)]" /> Regla de tasa
             </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Tasa que se aplicará al transferir o depositar con conversión desde/hacia esta cuenta.
+              Tasa que se aplicará al transferir o convertir (crédito o débito) desde/hacia esta cuenta.
             </p>
           </div>
           <DropdownMenu>

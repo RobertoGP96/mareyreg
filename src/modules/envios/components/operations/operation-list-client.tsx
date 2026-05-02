@@ -323,7 +323,7 @@ export function OperationListClient({ initialOperations, accounts, currencies }:
               variant="outline"
               onClick={() => setIsDepositConvertOpen(true)}
             >
-              <ArrowDownLeft className="h-4 w-4" /> Depósito con conversión
+              <ArrowRightLeft className="h-4 w-4" /> Conversión
             </Button>
             <Button
               variant="outline"

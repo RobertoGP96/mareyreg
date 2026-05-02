@@ -21,7 +21,7 @@ import {
   previewDepositConversion,
 } from "../../actions/operation-actions";
 import type { OperationFormAccount } from "../../queries/operation-queries";
-import type { BatchRowInput } from "../../lib/schemas";
+import type { BatchRowInput, ConversionDirection } from "../../lib/schemas";
 
 type Props = {
   open: boolean;
@@ -45,6 +45,7 @@ type Row = {
   type: RegularType;
   amount: string;
   // conversion
+  conversionDirection: ConversionDirection;
   externalCurrencyId: string;
   externalAmount: string;
   rateInput: string;
@@ -58,6 +59,7 @@ const newRow = (presetAccountId?: number): Row => ({
   accountId: presetAccountId ? String(presetAccountId) : "",
   type: "deposit",
   amount: "",
+  conversionDirection: "credit",
   externalCurrencyId: "",
   externalAmount: "",
   rateInput: "",
@@ -357,15 +359,16 @@ export function OperationsBatchForm({
       if (row.type === "withdrawal") return -Math.abs(n);
       return n;
     }
+    const sign = row.conversionDirection === "credit" ? 1 : -1;
     const conv = num(row.convertedInput);
-    if (conv != null && conv > 0) return conv;
+    if (conv != null && conv > 0) return sign * conv;
     // fallback: si rate y external están y manualConvertedInput no, computar
     const ext = num(row.externalAmount);
     const rate = num(row.rateInput);
     const dir = directionFor(row);
     if (ext != null && rate != null && rate > 0 && dir) {
       const c = computeConverted(ext, rate, dir);
-      return Number.isFinite(c) ? c : null;
+      return Number.isFinite(c) ? sign * c : null;
     }
     return null;
   };
@@ -455,6 +458,7 @@ export function OperationsBatchForm({
       const overrode = defaultRate != null && Math.abs(userRate - defaultRate) > 1e-10;
       return {
         kind: "conversion",
+        direction: row.conversionDirection,
         accountId: Number(row.accountId),
         externalAmount: Number(row.externalAmount),
         externalCurrencyId: Number(row.externalCurrencyId),
@@ -729,10 +733,36 @@ export function OperationsBatchForm({
                   </div>
                 ) : (
                   <>
+                    <div className="flex items-center gap-1 rounded-md bg-background ring-1 ring-inset ring-border p-0.5 w-fit">
+                      {(["credit", "debit"] as const).map((d) => {
+                        const active = row.conversionDirection === d;
+                        const Icon = d === "credit" ? ArrowDownLeft : ArrowUpRight;
+                        return (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => updateRow(i, { conversionDirection: d })}
+                            className={cn(
+                              "px-2 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-1",
+                              active
+                                ? d === "credit"
+                                  ? "bg-[var(--ops-success)] text-white"
+                                  : "bg-rose-500 text-white"
+                                : "text-muted-foreground hover:text-foreground",
+                            )}
+                          >
+                            <Icon className="h-3 w-3" />
+                            {d === "credit" ? "Crédito" : "Débito"}
+                          </button>
+                        );
+                      })}
+                    </div>
                     <div className="grid grid-cols-12 gap-2">
                       <div className="col-span-12 md:col-span-3">
                         <label className="text-[10px] font-medium text-muted-foreground">
-                          Monto entrante {counter ? `(${counter.code})` : ""}
+                          {row.conversionDirection === "credit"
+                            ? `Monto entrante ${counter ? `(${counter.code})` : ""}`
+                            : `Monto a entregar ${counter ? `(${counter.code})` : ""}`}
                         </label>
                         <Input
                           type="number"
@@ -782,14 +812,17 @@ export function OperationsBatchForm({
                       </div>
                       <div className="col-span-6 md:col-span-3">
                         <label className="text-[10px] font-medium text-muted-foreground">
-                          Acreditará {acc ? `(${acc.currencyCode})` : ""}
+                          {row.conversionDirection === "credit" ? "Acreditará" : "Debitará"} {acc ? `(${acc.currencyCode})` : ""}
                         </label>
                         <Input
                           type="number"
                           step="0.00000001"
                           inputMode="decimal"
                           placeholder="0.00"
-                          className="text-right font-mono tabular-nums font-semibold"
+                          className={cn(
+                            "text-right font-mono tabular-nums font-semibold",
+                            row.conversionDirection === "debit" && "text-rose-500",
+                          )}
                           value={row.convertedInput}
                           onChange={(e) => onConvertedChange(i, e.target.value)}
                           disabled={!counter}
