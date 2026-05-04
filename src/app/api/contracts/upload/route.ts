@@ -43,18 +43,18 @@ export async function POST(request: Request): Promise<NextResponse> {
       body,
       request,
       onBeforeGenerateToken: async (pathname, clientPayload, multipart) => {
-        // La autenticación está protegida por el middleware (ver
-        // src/middleware.ts + auth.config.ts). Si la request llega aquí,
-        // el usuario está autenticado. `auth()` directo en route handlers
-        // tiene un quirk en next-auth v5 y suele devolver null aún con
-        // sesión válida, así que no bloqueamos por eso.
+        // El middleware (auth.config.ts -> authorized) ya bloquea
+        // requests no autenticadas a esta ruta. `auth()` en next-auth v5
+        // a veces devuelve null en route handlers aunque la sesión sea
+        // válida; por eso NO bloqueamos si falla — sólo intentamos
+        // capturar el userId para el tokenPayload (informativo).
         type SessionShape = { user?: { id?: string | number; userId?: string | number } } | null;
         let userId: string | number | null = null;
         try {
           const session = (await auth()) as SessionShape;
           userId = session?.user?.id ?? session?.user?.userId ?? null;
         } catch (authError) {
-          console.warn("[contracts/upload] auth() falló (no bloqueante):", authError);
+          console.warn("[contracts/upload] auth() falló:", authError);
         }
         console.log("[contracts/upload] onBeforeGenerateToken", {
           pathname,
