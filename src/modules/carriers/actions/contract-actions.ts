@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { put, del } from "@vercel/blob";
+import { del } from "@vercel/blob";
 import { createAuditLog, getCurrentUserId } from "@/lib/audit";
 import type { ActionResult } from "@/types";
 import {
@@ -27,43 +27,52 @@ function parseDate(input?: string | null): Date | null {
   return d;
 }
 
+export type CreateContractInput = {
+  driverId: number;
+  contractNo: string;
+  startDate: string;
+  endDate?: string | null;
+  status?: ContractStatus;
+  notes?: string | null;
+  fileUrl: string;
+  fileName: string;
+  fileMime: string;
+  fileSize: number;
+};
+
+/**
+ * Persiste la metadata del contrato. El archivo ya fue subido a Vercel Blob
+ * desde el cliente vía `@vercel/blob/client` `upload()` apuntando a
+ * `/api/contracts/upload`. Si la DB falla, se elimina el blob para no dejar
+ * archivos huérfanos.
+ */
 export async function createContract(
-  formData: FormData
+  input: CreateContractInput
 ): Promise<ActionResult<{ contractId: number; fileUrl: string }>> {
   try {
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      return {
-        success: false,
-        error: "Almacenamiento de archivos no configurado (BLOB_READ_WRITE_TOKEN).",
-      };
-    }
-
-    const file = formData.get("file");
-    const meta = {
-      driverId: formData.get("driverId"),
-      contractNo: formData.get("contractNo"),
-      startDate: formData.get("startDate"),
-      endDate: formData.get("endDate"),
-      status: formData.get("status") ?? "active",
-      notes: formData.get("notes"),
-    };
-
-    const parsed = contractMetaSchema.safeParse(meta);
+    const parsed = contractMetaSchema.safeParse({
+      driverId: input.driverId,
+      contractNo: input.contractNo,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      status: input.status ?? "active",
+      notes: input.notes,
+    });
     if (!parsed.success) {
       return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     }
     const data = parsed.data;
 
-    if (!(file instanceof File)) {
-      return { success: false, error: "Adjunta el archivo del contrato" };
+    if (!input.fileUrl) {
+      return { success: false, error: "Falta la URL del archivo" };
     }
-    if (file.size === 0) {
-      return { success: false, error: "El archivo está vacío" };
+    if (!input.fileSize || input.fileSize <= 0) {
+      return { success: false, error: "Archivo inválido" };
     }
-    if (file.size > CONTRACT_MAX_BYTES) {
+    if (input.fileSize > CONTRACT_MAX_BYTES) {
       return { success: false, error: "El archivo supera 10 MB" };
     }
-    if (!isContractMime(file.type)) {
+    if (!isContractMime(input.fileMime)) {
       return {
         success: false,
         error: `Tipo no soportado. Usa: ${CONTRACT_ACCEPTED_MIME.join(", ")}`,
@@ -84,7 +93,10 @@ export async function createContract(
       where: { driverId: data.driverId },
       select: { driverId: true, fullName: true, status: true },
     });
-    if (!driver) return { success: false, error: "Conductor no encontrado" };
+    if (!driver) {
+      await safeDelBlob(input.fileUrl);
+      return { success: false, error: "Conductor no encontrado" };
+    }
 
     const dup = await db.carrierContract.findUnique({
       where: {
@@ -96,21 +108,14 @@ export async function createContract(
       select: { contractId: true },
     });
     if (dup) {
-      return { success: false, error: `Ya existe un contrato con folio ${data.contractNo} para este conductor` };
+      await safeDelBlob(input.fileUrl);
+      return {
+        success: false,
+        error: `Ya existe un contrato con folio ${data.contractNo} para este conductor`,
+      };
     }
 
     const userId = await getCurrentUserId();
-
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const blob = await put(
-      `contracts/driver-${data.driverId}/${data.contractNo}-${safeName}`,
-      file,
-      {
-        access: "public",
-        addRandomSuffix: true,
-        contentType: file.type,
-      }
-    );
 
     try {
       const created = await db.$transaction(async (tx) => {
@@ -121,10 +126,10 @@ export async function createContract(
             startDate,
             endDate,
             status: data.status,
-            fileUrl: blob.url,
-            fileName: file.name,
-            fileMime: file.type,
-            fileSize: file.size,
+            fileUrl: input.fileUrl,
+            fileName: input.fileName,
+            fileMime: input.fileMime,
+            fileSize: input.fileSize,
             notes: data.notes?.trim() || null,
             createdById: userId ?? null,
           },
@@ -139,7 +144,7 @@ export async function createContract(
             driverId: data.driverId,
             contractNo: data.contractNo,
             status: data.status,
-            fileName: file.name,
+            fileName: input.fileName,
           },
         });
         return c;
@@ -148,20 +153,23 @@ export async function createContract(
       revalidateAll();
       return {
         success: true,
-        data: { contractId: created.contractId, fileUrl: blob.url },
+        data: { contractId: created.contractId, fileUrl: input.fileUrl },
       };
     } catch (dbError) {
-      // Si la DB falla, eliminar el blob para no dejar archivos huérfanos.
-      try {
-        await del(blob.url);
-      } catch (cleanupError) {
-        console.error("Error eliminando blob huérfano:", cleanupError);
-      }
+      await safeDelBlob(input.fileUrl);
       throw dbError;
     }
   } catch (error) {
     console.error("createContract:", error);
     return { success: false, error: "Error al guardar el contrato" };
+  }
+}
+
+async function safeDelBlob(url: string) {
+  try {
+    await del(url);
+  } catch (cleanupError) {
+    console.error("Error eliminando blob:", cleanupError);
   }
 }
 

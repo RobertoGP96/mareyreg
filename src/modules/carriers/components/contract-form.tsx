@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,6 +61,7 @@ export function ContractForm({ open, onOpenChange, drivers, presetDriverId }: Pr
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [driverId, setDriverId] = useState(presetDriverId ? String(presetDriverId) : "");
   const [contractNo, setContractNo] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -134,24 +136,46 @@ export function ContractForm({ open, onOpenChange, drivers, presetDriverId }: Pr
     if (!file) return;
 
     setSubmitting(true);
-    const fd = new FormData();
-    fd.append("driverId", driverId);
-    fd.append("contractNo", contractNo.trim());
-    fd.append("startDate", new Date(startDate).toISOString());
-    if (endDate) fd.append("endDate", new Date(endDate).toISOString());
-    fd.append("status", status);
-    if (notes.trim()) fd.append("notes", notes.trim());
-    fd.append("file", file);
+    setUploadProgress(0);
 
-    const r = await createContract(fd);
-    setSubmitting(false);
-    if (r.success) {
-      toast.success("Contrato registrado");
-      reset();
-      onOpenChange(false);
-      router.refresh();
-    } else {
-      toast.error(r.error);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const pathname = `contracts/driver-${driverId}/${contractNo.trim()}-${safeName}`;
+
+      const blob = await upload(pathname, file, {
+        access: "public",
+        handleUploadUrl: "/api/contracts/upload",
+        contentType: file.type,
+        onUploadProgress: (e) => setUploadProgress(Math.round(e.percentage)),
+      });
+
+      const r = await createContract({
+        driverId: Number(driverId),
+        contractNo: contractNo.trim(),
+        startDate: new Date(startDate).toISOString(),
+        endDate: endDate ? new Date(endDate).toISOString() : null,
+        status,
+        notes: notes.trim() || null,
+        fileUrl: blob.url,
+        fileName: file.name,
+        fileMime: file.type,
+        fileSize: file.size,
+      });
+
+      if (r.success) {
+        toast.success("Contrato registrado");
+        reset();
+        onOpenChange(false);
+        router.refresh();
+      } else {
+        toast.error(r.error);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al subir el archivo";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -319,7 +343,11 @@ export function ContractForm({ open, onOpenChange, drivers, presetDriverId }: Pr
           disabled={submitting || !file}
         >
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-          {submitting ? "Subiendo…" : "Guardar contrato"}
+          {submitting
+            ? uploadProgress > 0 && uploadProgress < 100
+              ? `Subiendo… ${uploadProgress}%`
+              : "Guardando…"
+            : "Guardar contrato"}
         </Button>
       </div>
     </ResponsiveFormDialog>
