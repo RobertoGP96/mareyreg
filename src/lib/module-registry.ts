@@ -26,6 +26,7 @@ import {
   Wallet,
   ArrowRightLeft,
   Clock,
+  FileSignature,
   type LucideIcon,
 } from "lucide-react";
 
@@ -55,6 +56,7 @@ export const modules: AppModule[] = [
       { name: "Conductores", href: "/drivers", icon: Contact },
       { name: "Vehiculos", href: "/vehicles", icon: Truck },
       { name: "Viajes", href: "/trips", icon: Route },
+      { name: "Contratos", href: "/contracts", icon: FileSignature },
     ],
   },
   {

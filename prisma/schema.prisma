@@ -118,14 +118,45 @@ model Driver {
   createdAt            DateTime     @default(now()) @map("created_at")
   updatedAt            DateTime     @default(now()) @updatedAt @map("updated_at")
 
-  entity   Entity    @relation(fields: [entityId], references: [entityId])
-  vehicles Vehicle[]
-  trips    Trip[]
+  entity    Entity            @relation(fields: [entityId], references: [entityId])
+  vehicles  Vehicle[]
+  trips     Trip[]
+  contracts CarrierContract[]
 
   @@index([entityId])
   @@index([identificationNumber])
   @@index([fullName])
   @@map("drivers")
+}
+
+enum CarrierContractStatus {
+  active
+  expired
+  cancelled
+}
+
+model CarrierContract {
+  contractId  Int                   @id @default(autoincrement()) @map("contract_id")
+  driverId    Int                   @map("driver_id")
+  contractNo  String                @map("contract_no")
+  startDate   DateTime              @map("start_date") @db.Date
+  endDate     DateTime?             @map("end_date") @db.Date
+  status      CarrierContractStatus @default(active)
+  fileUrl     String                @map("file_url")
+  fileName    String                @map("file_name")
+  fileMime    String                @map("file_mime")
+  fileSize    Int                   @map("file_size")
+  notes       String?
+  createdById Int?                  @map("created_by_id")
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @default(now()) @updatedAt @map("updated_at")
+
+  driver Driver @relation(fields: [driverId], references: [driverId], onDelete: Restrict)
+
+  @@unique([driverId, contractNo])
+  @@index([driverId, status])
+  @@index([endDate])
+  @@map("carrier_contracts")
 }
 
 model Vehicle {
