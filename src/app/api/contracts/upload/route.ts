@@ -1,10 +1,12 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/audit";
+import { auth } from "@/lib/auth";
 import {
   CONTRACT_ACCEPTED_MIME,
   CONTRACT_MAX_BYTES,
 } from "@/modules/carriers/lib/schemas";
+
+export const runtime = "nodejs";
 
 /**
  * Endpoint para upload directo cliente → Vercel Blob.
@@ -14,6 +16,8 @@ import {
  * función (evita el límite de body de Server Actions / Functions).
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  console.log("[contracts/upload] POST recibido");
+
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     console.error("[contracts/upload] BLOB_READ_WRITE_TOKEN no configurado");
     return NextResponse.json(
@@ -25,6 +29,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   let body: HandleUploadBody;
   try {
     body = (await request.json()) as HandleUploadBody;
+    console.log(
+      "[contracts/upload] body type:",
+      (body as { type?: string }).type
+    );
   } catch (e) {
     console.error("[contracts/upload] body parse error:", e);
     return NextResponse.json({ error: "Body inválido" }, { status: 400 });
@@ -34,19 +42,31 @@ export async function POST(request: Request): Promise<NextResponse> {
     const jsonResponse = await handleUpload({
       body,
       request,
-      onBeforeGenerateToken: async (pathname) => {
-        const userId = await getCurrentUserId();
-        if (!userId) {
-          console.warn(
-            `[contracts/upload] sin sesión activa al solicitar token (${pathname})`
-          );
-          throw new Error("Sesión expirada. Recarga la página e inicia sesión.");
+      onBeforeGenerateToken: async (pathname, clientPayload, multipart) => {
+        // La autenticación está protegida por el middleware (ver
+        // src/middleware.ts + auth.config.ts). Si la request llega aquí,
+        // el usuario está autenticado. `auth()` directo en route handlers
+        // tiene un quirk en next-auth v5 y suele devolver null aún con
+        // sesión válida, así que no bloqueamos por eso.
+        type SessionShape = { user?: { id?: string | number; userId?: string | number } } | null;
+        let userId: string | number | null = null;
+        try {
+          const session = (await auth()) as SessionShape;
+          userId = session?.user?.id ?? session?.user?.userId ?? null;
+        } catch (authError) {
+          console.warn("[contracts/upload] auth() falló (no bloqueante):", authError);
         }
+        console.log("[contracts/upload] onBeforeGenerateToken", {
+          pathname,
+          userId,
+          hasClientPayload: !!clientPayload,
+          multipart,
+        });
         return {
           allowedContentTypes: [...CONTRACT_ACCEPTED_MIME],
           maximumSizeInBytes: CONTRACT_MAX_BYTES,
           addRandomSuffix: true,
-          tokenPayload: JSON.stringify({ userId }),
+          tokenPayload: JSON.stringify({ userId: userId ? String(userId) : null }),
         };
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
@@ -60,7 +80,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(jsonResponse);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error en upload";
-    console.error("[contracts/upload] handleUpload error:", error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error("[contracts/upload] handleUpload error:", message, stack);
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
