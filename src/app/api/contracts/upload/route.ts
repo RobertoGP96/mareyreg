@@ -1,6 +1,6 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getCurrentUserId } from "@/lib/audit";
 import {
   CONTRACT_ACCEPTED_MIME,
   CONTRACT_MAX_BYTES,
@@ -15,37 +15,52 @@ import {
  */
 export async function POST(request: Request): Promise<NextResponse> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    console.error("[contracts/upload] BLOB_READ_WRITE_TOKEN no configurado");
     return NextResponse.json(
-      { error: "BLOB_READ_WRITE_TOKEN no configurado" },
+      { error: "BLOB_READ_WRITE_TOKEN no configurado en el servidor" },
       { status: 500 }
     );
   }
 
-  const body = (await request.json()) as HandleUploadBody;
+  let body: HandleUploadBody;
+  try {
+    body = (await request.json()) as HandleUploadBody;
+  } catch (e) {
+    console.error("[contracts/upload] body parse error:", e);
+    return NextResponse.json({ error: "Body inválido" }, { status: 400 });
+  }
 
   try {
     const jsonResponse = await handleUpload({
       body,
       request,
-      onBeforeGenerateToken: async () => {
-        const session = await auth();
-        if (!session?.user?.id) {
-          throw new Error("No autenticado");
+      onBeforeGenerateToken: async (pathname) => {
+        const userId = await getCurrentUserId();
+        if (!userId) {
+          console.warn(
+            `[contracts/upload] sin sesión activa al solicitar token (${pathname})`
+          );
+          throw new Error("Sesión expirada. Recarga la página e inicia sesión.");
         }
         return {
           allowedContentTypes: [...CONTRACT_ACCEPTED_MIME],
           maximumSizeInBytes: CONTRACT_MAX_BYTES,
           addRandomSuffix: true,
+          tokenPayload: JSON.stringify({ userId }),
         };
       },
-      onUploadCompleted: async () => {
-        // No-op: la metadata se guarda en DB desde el cliente vía
-        // createContract después de recibir la URL del blob.
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        console.log(
+          "[contracts/upload] completed",
+          blob.url,
+          tokenPayload ? JSON.parse(tokenPayload) : null
+        );
       },
     });
     return NextResponse.json(jsonResponse);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error en upload";
+    console.error("[contracts/upload] handleUpload error:", error);
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }
