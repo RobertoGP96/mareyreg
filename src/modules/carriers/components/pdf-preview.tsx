@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Loader2, AlertTriangle, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,9 +9,10 @@ import { cn } from "@/lib/utils";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-// Worker servido desde unpkg (cacheado por el navegador tras la primera carga).
-// react-pdf >= 10 usa archivo .mjs.
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// Worker self-hosteado en /public/pdfjs/ (más confiable que unpkg/CDNs externos
+// y evita problemas de CSP/CORS). Sincronizado manualmente con la versión
+// instalada de pdfjs-dist (ver scripts/copy-pdf-worker o postinstall).
+pdfjs.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
 
 type Props = {
   /** URL del PDF (preferiblemente la del proxy /api/contracts/[id]/file). */
@@ -28,6 +29,21 @@ export function PdfPreview({ src, fileName, className }: Props) {
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [width, setWidth] = useState<number | null>(null);
+
+  // El objeto `file` y `options` deben ser estables — si cambian de identidad
+  // entre renders, react-pdf re-descarga el PDF.
+  const file = useMemo(
+    () => ({ url: src, withCredentials: true }),
+    [src],
+  );
+  const documentOptions = useMemo(
+    () => ({
+      cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/cmaps/`,
+      cMapPacked: true,
+      withCredentials: true,
+    }),
+    [],
+  );
 
   // Ajuste de ancho responsivo: la página se renderiza al ancho del contenedor.
   useEffect(() => {
@@ -92,7 +108,7 @@ export function PdfPreview({ src, fileName, className }: Props) {
 
       <div className="px-3 pb-6 -mt-8">
         <Document
-          file={src}
+          file={file}
           loading={
             <div className="flex items-center justify-center gap-2 py-12 text-xs text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Cargando PDF…
@@ -102,7 +118,9 @@ export function PdfPreview({ src, fileName, className }: Props) {
             <div className="flex flex-col items-center gap-2 py-12 px-4 text-center text-xs text-destructive">
               <AlertTriangle className="h-5 w-5" />
               <div>No se pudo cargar el PDF</div>
-              <div className="text-muted-foreground">{loadError ?? "Error desconocido"}</div>
+              {loadError && (
+                <div className="text-muted-foreground font-mono break-all">{loadError}</div>
+              )}
             </div>
           }
           onLoadSuccess={({ numPages }) => {
@@ -113,11 +131,7 @@ export function PdfPreview({ src, fileName, className }: Props) {
             console.error("[PdfPreview] load error:", err);
             setLoadError(err.message);
           }}
-          options={{
-            // Aumenta el rendimiento desactivando algunos features avanzados.
-            cMapUrl: `https://unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
-            cMapPacked: true,
-          }}
+          options={documentOptions}
         >
           {numPages !== null &&
             Array.from({ length: numPages }, (_, i) => i + 1).map((pageNumber) => (
