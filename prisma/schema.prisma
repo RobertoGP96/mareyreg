@@ -33,6 +33,9 @@ model User {
   modulePermissions UserModulePermission[]
   accountGroups     AccountGroup[]
   accounts          Account[]
+  recipients               Recipient[]
+  cashDeliveriesCreated    CashDelivery[] @relation("CashDeliveryCreatedBy")
+  cashDeliveriesConfirmed  CashDelivery[] @relation("CashDeliveryConfirmedBy")
 
   @@map("users")
 }
@@ -1193,6 +1196,7 @@ model Currency {
   operationsAsCounter Operation[]        @relation("CounterCurrency")
   rulesAsBase         ExchangeRateRule[] @relation("BaseCurrency")
   rulesAsQuote        ExchangeRateRule[] @relation("QuoteCurrency")
+  cashDeliveries      CashDelivery[]
 
   @@map("currencies")
 }
@@ -1314,4 +1318,56 @@ model Operation {
   @@index([reference])
   @@index([exchangeRateRuleId])
   @@map("operations")
+}
+
+enum CashDeliveryStatus {
+  pending
+  delivered
+  cancelled
+}
+
+model Recipient {
+  recipientId Int      @id @default(autoincrement()) @map("recipient_id")
+  userId      Int      @map("user_id")
+  fullName    String   @map("full_name")
+  phone       String?
+  address     String?
+  mapUrl      String?  @map("map_url")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user       User           @relation(fields: [userId], references: [userId], onDelete: Restrict)
+  deliveries CashDelivery[]
+
+  @@index([userId, active])
+  @@index([fullName])
+  @@map("recipients")
+}
+
+model CashDelivery {
+  deliveryId    Int                @id @default(autoincrement()) @map("delivery_id")
+  recipientId   Int                @map("recipient_id")
+  currencyId    Int                @map("currency_id")
+  amount        Decimal            @db.Decimal(20, 8)
+  status        CashDeliveryStatus @default(pending)
+  reference     String?
+  notes         String?
+  occurredAt    DateTime           @default(now()) @map("occurred_at")
+  deliveredAt   DateTime?          @map("delivered_at")
+  cancelledAt   DateTime?          @map("cancelled_at")
+  createdById   Int?               @map("created_by_id")
+  confirmedById Int?               @map("confirmed_by_id")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @default(now()) @updatedAt @map("updated_at")
+
+  recipient   Recipient @relation(fields: [recipientId], references: [recipientId], onDelete: Restrict)
+  currency    Currency  @relation(fields: [currencyId], references: [currencyId], onDelete: Restrict)
+  createdBy   User?     @relation("CashDeliveryCreatedBy", fields: [createdById], references: [userId], onDelete: SetNull)
+  confirmedBy User?     @relation("CashDeliveryConfirmedBy", fields: [confirmedById], references: [userId], onDelete: SetNull)
+
+  @@index([recipientId])
+  @@index([status, occurredAt])
+  @@index([currencyId])
+  @@map("cash_deliveries")
 }

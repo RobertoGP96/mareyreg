@@ -139,6 +139,31 @@ export const assignAccountRulesSchema = z.object({
 });
 export type AssignAccountRulesInput = z.infer<typeof assignAccountRulesSchema>;
 
+export const recipientSchema = z.object({
+  fullName: z.string().trim().min(2, "Nombre mínimo 2 caracteres").max(120),
+  phone: z.string().trim().max(40).nullish(),
+  address: z.string().trim().max(500).nullish(),
+  mapUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .url("URL inválida")
+    .nullish()
+    .or(z.literal("").transform(() => null)),
+  active: z.boolean().optional(),
+});
+export type RecipientInput = z.infer<typeof recipientSchema>;
+
+export const cashDeliverySchema = z.object({
+  recipientId: z.coerce.number().int().positive("Selecciona un destinatario"),
+  currencyId: z.coerce.number().int().positive("Selecciona una moneda"),
+  amount: z.coerce.number().positive("Monto debe ser mayor a 0"),
+  reference: z.string().trim().max(80).nullish(),
+  notes: z.string().trim().max(500).nullish(),
+  occurredAt: z.string().datetime().nullish().or(z.string().length(0).nullish()),
+});
+export type CashDeliveryInput = z.infer<typeof cashDeliverySchema>;
+
 export const accountGroupSchema = z.object({
   code: z
     .string()

@@ -27,6 +27,8 @@ import {
   ArrowRightLeft,
   Clock,
   FileSignature,
+  Send,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -141,6 +143,8 @@ export const modules: AppModule[] = [
       { name: "Cuentas", href: "/envios/cuentas", icon: Wallet },
       { name: "Operaciones", href: "/envios/operaciones", icon: ArrowRightLeft },
       { name: "Pendientes", href: "/envios/pendientes", icon: Clock },
+      { name: "Entregas", href: "/envios/entregas", icon: Send },
+      { name: "Destinatarios", href: "/envios/destinatarios", icon: UserRound },
       { name: "Tasas de cambio", href: "/envios/tasas", icon: LineChart },
       { name: "Monedas", href: "/envios/monedas", icon: CircleDollarSign },
     ],
