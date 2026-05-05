@@ -22,7 +22,13 @@ export const authConfig: NextAuthConfig = {
       // handler (onBeforeGenerateToken) y handleUpload verifica la firma del
       // callback internamente, así que el middleware NO debe bloquearlo.
       const isPublicApi = pathname === "/api/contracts/upload";
-      const isPublic = publicPaths.some((p) => pathname.startsWith(p)) || isPublicApi;
+      const isPublicAsset =
+        pathname === "/manifest.webmanifest" ||
+        pathname === "/manifest.json" ||
+        pathname === "/robots.txt" ||
+        pathname === "/sitemap.xml";
+      const isPublic =
+        publicPaths.some((p) => pathname.startsWith(p)) || isPublicApi || isPublicAsset;
 
       if (isPublic) return true;
       if (!isLoggedIn) return false;

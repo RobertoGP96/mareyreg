@@ -26,6 +26,7 @@ export const metadata: Metadata = {
   title: "GR Technology · Soluciones que avanzan contigo",
   description:
     "Plataforma operativa de logística, pacas, inventario y ventas — integrados en un solo sistema.",
+  manifest: "/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {
