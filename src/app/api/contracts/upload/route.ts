@@ -43,11 +43,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       body,
       request,
       onBeforeGenerateToken: async (pathname, clientPayload, multipart) => {
-        // El middleware (auth.config.ts -> authorized) ya bloquea
-        // requests no autenticadas a esta ruta. `auth()` en next-auth v5
-        // a veces devuelve null en route handlers aunque la sesión sea
-        // válida; por eso NO bloqueamos si falla — sólo intentamos
-        // capturar el userId para el tokenPayload (informativo).
+        // Esta ruta está fuera del middleware de auth (ver auth.config.ts)
+        // porque Vercel Blob hace callbacks server-to-server sin cookies.
+        // Aquí (en la generación de token, que SÍ viene del navegador del
+        // usuario) validamos la sesión.
         type SessionShape = { user?: { id?: string | number; userId?: string | number } } | null;
         let userId: string | number | null = null;
         try {
@@ -62,11 +61,14 @@ export async function POST(request: Request): Promise<NextResponse> {
           hasClientPayload: !!clientPayload,
           multipart,
         });
+        if (!userId) {
+          throw new Error("No autenticado. Recarga la página e inicia sesión.");
+        }
         return {
           allowedContentTypes: [...CONTRACT_ACCEPTED_MIME],
           maximumSizeInBytes: CONTRACT_MAX_BYTES,
           addRandomSuffix: true,
-          tokenPayload: JSON.stringify({ userId: userId ? String(userId) : null }),
+          tokenPayload: JSON.stringify({ userId: String(userId) }),
         };
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {

@@ -17,7 +17,12 @@ export const authConfig: NextAuthConfig = {
       const { pathname } = request.nextUrl;
 
       const publicPaths = ["/login", "/register"];
-      const isPublic = publicPaths.some((p) => pathname.startsWith(p));
+      // /api/contracts/upload recibe callbacks server-to-server desde Vercel Blob
+      // (onUploadCompleted) sin cookies. La autenticación se valida dentro del
+      // handler (onBeforeGenerateToken) y handleUpload verifica la firma del
+      // callback internamente, así que el middleware NO debe bloquearlo.
+      const isPublicApi = pathname === "/api/contracts/upload";
+      const isPublic = publicPaths.some((p) => pathname.startsWith(p)) || isPublicApi;
 
       if (isPublic) return true;
       if (!isLoggedIn) return false;
