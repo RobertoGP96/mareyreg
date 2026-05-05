@@ -19,6 +19,13 @@ type Props = {
   fileUrl: string;
   fileName: string;
   fileMime: string;
+  /**
+   * URL inline servida por nuestro proxy (/api/contracts/[id]/file).
+   * Necesaria para PDFs porque Vercel Blob añade Content-Security-Policy
+   * que bloquea el render inline en iframe; el proxy elimina ese header.
+   * Si no se pasa, se cae a `fileUrl` (puede forzar descarga).
+   */
+  inlineUrl?: string;
   className?: string;
   /** Altura mínima del visor; default h-[70vh] */
   heightClassName?: string;
@@ -38,9 +45,11 @@ export function ContractViewer({
   fileUrl,
   fileName,
   fileMime,
+  inlineUrl,
   className,
   heightClassName = "h-[70vh]",
 }: Props) {
+  const pdfSrc = inlineUrl ?? fileUrl;
   const kind = useMemo<"pdf" | "word" | "other">(() => {
     if (isPdfMime(fileMime)) return "pdf";
     if (isWordMime(fileMime)) return "word";
@@ -63,7 +72,7 @@ export function ContractViewer({
     return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
   }, [kind, fileUrl]);
 
-  const openInNewTab = () => window.open(fileUrl, "_blank", "noopener,noreferrer");
+  const openInNewTab = () => window.open(pdfSrc, "_blank", "noopener,noreferrer");
 
   const KindIcon = kind === "pdf" ? FileText : kind === "word" ? FileType2 : FileWarning;
   const kindLabel = kind === "pdf" ? "PDF" : kind === "word" ? "Word" : "Archivo";
@@ -82,7 +91,10 @@ export function ContractViewer({
             <span className="hidden md:inline">Abrir</span>
           </Button>
           <Button size="sm" variant="ghost" asChild title="Descargar">
-            <a href={fileUrl} download={fileName}>
+            <a
+              href={inlineUrl ? `${inlineUrl}?download=1` : fileUrl}
+              download={fileName}
+            >
               <Download className="h-3.5 w-3.5" />
               <span className="hidden md:inline">Descargar</span>
             </a>
@@ -126,10 +138,10 @@ export function ContractViewer({
           </div>
         )}
 
-        {/* Iframe PDF */}
+        {/* Iframe PDF (vía proxy si está disponible) */}
         {previewActive && kind === "pdf" && (
           <iframe
-            src={fileUrl}
+            src={pdfSrc}
             title={fileName}
             className="w-full h-full"
             onLoad={() => setLoaded(true)}

@@ -222,7 +222,10 @@ export function ContractListClient({ initialContracts, drivers }: Props) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
-                <a href={c.fileUrl} download={c.fileName} target="_blank" rel="noopener noreferrer">
+                <a
+                  href={`/api/contracts/${c.contractId}/file?download=1`}
+                  download={c.fileName}
+                >
                   <Download className="h-4 w-4" /> Descargar
                 </a>
               </DropdownMenuItem>

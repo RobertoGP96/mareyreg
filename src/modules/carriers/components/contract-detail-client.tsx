@@ -178,7 +178,10 @@ export function ContractDetailClient({ contract }: Props) {
               </Link>
             </Button>
             <Button asChild variant="outline" size="sm">
-              <a href={contract.fileUrl} download={contract.fileName} target="_blank" rel="noopener noreferrer">
+              <a
+                href={`/api/contracts/${contract.contractId}/file?download=1`}
+                download={contract.fileName}
+              >
                 <Download className="h-4 w-4" /> Descargar
               </a>
             </Button>
@@ -200,6 +203,7 @@ export function ContractDetailClient({ contract }: Props) {
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_320px]">
         <ContractViewer
           fileUrl={contract.fileUrl}
+          inlineUrl={`/api/contracts/${contract.contractId}/file`}
           fileName={contract.fileName}
           fileMime={contract.fileMime}
         />
