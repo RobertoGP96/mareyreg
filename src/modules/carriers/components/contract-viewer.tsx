@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import {
   Download,
@@ -14,6 +15,19 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isPdfMime, isWordMime } from "../lib/schemas";
+
+// react-pdf usa `pdfjs-dist` que es pesado y client-only; lo cargamos dinámicamente.
+const PdfPreview = dynamic(
+  () => import("./pdf-preview").then((m) => m.PdfPreview),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center w-full h-full text-xs text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin mr-2" /> Inicializando visor…
+      </div>
+    ),
+  },
+);
 
 type Props = {
   fileUrl: string;
@@ -122,8 +136,8 @@ export function ContractViewer({
           </div>
         )}
 
-        {/* Loading state mientras el iframe se monta */}
-        {previewActive && !loaded && kind !== "other" && (
+        {/* Loading state mientras el iframe de Word se monta (PDF maneja su propio loader). */}
+        {previewActive && !loaded && kind === "word" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground pointer-events-none">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span>Cargando vista previa…</span>
@@ -138,14 +152,11 @@ export function ContractViewer({
           </div>
         )}
 
-        {/* Iframe PDF (vía proxy si está disponible) */}
+        {/* PDF render con pdfjs (no depende del visor nativo del browser) */}
         {previewActive && kind === "pdf" && (
-          <iframe
-            src={pdfSrc}
-            title={fileName}
-            className="w-full h-full"
-            onLoad={() => setLoaded(true)}
-          />
+          <div className="absolute inset-0">
+            <PdfPreview src={pdfSrc} fileName={fileName} />
+          </div>
         )}
 
         {/* Iframe Word/Office */}
