@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Download,
   ExternalLink,
+  FileText,
+  FileType2,
   FileWarning,
   Loader2,
   Maximize2,
+  Play,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isPdfMime, isWordMime } from "../lib/schemas";
@@ -21,11 +24,15 @@ type Props = {
   heightClassName?: string;
 };
 
+const SLOW_THRESHOLD_MS = 6000;
+
 /**
  * Visor de documentos:
  *  - PDF: <iframe> nativo apuntando al blob público (el navegador renderiza).
- *  - Word (.doc/.docx): Office Online Viewer (https://view.officeapps.live.com/op/embed.aspx?src=...).
- *    Requiere que `fileUrl` sea una URL pública accesible (Vercel Blob `access: "public"`).
+ *    Auto-carga; muestra "tardando demasiado" tras 6s.
+ *  - Word (.doc/.docx): Office Online Viewer (view.officeapps.live.com).
+ *    Opt-in (botón "Cargar vista previa") porque suele tardar 5-15s la
+ *    primera vez. Mientras tanto se muestra un placeholder con descarga.
  */
 export function ContractViewer({
   fileUrl,
@@ -34,13 +41,22 @@ export function ContractViewer({
   className,
   heightClassName = "h-[70vh]",
 }: Props) {
-  const [loaded, setLoaded] = useState(false);
-
   const kind = useMemo<"pdf" | "word" | "other">(() => {
     if (isPdfMime(fileMime)) return "pdf";
     if (isWordMime(fileMime)) return "word";
     return "other";
   }, [fileMime]);
+
+  // PDF carga inmediato; Word espera click del usuario.
+  const [previewActive, setPreviewActive] = useState(kind === "pdf");
+  const [loaded, setLoaded] = useState(false);
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    if (!previewActive || loaded) return;
+    const t = setTimeout(() => setSlow(true), SLOW_THRESHOLD_MS);
+    return () => clearTimeout(t);
+  }, [previewActive, loaded]);
 
   const officeUrl = useMemo(() => {
     if (kind !== "word") return null;
@@ -49,14 +65,16 @@ export function ContractViewer({
 
   const openInNewTab = () => window.open(fileUrl, "_blank", "noopener,noreferrer");
 
+  const KindIcon = kind === "pdf" ? FileText : kind === "word" ? FileType2 : FileWarning;
+  const kindLabel = kind === "pdf" ? "PDF" : kind === "word" ? "Word" : "Archivo";
+
   return (
     <div className={cn("rounded-md ring-1 ring-inset ring-border overflow-hidden bg-muted/20", className)}>
       <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-background/50">
-        <div className="text-xs truncate flex-1">
-          <span className="font-medium">{fileName}</span>
-          <span className="ml-2 text-muted-foreground uppercase">
-            {kind === "pdf" ? "PDF" : kind === "word" ? "Word" : "Archivo"}
-          </span>
+        <div className="text-xs truncate flex-1 flex items-center gap-2">
+          <KindIcon className={cn("h-3.5 w-3.5 shrink-0", kind === "pdf" ? "text-rose-500" : kind === "word" ? "text-sky-500" : "text-muted-foreground")} />
+          <span className="font-medium truncate">{fileName}</span>
+          <span className="text-muted-foreground uppercase shrink-0">{kindLabel}</span>
         </div>
         <div className="flex items-center gap-1">
           <Button size="sm" variant="ghost" onClick={openInNewTab} title="Abrir en pestaña nueva">
@@ -73,13 +91,43 @@ export function ContractViewer({
       </div>
 
       <div className={cn("relative w-full bg-background", heightClassName)}>
-        {!loaded && kind !== "other" && (
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin mr-2" /> Cargando vista previa…
+        {/* Placeholder para Word antes del opt-in */}
+        {kind === "word" && !previewActive && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+            <FileType2 className="h-10 w-10 text-sky-500" />
+            <div className="text-sm font-medium">Vista previa de Word</div>
+            <p className="text-xs text-muted-foreground max-w-sm">
+              Se renderiza con Office Online Viewer (Microsoft). Suele tardar entre 5 y 15 segundos la primera vez.
+            </p>
+            <div className="flex gap-2 mt-1">
+              <Button size="sm" variant="brand" onClick={() => setPreviewActive(true)}>
+                <Play className="h-3.5 w-3.5" /> Cargar vista previa
+              </Button>
+              <Button size="sm" variant="outline" onClick={openInNewTab}>
+                <ExternalLink className="h-3.5 w-3.5" /> Descargar y abrir
+              </Button>
+            </div>
           </div>
         )}
 
-        {kind === "pdf" && (
+        {/* Loading state mientras el iframe se monta */}
+        {previewActive && !loaded && kind !== "other" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground pointer-events-none">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Cargando vista previa…</span>
+            {slow && (
+              <div className="flex flex-col items-center gap-2 mt-2 pointer-events-auto">
+                <span className="text-amber-600 dark:text-amber-400">Está tardando más de lo normal.</span>
+                <Button size="sm" variant="outline" onClick={openInNewTab}>
+                  <ExternalLink className="h-3.5 w-3.5" /> Abrir directo
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Iframe PDF */}
+        {previewActive && kind === "pdf" && (
           <iframe
             src={fileUrl}
             title={fileName}
@@ -88,7 +136,8 @@ export function ContractViewer({
           />
         )}
 
-        {kind === "word" && officeUrl && (
+        {/* Iframe Word/Office */}
+        {previewActive && kind === "word" && officeUrl && (
           <iframe
             src={officeUrl}
             title={fileName}
@@ -97,6 +146,7 @@ export function ContractViewer({
           />
         )}
 
+        {/* Formato no soportado */}
         {kind === "other" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
             <FileWarning className="h-10 w-10 text-muted-foreground" />
