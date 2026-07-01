@@ -3,8 +3,25 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
+
+const BUSINESS_ERRORS = new Set([
+  "OC no encontrada",
+  "No se puede cambiar el estado de una OC ya recibida",
+  "No se puede eliminar una OC con recepciones",
+]);
+
+function toUserMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && BUSINESS_ERRORS.has(error.message)) {
+    return error.message;
+  }
+  return fallback;
+}
 
 export interface POLineInput {
   productId: number;
@@ -39,7 +56,7 @@ export async function createPurchaseOrder(
     }
 
     const { subtotal, total } = calcTotals(data.lines);
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     const po = await db.$transaction(async (tx) => {
       const folio = await nextFolio(tx, DOC_TYPES.PURCHASE_ORDER);
@@ -78,9 +95,11 @@ export async function createPurchaseOrder(
     revalidatePath("/purchase-orders");
     return { success: true, data: { poId: po.poId, folio: po.folio } };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para crear una OC" };
+    }
     console.error("Error creating PO:", error);
-    const msg = error instanceof Error ? error.message : "Error al crear la OC";
-    return { success: false, error: msg };
+    return { success: false, error: toUserMessage(error, "Error al crear la OC") };
   }
 }
 
@@ -89,7 +108,7 @@ export async function updatePurchaseOrderStatus(
   status: "draft" | "sent" | "cancelled"
 ): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.purchaseOrder.findUnique({ where: { poId } });
       if (!prev) throw new Error("OC no encontrada");
@@ -110,15 +129,17 @@ export async function updatePurchaseOrderStatus(
     revalidatePath("/purchase-orders");
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para actualizar una OC" };
+    }
     console.error("Error updating PO status:", error);
-    const msg = error instanceof Error ? error.message : "Error al actualizar la OC";
-    return { success: false, error: msg };
+    return { success: false, error: toUserMessage(error, "Error al actualizar la OC") };
   }
 }
 
 export async function deletePurchaseOrder(poId: number): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.purchaseOrder.findUnique({
         where: { poId },
@@ -139,8 +160,10 @@ export async function deletePurchaseOrder(poId: number): Promise<ActionResult<vo
     revalidatePath("/purchase-orders");
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para eliminar una OC" };
+    }
     console.error("Error deleting PO:", error);
-    const msg = error instanceof Error ? error.message : "Error al eliminar la OC";
-    return { success: false, error: msg };
+    return { success: false, error: toUserMessage(error, "Error al eliminar la OC") };
   }
 }
