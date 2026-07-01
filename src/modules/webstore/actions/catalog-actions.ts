@@ -6,6 +6,7 @@ import { createAuditLog, getCurrentUserId } from "@/lib/audit";
 import type { ActionResult } from "@/types";
 import { updateProduct } from "@/modules/inventory/actions/product-actions";
 import { updatePriceSchema, toggleFlagSchema } from "../lib/catalog-schemas";
+import { getDiscountsByProduct, type ProductDiscountRow } from "../queries/catalog-queries";
 
 const CATALOG_PATH = "/webstore/catalogo";
 
@@ -78,4 +79,16 @@ export async function updateWebstorePrice(
   const res = await updateProduct(productId, { salePrice });
   if (res.success) revalidatePath(CATALOG_PATH);
   return res;
+}
+
+export async function getProductDiscountsAction(
+  productId: number
+): Promise<ActionResult<ProductDiscountRow[]>> {
+  try {
+    const rows = await getDiscountsByProduct(productId);
+    return { success: true, data: rows };
+  } catch (e) {
+    console.error("getProductDiscountsAction:", e);
+    return { success: false, error: "No se pudieron cargar los descuentos del producto." };
+  }
 }
