@@ -5,8 +5,16 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { applyDelta, BalanceError, ConcurrencyError } from "../lib/balance";
-import { RateNotConfiguredError, RateOverlapError } from "../lib/exchange-rate";
+import {
+  RateNotConfiguredError,
+  RateOverlapError,
+  RateOverrideDeviationError,
+  assertRateOverrideWithinBounds,
+  resolveAccountConversion,
+  type ConversionDirection,
+} from "../lib/exchange-rate";
 import type { Prisma } from "@/generated/prisma";
+import { transferSchema, type TransferInput } from "../lib/schemas";
 
 const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
 
@@ -16,6 +24,15 @@ function isAuthError(error: unknown): boolean {
 
 type Tx = Prisma.TransactionClient | typeof db;
 
+/**
+ * Resuelve la tasa aplicable a una transferencia entre dos cuentas delegando
+ * en `resolveAccountConversion`: las reglas asignadas a la cuenta origen
+ * (`fromAccountId`) determinan la tasa entre `fromCurrencyId` (tratada como
+ * "moneda externa" de entrada) y `toCurrencyId` (tratada como "moneda de
+ * cuenta" de salida). Esto reutiliza bounds inclusivos/exclusivos y detección
+ * de solape de `lib/exchange-rate.ts` en vez de duplicar la lógica con
+ * semántica propia.
+ */
 async function resolveTransferRate(
   client: Tx,
   args: {
@@ -25,58 +42,21 @@ async function resolveTransferRate(
     amount: number;
   },
 ) {
-  const links = await client.accountExchangeRateRule.findMany({
-    where: {
-      accountId: args.fromAccountId,
-      rule: {
-        active: true,
-        OR: [
-          { baseCurrencyId: args.fromCurrencyId, quoteCurrencyId: args.toCurrencyId },
-          { baseCurrencyId: args.toCurrencyId, quoteCurrencyId: args.fromCurrencyId },
-        ],
-      },
-    },
-    include: { rule: true },
-    orderBy: { rule: { minAmount: "asc" } },
+  const resolved = await resolveAccountConversion(client, {
+    accountId: args.fromAccountId,
+    accountCurrencyId: args.toCurrencyId,
+    externalCurrencyId: args.fromCurrencyId,
+    externalAmount: args.amount,
   });
-
-  if (links.length === 0) {
-    throw new RateNotConfiguredError({
-      accountId: args.fromAccountId,
-      baseCurrencyId: args.fromCurrencyId,
-      quoteCurrencyId: args.toCurrencyId,
-      amount: args.amount,
-      message: "La cuenta origen no tiene reglas para convertir entre estas monedas",
-    });
-  }
-
-  const matches = links.filter((l) => {
-    const min = Number(l.rule.minAmount);
-    const max = l.rule.maxAmount === null ? null : Number(l.rule.maxAmount);
-    return args.amount >= min && (max === null || args.amount < max);
-  });
-  if (matches.length === 0) {
-    throw new RateNotConfiguredError({
-      accountId: args.fromAccountId,
-      baseCurrencyId: args.fromCurrencyId,
-      quoteCurrencyId: args.toCurrencyId,
-      amount: args.amount,
-    });
-  }
-  const rule = matches[0].rule;
-  const direction: "base_to_quote" | "quote_to_base" =
-    rule.baseCurrencyId === args.fromCurrencyId ? "base_to_quote" : "quote_to_base";
-  const rate = Number(rule.rate);
   return {
-    rate,
-    ruleId: rule.ruleId,
-    ruleName: rule.name,
-    minAmount: Number(rule.minAmount),
-    maxAmount: rule.maxAmount === null ? null : Number(rule.maxAmount),
-    direction,
+    rate: resolved.rate,
+    ruleId: resolved.ruleId,
+    ruleName: resolved.ruleName,
+    minAmount: resolved.minAmount,
+    maxAmount: resolved.maxAmount,
+    direction: resolved.direction,
   };
 }
-import { transferSchema, type TransferInput } from "../lib/schemas";
 
 const revalidateAll = () => {
   revalidatePath("/envios/operaciones");
@@ -183,15 +163,41 @@ export async function createTransfer(
       if (!from.active) throw new Error("La cuenta origen está inactiva");
       if (!to.active) throw new Error("La cuenta destino está inactiva");
 
-      const resolved = await resolveTransferRate(tx, {
-        fromAccountId: from.accountId,
-        fromCurrencyId: from.currencyId,
-        toCurrencyId: to.currencyId,
-        amount: data.amount,
-      });
-      const ruleId = resolved.ruleId;
-      const direction = resolved.direction;
-      const rate = data.rateOverride ?? resolved.rate;
+      let resolved: Awaited<ReturnType<typeof resolveTransferRate>> | null = null;
+      try {
+        resolved = await resolveTransferRate(tx, {
+          fromAccountId: from.accountId,
+          fromCurrencyId: from.currencyId,
+          toCurrencyId: to.currencyId,
+          amount: data.amount,
+        });
+      } catch (e) {
+        if (e instanceof RateNotConfiguredError && data.rateOverride) {
+          resolved = null;
+        } else {
+          throw e;
+        }
+      }
+
+      let rateOverrideUnbounded = false;
+      if (data.rateOverride && resolved) {
+        assertRateOverrideWithinBounds(data.rateOverride, resolved.rate);
+      } else if (data.rateOverride && !resolved) {
+        rateOverrideUnbounded = true;
+      }
+
+      const ruleId = resolved?.ruleId ?? null;
+      const direction: ConversionDirection = resolved?.direction ?? "base_to_quote";
+      const rate = data.rateOverride ?? resolved?.rate;
+      if (rate === undefined) {
+        throw new RateNotConfiguredError({
+          accountId: from.accountId,
+          baseCurrencyId: from.currencyId,
+          quoteCurrencyId: to.currencyId,
+          amount: data.amount,
+          message: "La cuenta origen no tiene reglas para convertir entre estas monedas",
+        });
+      }
       const amountTo =
         direction === "base_to_quote" ? data.amount * rate : data.amount / rate;
 
@@ -262,6 +268,7 @@ export async function createTransfer(
           amountTo,
           direction,
           status,
+          ...(rateOverrideUnbounded ? { rateOverrideUnbounded: true } : {}),
         },
       });
 
@@ -276,6 +283,7 @@ export async function createTransfer(
     if (error instanceof ConcurrencyError) return { success: false, error: "Conflicto de concurrencia, reintenta" };
     if (error instanceof RateNotConfiguredError) return { success: false, error: error.message };
     if (error instanceof RateOverlapError) return { success: false, error: error.message };
+    if (error instanceof RateOverrideDeviationError) return { success: false, error: error.message };
     const KNOWN_MESSAGES = new Set(["La cuenta origen está inactiva", "La cuenta destino está inactiva"]);
     const msg =
       error instanceof Error && KNOWN_MESSAGES.has(error.message)

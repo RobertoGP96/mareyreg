@@ -32,6 +32,47 @@ export class RateOverlapError extends Error {
   }
 }
 
+export class RateOverrideDeviationError extends Error {
+  readonly ruleRate: number;
+  readonly overrideRate: number;
+  readonly maxDeviation: number;
+  constructor(args: { ruleRate: number; overrideRate: number; maxDeviation: number }) {
+    super(
+      `La tasa manual se desvía más de ${(args.maxDeviation * 100).toFixed(0)}% de la tasa configurada`,
+    );
+    this.name = "RateOverrideDeviationError";
+    this.ruleRate = args.ruleRate;
+    this.overrideRate = args.overrideRate;
+    this.maxDeviation = args.maxDeviation;
+  }
+}
+
+/**
+ * Desviación máxima permitida (fracción) entre una tasa manual (`rateOverride`)
+ * y la tasa resuelta por la regla vigente para el par/monto. Si no hay regla
+ * configurada, el override se permite sin límite (es el único mecanismo
+ * disponible) pero debe registrarse con `rateOverrideUnbounded: true` en el
+ * audit log del caller.
+ */
+export const MAX_RATE_OVERRIDE_DEVIATION = 0.1;
+
+/**
+ * Valida que `overrideRate` no se desvíe de `ruleRate` en más de
+ * `MAX_RATE_OVERRIDE_DEVIATION` (10% por defecto). Lanza
+ * RateOverrideDeviationError si excede el límite.
+ */
+export function assertRateOverrideWithinBounds(
+  overrideRate: number,
+  ruleRate: number,
+  maxDeviation: number = MAX_RATE_OVERRIDE_DEVIATION,
+): void {
+  if (ruleRate === 0) return;
+  const deviation = Math.abs(overrideRate - ruleRate) / Math.abs(ruleRate);
+  if (deviation > maxDeviation) {
+    throw new RateOverrideDeviationError({ ruleRate, overrideRate, maxDeviation });
+  }
+}
+
 type Tx = Prisma.TransactionClient | typeof db;
 
 export type RuleBounds = {

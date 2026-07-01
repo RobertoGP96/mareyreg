@@ -19,6 +19,9 @@ import {
   resolveAccountConversion,
   RateNotConfiguredError,
   RateOverlapError,
+  RateOverrideDeviationError,
+  assertRateOverrideWithinBounds,
+  type ConversionDirection as RuleConversionDirection,
 } from "../lib/exchange-rate";
 
 const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
@@ -222,6 +225,7 @@ export async function createOperationsBatch(
         const status = data.status ?? "confirmed";
 
         let opId: number;
+        let rowRateOverrideUnbounded = false;
 
         if (data.kind === "regular") {
           let balanceAfter: number;
@@ -262,28 +266,53 @@ export async function createOperationsBatch(
           }
 
           let rate: number;
-          let ruleId: number;
+          let ruleId: number | null;
           let amountInAccountCurrency: number;
 
+          let resolved: Awaited<ReturnType<typeof resolveAccountConversion>> | null = null;
           try {
-            const resolved = await resolveAccountConversion(tx, {
+            resolved = await resolveAccountConversion(tx, {
               accountId: data.accountId,
               accountCurrencyId: account.currencyId,
               externalCurrencyId: data.externalCurrencyId,
               externalAmount: data.externalAmount,
             });
-            ruleId = resolved.ruleId;
-            rate = data.rateOverride ?? resolved.rate;
-            amountInAccountCurrency =
-              resolved.direction === "base_to_quote"
-                ? data.externalAmount * rate
-                : data.externalAmount / rate;
           } catch (e) {
-            if (e instanceof RateNotConfiguredError) {
+            if (e instanceof RateNotConfiguredError && data.rateOverride) {
+              resolved = null;
+            } else if (e instanceof RateNotConfiguredError) {
               throw new Error(`Fila ${i + 1}: ${e.message}`);
+            } else {
+              throw e;
             }
-            throw e;
           }
+
+          if (data.rateOverride && resolved) {
+            try {
+              assertRateOverrideWithinBounds(data.rateOverride, resolved.rate);
+            } catch (e) {
+              if (e instanceof RateOverrideDeviationError) {
+                throw new Error(`Fila ${i + 1}: ${e.message}`);
+              }
+              throw e;
+            }
+          } else if (data.rateOverride && !resolved) {
+            rowRateOverrideUnbounded = true;
+          }
+
+          ruleId = resolved?.ruleId ?? null;
+          const resolvedRate = data.rateOverride ?? resolved?.rate;
+          if (resolvedRate === undefined) {
+            throw new Error(
+              `Fila ${i + 1}: La cuenta no tiene reglas para convertir entre estas monedas`,
+            );
+          }
+          rate = resolvedRate;
+          const conversionDirection = resolved?.direction ?? "base_to_quote";
+          amountInAccountCurrency =
+            conversionDirection === "base_to_quote"
+              ? data.externalAmount * rate
+              : data.externalAmount / rate;
 
           const isCredit = data.direction === "credit";
           const delta = isCredit ? +amountInAccountCurrency : -amountInAccountCurrency;
@@ -331,7 +360,13 @@ export async function createOperationsBatch(
           entityId: opId,
           module: "envios",
           userId,
-          newValues: { ...data, status, batch: true, batchIndex: i },
+          newValues: {
+            ...data,
+            status,
+            batch: true,
+            batchIndex: i,
+            ...(rowRateOverrideUnbounded ? { rateOverrideUnbounded: true } : {}),
+          },
         });
 
         ids.push(opId);
@@ -349,6 +384,7 @@ export async function createOperationsBatch(
     }
     if (error instanceof RateNotConfiguredError) return { success: false, error: error.message };
     if (error instanceof RateOverlapError) return { success: false, error: error.message };
+    if (error instanceof RateOverrideDeviationError) return { success: false, error: error.message };
     // Los errores "Fila N: ..." se construyen deliberadamente dentro de la
     // transacción como mensajes seguros en español (ver throws arriba); no
     // son un Error.message crudo de una excepción no controlada.
@@ -460,15 +496,41 @@ export async function createConversionOperation(
         throw new Error("La moneda externa debe ser distinta a la moneda de la cuenta");
       }
 
-      const resolved = await resolveAccountConversion(tx, {
-        accountId: account.accountId,
-        accountCurrencyId: account.currencyId,
-        externalCurrencyId: data.externalCurrencyId,
-        externalAmount: data.externalAmount,
-      });
-      const ruleId = resolved.ruleId;
-      const ruleDirection = resolved.direction;
-      const rate = data.rateOverride ?? resolved.rate;
+      let resolved: Awaited<ReturnType<typeof resolveAccountConversion>> | null = null;
+      try {
+        resolved = await resolveAccountConversion(tx, {
+          accountId: account.accountId,
+          accountCurrencyId: account.currencyId,
+          externalCurrencyId: data.externalCurrencyId,
+          externalAmount: data.externalAmount,
+        });
+      } catch (e) {
+        if (e instanceof RateNotConfiguredError && data.rateOverride) {
+          resolved = null;
+        } else {
+          throw e;
+        }
+      }
+
+      let rateOverrideUnbounded = false;
+      if (data.rateOverride && resolved) {
+        assertRateOverrideWithinBounds(data.rateOverride, resolved.rate);
+      } else if (data.rateOverride && !resolved) {
+        rateOverrideUnbounded = true;
+      }
+
+      const ruleId = resolved?.ruleId ?? null;
+      const ruleDirection: RuleConversionDirection = resolved?.direction ?? "base_to_quote";
+      const rate = data.rateOverride ?? resolved?.rate;
+      if (rate === undefined) {
+        throw new RateNotConfiguredError({
+          accountId: account.accountId,
+          baseCurrencyId: data.externalCurrencyId,
+          quoteCurrencyId: account.currencyId,
+          amount: data.externalAmount,
+          message: "La cuenta no tiene reglas para convertir entre estas monedas",
+        });
+      }
       const amountInAccountCurrency =
         ruleDirection === "base_to_quote"
           ? data.externalAmount * rate
@@ -520,6 +582,7 @@ export async function createConversionOperation(
           ruleId,
           status,
           variant: isCredit ? "conversion_credit" : "conversion_debit",
+          ...(rateOverrideUnbounded ? { rateOverrideUnbounded: true } : {}),
         },
       });
 
@@ -538,6 +601,9 @@ export async function createConversionOperation(
       return { success: false, error: error.message };
     }
     if (error instanceof RateOverlapError) {
+      return { success: false, error: error.message };
+    }
+    if (error instanceof RateOverrideDeviationError) {
       return { success: false, error: error.message };
     }
     const KNOWN_MESSAGES = new Set([
