@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import {
   exchangeRateRuleSchema,
   assignAccountRulesSchema,
@@ -14,6 +14,12 @@ import {
   computeAccountRateCoverage,
   type CoverageReport,
 } from "../lib/exchange-rate";
+
+const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
 
 const revalidateAll = () => {
   revalidatePath("/envios/tasas");
@@ -52,7 +58,7 @@ export async function createExchangeRateRule(
     });
     if (dup) return { success: false, error: `Ya existe una regla "${data.name}" con ese par.` };
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const created = await db.$transaction(async (tx) => {
       const r = await tx.exchangeRateRule.create({
         data: {
@@ -81,6 +87,7 @@ export async function createExchangeRateRule(
     revalidateAll();
     return { success: true, data: { ruleId: created.ruleId } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("createExchangeRateRule:", error);
     return { success: false, error: describeDbError(error, "Error al crear la regla") };
   }
@@ -91,7 +98,7 @@ export async function updateExchangeRateRule(
   input: Partial<ExchangeRateRuleInput>,
 ): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.exchangeRateRule.findUnique({ where: { ruleId: id } });
       if (!prev) throw new Error("Regla no encontrada");
@@ -129,8 +136,16 @@ export async function updateExchangeRateRule(
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
-    console.error("updateExchangeRateRule:", error);
-    const fallback = error instanceof Error ? error.message : "Error al actualizar la regla";
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    const KNOWN_MESSAGES = new Set([
+      "Regla no encontrada",
+      "La regla cambió mientras la editabas. Recarga e intenta de nuevo.",
+    ]);
+    const fallback =
+      error instanceof Error && KNOWN_MESSAGES.has(error.message)
+        ? error.message
+        : "Error al actualizar la regla";
+    if (fallback === "Error al actualizar la regla") console.error("updateExchangeRateRule:", error);
     return { success: false, error: describeDbError(error, fallback) };
   }
 }
@@ -139,7 +154,7 @@ export async function toggleExchangeRateRule(
   id: number,
 ): Promise<ActionResult<{ active: boolean }>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const next = await db.$transaction(async (tx) => {
       const prev = await tx.exchangeRateRule.findUnique({ where: { ruleId: id } });
       if (!prev) throw new Error("Regla no encontrada");
@@ -161,6 +176,7 @@ export async function toggleExchangeRateRule(
     revalidateAll();
     return { success: true, data: { active: next } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("toggleExchangeRateRule:", error);
     return { success: false, error: describeDbError(error, "Error al cambiar el estado") };
   }
@@ -175,7 +191,7 @@ export async function deleteExchangeRateRule(id: number): Promise<ActionResult<v
         error: `No se puede eliminar: ${linked} cuenta(s) usan esta regla. Quítala de las cuentas o desactívala primero.`,
       };
     }
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.exchangeRateRule.findUnique({ where: { ruleId: id } });
       await tx.exchangeRateRule.delete({ where: { ruleId: id } });
@@ -191,6 +207,7 @@ export async function deleteExchangeRateRule(id: number): Promise<ActionResult<v
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("deleteExchangeRateRule:", error);
     return { success: false, error: describeDbError(error, "Error al eliminar la regla") };
   }
@@ -206,7 +223,7 @@ export async function assignRulesToAccount(
     }
     const { accountId, ruleIds } = parsed.data;
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const result = await db.$transaction(async (tx) => {
       const account = await tx.account.findUnique({ where: { accountId } });
       if (!account) throw new Error("Cuenta no encontrada");
@@ -249,6 +266,7 @@ export async function assignRulesToAccount(
     revalidateAll();
     return { success: true, data: result };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("assignRulesToAccount:", error);
     return { success: false, error: describeDbError(error, "Error al asignar reglas") };
   }
@@ -259,7 +277,7 @@ export async function unassignRuleFromAccount(
   ruleId: number,
 ): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       await tx.accountExchangeRateRule.delete({
         where: { accountId_ruleId: { accountId, ruleId } },
@@ -276,6 +294,7 @@ export async function unassignRuleFromAccount(
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("unassignRuleFromAccount:", error);
     return { success: false, error: describeDbError(error, "Error al quitar la regla") };
   }

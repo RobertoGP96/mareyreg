@@ -3,8 +3,14 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { accountGroupSchema, type AccountGroupInput } from "../lib/schemas";
+
+const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
 
 const revalidateAll = () => {
   revalidatePath("/envios/grupos");
@@ -27,7 +33,7 @@ export async function createAccountGroup(
     const owner = await db.user.findUnique({ where: { userId: data.userId } });
     if (!owner) return { success: false, error: "Responsable no encontrado" };
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const created = await db.$transaction(async (tx) => {
       const g = await tx.accountGroup.create({
         data: {
@@ -52,6 +58,7 @@ export async function createAccountGroup(
     revalidateAll();
     return { success: true, data: { groupId: created.groupId } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("createAccountGroup:", error);
     return { success: false, error: "Error al crear el grupo" };
   }
@@ -75,7 +82,7 @@ export async function updateAccountGroup(
       if (!owner) return { success: false, error: "Responsable no encontrado" };
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.accountGroup.findUnique({ where: { groupId: id } });
       if (!prev) throw new Error("Grupo no encontrado");
@@ -103,6 +110,7 @@ export async function updateAccountGroup(
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("updateAccountGroup:", error);
     return { success: false, error: "Error al actualizar el grupo" };
   }
@@ -112,7 +120,7 @@ export async function toggleAccountGroup(
   id: number
 ): Promise<ActionResult<{ active: boolean }>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const next = await db.$transaction(async (tx) => {
       const prev = await tx.accountGroup.findUnique({ where: { groupId: id } });
       if (!prev) throw new Error("Grupo no encontrado");
@@ -134,6 +142,7 @@ export async function toggleAccountGroup(
     revalidateAll();
     return { success: true, data: { active: next } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("toggleAccountGroup:", error);
     return { success: false, error: "Error al cambiar el estado" };
   }
@@ -148,7 +157,7 @@ export async function deleteAccountGroup(id: number): Promise<ActionResult<void>
         error: `No se puede eliminar: ${linked} cuenta(s) en el grupo. Desactívalo en su lugar.`,
       };
     }
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.accountGroup.findUnique({ where: { groupId: id } });
       await tx.accountGroup.delete({ where: { groupId: id } });
@@ -164,6 +173,7 @@ export async function deleteAccountGroup(id: number): Promise<ActionResult<void>
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("deleteAccountGroup:", error);
     return { success: false, error: "Error al eliminar el grupo" };
   }

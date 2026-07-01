@@ -3,10 +3,16 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { applyDelta, BalanceError, ConcurrencyError } from "../lib/balance";
-import { RateNotConfiguredError } from "../lib/exchange-rate";
+import { RateNotConfiguredError, RateOverlapError } from "../lib/exchange-rate";
 import type { Prisma } from "@/generated/prisma";
+
+const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
 
 type Tx = Prisma.TransactionClient | typeof db;
 
@@ -160,7 +166,7 @@ export async function createTransfer(
       return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     }
     const data = parsed.data;
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date();
     const status = data.status ?? "confirmed";
     const reference = generateReference();
@@ -265,11 +271,17 @@ export async function createTransfer(
     revalidateAll();
     return { success: true, data: result };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     if (error instanceof BalanceError) return { success: false, error: error.message };
     if (error instanceof ConcurrencyError) return { success: false, error: "Conflicto de concurrencia, reintenta" };
     if (error instanceof RateNotConfiguredError) return { success: false, error: error.message };
-    const msg = error instanceof Error ? error.message : "Error al crear la transferencia";
-    console.error("createTransfer:", error);
+    if (error instanceof RateOverlapError) return { success: false, error: error.message };
+    const KNOWN_MESSAGES = new Set(["La cuenta origen está inactiva", "La cuenta destino está inactiva"]);
+    const msg =
+      error instanceof Error && KNOWN_MESSAGES.has(error.message)
+        ? error.message
+        : "Error al crear la transferencia";
+    if (msg === "Error al crear la transferencia") console.error("createTransfer:", error);
     return { success: false, error: msg };
   }
 }
@@ -278,7 +290,7 @@ export async function confirmTransfer(
   reference: string
 ): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const ops = await tx.operation.findMany({
         where: { reference, status: "pending" },
@@ -323,17 +335,22 @@ export async function confirmTransfer(
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     if (error instanceof BalanceError) return { success: false, error: error.message };
     if (error instanceof ConcurrencyError) return { success: false, error: "Conflicto de concurrencia, reintenta" };
-    const msg = error instanceof Error ? error.message : "Error al confirmar transferencia";
-    console.error("confirmTransfer:", error);
+    const KNOWN_MESSAGES = new Set(["Pareja de transferencia no encontrada o ya confirmada"]);
+    const msg =
+      error instanceof Error && KNOWN_MESSAGES.has(error.message)
+        ? error.message
+        : "Error al confirmar la transferencia";
+    if (msg === "Error al confirmar la transferencia") console.error("confirmTransfer:", error);
     return { success: false, error: msg };
   }
 }
 
 export async function cancelTransfer(reference: string): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const ops = await tx.operation.findMany({
         where: { reference, status: "pending" },
@@ -356,8 +373,13 @@ export async function cancelTransfer(reference: string): Promise<ActionResult<vo
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Error al cancelar transferencia";
-    console.error("cancelTransfer:", error);
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    const KNOWN_MESSAGES = new Set(["Transferencia no encontrada o ya procesada"]);
+    const msg =
+      error instanceof Error && KNOWN_MESSAGES.has(error.message)
+        ? error.message
+        : "Error al cancelar la transferencia";
+    if (msg === "Error al cancelar la transferencia") console.error("cancelTransfer:", error);
     return { success: false, error: msg };
   }
 }
@@ -369,7 +391,7 @@ export async function bulkConfirmOperations(
     if (!operationIds.length) {
       return { success: true, data: { confirmed: 0, failed: [] } };
     }
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     let confirmed = 0;
     const failed: { id: number; error: string }[] = [];
 
@@ -422,11 +444,18 @@ export async function bulkConfirmOperations(
         });
         confirmed++;
       } catch (e) {
-        const msg = e instanceof BalanceError
-          ? e.message
-          : e instanceof Error
+        const KNOWN_MESSAGES = new Set([
+          "No encontrada",
+          "Ya no está pendiente",
+          "Par incompleto",
+        ]);
+        const msg =
+          e instanceof BalanceError
             ? e.message
-            : "Error";
+            : e instanceof Error && KNOWN_MESSAGES.has(e.message)
+              ? e.message
+              : "Error al confirmar";
+        if (msg === "Error al confirmar") console.error(`bulkConfirmOperations[${id}]:`, e);
         failed.push({ id, error: msg });
       }
     }
@@ -434,6 +463,7 @@ export async function bulkConfirmOperations(
     revalidateAll();
     return { success: true, data: { confirmed, failed } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("bulkConfirmOperations:", error);
     return { success: false, error: "Error en confirmación masiva" };
   }

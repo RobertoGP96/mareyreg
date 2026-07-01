@@ -3,13 +3,19 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import {
   accountSchema,
   exchangeRateRuleSchema,
   type AccountInput,
   type ExchangeRateRuleInput,
 } from "../lib/schemas";
+
+const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
 
 const revalidateAll = () => {
   revalidatePath("/envios/cuentas");
@@ -61,7 +67,7 @@ export async function createAccount(
         error: "Activa \"Permitir saldo negativo\" para crear con saldo inicial negativo.",
       };
     }
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     const created = await db.$transaction(async (tx) => {
       const a = await tx.account.create({
@@ -84,7 +90,10 @@ export async function createAccount(
             currencyId: a.currencyId,
             type: "adjustment",
             status: "confirmed",
-            amount: Math.abs(opening),
+            // El signo se conserva (igual que en operation-actions.storedAmountFor):
+            // `adjustment` no deriva el delta del `type`, así que la UI y cualquier
+            // futura confirmación leen `amount` directamente como el delta aplicado.
+            amount: opening,
             description: "Saldo inicial",
             balanceAfter: opening,
             confirmedAt: new Date(),
@@ -107,6 +116,7 @@ export async function createAccount(
     revalidateAll();
     return { success: true, data: { accountId: created.accountId } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("createAccount:", error);
     return { success: false, error: "Error al crear la cuenta" };
   }
@@ -121,7 +131,7 @@ export async function updateAccount(
   }
 ): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.account.findUnique({ where: { accountId: id } });
       if (!prev) throw new Error("Cuenta no encontrada");
@@ -174,8 +184,18 @@ export async function updateAccount(
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Error al actualizar la cuenta";
-    console.error("updateAccount:", error);
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    const KNOWN_MESSAGES = new Set([
+      "Cuenta no encontrada",
+      "Número de cuenta inválido",
+      "No se puede desactivar saldo negativo: la cuenta está actualmente en rojo. Compensa el saldo primero.",
+    ]);
+    const isDup = error instanceof Error && /^Ya existe la cuenta /.test(error.message);
+    const message =
+      error instanceof Error && (KNOWN_MESSAGES.has(error.message) || isDup)
+        ? error.message
+        : "Error al actualizar la cuenta";
+    if (message === "Error al actualizar la cuenta") console.error("updateAccount:", error);
     return { success: false, error: message };
   }
 }
@@ -184,7 +204,7 @@ export async function toggleAccountActive(
   id: number
 ): Promise<ActionResult<{ active: boolean }>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const next = await db.$transaction(async (tx) => {
       const prev = await tx.account.findUnique({ where: { accountId: id } });
       if (!prev) throw new Error("Cuenta no encontrada");
@@ -206,6 +226,7 @@ export async function toggleAccountActive(
     revalidateAll();
     return { success: true, data: { active: next } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("toggleAccountActive:", error);
     return { success: false, error: "Error al cambiar el estado" };
   }
@@ -221,7 +242,7 @@ export async function createRuleAndAssign(
       return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     }
     const data = parsed.data;
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     const result = await db.$transaction(async (tx) => {
       const acc = await tx.account.findUnique({ where: { accountId } });
@@ -277,12 +298,20 @@ export async function createRuleAndAssign(
     revalidateAll();
     return { success: true, data: result };
   } catch (error) {
-    const msg = error instanceof Error
-      ? error.message.includes("err_account_rates_overlap")
-        ? "La nueva regla se solapa con otras reglas asignadas a la cuenta"
-        : error.message
-      : "Error al crear y asignar la regla";
-    console.error("createRuleAndAssign:", error);
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    if (error instanceof Error && error.message.includes("err_account_rates_overlap")) {
+      return { success: false, error: "La nueva regla se solapa con otras reglas asignadas a la cuenta" };
+    }
+    const KNOWN_MESSAGES = new Set([
+      "Cuenta no encontrada",
+      "La regla debe involucrar la moneda de la cuenta (como base o destino)",
+    ]);
+    const isDup = error instanceof Error && /^Ya existe una regla /.test(error.message);
+    const msg =
+      error instanceof Error && (KNOWN_MESSAGES.has(error.message) || isDup)
+        ? error.message
+        : "Error al crear y asignar la regla";
+    if (msg === "Error al crear y asignar la regla") console.error("createRuleAndAssign:", error);
     return { success: false, error: msg };
   }
 }
@@ -296,7 +325,7 @@ export async function deleteAccount(id: number): Promise<ActionResult<void>> {
         error: `No se puede eliminar: ${linked} operación(es) registradas. Desactívala en su lugar.`,
       };
     }
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.account.findUnique({ where: { accountId: id } });
       await tx.account.delete({ where: { accountId: id } });
@@ -312,6 +341,7 @@ export async function deleteAccount(id: number): Promise<ActionResult<void>> {
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("deleteAccount:", error);
     return { success: false, error: "Error al eliminar la cuenta" };
   }

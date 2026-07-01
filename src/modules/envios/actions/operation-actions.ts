@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { applyDelta, BalanceError, ConcurrencyError } from "../lib/balance";
 import {
   operationSchema,
@@ -18,7 +18,14 @@ import {
 import {
   resolveAccountConversion,
   RateNotConfiguredError,
+  RateOverlapError,
 } from "../lib/exchange-rate";
+
+const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
 
 const revalidateAll = () => {
   revalidatePath("/envios/operaciones");
@@ -32,6 +39,18 @@ function deltaFor(type: "deposit" | "withdrawal" | "adjustment", amount: number)
   if (type === "deposit") return Math.abs(amount);
   if (type === "withdrawal") return -Math.abs(amount);
   return amount; // adjustment respeta el signo entrante
+}
+
+// El campo `amount` almacenado debe reflejar el mismo signo que usa `deltaFor`
+// para calcular el delta de balance. deposit/withdrawal derivan el signo de
+// `type`, así que se guardan en valor absoluto; adjustment NO tiene esa
+// derivación (la UI y confirmOperation leen `op.amount` tal cual como delta),
+// por lo que debe conservar el signo capturado en la creación. Si se guardara
+// Math.abs() para adjustment, crear-pendiente-luego-confirmar reconstruiría
+// el delta con signo positivo siempre, invirtiendo ajustes negativos al confirmar.
+function storedAmountFor(type: "deposit" | "withdrawal" | "adjustment", amount: number) {
+  if (type === "adjustment") return amount;
+  return Math.abs(amount);
 }
 
 export async function createOperation(
@@ -54,7 +73,7 @@ export async function createOperation(
     if (!account) return { success: false, error: "Cuenta no encontrada" };
     if (!account.active) return { success: false, error: "La cuenta está inactiva" };
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date();
     const status = data.status ?? "confirmed";
 
@@ -78,7 +97,7 @@ export async function createOperation(
           currencyId: account.currencyId,
           type: data.type,
           status,
-          amount: Math.abs(data.amount),
+          amount: storedAmountFor(data.type, data.amount),
           description: data.description?.trim() || null,
           reference: data.reference?.trim() || null,
           balanceAfter,
@@ -102,6 +121,7 @@ export async function createOperation(
     revalidateAll();
     return { success: true, data: { operationId: created.operationId } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     if (error instanceof BalanceError) {
       return { success: false, error: error.message };
     }
@@ -117,7 +137,7 @@ export async function confirmOperation(
   operationId: number
 ): Promise<ActionResult<{ balanceAfter: number }>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const result = await db.$transaction(async (tx) => {
       const op = await tx.operation.findUnique({ where: { operationId } });
       if (!op) throw new Error("Operación no encontrada");
@@ -159,11 +179,11 @@ export async function confirmOperation(
     revalidateAll();
     return { success: true, data: { balanceAfter: result } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     if (error instanceof BalanceError) return { success: false, error: error.message };
     if (error instanceof ConcurrencyError) return { success: false, error: "Conflicto de concurrencia, reintenta" };
-    const msg = error instanceof Error ? error.message : "Error al confirmar";
     console.error("confirmOperation:", error);
-    return { success: false, error: msg };
+    return { success: false, error: "Error al confirmar la operación" };
   }
 }
 
@@ -186,7 +206,7 @@ export async function createOperationsBatch(
       }
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     const created = await db.$transaction(async (tx) => {
       const ids: number[] = [];
@@ -224,7 +244,7 @@ export async function createOperationsBatch(
               currencyId: account.currencyId,
               type: data.type,
               status,
-              amount: Math.abs(data.amount),
+              amount: storedAmountFor(data.type, data.amount),
               description: data.description?.trim() || null,
               reference: data.reference?.trim() || null,
               balanceAfter,
@@ -322,13 +342,21 @@ export async function createOperationsBatch(
     revalidateAll();
     return { success: true, data: { created } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     if (error instanceof BalanceError) return { success: false, error: error.message };
     if (error instanceof ConcurrencyError) {
       return { success: false, error: "Conflicto de concurrencia, reintenta" };
     }
     if (error instanceof RateNotConfiguredError) return { success: false, error: error.message };
-    const msg = error instanceof Error ? error.message : "Error al registrar el lote";
-    console.error("createOperationsBatch:", error);
+    if (error instanceof RateOverlapError) return { success: false, error: error.message };
+    // Los errores "Fila N: ..." se construyen deliberadamente dentro de la
+    // transacción como mensajes seguros en español (ver throws arriba); no
+    // son un Error.message crudo de una excepción no controlada.
+    const msg =
+      error instanceof Error && /^Fila \d+: /.test(error.message)
+        ? error.message
+        : "Error al registrar el lote";
+    if (msg === "Error al registrar el lote") console.error("createOperationsBatch:", error);
     return { success: false, error: msg };
   }
 }
@@ -417,7 +445,7 @@ export async function createConversionOperation(
       return { success: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     }
     const data = parsed.data;
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const occurredAt = data.occurredAt ? new Date(data.occurredAt) : new Date();
     const status = data.status ?? "confirmed";
     const isCredit = data.direction === "credit";
@@ -501,6 +529,7 @@ export async function createConversionOperation(
     revalidateAll();
     return { success: true, data: { ...result, direction: data.direction } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     if (error instanceof BalanceError) return { success: false, error: error.message };
     if (error instanceof ConcurrencyError) {
       return { success: false, error: "Conflicto de concurrencia, reintenta" };
@@ -508,8 +537,18 @@ export async function createConversionOperation(
     if (error instanceof RateNotConfiguredError) {
       return { success: false, error: error.message };
     }
-    const msg = error instanceof Error ? error.message : "Error al registrar la conversión";
-    console.error("createConversionOperation:", error);
+    if (error instanceof RateOverlapError) {
+      return { success: false, error: error.message };
+    }
+    const KNOWN_MESSAGES = new Set([
+      "La cuenta está inactiva",
+      "La moneda externa debe ser distinta a la moneda de la cuenta",
+    ]);
+    const msg =
+      error instanceof Error && KNOWN_MESSAGES.has(error.message)
+        ? error.message
+        : "Error al registrar la conversión";
+    if (msg === "Error al registrar la conversión") console.error("createConversionOperation:", error);
     return { success: false, error: msg };
   }
 }
@@ -522,7 +561,7 @@ export async function createDepositWithConversion(
 
 export async function cancelOperation(operationId: number): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const op = await tx.operation.findUnique({ where: { operationId } });
       if (!op) throw new Error("Operación no encontrada");
@@ -548,8 +587,13 @@ export async function cancelOperation(operationId: number): Promise<ActionResult
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Error al cancelar";
-    console.error("cancelOperation:", error);
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    const KNOWN_MESSAGES = new Set(["Operación no encontrada", "Solo se pueden cancelar pendientes"]);
+    const msg =
+      error instanceof Error && KNOWN_MESSAGES.has(error.message)
+        ? error.message
+        : "Error al cancelar la operación";
+    if (msg === "Error al cancelar la operación") console.error("cancelOperation:", error);
     return { success: false, error: msg };
   }
 }

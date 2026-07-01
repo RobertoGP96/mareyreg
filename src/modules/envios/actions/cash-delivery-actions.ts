@@ -3,8 +3,14 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId, requireCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { cashDeliverySchema, type CashDeliveryInput } from "../lib/schemas";
+
+const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
 
 const revalidateAll = () => {
   revalidatePath("/envios/entregas");
@@ -72,6 +78,7 @@ export async function createCashDelivery(
     revalidateAll();
     return { success: true, data: { deliveryId: created.deliveryId } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("createCashDelivery:", error);
     return { success: false, error: "Error al registrar la entrega" };
   }
@@ -82,7 +89,7 @@ export async function updateCashDelivery(
   input: Partial<CashDeliveryInput>
 ): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.cashDelivery.findUnique({ where: { deliveryId: id } });
       if (!prev) throw new Error("Entrega no encontrada");
@@ -116,6 +123,7 @@ export async function updateCashDelivery(
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     const message =
       error instanceof Error && error.message === "Solo se pueden editar entregas pendientes"
         ? error.message
@@ -157,6 +165,7 @@ export async function markCashDeliveryDelivered(
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     const message =
       error instanceof Error && error.message === "Solo se pueden confirmar entregas pendientes"
         ? error.message
@@ -168,7 +177,7 @@ export async function markCashDeliveryDelivered(
 
 export async function cancelCashDelivery(id: number): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.cashDelivery.findUnique({ where: { deliveryId: id } });
       if (!prev) throw new Error("Entrega no encontrada");
@@ -195,6 +204,7 @@ export async function cancelCashDelivery(id: number): Promise<ActionResult<void>
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     const message =
       error instanceof Error && error.message === "Solo se pueden cancelar entregas pendientes"
         ? error.message
@@ -206,7 +216,7 @@ export async function cancelCashDelivery(id: number): Promise<ActionResult<void>
 
 export async function deleteCashDelivery(id: number): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.cashDelivery.findUnique({ where: { deliveryId: id } });
       if (!prev) throw new Error("Entrega no encontrada");
@@ -226,6 +236,7 @@ export async function deleteCashDelivery(id: number): Promise<ActionResult<void>
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     const message =
       error instanceof Error && error.message === "No se pueden eliminar entregas ya confirmadas"
         ? error.message

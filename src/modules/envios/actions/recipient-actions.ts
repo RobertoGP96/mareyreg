@@ -3,8 +3,14 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId, requireCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { recipientSchema, type RecipientInput } from "../lib/schemas";
+
+const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
 
 const revalidateAll = () => {
   revalidatePath("/envios/destinatarios");
@@ -53,6 +59,7 @@ export async function createRecipient(
     revalidateAll();
     return { success: true, data: { recipientId: created.recipientId } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("createRecipient:", error);
     return { success: false, error: "Error al crear el destinatario" };
   }
@@ -63,7 +70,7 @@ export async function updateRecipient(
   input: Partial<RecipientInput>
 ): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.recipient.findUnique({ where: { recipientId: id } });
       if (!prev) throw new Error("Destinatario no encontrado");
@@ -91,6 +98,7 @@ export async function updateRecipient(
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("updateRecipient:", error);
     return { success: false, error: "Error al actualizar el destinatario" };
   }
@@ -100,7 +108,7 @@ export async function toggleRecipientActive(
   id: number
 ): Promise<ActionResult<{ active: boolean }>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const next = await db.$transaction(async (tx) => {
       const prev = await tx.recipient.findUnique({ where: { recipientId: id } });
       if (!prev) throw new Error("Destinatario no encontrado");
@@ -122,6 +130,7 @@ export async function toggleRecipientActive(
     revalidateAll();
     return { success: true, data: { active: next } };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("toggleRecipientActive:", error);
     return { success: false, error: "Error al cambiar el estado" };
   }
@@ -136,7 +145,7 @@ export async function deleteRecipient(id: number): Promise<ActionResult<void>> {
         error: `No se puede eliminar: ${linked} entrega(s) registradas. Desactívalo en su lugar.`,
       };
     }
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.recipient.findUnique({ where: { recipientId: id } });
       await tx.recipient.delete({ where: { recipientId: id } });
@@ -152,6 +161,7 @@ export async function deleteRecipient(id: number): Promise<ActionResult<void>> {
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("deleteRecipient:", error);
     return { success: false, error: "Error al eliminar el destinatario" };
   }
