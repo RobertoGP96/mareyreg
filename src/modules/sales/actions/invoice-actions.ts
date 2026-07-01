@@ -3,12 +3,40 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
 import { applyInventoryExit } from "@/lib/valuation";
+import { getEffectivePrice } from "@/modules/inventory/lib/effective-price";
 import type { Prisma } from "@/generated/prisma";
 
 type PrismaTx = Prisma.TransactionClient;
+
+const AUTH_ERROR_MESSAGE = "No autenticado";
+const SESSION_ERROR_RESPONSE =
+  "Tu sesión expiró o no iniciaste sesión. Vuelve a iniciar sesión e intenta de nuevo.";
+
+// Whitelist de errores de negocio conocidos (mensajes ya en español, seguros
+// de mostrar al usuario tal cual). Cualquier otro error se reemplaza por un
+// mensaje generico para no filtrar detalles internos (stack, SQL, etc.).
+function toUserMessage(error: unknown, genericMessage: string): string {
+  if (error instanceof Error) {
+    if (error.message === AUTH_ERROR_MESSAGE) return SESSION_ERROR_RESPONSE;
+    if (
+      error.message.startsWith("Stock insuficiente") ||
+      error.message.startsWith("Stock FIFO insuficiente") ||
+      error.message.startsWith("Producto ") ||
+      error.message === "Factura no encontrada" ||
+      error.message === "Factura cancelada" ||
+      error.message === "Ya cancelada" ||
+      error.message.startsWith("El monto excede el saldo pendiente") ||
+      error.message.startsWith("El monto del cobro excede el total") ||
+      error.message.startsWith("No se puede cancelar una factura con pagos")
+    ) {
+      return error.message;
+    }
+  }
+  return genericMessage;
+}
 
 export interface InvoiceLineInput {
   productId: number;
@@ -36,39 +64,97 @@ export interface InvoiceInput {
   };
 }
 
+export interface PriceOverride {
+  productId: number;
+  catalogPrice: number;
+  chargedPrice: number;
+}
+
 async function dispatchLines(
   tx: PrismaTx,
   params: {
     invoiceId: number;
     folio: string;
     warehouseId: number;
+    customerId: number;
     lines: InvoiceLineInput[];
-    userId: number | null;
+    userId: number;
   }
 ) {
   const lineResults: Array<{ productId: number; quantity: number; unitPrice: number; discount: number; unitCost: number; subtotal: number; lotId: number | null }> = [];
+  const priceOverrides: PriceOverride[] = [];
 
   for (const line of params.lines) {
     const product = await tx.product.findUnique({ where: { productId: line.productId } });
     if (!product) throw new Error(`Producto ${line.productId} no existe`);
 
+    // Precio de catalogo server-side (fuente de verdad). El POS permite
+    // edicion manual legitima del precio, asi que se acepta el precio que
+    // envia el cliente, pero se registra en el audit log cuando difiere del
+    // precio de catalogo, para trazabilidad.
+    const effective = await getEffectivePrice(tx, {
+      productId: line.productId,
+      quantity: line.quantity,
+      customerId: params.customerId,
+    });
+    if (Math.abs(line.unitPrice - effective.finalPrice) > 0.0001) {
+      priceOverrides.push({
+        productId: line.productId,
+        catalogPrice: effective.finalPrice,
+        chargedPrice: line.unitPrice,
+      });
+    }
+
     // Validar stock si no es servicio
     if (!product.isService) {
+      // Descontar StockLevel de forma atomica: si el producto no permite
+      // stock negativo, updateMany solo aplica si currentQuantity >= qty;
+      // si count === 0, no habia stock suficiente. Si allowNegative es
+      // true, se descuenta sin condicion (puede quedar en negativo).
       if (!product.allowNegative) {
-        const lvl = await tx.stockLevel.findUnique({
+        const updated = await tx.stockLevel.updateMany({
+          where: {
+            productId: line.productId,
+            warehouseId: params.warehouseId,
+            currentQuantity: { gte: line.quantity },
+          },
+          data: {
+            currentQuantity: { decrement: line.quantity },
+            lastUpdated: new Date(),
+          },
+        });
+        if (updated.count === 0) {
+          const lvl = await tx.stockLevel.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId: line.productId,
+                warehouseId: params.warehouseId,
+              },
+            },
+          });
+          const current = lvl ? Number(lvl.currentQuantity) : 0;
+          throw new Error(
+            `Stock insuficiente para ${product.name}. Disponible: ${current}, solicitado: ${line.quantity}`
+          );
+        }
+      } else {
+        await tx.stockLevel.upsert({
           where: {
             productId_warehouseId: {
               productId: line.productId,
               warehouseId: params.warehouseId,
             },
           },
+          create: {
+            productId: line.productId,
+            warehouseId: params.warehouseId,
+            currentQuantity: -line.quantity,
+          },
+          update: {
+            currentQuantity: { decrement: line.quantity },
+            lastUpdated: new Date(),
+          },
         });
-        const current = lvl ? Number(lvl.currentQuantity) : 0;
-        if (current < line.quantity) {
-          throw new Error(
-            `Stock insuficiente para ${product.name}. Disponible: ${current}, solicitado: ${line.quantity}`
-          );
-        }
       }
 
       // Valuacion: salida
@@ -89,20 +175,6 @@ async function dispatchLines(
           referenceDoc: params.folio,
           notes: `Venta ${params.folio}`,
           createdBy: params.userId,
-        },
-      });
-
-      // StockLevel
-      await tx.stockLevel.update({
-        where: {
-          productId_warehouseId: {
-            productId: line.productId,
-            warehouseId: params.warehouseId,
-          },
-        },
-        data: {
-          currentQuantity: { decrement: line.quantity },
-          lastUpdated: new Date(),
         },
       });
 
@@ -149,7 +221,7 @@ async function dispatchLines(
     })),
   });
 
-  return lineResults;
+  return { lineResults, priceOverrides };
 }
 
 export async function createInvoice(
@@ -158,11 +230,20 @@ export async function createInvoice(
   try {
     if (!data.lines.length) return { success: false, error: "Agrega al menos una linea" };
     for (const l of data.lines) {
-      if (l.quantity <= 0) return { success: false, error: "Cantidades deben ser > 0" };
-      if (l.unitPrice < 0) return { success: false, error: "Precios no pueden ser negativos" };
+      if (!Number.isInteger(l.quantity) || l.quantity <= 0) {
+        return { success: false, error: "Cantidades deben ser numeros enteros mayores a 0" };
+      }
+      if (!Number.isFinite(l.unitPrice) || l.unitPrice < 0) {
+        return { success: false, error: "Precios no pueden ser negativos" };
+      }
+    }
+    // Tolerancia minima de redondeo para comparar montos monetarios.
+    const ROUNDING_TOLERANCE = 0.01;
+    if (data.immediatePayment && data.immediatePayment.amount <= 0) {
+      return { success: false, error: "El monto del cobro inmediato debe ser mayor a 0" };
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     const result = await db.$transaction(async (tx) => {
       const folio = await nextFolio(tx, DOC_TYPES.INVOICE);
@@ -184,16 +265,26 @@ export async function createInvoice(
         },
       });
 
-      const lines = await dispatchLines(tx, {
+      const { lineResults: lines, priceOverrides } = await dispatchLines(tx, {
         invoiceId: invoice.invoiceId,
         folio,
         warehouseId: data.warehouseId,
+        customerId: data.customerId,
         lines: data.lines,
         userId,
       });
 
       const subtotal = lines.reduce((s, l) => s + l.subtotal, 0);
       const total = subtotal;
+
+      // Validar el cobro inmediato contra el total ya calculado server-side
+      // (no el total que hubiera enviado el cliente), con tolerancia minima
+      // de redondeo, igual que registerInvoicePayment.
+      if (data.immediatePayment && data.immediatePayment.amount > total + ROUNDING_TOLERANCE) {
+        throw new Error(
+          `El monto del cobro excede el total de la factura (${total.toFixed(2)})`
+        );
+      }
 
       await tx.invoice.update({
         where: { invoiceId: invoice.invoiceId },
@@ -238,7 +329,13 @@ export async function createInvoice(
         entityId: invoice.invoiceId,
         module: "sales",
         userId,
-        newValues: { folio, customerId: data.customerId, total, channel: data.channel },
+        newValues: {
+          folio,
+          customerId: data.customerId,
+          total,
+          channel: data.channel,
+          ...(priceOverrides.length > 0 ? { priceOverrides } : {}),
+        },
       });
 
       return { invoice, folio };
@@ -250,7 +347,7 @@ export async function createInvoice(
     return { success: true, data: { invoiceId: result.invoice.invoiceId, folio: result.folio } };
   } catch (error) {
     console.error("Error creating invoice:", error);
-    const msg = error instanceof Error ? error.message : "Error al crear la factura";
+    const msg = toUserMessage(error, "Error al crear la factura");
     return { success: false, error: msg };
   }
 }
@@ -260,9 +357,11 @@ export async function registerInvoicePayment(
   payment: { amount: number; paymentMethod: string; paidAt: string; reference?: string }
 ): Promise<ActionResult<void>> {
   try {
-    if (payment.amount <= 0) return { success: false, error: "El monto debe ser mayor a 0" };
+    if (!Number.isFinite(payment.amount) || payment.amount <= 0) {
+      return { success: false, error: "El monto debe ser mayor a 0" };
+    }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     await db.$transaction(async (tx) => {
       const invoice = await tx.invoice.findUnique({ where: { invoiceId } });
@@ -271,7 +370,8 @@ export async function registerInvoicePayment(
 
       const alreadyPaid = Number(invoice.paid);
       const total = Number(invoice.total);
-      if (alreadyPaid + payment.amount > total + 0.001) {
+      // Tolerancia minima de redondeo para comparar montos monetarios.
+      if (alreadyPaid + payment.amount > total + 0.01) {
         throw new Error(`El monto excede el saldo pendiente (${(total - alreadyPaid).toFixed(2)})`);
       }
 
@@ -309,17 +409,18 @@ export async function registerInvoicePayment(
     });
 
     revalidatePath("/invoices");
+    revalidatePath("/accounts-receivable");
     return { success: true, data: undefined };
   } catch (error) {
     console.error("Error registering payment:", error);
-    const msg = error instanceof Error ? error.message : "Error al registrar el pago";
+    const msg = toUserMessage(error, "Error al registrar el pago");
     return { success: false, error: msg };
   }
 }
 
 export async function cancelInvoice(invoiceId: number): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const invoice = await tx.invoice.findUnique({
         where: { invoiceId },
@@ -355,7 +456,7 @@ export async function cancelInvoice(invoiceId: number): Promise<ActionResult<voi
     return { success: true, data: undefined };
   } catch (error) {
     console.error("Error cancelling invoice:", error);
-    const msg = error instanceof Error ? error.message : "Error al cancelar la factura";
+    const msg = toUserMessage(error, "Error al cancelar la factura");
     return { success: false, error: msg };
   }
 }
