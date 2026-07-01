@@ -416,6 +416,7 @@ model PacaSale {
   clientId      Int?     @map("client_id")
   quantity      Int
   salePrice     Decimal  @map("sale_price")
+  costOfGoods   Decimal  @default(0) @db.Decimal(20, 8) @map("cost_of_goods")
   clientName    String   @map("client_name")
   clientPhone   String?  @map("client_phone")
   paymentMethod String?  @map("payment_method")

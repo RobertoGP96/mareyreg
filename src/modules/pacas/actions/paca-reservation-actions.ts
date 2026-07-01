@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+import { calculateWeightedCost } from "@/modules/pacas/lib/weighted-cost";
 
 function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
@@ -335,9 +336,7 @@ export async function completeReservation(
       const inventory = await tx.pacaInventory.findUnique({
         where: { categoryId: reservation.categoryId },
       });
-      const totalInStock = (inventory?.available ?? 0) + (inventory?.reserved ?? 0);
-      const avgCost = totalInStock > 0 ? Number(inventory?.totalCost ?? 0) / totalInStock : 0;
-      const costToDeduct = avgCost * reservation.quantity;
+      const { costToDeduct } = calculateWeightedCost(inventory, reservation.quantity);
 
       const updated = await tx.pacaInventory.updateMany({
         where: { categoryId: reservation.categoryId, reserved: { gte: reservation.quantity } },
@@ -362,6 +361,7 @@ export async function completeReservation(
           clientId: reservation.clientId,
           quantity: reservation.quantity,
           salePrice: saleData.salePrice,
+          costOfGoods: costToDeduct,
           clientName: reservation.clientName,
           clientPhone: reservation.clientPhone,
           paymentMethod: saleData.paymentMethod || null,

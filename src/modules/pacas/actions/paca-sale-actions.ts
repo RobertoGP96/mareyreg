@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+import { calculateWeightedCost } from "@/modules/pacas/lib/weighted-cost";
 
 function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
@@ -41,9 +42,7 @@ export async function createSale(data: {
       if (!inventory) {
         throw new Error("No hay inventario para esta categoria");
       }
-      const totalInStock = inventory.available + inventory.reserved;
-      const avgCost = totalInStock > 0 ? Number(inventory.totalCost) / totalInStock : 0;
-      const costToDeduct = avgCost * data.quantity;
+      const { costToDeduct } = calculateWeightedCost(inventory, data.quantity);
 
       const updated = await tx.pacaInventory.updateMany({
         where: { categoryId: data.categoryId, available: { gte: data.quantity } },
@@ -62,6 +61,7 @@ export async function createSale(data: {
           categoryId: data.categoryId,
           quantity: data.quantity,
           salePrice: data.salePrice,
+          costOfGoods: costToDeduct,
           clientName: data.clientName,
           clientPhone: data.clientPhone || null,
           paymentMethod: data.paymentMethod || null,
@@ -127,13 +127,12 @@ export async function deleteSale(id: number): Promise<ActionResult<void>> {
 
       await tx.pacaSale.delete({ where: { saleId: id } });
 
-      // Recalcular costo a devolver usando el precio de compra promedio historico
-      // Como no tenemos el costo exacto, usamos 0 (no afecta el totalCost al revertir)
       const updated = await tx.pacaInventory.updateMany({
         where: { categoryId: sale.categoryId, sold: { gte: sale.quantity } },
         data: {
           sold: { decrement: sale.quantity },
           available: { increment: sale.quantity },
+          totalCost: { increment: sale.costOfGoods },
         },
       });
       if (updated.count !== 1) {
