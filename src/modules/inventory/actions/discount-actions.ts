@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 
 export interface DiscountInput {
   name: string;
@@ -40,7 +40,7 @@ export async function createDiscount(
     const validationError = validate(data);
     if (validationError) return { success: false, error: validationError };
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const discount = await db.$transaction(async (tx) => {
       const d = await tx.discount.create({
         data: {
@@ -70,6 +70,9 @@ export async function createDiscount(
     revalidatePath("/discounts");
     return { success: true, data: { discountId: discount.discountId } };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error creating discount:", error);
     return { success: false, error: "Error al crear el descuento" };
   }
@@ -83,7 +86,7 @@ export async function updateDiscount(
     const validationError = validate(data);
     if (validationError) return { success: false, error: validationError };
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.discount.findUnique({ where: { discountId: id } });
 
@@ -128,6 +131,9 @@ export async function updateDiscount(
     if (error instanceof Error && error.message === "STALE_VERSION") {
       return { success: false, error: "El descuento fue modificado por otra persona. Recarga e intenta de nuevo." };
     }
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error updating discount:", error);
     return { success: false, error: "Error al actualizar el descuento" };
   }
@@ -135,7 +141,7 @@ export async function updateDiscount(
 
 export async function toggleDiscount(id: number, isActive: boolean): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       await tx.discount.update({ where: { discountId: id }, data: { isActive } });
       await createAuditLog(tx, {
@@ -150,6 +156,9 @@ export async function toggleDiscount(id: number, isActive: boolean): Promise<Act
     revalidatePath("/discounts");
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error toggling discount:", error);
     return { success: false, error: "Error al cambiar el estado del descuento" };
   }
@@ -157,7 +166,7 @@ export async function toggleDiscount(id: number, isActive: boolean): Promise<Act
 
 export async function deleteDiscount(id: number): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.discount.findUnique({ where: { discountId: id } });
       await tx.discount.delete({ where: { discountId: id } });
@@ -173,6 +182,9 @@ export async function deleteDiscount(id: number): Promise<ActionResult<void>> {
     revalidatePath("/discounts");
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error deleting discount:", error);
     return { success: false, error: "Error al eliminar el descuento" };
   }

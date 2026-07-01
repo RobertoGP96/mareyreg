@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 
 export async function createWarehouse(data: {
   name: string;
@@ -14,7 +14,7 @@ export async function createWarehouse(data: {
   contactPhone?: string;
 }): Promise<ActionResult<{ warehouseId: number }>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const warehouse = await db.$transaction(async (tx) => {
       const w = await tx.warehouse.create({
         data: {
@@ -40,6 +40,9 @@ export async function createWarehouse(data: {
     revalidatePath("/warehouses");
     return { success: true, data: { warehouseId: warehouse.warehouseId } };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error creating warehouse:", error);
     return { success: false, error: "Error al crear el almacen" };
   }
@@ -58,7 +61,7 @@ export async function updateWarehouse(
   }
 ): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.warehouse.findUnique({ where: { warehouseId: id } });
       await tx.warehouse.update({
@@ -87,6 +90,9 @@ export async function updateWarehouse(
     revalidatePath("/warehouses");
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error updating warehouse:", error);
     return { success: false, error: "Error al actualizar el almacen" };
   }
@@ -94,7 +100,7 @@ export async function updateWarehouse(
 
 export async function deleteWarehouse(id: number): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.warehouse.findUnique({ where: { warehouseId: id } });
       await tx.warehouse.delete({ where: { warehouseId: id } });
@@ -110,6 +116,9 @@ export async function deleteWarehouse(id: number): Promise<ActionResult<void>> {
     revalidatePath("/warehouses");
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error deleting warehouse:", error);
     return { success: false, error: "Error al eliminar el almacen. Verifique que no tiene stock o pacas asociadas." };
   }

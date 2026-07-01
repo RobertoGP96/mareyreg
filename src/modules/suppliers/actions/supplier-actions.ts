@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 
 export interface SupplierInput {
   name: string;
@@ -20,7 +20,7 @@ export async function createSupplier(
   data: SupplierInput
 ): Promise<ActionResult<{ supplierId: number }>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const supplier = await db.$transaction(async (tx) => {
       const s = await tx.supplier.create({
         data: {
@@ -47,6 +47,9 @@ export async function createSupplier(
     revalidatePath("/suppliers");
     return { success: true, data: { supplierId: supplier.supplierId } };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error creating supplier:", error);
     return { success: false, error: "Error al crear el proveedor" };
   }
@@ -57,7 +60,7 @@ export async function updateSupplier(
   data: Partial<SupplierInput> & { isActive?: boolean }
 ): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.supplier.findUnique({ where: { supplierId: id } });
       await tx.supplier.update({
@@ -87,6 +90,9 @@ export async function updateSupplier(
     revalidatePath("/suppliers");
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error updating supplier:", error);
     return { success: false, error: "Error al actualizar el proveedor" };
   }
@@ -94,7 +100,7 @@ export async function updateSupplier(
 
 export async function deleteSupplier(id: number): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.supplier.findUnique({ where: { supplierId: id } });
       await tx.supplier.delete({ where: { supplierId: id } });
@@ -110,6 +116,9 @@ export async function deleteSupplier(id: number): Promise<ActionResult<void>> {
     revalidatePath("/suppliers");
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error deleting supplier:", error);
     return { success: false, error: "Error al eliminar el proveedor. Verifique que no tenga OC asociadas." };
   }

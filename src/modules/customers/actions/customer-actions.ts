@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 
 export interface CustomerInput {
   name: string;
@@ -22,7 +22,7 @@ export async function createCustomer(
   data: CustomerInput
 ): Promise<ActionResult<{ customerId: number }>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const customer = await db.$transaction(async (tx) => {
       const c = await tx.customer.create({
         data: {
@@ -51,6 +51,9 @@ export async function createCustomer(
     revalidatePath("/customers");
     return { success: true, data: { customerId: customer.customerId } };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error creating customer:", error);
     return { success: false, error: "Error al crear el cliente" };
   }
@@ -61,7 +64,7 @@ export async function updateCustomer(
   data: Partial<CustomerInput> & { isActive?: boolean }
 ): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.customer.findUnique({ where: { customerId: id } });
       await tx.customer.update({
@@ -93,6 +96,9 @@ export async function updateCustomer(
     revalidatePath("/customers");
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error updating customer:", error);
     return { success: false, error: "Error al actualizar el cliente" };
   }
@@ -100,7 +106,7 @@ export async function updateCustomer(
 
 export async function deleteCustomer(id: number): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.customer.findUnique({ where: { customerId: id } });
       await tx.customer.delete({ where: { customerId: id } });
@@ -116,6 +122,9 @@ export async function deleteCustomer(id: number): Promise<ActionResult<void>> {
     revalidatePath("/customers");
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error deleting customer:", error);
     return { success: false, error: "Error al eliminar el cliente. Verifique que no tenga facturas asociadas." };
   }

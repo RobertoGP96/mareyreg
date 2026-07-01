@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { del } from "@vercel/blob";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import type { ActionResult } from "@/types";
 import {
   CONTRACT_ACCEPTED_MIME,
@@ -115,7 +115,7 @@ export async function createContract(
       };
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     try {
       const created = await db.$transaction(async (tx) => {
@@ -160,6 +160,9 @@ export async function createContract(
       throw dbError;
     }
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("createContract:", error);
     return { success: false, error: "Error al guardar el contrato" };
   }
@@ -230,7 +233,7 @@ export async function updateContract(
       }
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     await db.$transaction(async (tx) => {
       await tx.carrierContract.update({
@@ -261,6 +264,9 @@ export async function updateContract(
     revalidatePath(`/contracts/${contractId}`);
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("updateContract:", error);
     return { success: false, error: "Error al actualizar el contrato" };
   }
@@ -284,7 +290,7 @@ export async function deleteContract(
     });
     if (!current) return { success: false, error: "Contrato no encontrado" };
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     await db.$transaction(async (tx) => {
       await tx.carrierContract.delete({ where: { contractId } });
@@ -311,6 +317,9 @@ export async function deleteContract(
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("deleteContract:", error);
     return { success: false, error: "Error al eliminar el contrato" };
   }

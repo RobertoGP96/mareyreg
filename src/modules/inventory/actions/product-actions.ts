@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 
 export async function createProduct(data: {
   name: string;
@@ -46,7 +46,7 @@ export async function createProduct(data: {
       }
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const product = await db.$transaction(async (tx) => {
       const p = await tx.product.create({
         data: {
@@ -90,6 +90,9 @@ export async function createProduct(data: {
     revalidatePath("/products");
     return { success: true, data: { productId: product.productId } };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error creating product:", error);
     return { success: false, error: "Error al crear el producto" };
   }
@@ -126,7 +129,7 @@ export async function updateProduct(
   }
 ): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.product.findUnique({ where: { productId: id } });
       await tx.product.update({
@@ -193,6 +196,9 @@ export async function updateProduct(
     revalidatePath("/products");
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error updating product:", error);
     return { success: false, error: "Error al actualizar el producto" };
   }
@@ -237,7 +243,7 @@ export async function getProductPriceHistoryAction(
 
 export async function deleteProduct(id: number): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.product.findUnique({ where: { productId: id } });
       await tx.product.delete({ where: { productId: id } });
@@ -253,6 +259,9 @@ export async function deleteProduct(id: number): Promise<ActionResult<void>> {
     revalidatePath("/products");
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
     console.error("Error deleting product:", error);
     return { success: false, error: "Error al eliminar el producto. Verifique que no tiene movimientos de stock." };
   }
