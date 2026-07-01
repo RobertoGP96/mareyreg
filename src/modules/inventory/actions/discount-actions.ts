@@ -16,6 +16,7 @@ export interface DiscountInput {
   category?: string;
   customerId?: number;
   stackable?: boolean;
+  version?: number;
 }
 
 function validate(data: DiscountInput): string | null {
@@ -85,21 +86,31 @@ export async function updateDiscount(
     const userId = await getCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.discount.findUnique({ where: { discountId: id } });
-      await tx.discount.update({
-        where: { discountId: id },
-        data: {
-          name: data.name,
-          type: data.type,
-          value: data.value,
-          minQty: data.minQty ?? null,
-          startsAt: data.startsAt ? new Date(data.startsAt) : null,
-          endsAt: data.endsAt ? new Date(data.endsAt) : null,
-          productId: data.productId ?? null,
-          category: data.category ?? null,
-          customerId: data.customerId ?? null,
-          stackable: data.stackable ?? false,
-        },
-      });
+
+      // Reusa el `prev` ya obtenido arriba — NO vuelvas a hacer findUnique.
+      const discountData = {
+        name: data.name,
+        type: data.type,
+        value: data.value,
+        minQty: data.minQty ?? null,
+        startsAt: data.startsAt ? new Date(data.startsAt) : null,
+        endsAt: data.endsAt ? new Date(data.endsAt) : null,
+        productId: data.productId ?? null,
+        category: data.category ?? null,
+        customerId: data.customerId ?? null,
+        stackable: data.stackable ?? false,
+        version: { increment: 1 },
+      };
+
+      if (data.version !== undefined) {
+        const res = await tx.discount.updateMany({
+          where: { discountId: id, version: data.version },
+          data: discountData,
+        });
+        if (res.count === 0) throw new Error("STALE_VERSION");
+      } else {
+        await tx.discount.update({ where: { discountId: id }, data: discountData });
+      }
       await createAuditLog(tx, {
         action: "update",
         entityType: "Discount",
@@ -114,6 +125,9 @@ export async function updateDiscount(
     revalidatePath("/discounts");
     return { success: true, data: undefined };
   } catch (error) {
+    if (error instanceof Error && error.message === "STALE_VERSION") {
+      return { success: false, error: "El descuento fue modificado por otra persona. Recarga e intenta de nuevo." };
+    }
     console.error("Error updating discount:", error);
     return { success: false, error: "Error al actualizar el descuento" };
   }
