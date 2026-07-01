@@ -5,11 +5,8 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
-import { applyInventoryExit } from "@/lib/valuation";
-import { getEffectivePrice } from "@/modules/inventory/lib/effective-price";
+import { dispatchLines, reverseInvoiceStock } from "@/modules/sales/lib/dispatch-lines";
 import type { Prisma } from "@/generated/prisma";
-
-type PrismaTx = Prisma.TransactionClient;
 
 const AUTH_ERROR_MESSAGE = "No autenticado";
 const SESSION_ERROR_RESPONSE =
@@ -70,160 +67,6 @@ export interface PriceOverride {
   chargedPrice: number;
 }
 
-async function dispatchLines(
-  tx: PrismaTx,
-  params: {
-    invoiceId: number;
-    folio: string;
-    warehouseId: number;
-    customerId: number;
-    lines: InvoiceLineInput[];
-    userId: number;
-  }
-) {
-  const lineResults: Array<{ productId: number; quantity: number; unitPrice: number; discount: number; unitCost: number; subtotal: number; lotId: number | null }> = [];
-  const priceOverrides: PriceOverride[] = [];
-
-  for (const line of params.lines) {
-    const product = await tx.product.findUnique({ where: { productId: line.productId } });
-    if (!product) throw new Error(`Producto ${line.productId} no existe`);
-
-    // Precio de catalogo server-side (fuente de verdad). El POS permite
-    // edicion manual legitima del precio, asi que se acepta el precio que
-    // envia el cliente, pero se registra en el audit log cuando difiere del
-    // precio de catalogo, para trazabilidad.
-    const effective = await getEffectivePrice(tx, {
-      productId: line.productId,
-      quantity: line.quantity,
-      customerId: params.customerId,
-    });
-    if (Math.abs(line.unitPrice - effective.finalPrice) > 0.0001) {
-      priceOverrides.push({
-        productId: line.productId,
-        catalogPrice: effective.finalPrice,
-        chargedPrice: line.unitPrice,
-      });
-    }
-
-    // Validar stock si no es servicio
-    if (!product.isService) {
-      // Descontar StockLevel de forma atomica: si el producto no permite
-      // stock negativo, updateMany solo aplica si currentQuantity >= qty;
-      // si count === 0, no habia stock suficiente. Si allowNegative es
-      // true, se descuenta sin condicion (puede quedar en negativo).
-      if (!product.allowNegative) {
-        const updated = await tx.stockLevel.updateMany({
-          where: {
-            productId: line.productId,
-            warehouseId: params.warehouseId,
-            currentQuantity: { gte: line.quantity },
-          },
-          data: {
-            currentQuantity: { decrement: line.quantity },
-            lastUpdated: new Date(),
-          },
-        });
-        if (updated.count === 0) {
-          const lvl = await tx.stockLevel.findUnique({
-            where: {
-              productId_warehouseId: {
-                productId: line.productId,
-                warehouseId: params.warehouseId,
-              },
-            },
-          });
-          const current = lvl ? Number(lvl.currentQuantity) : 0;
-          throw new Error(
-            `Stock insuficiente para ${product.name}. Disponible: ${current}, solicitado: ${line.quantity}`
-          );
-        }
-      } else {
-        await tx.stockLevel.upsert({
-          where: {
-            productId_warehouseId: {
-              productId: line.productId,
-              warehouseId: params.warehouseId,
-            },
-          },
-          create: {
-            productId: line.productId,
-            warehouseId: params.warehouseId,
-            currentQuantity: -line.quantity,
-          },
-          update: {
-            currentQuantity: { decrement: line.quantity },
-            lastUpdated: new Date(),
-          },
-        });
-      }
-
-      // Valuacion: salida
-      const exit = await applyInventoryExit(tx, {
-        productId: line.productId,
-        warehouseId: params.warehouseId,
-        qty: line.quantity,
-      });
-
-      // StockMovement exit
-      await tx.stockMovement.create({
-        data: {
-          productId: line.productId,
-          warehouseId: params.warehouseId,
-          quantity: line.quantity,
-          movementType: "exit",
-          unitCost: exit.avgCostUsed,
-          referenceDoc: params.folio,
-          notes: `Venta ${params.folio}`,
-          createdBy: params.userId,
-        },
-      });
-
-      // LotStock si se especific\u00f3 lote
-      if (line.lotId) {
-        await tx.lotStock.update({
-          where: { lotId_warehouseId: { lotId: line.lotId, warehouseId: params.warehouseId } },
-          data: { quantity: { decrement: line.quantity } },
-        });
-      }
-
-      const discount = line.discount ?? 0;
-      const subtotal = line.quantity * line.unitPrice - discount;
-
-      lineResults.push({
-        productId: line.productId,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice,
-        discount,
-        unitCost: exit.avgCostUsed,
-        subtotal,
-        lotId: line.lotId ?? null,
-      });
-    } else {
-      // Servicio: sin stock
-      const discount = line.discount ?? 0;
-      const subtotal = line.quantity * line.unitPrice - discount;
-      lineResults.push({
-        productId: line.productId,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice,
-        discount,
-        unitCost: 0,
-        subtotal,
-        lotId: null,
-      });
-    }
-  }
-
-  await tx.invoiceLine.createMany({
-    data: lineResults.map((r) => ({
-      invoiceId: params.invoiceId,
-      ...r,
-    })),
-  });
-
-  return { lineResults, priceOverrides };
-}
-
 export async function createInvoice(
   data: InvoiceInput
 ): Promise<ActionResult<{ invoiceId: number; folio: string }>> {
@@ -272,6 +115,8 @@ export async function createInvoice(
         customerId: data.customerId,
         lines: data.lines,
         userId,
+        allowManualPrice: true,
+        movementNotesPrefix: "Venta",
       });
 
       const subtotal = lines.reduce((s, l) => s + l.subtotal, 0);
@@ -424,13 +269,45 @@ export async function cancelInvoice(invoiceId: number): Promise<ActionResult<voi
     await db.$transaction(async (tx) => {
       const invoice = await tx.invoice.findUnique({
         where: { invoiceId },
-        include: { lines: true },
+        include: { lines: true, order: true },
       });
       if (!invoice) throw new Error("Factura no encontrada");
       if (invoice.status === "cancelled") throw new Error("Ya cancelada");
       if (Number(invoice.paid) > 0) {
         throw new Error("No se puede cancelar una factura con pagos registrados. Emite nota de credito.");
       }
+
+      // Resolver el almacen de origen por producto: si la factura viene de
+      // una orden (B2B/webstore), todas las lineas salieron de
+      // order.warehouseId. Si es POS sin orden, se recupera del
+      // StockMovement de salida original (unico por producto+folio).
+      const warehouseByProductId = new Map<number, number>();
+      if (invoice.order) {
+        for (const line of invoice.lines) {
+          warehouseByProductId.set(line.productId, invoice.order.warehouseId);
+        }
+      } else {
+        const exitMovements = await tx.stockMovement.findMany({
+          where: { referenceDoc: invoice.folio, movementType: "exit" },
+          select: { productId: true, warehouseId: true },
+        });
+        for (const mv of exitMovements) {
+          warehouseByProductId.set(mv.productId, mv.warehouseId);
+        }
+      }
+
+      const reversedLines = await reverseInvoiceStock(tx, {
+        folio: invoice.folio,
+        warehouseByProductId,
+        lines: invoice.lines.map((l) => ({
+          productId: l.productId,
+          quantity: Number(l.quantity),
+          unitCost: Number(l.unitCost),
+          lotId: l.lotId,
+        })),
+        userId,
+        movementNotesPrefix: "Cancelacion factura",
+      });
 
       // Revertir saldo del cliente
       await tx.customer.update({
@@ -450,9 +327,11 @@ export async function cancelInvoice(invoiceId: number): Promise<ActionResult<voi
         module: "sales",
         userId,
         oldValues: invoice,
+        newValues: { stockReversal: reversedLines },
       });
     });
     revalidatePath("/invoices");
+    revalidatePath("/stock");
     return { success: true, data: undefined };
   } catch (error) {
     console.error("Error cancelling invoice:", error);

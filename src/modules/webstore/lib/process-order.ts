@@ -1,12 +1,9 @@
 import { db } from "@/lib/db";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
-import { applyInventoryExit } from "@/lib/valuation";
 import { createAuditLog } from "@/lib/audit";
 import { getEffectivePrice } from "@/modules/inventory/lib/effective-price";
-import type { Prisma } from "@/generated/prisma";
+import { dispatchLines } from "@/modules/sales/lib/dispatch-lines";
 import type { WebstoreOrderPayload } from "./schemas";
-
-type PrismaTx = Prisma.TransactionClient;
 
 export class NeedsReviewError extends Error {
   unresolvedSkus: string[];
@@ -25,99 +22,6 @@ export interface ProcessOrderAttribution {
   userId?: number;
   /** API key que originó la orden vía integración externa. */
   apiKeyId?: number;
-}
-
-async function dispatchWebstoreLines(
-  tx: PrismaTx,
-  params: {
-    invoiceId: number;
-    folio: string;
-    warehouseId: number;
-    lines: Array<{ productId: number; quantity: number; unitPrice: number }>;
-  }
-) {
-  const lineResults: Array<{
-    productId: number;
-    quantity: number;
-    unitPrice: number;
-    discount: number;
-    unitCost: number;
-    subtotal: number;
-  }> = [];
-
-  for (const line of params.lines) {
-    const product = await tx.product.findUniqueOrThrow({ where: { productId: line.productId } });
-    let unitCost = 0;
-
-    if (!product.isService) {
-      if (!product.allowNegative) {
-        // Decremento condicional atómico: evita la carrera findUnique + decrement
-        // ciego bajo concurrencia (Neon serverless no soporta SELECT FOR UPDATE).
-        const claim = await tx.stockLevel.updateMany({
-          where: {
-            productId: line.productId,
-            warehouseId: params.warehouseId,
-            currentQuantity: { gte: line.quantity },
-          },
-          data: { currentQuantity: { decrement: line.quantity }, lastUpdated: new Date() },
-        });
-        if (claim.count !== 1) {
-          const level = await tx.stockLevel.findUnique({
-            where: {
-              productId_warehouseId: { productId: line.productId, warehouseId: params.warehouseId },
-            },
-          });
-          const current = level ? Number(level.currentQuantity) : 0;
-          throw new Error(
-            `Stock insuficiente para ${product.name}. Disponible: ${current}, solicitado: ${line.quantity}`
-          );
-        }
-      }
-
-      const exit = await applyInventoryExit(tx, {
-        productId: line.productId,
-        warehouseId: params.warehouseId,
-        qty: line.quantity,
-      });
-      unitCost = exit.avgCostUsed;
-
-      await tx.stockMovement.create({
-        data: {
-          productId: line.productId,
-          warehouseId: params.warehouseId,
-          quantity: line.quantity,
-          movementType: "exit",
-          unitCost,
-          referenceDoc: params.folio,
-          notes: `Venta tienda en línea ${params.folio}`,
-        },
-      });
-
-      if (product.allowNegative) {
-        await tx.stockLevel.update({
-          where: {
-            productId_warehouseId: { productId: line.productId, warehouseId: params.warehouseId },
-          },
-          data: { currentQuantity: { decrement: line.quantity }, lastUpdated: new Date() },
-        });
-      }
-    }
-
-    lineResults.push({
-      productId: line.productId,
-      quantity: line.quantity,
-      unitPrice: line.unitPrice,
-      discount: 0,
-      unitCost,
-      subtotal: line.quantity * line.unitPrice,
-    });
-  }
-
-  await tx.invoiceLine.createMany({
-    data: lineResults.map((r) => ({ invoiceId: params.invoiceId, ...r })),
-  });
-
-  return lineResults;
 }
 
 export async function processWebstoreOrder(
@@ -236,11 +140,14 @@ export async function processWebstoreOrder(
       },
     });
 
-    await dispatchWebstoreLines(tx, {
+    await dispatchLines(tx, {
       invoiceId: invoice.invoiceId,
       folio: invoiceFolio,
       warehouseId,
+      customerId: customer.customerId,
       lines: priced,
+      allowManualPrice: false,
+      movementNotesPrefix: "Venta tienda en línea",
     });
 
     await tx.customer.update({
