@@ -10,3 +10,11 @@ export async function getProducts(includeInactive = false) {
 export async function getProduct(id: number) {
   return db.product.findUnique({ where: { productId: id } });
 }
+
+export async function getProductPriceHistory(productId: number) {
+  return db.productPriceHistory.findMany({
+    where: { productId },
+    include: { changedByUser: { select: { fullName: true } } },
+    orderBy: { changedAt: "desc" },
+  });
+}

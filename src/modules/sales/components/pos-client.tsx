@@ -27,6 +27,7 @@ import {
 import { Plus, Trash2, ShoppingCart, Loader2, Search, Barcode } from "lucide-react";
 import { toast } from "sonner";
 import { createInvoice } from "../actions/invoice-actions";
+import { getSuggestedUnitPriceAction } from "@/modules/inventory/actions/pricing-actions";
 
 interface ProductOption {
   productId: number;
@@ -96,6 +97,7 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
   const addProduct = (p: ProductOption) => {
     const existing = cart.find((l) => l.productId === p.productId);
     const price = p.salePrice != null ? Number(p.salePrice) : 0;
+    const nextQty = existing ? existing.quantity + 1 : 1;
     if (existing) {
       if (existing.quantity + 1 > p.stock) {
         toast.error(`Sin stock suficiente de ${p.name}`);
@@ -120,6 +122,18 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
       ]);
     }
     setSearch("");
+
+    // Precio sugerido con descuentos activos (no bloquea el flujo; el cajero puede editarlo después).
+    const custId = customerId ? Number(customerId) : undefined;
+    getSuggestedUnitPriceAction(p.productId, nextQty, custId).then((result) => {
+      if (result.success && result.data.finalPrice !== price) {
+        setCart((prev) =>
+          prev.map((l) =>
+            l.productId === p.productId ? { ...l, unitPrice: result.data.finalPrice } : l
+          )
+        );
+      }
+    });
   };
 
   const handleBarcode = (code: string) => {

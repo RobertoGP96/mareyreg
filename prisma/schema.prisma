@@ -36,6 +36,8 @@ model User {
   recipients               Recipient[]
   cashDeliveriesCreated    CashDelivery[] @relation("CashDeliveryCreatedBy")
   cashDeliveriesConfirmed  CashDelivery[] @relation("CashDeliveryConfirmedBy")
+  webstoreApiKeys          WebstoreApiKey[]
+  productPriceChanges      ProductPriceHistory[]
 
   @@map("users")
 }
@@ -461,6 +463,7 @@ model Product {
   valuationMethod ValuationMethod @default(average) @map("valuation_method")
   tracksLots      Boolean         @default(false) @map("tracks_lots")
   allowNegative   Boolean         @default(false) @map("allow_negative_stock")
+  webstoreEnabled Boolean         @default(false) @map("webstore_enabled")
   imageUrl        String?         @map("image_url")
   supplierId      Int?            @map("supplier_id")
   reorderPoint    Decimal?        @map("reorder_point")
@@ -490,6 +493,7 @@ model Product {
   discounts          Discount[]
   returnLines        ReturnLine[]
   stockCountLines    StockCountLine[]
+  priceHistory       ProductPriceHistory[]
 
   @@index([category])
   @@index([isActive])
@@ -798,6 +802,7 @@ enum InvoiceStatus {
 enum SalesChannel {
   pos
   b2b
+  online
 }
 
 enum SalesReservationStatus {
@@ -862,6 +867,7 @@ model SalesOrder {
   lines        SalesOrderLine[]
   invoices     Invoice[]
   reservations StockReservation[]
+  webstoreLog  WebstoreOrderLog?
 
   @@index([customerId])
   @@index([status])
@@ -907,6 +913,7 @@ model Invoice {
   session  CashSession?     @relation(fields: [sessionId], references: [sessionId])
   lines    InvoiceLine[]
   payments InvoicePayment[]
+  webstoreLog WebstoreOrderLog?
 
   @@index([customerId])
   @@index([status])
@@ -1050,14 +1057,38 @@ model Discount {
   startsAt   DateTime?    @map("starts_at")
   endsAt     DateTime?    @map("ends_at")
   productId  Int?         @map("product_id")
+  category   String?
   customerId Int?         @map("customer_id")
+  stackable  Boolean      @default(false)
   isActive   Boolean      @default(true) @map("is_active")
   createdAt  DateTime     @default(now()) @map("created_at")
 
   product  Product?  @relation(fields: [productId], references: [productId])
   customer Customer? @relation(fields: [customerId], references: [customerId])
 
+  @@index([productId])
+  @@index([category])
+  @@index([isActive])
   @@map("discounts")
+}
+
+model ProductPriceHistory {
+  historyId    Int      @id @default(autoincrement()) @map("history_id")
+  productId    Int      @map("product_id")
+  oldCostPrice Decimal? @map("old_cost_price")
+  newCostPrice Decimal? @map("new_cost_price")
+  oldSalePrice Decimal? @map("old_sale_price")
+  newSalePrice Decimal? @map("new_sale_price")
+  changedBy    Int?     @map("changed_by")
+  changedAt    DateTime @default(now()) @map("changed_at")
+  reason       String?
+
+  product     Product @relation(fields: [productId], references: [productId], onDelete: Restrict)
+  changedByUser User?  @relation(fields: [changedBy], references: [userId], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([changedAt])
+  @@map("product_price_history")
 }
 
 // =============================================
@@ -1370,4 +1401,55 @@ model CashDelivery {
   @@index([status, occurredAt])
   @@index([currencyId])
   @@map("cash_deliveries")
+}
+
+// =============================================
+// WEBSTORE MODULE - Integración de ventas con tienda en línea
+// =============================================
+
+enum WebstoreOrderStatus {
+  received
+  processed
+  needs_review
+  error
+}
+
+model WebstoreApiKey {
+  apiKeyId   Int       @id @default(autoincrement()) @map("api_key_id")
+  label      String
+  keyHash    String    @map("key_hash")
+  keyPrefix  String    @map("key_prefix")
+  isActive   Boolean   @default(true) @map("is_active")
+  revokedAt  DateTime? @map("revoked_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  createdBy  Int?      @map("created_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  creator User?              @relation(fields: [createdBy], references: [userId], onDelete: SetNull)
+  orders  WebstoreOrderLog[]
+
+  @@index([isActive])
+  @@map("webstore_api_keys")
+}
+
+model WebstoreOrderLog {
+  logId           Int                 @id @default(autoincrement()) @map("log_id")
+  externalOrderId String              @map("external_order_id")
+  apiKeyId        Int                 @map("api_key_id")
+  status          WebstoreOrderStatus @default(received)
+  rawPayload      Json                @map("raw_payload")
+  errorMessage    String?             @map("error_message")
+  salesOrderId    Int?                @unique @map("sales_order_id")
+  invoiceId       Int?                @unique @map("invoice_id")
+  receivedAt      DateTime            @default(now()) @map("received_at")
+  processedAt     DateTime?           @map("processed_at")
+
+  apiKey     WebstoreApiKey @relation(fields: [apiKeyId], references: [apiKeyId], onDelete: Restrict)
+  salesOrder SalesOrder?    @relation(fields: [salesOrderId], references: [orderId], onDelete: Restrict)
+  invoice    Invoice?       @relation(fields: [invoiceId], references: [invoiceId], onDelete: Restrict)
+
+  @@unique([externalOrderId])
+  @@index([status])
+  @@index([receivedAt])
+  @@map("webstore_order_logs")
 }

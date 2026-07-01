@@ -46,3 +46,5 @@ next-env.d.ts
 drizzle/meta
 
 /generated/prisma
+
+.env*.local
