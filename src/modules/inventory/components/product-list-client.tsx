@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -57,13 +59,19 @@ import {
   CircleDollarSign,
   Store,
   Loader2,
+  History,
+  Globe,
+  ImagePlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   createProduct,
   updateProduct,
   deleteProduct,
+  getProductPriceHistoryAction,
+  type ProductPriceHistoryEntry,
 } from "../actions/product-actions";
+import { PRODUCT_IMAGE_ACCEPT_ATTR, PRODUCT_IMAGE_MAX_BYTES } from "../lib/schemas";
 import {
   PRODUCT_UNITS,
   UNIT_GROUPS,
@@ -82,6 +90,9 @@ interface ProductItem {
   minStock: number;
   maxStock: number | null;
   costPrice: number | null;
+  salePrice: number | null;
+  webstoreEnabled: boolean;
+  imageUrl: string | null;
   brand: string | null;
   supplier: string | null;
   supplierRef: string | null;
@@ -97,6 +108,14 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
   const [toEdit, setToEdit] = useState<ProductItem | null>(null);
   const [toDelete, setToDelete] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [webstoreEnabled, setWebstoreEnabled] = useState(false);
+  const [historyProduct, setHistoryProduct] = useState<ProductItem | null>(null);
+  const [history, setHistory] = useState<ProductPriceHistoryEntry[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const filtered = products.filter(
     (p) =>
@@ -108,9 +127,40 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
       p.supplier?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const onImageChange = (f: File | null) => {
+    if (!f) return;
+    if (f.size > PRODUCT_IMAGE_MAX_BYTES) {
+      toast.error("La imagen no puede pesar más de 5 MB");
+      return;
+    }
+    setImageFile(f);
+    setImagePreview(URL.createObjectURL(f));
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, editId?: number) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    let uploadedImageUrl: string | undefined;
+    if (imageFile) {
+      setIsUploadingImage(true);
+      try {
+        const safeName = imageFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const blob = await upload(`products/${Date.now()}-${safeName}`, imageFile, {
+          access: "public",
+          handleUploadUrl: "/api/products/upload",
+          contentType: imageFile.type,
+        });
+        uploadedImageUrl = blob.url;
+      } catch (err) {
+        setIsSubmitting(false);
+        setIsUploadingImage(false);
+        toast.error(err instanceof Error ? err.message : "Error al subir la imagen");
+        return;
+      }
+      setIsUploadingImage(false);
+    }
+
     const fd = new FormData(e.currentTarget);
     const data = {
       name: fd.get("name") as string,
@@ -121,6 +171,9 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
       minStock: fd.get("minStock") ? Number(fd.get("minStock")) : 0,
       maxStock: fd.get("maxStock") ? Number(fd.get("maxStock")) : undefined,
       costPrice: fd.get("costPrice") ? Number(fd.get("costPrice")) : undefined,
+      salePrice: fd.get("salePrice") ? Number(fd.get("salePrice")) : undefined,
+      webstoreEnabled,
+      imageUrl: uploadedImageUrl,
       brand: (fd.get("brand") as string) || undefined,
       supplier: (fd.get("supplier") as string) || undefined,
       supplierRef: (fd.get("supplierRef") as string) || undefined,
@@ -136,6 +189,8 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
     if (result.success) {
       setIsCreateOpen(false);
       setToEdit(null);
+      setImageFile(null);
+      setImagePreview(null);
       toast.success(editId ? "Producto actualizado" : "Producto creado");
       router.refresh();
     } else toast.error(result.error);
@@ -155,6 +210,29 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
 
   const getCategoryLabel = (value: string) =>
     PRODUCT_CATEGORIES.find((c) => c.value === value)?.label ?? value;
+
+  const openEdit = (p: ProductItem) => {
+    setToEdit(p);
+    setWebstoreEnabled(p.webstoreEnabled);
+    setImageFile(null);
+    setImagePreview(p.imageUrl);
+  };
+
+  const openCreate = () => {
+    setWebstoreEnabled(false);
+    setImageFile(null);
+    setImagePreview(null);
+    setIsCreateOpen(true);
+  };
+
+  const openHistory = async (p: ProductItem) => {
+    setHistoryProduct(p);
+    setIsHistoryLoading(true);
+    const result = await getProductPriceHistoryAction(p.productId);
+    setIsHistoryLoading(false);
+    if (result.success) setHistory(result.data);
+    else toast.error(result.error);
+  };
 
   const ProductFormFields = ({ product }: { product?: ProductItem | null }) => (
     <div className="space-y-6">
@@ -203,8 +281,8 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
         </div>
       </FormSection>
 
-      <FormSection icon={WarehouseIcon} title="Stock y costos" description="Niveles de inventario y costo unitario.">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <FormSection icon={WarehouseIcon} title="Stock y costos" description="Niveles de inventario, costo y precio de venta.">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Stock mínimo" icon={WarehouseIcon}>
             <Input name="minStock" type="number" step="0.01" defaultValue={product ? String(product.minStock) : "0"} />
           </Field>
@@ -214,7 +292,45 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
           <Field label="Costo unitario" icon={CircleDollarSign}>
             <Input name="costPrice" type="number" step="0.01" defaultValue={product?.costPrice ? String(product.costPrice) : ""} placeholder="$0.00" />
           </Field>
+          <Field label="Precio de venta" icon={CircleDollarSign} hint="Precio base; los descuentos activos se aplican sobre este.">
+            <Input name="salePrice" type="number" step="0.01" defaultValue={product?.salePrice ? String(product.salePrice) : ""} placeholder="$0.00" />
+          </Field>
         </div>
+      </FormSection>
+
+      <FormSection icon={Globe} title="Tienda en línea" description="Controla si este producto se vende en la tienda web y su foto.">
+        <Field label="Disponible en tienda en línea" icon={Globe} hint="Si está apagado, el producto no aparece en el catálogo ni se puede vender por ese canal.">
+          <div className="flex items-center gap-3">
+            <Switch checked={webstoreEnabled} onCheckedChange={setWebstoreEnabled} aria-label="Disponible en tienda en línea" />
+            <span className="text-sm text-muted-foreground">{webstoreEnabled ? "Sí" : "No"}</span>
+          </div>
+        </Field>
+        <Field label="Foto del producto" icon={ImagePlus} hint="JPG, PNG o WEBP · máximo 5 MB. La tienda la obtiene directo de aquí.">
+          <button
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            className="flex items-center gap-3 w-full rounded-md border-2 border-dashed border-border bg-muted/20 px-3 py-2 text-left text-sm hover:bg-muted/40 hover:border-[var(--brand)]/40 transition-colors"
+          >
+            {imagePreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imagePreview} alt="Vista previa" className="h-12 w-12 rounded object-cover shrink-0" />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded bg-muted shrink-0">
+                <ImagePlus className="h-5 w-5 text-muted-foreground" />
+              </div>
+            )}
+            <span className="text-muted-foreground truncate">
+              {imageFile ? imageFile.name : imagePreview ? "Toca para reemplazar la foto" : "Seleccionar foto…"}
+            </span>
+          </button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept={PRODUCT_IMAGE_ACCEPT_ATTR}
+            className="sr-only"
+            onChange={(e) => onImageChange(e.target.files?.[0] ?? null)}
+          />
+        </Field>
       </FormSection>
 
       <FormSection icon={Store} title="Proveedor" description="Información comercial.">
@@ -252,7 +368,7 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
         description="Catálogo de productos, componentes y materiales del inventario."
         badge={`${products.length} productos`}
         actions={
-          <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+          <Button variant="brand" onClick={openCreate}>
             <Plus className="h-4 w-4" />
             Nuevo producto
           </Button>
@@ -292,6 +408,11 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
                     {p.sku && <Badge variant="outline">{p.sku}</Badge>}
                     {p.category && <Badge variant="info">{getCategoryLabel(p.category)}</Badge>}
                     {p.brand && <Badge variant="secondary">{p.brand}</Badge>}
+                    {p.webstoreEnabled && (
+                      <Badge variant="brand">
+                        <Globe className="h-3 w-3" /> Tienda en línea
+                      </Badge>
+                    )}
                     {!p.isActive && <Badge variant="destructive">Inactivo</Badge>}
                   </div>
                   <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.82rem] text-muted-foreground">
@@ -315,9 +436,12 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={() => setToEdit(p)}>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={() => openEdit(p)}>
                       <SquarePen className="h-4 w-4" /> Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openHistory(p)}>
+                      <History className="h-4 w-4" /> Historial de precios
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setToDelete(p.productId)}
@@ -361,7 +485,7 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
               </Button>
               <Button type="submit" variant="brand" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isSubmitting ? "Creando…" : "Crear producto"}
+                {isSubmitting ? (isUploadingImage ? "Subiendo foto…" : "Creando…") : "Crear producto"}
               </Button>
             </div>
           </form>
@@ -385,7 +509,7 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
               </Button>
               <Button type="submit" variant="brand" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isSubmitting ? "Actualizando…" : "Actualizar"}
+                {isSubmitting ? (isUploadingImage ? "Subiendo foto…" : "Actualizando…") : "Actualizar"}
               </Button>
             </div>
           </form>
@@ -410,6 +534,44 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!historyProduct} onOpenChange={(o) => !o && setHistoryProduct(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <FormDialogHeader
+              icon={History}
+              title="Historial de precios"
+              description={historyProduct?.name}
+            />
+          </DialogHeader>
+          {isHistoryLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : history.length > 0 ? (
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+              {history.map((h) => (
+                <div key={h.historyId} className="rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground mb-1.5">
+                    <span>{new Date(h.changedAt).toLocaleString("es-MX")}</span>
+                    <span>{h.changedByName ?? "Sistema"}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-5 gap-y-1 font-mono tabular-nums">
+                    {(h.oldCostPrice !== h.newCostPrice) && (
+                      <span>Costo: {h.oldCostPrice ?? "—"} → {h.newCostPrice ?? "—"}</span>
+                    )}
+                    {(h.oldSalePrice !== h.newSalePrice) && (
+                      <span>Venta: {h.oldSalePrice ?? "—"} → {h.newSalePrice ?? "—"}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="Sin cambios registrados" description="Este producto no tiene historial de precios." />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

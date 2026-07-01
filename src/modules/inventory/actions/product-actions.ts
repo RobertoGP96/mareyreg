@@ -19,6 +19,7 @@ export async function createProduct(data: {
   valuationMethod?: "fifo" | "average";
   tracksLots?: boolean;
   allowNegative?: boolean;
+  webstoreEnabled?: boolean;
   imageUrl?: string;
   supplierId?: number;
   reorderPoint?: number;
@@ -62,6 +63,7 @@ export async function createProduct(data: {
           valuationMethod: data.valuationMethod ?? "average",
           tracksLots: data.tracksLots ?? false,
           allowNegative: data.allowNegative ?? false,
+          webstoreEnabled: data.webstoreEnabled ?? false,
           imageUrl: data.imageUrl || null,
           supplierId: data.supplierId ?? null,
           reorderPoint: data.reorderPoint ?? null,
@@ -109,6 +111,7 @@ export async function updateProduct(
     valuationMethod?: "fifo" | "average";
     tracksLots?: boolean;
     allowNegative?: boolean;
+    webstoreEnabled?: boolean;
     imageUrl?: string;
     supplierId?: number | null;
     reorderPoint?: number;
@@ -142,6 +145,7 @@ export async function updateProduct(
           ...(data.valuationMethod !== undefined && { valuationMethod: data.valuationMethod }),
           ...(data.tracksLots !== undefined && { tracksLots: data.tracksLots }),
           ...(data.allowNegative !== undefined && { allowNegative: data.allowNegative }),
+          ...(data.webstoreEnabled !== undefined && { webstoreEnabled: data.webstoreEnabled }),
           ...(data.imageUrl !== undefined && { imageUrl: data.imageUrl || null }),
           ...(data.supplierId !== undefined && { supplierId: data.supplierId ?? null }),
           ...(data.reorderPoint !== undefined && { reorderPoint: data.reorderPoint ?? null }),
@@ -155,6 +159,26 @@ export async function updateProduct(
           ...(data.isActive !== undefined && { isActive: data.isActive }),
         },
       });
+
+      const priceChanged =
+        (data.costPrice !== undefined && Number(prev?.costPrice ?? NaN) !== data.costPrice) ||
+        (data.salePrice !== undefined && Number(prev?.salePrice ?? NaN) !== data.salePrice) ||
+        (data.secondaryPrice !== undefined &&
+          Number(prev?.secondaryPrice ?? NaN) !== data.secondaryPrice);
+
+      if (priceChanged) {
+        await tx.productPriceHistory.create({
+          data: {
+            productId: id,
+            oldCostPrice: prev?.costPrice ?? null,
+            newCostPrice: data.costPrice !== undefined ? data.costPrice : prev?.costPrice ?? null,
+            oldSalePrice: prev?.salePrice ?? null,
+            newSalePrice: data.salePrice !== undefined ? data.salePrice : prev?.salePrice ?? null,
+            changedBy: userId,
+          },
+        });
+      }
+
       await createAuditLog(tx, {
         action: "update",
         entityType: "Product",
@@ -171,6 +195,43 @@ export async function updateProduct(
   } catch (error) {
     console.error("Error updating product:", error);
     return { success: false, error: "Error al actualizar el producto" };
+  }
+}
+
+export interface ProductPriceHistoryEntry {
+  historyId: number;
+  oldCostPrice: number | null;
+  newCostPrice: number | null;
+  oldSalePrice: number | null;
+  newSalePrice: number | null;
+  changedAt: string;
+  changedByName: string | null;
+}
+
+export async function getProductPriceHistoryAction(
+  productId: number
+): Promise<ActionResult<ProductPriceHistoryEntry[]>> {
+  try {
+    const rows = await db.productPriceHistory.findMany({
+      where: { productId },
+      include: { changedByUser: { select: { fullName: true } } },
+      orderBy: { changedAt: "desc" },
+    });
+    return {
+      success: true,
+      data: rows.map((r) => ({
+        historyId: r.historyId,
+        oldCostPrice: r.oldCostPrice != null ? Number(r.oldCostPrice) : null,
+        newCostPrice: r.newCostPrice != null ? Number(r.newCostPrice) : null,
+        oldSalePrice: r.oldSalePrice != null ? Number(r.oldSalePrice) : null,
+        newSalePrice: r.newSalePrice != null ? Number(r.newSalePrice) : null,
+        changedAt: r.changedAt.toISOString(),
+        changedByName: r.changedByUser?.fullName ?? null,
+      })),
+    };
+  } catch (error) {
+    console.error("Error fetching product price history:", error);
+    return { success: false, error: "Error al obtener el historial de precios" };
   }
 }
 

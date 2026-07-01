@@ -21,7 +21,13 @@ export const authConfig: NextAuthConfig = {
       // (onUploadCompleted) sin cookies. La autenticación se valida dentro del
       // handler (onBeforeGenerateToken) y handleUpload verifica la firma del
       // callback internamente, así que el middleware NO debe bloquearlo.
-      const isPublicApi = pathname === "/api/contracts/upload";
+      // /api/webstore/* lo llama la tienda web externa con su propia API key
+      // (Bearer token), sin cookie de sesión — la autenticación se valida
+      // dentro de cada route handler.
+      const isPublicApi =
+        pathname === "/api/contracts/upload" ||
+        pathname === "/api/webstore/orders" ||
+        pathname === "/api/webstore/products";
       const isPublicAsset =
         pathname === "/manifest.webmanifest" ||
         pathname === "/manifest.json" ||

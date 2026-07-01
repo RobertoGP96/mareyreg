@@ -29,6 +29,9 @@ import {
   FileSignature,
   Send,
   UserRound,
+  Store,
+  Inbox,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -87,6 +90,7 @@ export const modules: AppModule[] = [
       { name: "Productos", href: "/products", icon: Package },
       { name: "Almacenes", href: "/warehouses", icon: Warehouse },
       { name: "Stock", href: "/stock", icon: PackageOpen },
+      { name: "Descuentos", href: "/discounts", icon: Tags },
     ],
   },
   {
@@ -155,6 +159,17 @@ export const modules: AppModule[] = [
     icon: CircleDollarSign,
     enabled: false,
     routes: [{ name: "Pagos", href: "/payments", icon: CircleDollarSign }],
+  },
+  {
+    id: "webstore",
+    label: "Tienda en línea",
+    icon: Store,
+    enabled: true,
+    badge: "Nuevo",
+    routes: [
+      { name: "Órdenes", href: "/webstore/ordenes", icon: Inbox },
+      { name: "API keys", href: "/webstore/api-keys", icon: KeyRound },
+    ],
   },
 ];
 

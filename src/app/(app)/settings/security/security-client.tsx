@@ -14,6 +14,8 @@ import {
   X,
   Save,
   AlertTriangle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateUserPassword } from "@/modules/auth/actions/auth-actions";
@@ -50,10 +52,52 @@ const MOCK_SESSIONS: Session[] = [
   },
 ];
 
+type PasswordFieldName = "current" | "new" | "confirm";
+
+const getPasswordStrength = (password: string) => {
+  let score = 0;
+  if (password.length >= 8) score += 1;
+  if (password.length >= 12) score += 1;
+  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score += 1;
+  if (/\d/.test(password)) score += 1;
+  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+  return Math.min(score, 4);
+};
+
+const STRENGTH_LABEL: Record<number, string> = {
+  0: "Débil",
+  1: "Débil",
+  2: "Media",
+  3: "Media",
+  4: "Fuerte",
+};
+
+const STRENGTH_BADGE_VARIANT: Record<number, "warning" | "success"> = {
+  0: "warning",
+  1: "warning",
+  2: "warning",
+  3: "warning",
+  4: "success",
+};
+
 export function SecurityClient() {
   const [twoFactor, setTwoFactor] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
   const [sessions, setSessions] = useState(MOCK_SESSIONS);
+  const [newPasswordValue, setNewPasswordValue] = useState("");
+  const [visibleFields, setVisibleFields] = useState<
+    Record<PasswordFieldName, boolean>
+  >({
+    current: false,
+    new: false,
+    confirm: false,
+  });
+
+  const toggleVisibility = (field: PasswordFieldName) => {
+    setVisibleFields((prev) => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  const strength = getPasswordStrength(newPasswordValue);
 
   const handlePassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -75,6 +119,7 @@ export function SecurityClient() {
     if (result.success) {
       toast.success("Contraseña actualizada");
       form.reset();
+      setNewPasswordValue("");
     } else {
       toast.error(result.error);
     }
@@ -106,21 +151,112 @@ export function SecurityClient() {
         <div className="grid gap-4 p-6 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="current">Contraseña actual</Label>
-            <Input id="current" name="current" type="password" required />
+            <div className="relative">
+              <Input
+                id="current"
+                name="current"
+                type={visibleFields.current ? "text" : "password"}
+                required
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => toggleVisibility("current")}
+                aria-label={
+                  visibleFields.current
+                    ? "Ocultar contraseña actual"
+                    : "Mostrar contraseña actual"
+                }
+                className="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {visibleFields.current ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="new">Nueva contraseña</Label>
-            <Input id="new" name="new" type="password" required minLength={8} />
+            <div className="relative">
+              <Input
+                id="new"
+                name="new"
+                type={visibleFields.new ? "text" : "password"}
+                required
+                minLength={8}
+                value={newPasswordValue}
+                onChange={(e) => setNewPasswordValue(e.target.value)}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => toggleVisibility("new")}
+                aria-label={
+                  visibleFields.new
+                    ? "Ocultar nueva contraseña"
+                    : "Mostrar nueva contraseña"
+                }
+                className="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {visibleFields.new ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
+            </div>
+            {newPasswordValue.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <div className="flex gap-1">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className={`h-1.5 flex-1 rounded-full transition-colors ${
+                        i < strength
+                          ? strength === 4
+                            ? "bg-[var(--success)]"
+                            : "bg-[var(--warning)]"
+                          : "bg-muted"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <Badge variant={STRENGTH_BADGE_VARIANT[strength]}>
+                  {STRENGTH_LABEL[strength]}
+                </Badge>
+              </div>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="confirm">Confirmar nueva</Label>
-            <Input
-              id="confirm"
-              name="confirm"
-              type="password"
-              required
-              minLength={8}
-            />
+            <div className="relative">
+              <Input
+                id="confirm"
+                name="confirm"
+                type={visibleFields.confirm ? "text" : "password"}
+                required
+                minLength={8}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => toggleVisibility("confirm")}
+                aria-label={
+                  visibleFields.confirm
+                    ? "Ocultar confirmación de contraseña"
+                    : "Mostrar confirmación de contraseña"
+                }
+                className="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {visibleFields.confirm ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -140,9 +276,12 @@ export function SecurityClient() {
               <ShieldCheck className="size-5" />
             </div>
             <div>
-              <h3 className="font-headline text-base font-semibold text-foreground">
-                Autenticación de dos factores
-              </h3>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-headline text-base font-semibold text-foreground">
+                  Autenticación de dos factores
+                </h3>
+                <Badge variant="secondary">Demo</Badge>
+              </div>
               <p className="mt-1 max-w-xl text-[13px] text-muted-foreground">
                 Añade una capa extra de seguridad pidiendo un código generado en
                 tu dispositivo móvil al iniciar sesión.
@@ -178,9 +317,12 @@ export function SecurityClient() {
       {/* Sessions */}
       <div className="rounded-xl border border-border bg-card shadow-sm">
         <div className="border-b border-border p-6">
-          <h3 className="font-headline text-base font-semibold text-foreground">
-            Sesiones activas
-          </h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-headline text-base font-semibold text-foreground">
+              Sesiones activas
+            </h3>
+            <Badge variant="secondary">Demo</Badge>
+          </div>
           <p className="mt-1 text-[13px] text-muted-foreground">
             Dispositivos donde tu cuenta está iniciada actualmente.
           </p>
