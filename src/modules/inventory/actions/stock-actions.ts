@@ -3,7 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import {
   applyInventoryEntry,
   applyInventoryExit,
@@ -12,6 +12,29 @@ import {
 import type { Prisma } from "@/generated/prisma";
 
 type PrismaTx = Prisma.TransactionClient;
+
+const AUTH_ERROR_MESSAGE = "No autenticado";
+const SESSION_ERROR_RESPONSE =
+  "Tu sesión expiró o no iniciaste sesión. Vuelve a iniciar sesión e intenta de nuevo.";
+
+// Whitelist de errores de negocio conocidos (mensajes ya en español, seguros
+// de mostrar al usuario tal cual). Cualquier otro error se reemplaza por un
+// mensaje generico para no filtrar detalles internos (stack, SQL, etc.).
+function toUserMessage(error: unknown, genericMessage: string): string {
+  if (error instanceof Error) {
+    if (error.message === AUTH_ERROR_MESSAGE) return SESSION_ERROR_RESPONSE;
+    if (
+      error.message.startsWith("Stock insuficiente") ||
+      error.message.startsWith("Stock FIFO insuficiente") ||
+      error.message.includes("Debe indicar si el ajuste") ||
+      error.message.startsWith("Tipo de movimiento invalido") ||
+      error.message.includes("almacen origen y destino")
+    ) {
+      return error.message;
+    }
+  }
+  return genericMessage;
+}
 
 async function getStockQty(
   tx: PrismaTx,
@@ -44,6 +67,38 @@ async function upsertStockLevel(
   });
 }
 
+/**
+ * Igual que upsertStockLevel pero, cuando delta es negativo y allowNegative
+ * es false, aplica el decremento con condicion atomica
+ * (`currentQuantity >= |delta|`) via updateMany en vez de "findUnique + update"
+ * para evitar condiciones de carrera entre transacciones concurrentes.
+ * Si no existe la fila StockLevel aun, se trata como stock 0 (insuficiente).
+ */
+async function applyStockLevelDelta(
+  tx: PrismaTx,
+  params: { productId: number; warehouseId: number; delta: number; allowNegative: boolean }
+): Promise<void> {
+  const { productId, warehouseId, delta, allowNegative } = params;
+
+  if (delta >= 0 || allowNegative) {
+    await upsertStockLevel(tx, productId, warehouseId, delta);
+    return;
+  }
+
+  const need = Math.abs(delta);
+  const updated = await tx.stockLevel.updateMany({
+    where: { productId, warehouseId, currentQuantity: { gte: need } },
+    data: { currentQuantity: { decrement: need }, lastUpdated: new Date() },
+  });
+
+  if (updated.count === 0) {
+    const current = await getStockQty(tx, productId, warehouseId);
+    throw new Error(
+      `Stock insuficiente. Disponible: ${current}, solicitado: ${need}`
+    );
+  }
+}
+
 // -----------------------------------------------------------------------------
 // ENTRY / EXIT / ADJUSTMENT (single warehouse)
 // -----------------------------------------------------------------------------
@@ -63,7 +118,7 @@ export async function createStockMovement(data: {
       return { success: false, error: "La cantidad debe ser mayor a 0" };
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     const result = await db.$transaction(async (tx) => {
       // Calcular delta firmado sobre StockLevel
@@ -81,21 +136,22 @@ export async function createStockMovement(data: {
         throw new Error(`Tipo de movimiento invalido: ${data.movementType}`);
       }
 
-      // Validar que no quede negativo (respetando allowNegative por producto)
-      if (delta < 0) {
-        const product = await tx.product.findUnique({
-          where: { productId: data.productId },
-          select: { allowNegative: true },
-        });
-        if (!product?.allowNegative) {
-          const current = await getStockQty(tx, data.productId, data.warehouseId);
-          if (current + delta < 0) {
-            throw new Error(
-              `Stock insuficiente. Disponible: ${current}, solicitado: ${Math.abs(delta)}`
-            );
-          }
-        }
-      }
+      const product = await tx.product.findUnique({
+        where: { productId: data.productId },
+        select: { allowNegative: true },
+      });
+      const allowNegative = product?.allowNegative ?? false;
+
+      // Aplicar el delta a StockLevel primero, de forma atomica: si delta es
+      // negativo y el producto no permite negativo, esto falla (lanzando el
+      // error de stock insuficiente) antes de tocar la valuacion, igual que
+      // el comportamiento anterior (findUnique + validar + luego mutar).
+      await applyStockLevelDelta(tx, {
+        productId: data.productId,
+        warehouseId: data.warehouseId,
+        delta,
+        allowNegative,
+      });
 
       let actualUnitCost = data.unitCost ?? null;
 
@@ -143,8 +199,6 @@ export async function createStockMovement(data: {
         },
       });
 
-      await upsertStockLevel(tx, data.productId, data.warehouseId, delta);
-
       await createAuditLog(tx, {
         action: "create",
         entityType: "StockMovement",
@@ -168,8 +222,7 @@ export async function createStockMovement(data: {
     return { success: true, data: { movementId: result.movementId } };
   } catch (error) {
     console.error("Error creating stock movement:", error);
-    const message =
-      error instanceof Error ? error.message : "Error al registrar el movimiento de stock";
+    const message = toUserMessage(error, "Error al registrar el movimiento de stock");
     return { success: false, error: message };
   }
 }
@@ -193,22 +246,24 @@ export async function createStockTransfer(data: {
       return { success: false, error: "El almacen origen y destino deben ser diferentes" };
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     const result = await db.$transaction(async (tx) => {
-      // Validar stock en origen (salvo producto con allowNegative)
       const product = await tx.product.findUnique({
         where: { productId: data.productId },
         select: { allowNegative: true },
       });
-      if (!product?.allowNegative) {
-        const current = await getStockQty(tx, data.productId, data.warehouseIdFrom);
-        if (current < data.quantity) {
-          throw new Error(
-            `Stock insuficiente en almacen origen. Disponible: ${current}, solicitado: ${data.quantity}`
-          );
-        }
-      }
+      const allowNegative = product?.allowNegative ?? false;
+
+      // Descontar del almacen origen de forma atomica (salvo producto con
+      // allowNegative). Si no alcanza, lanza el error de stock insuficiente
+      // antes de tocar la valuacion, igual que el comportamiento anterior.
+      await applyStockLevelDelta(tx, {
+        productId: data.productId,
+        warehouseId: data.warehouseIdFrom,
+        delta: -data.quantity,
+        allowNegative,
+      });
 
       const noteBase = data.notes
         ? `${data.notes} | Transferencia`
@@ -250,7 +305,6 @@ export async function createStockTransfer(data: {
         },
       });
 
-      await upsertStockLevel(tx, data.productId, data.warehouseIdFrom, -data.quantity);
       await upsertStockLevel(tx, data.productId, data.warehouseIdTo, data.quantity);
 
       await createAuditLog(tx, {
@@ -282,8 +336,7 @@ export async function createStockTransfer(data: {
     };
   } catch (error) {
     console.error("Error creating stock transfer:", error);
-    const message =
-      error instanceof Error ? error.message : "Error al registrar la transferencia";
+    const message = toUserMessage(error, "Error al registrar la transferencia");
     return { success: false, error: message };
   }
 }
