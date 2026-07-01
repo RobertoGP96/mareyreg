@@ -167,6 +167,7 @@ export const modules: AppModule[] = [
     enabled: true,
     badge: "Nuevo",
     routes: [
+      { name: "Catálogo", href: "/webstore/catalogo", icon: Tags },
       { name: "Órdenes", href: "/webstore/ordenes", icon: Inbox },
       { name: "API keys", href: "/webstore/api-keys", icon: KeyRound },
     ],
