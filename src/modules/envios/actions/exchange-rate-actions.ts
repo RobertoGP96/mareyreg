@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+import { assertRole, ForbiddenError } from "@/lib/auth-guard";
 import {
   exchangeRateRuleSchema,
   assignAccountRulesSchema,
@@ -16,9 +17,14 @@ import {
 } from "../lib/exchange-rate";
 
 const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
+const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 
 function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
+}
+
+function isForbiddenError(error: unknown): boolean {
+  return error instanceof ForbiddenError;
 }
 
 const revalidateAll = () => {
@@ -59,6 +65,7 @@ export async function createExchangeRateRule(
     if (dup) return { success: false, error: `Ya existe una regla "${data.name}" con ese par.` };
 
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
     const created = await db.$transaction(async (tx) => {
       const r = await tx.exchangeRateRule.create({
         data: {
@@ -88,6 +95,7 @@ export async function createExchangeRateRule(
     return { success: true, data: { ruleId: created.ruleId } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    if (isForbiddenError(error)) return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     console.error("createExchangeRateRule:", error);
     return { success: false, error: describeDbError(error, "Error al crear la regla") };
   }
@@ -99,6 +107,7 @@ export async function updateExchangeRateRule(
 ): Promise<ActionResult<void>> {
   try {
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
     await db.$transaction(async (tx) => {
       const prev = await tx.exchangeRateRule.findUnique({ where: { ruleId: id } });
       if (!prev) throw new Error("Regla no encontrada");
@@ -137,6 +146,7 @@ export async function updateExchangeRateRule(
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    if (isForbiddenError(error)) return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     const KNOWN_MESSAGES = new Set([
       "Regla no encontrada",
       "La regla cambió mientras la editabas. Recarga e intenta de nuevo.",
@@ -155,6 +165,7 @@ export async function toggleExchangeRateRule(
 ): Promise<ActionResult<{ active: boolean }>> {
   try {
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
     const next = await db.$transaction(async (tx) => {
       const prev = await tx.exchangeRateRule.findUnique({ where: { ruleId: id } });
       if (!prev) throw new Error("Regla no encontrada");
@@ -177,6 +188,7 @@ export async function toggleExchangeRateRule(
     return { success: true, data: { active: next } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    if (isForbiddenError(error)) return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     console.error("toggleExchangeRateRule:", error);
     return { success: false, error: describeDbError(error, "Error al cambiar el estado") };
   }
@@ -192,6 +204,7 @@ export async function deleteExchangeRateRule(id: number): Promise<ActionResult<v
       };
     }
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
     await db.$transaction(async (tx) => {
       const prev = await tx.exchangeRateRule.findUnique({ where: { ruleId: id } });
       await tx.exchangeRateRule.delete({ where: { ruleId: id } });
@@ -208,6 +221,7 @@ export async function deleteExchangeRateRule(id: number): Promise<ActionResult<v
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    if (isForbiddenError(error)) return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     console.error("deleteExchangeRateRule:", error);
     return { success: false, error: describeDbError(error, "Error al eliminar la regla") };
   }
@@ -224,6 +238,7 @@ export async function assignRulesToAccount(
     const { accountId, ruleIds } = parsed.data;
 
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
     const result = await db.$transaction(async (tx) => {
       const account = await tx.account.findUnique({ where: { accountId } });
       if (!account) throw new Error("Cuenta no encontrada");
@@ -267,6 +282,7 @@ export async function assignRulesToAccount(
     return { success: true, data: result };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    if (isForbiddenError(error)) return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     console.error("assignRulesToAccount:", error);
     return { success: false, error: describeDbError(error, "Error al asignar reglas") };
   }
@@ -278,6 +294,7 @@ export async function unassignRuleFromAccount(
 ): Promise<ActionResult<void>> {
   try {
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
     await db.$transaction(async (tx) => {
       await tx.accountExchangeRateRule.delete({
         where: { accountId_ruleId: { accountId, ruleId } },
@@ -295,6 +312,7 @@ export async function unassignRuleFromAccount(
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    if (isForbiddenError(error)) return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     console.error("unassignRuleFromAccount:", error);
     return { success: false, error: describeDbError(error, "Error al quitar la regla") };
   }

@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+import { assertRole, ForbiddenError } from "@/lib/auth-guard";
+
+const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 
 export async function createProduct(data: {
   name: string;
@@ -132,6 +135,17 @@ export async function updateProduct(
     const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.product.findUnique({ where: { productId: id } });
+
+      const priceChanged =
+        (data.costPrice !== undefined && Number(prev?.costPrice ?? NaN) !== data.costPrice) ||
+        (data.salePrice !== undefined && Number(prev?.salePrice ?? NaN) !== data.salePrice) ||
+        (data.secondaryPrice !== undefined &&
+          Number(prev?.secondaryPrice ?? NaN) !== data.secondaryPrice);
+
+      if (priceChanged) {
+        await assertRole("admin", "dispatcher");
+      }
+
       await tx.product.update({
         where: { productId: id },
         data: {
@@ -163,12 +177,6 @@ export async function updateProduct(
         },
       });
 
-      const priceChanged =
-        (data.costPrice !== undefined && Number(prev?.costPrice ?? NaN) !== data.costPrice) ||
-        (data.salePrice !== undefined && Number(prev?.salePrice ?? NaN) !== data.salePrice) ||
-        (data.secondaryPrice !== undefined &&
-          Number(prev?.secondaryPrice ?? NaN) !== data.secondaryPrice);
-
       if (priceChanged) {
         await tx.productPriceHistory.create({
           data: {
@@ -198,6 +206,9 @@ export async function updateProduct(
   } catch (error) {
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
+    if (error instanceof ForbiddenError) {
+      return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     }
     console.error("Error updating product:", error);
     return { success: false, error: "Error al actualizar el producto" };
@@ -244,6 +255,7 @@ export async function getProductPriceHistoryAction(
 export async function deleteProduct(id: number): Promise<ActionResult<void>> {
   try {
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
     await db.$transaction(async (tx) => {
       const prev = await tx.product.findUnique({ where: { productId: id } });
       await tx.product.delete({ where: { productId: id } });
@@ -261,6 +273,9 @@ export async function deleteProduct(id: number): Promise<ActionResult<void>> {
   } catch (error) {
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
+    if (error instanceof ForbiddenError) {
+      return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     }
     console.error("Error deleting product:", error);
     return { success: false, error: "Error al eliminar el producto. Verifique que no tiene movimientos de stock." };

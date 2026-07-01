@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+import { assertRole, ForbiddenError } from "@/lib/auth-guard";
+
+const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 
 export async function createWarehouse(data: {
   name: string;
@@ -101,6 +104,7 @@ export async function updateWarehouse(
 export async function deleteWarehouse(id: number): Promise<ActionResult<void>> {
   try {
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
     await db.$transaction(async (tx) => {
       const prev = await tx.warehouse.findUnique({ where: { warehouseId: id } });
       await tx.warehouse.delete({ where: { warehouseId: id } });
@@ -118,6 +122,9 @@ export async function deleteWarehouse(id: number): Promise<ActionResult<void>> {
   } catch (error) {
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
+    if (error instanceof ForbiddenError) {
+      return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     }
     console.error("Error deleting warehouse:", error);
     return { success: false, error: "Error al eliminar el almacen. Verifique que no tiene stock o pacas asociadas." };

@@ -3,12 +3,14 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+import { assertRole, ForbiddenError } from "@/lib/auth-guard";
 import type { ActionResult } from "@/types";
 import { updateProduct } from "@/modules/inventory/actions/product-actions";
 import { updatePriceSchema, toggleFlagSchema } from "../lib/catalog-schemas";
 import { getDiscountsByProduct, type ProductDiscountRow } from "../queries/catalog-queries";
 
 const CATALOG_PATH = "/webstore/catalogo";
+const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 
 export async function toggleWebstoreEnabled(
   productId: number,
@@ -18,6 +20,7 @@ export async function toggleWebstoreEnabled(
   if (!parsed.success) return { success: false, error: "Datos inválidos" };
   try {
     const userId = await requireCurrentUserId();
+    await assertRole("admin", "dispatcher");
     await db.$transaction(async (tx) => {
       await tx.product.update({
         where: { productId },
@@ -38,6 +41,9 @@ export async function toggleWebstoreEnabled(
     if (e instanceof Error && e.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción" };
     }
+    if (e instanceof ForbiddenError) {
+      return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
+    }
     console.error("toggleWebstoreEnabled:", e);
     return { success: false, error: "No se pudo actualizar la visibilidad del producto." };
   }
@@ -51,6 +57,7 @@ export async function toggleWebstoreFeatured(
   if (!parsed.success) return { success: false, error: "Datos inválidos" };
   try {
     const userId = await requireCurrentUserId();
+    await assertRole("admin", "dispatcher");
     await db.$transaction(async (tx) => {
       await tx.product.update({
         where: { productId },
@@ -70,6 +77,9 @@ export async function toggleWebstoreFeatured(
   } catch (e) {
     if (e instanceof Error && e.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción" };
+    }
+    if (e instanceof ForbiddenError) {
+      return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     }
     console.error("toggleWebstoreFeatured:", e);
     return { success: false, error: "No se pudo actualizar la oferta destacada." };

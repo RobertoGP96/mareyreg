@@ -5,7 +5,10 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+import { assertRole, ForbiddenError } from "@/lib/auth-guard";
 import { generateRawKey, getKeyPrefix } from "../lib/api-key";
+
+const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 
 export async function createWebstoreApiKey(
   label: string
@@ -14,6 +17,7 @@ export async function createWebstoreApiKey(
     if (!label.trim()) return { success: false, error: "La etiqueta es requerida" };
 
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
     const rawKey = generateRawKey();
     const keyHash = await bcrypt.hash(rawKey, 10);
     const keyPrefix = getKeyPrefix(rawKey);
@@ -39,6 +43,9 @@ export async function createWebstoreApiKey(
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción" };
     }
+    if (error instanceof ForbiddenError) {
+      return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
+    }
     console.error("Error creating webstore API key:", error);
     return { success: false, error: "Error al crear la API key" };
   }
@@ -47,6 +54,7 @@ export async function createWebstoreApiKey(
 export async function revokeWebstoreApiKey(apiKeyId: number): Promise<ActionResult<void>> {
   try {
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
     await db.$transaction(async (tx) => {
       await tx.webstoreApiKey.update({
         where: { apiKeyId },
@@ -66,6 +74,9 @@ export async function revokeWebstoreApiKey(apiKeyId: number): Promise<ActionResu
   } catch (error) {
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción" };
+    }
+    if (error instanceof ForbiddenError) {
+      return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     }
     console.error("Error revoking webstore API key:", error);
     return { success: false, error: "Error al revocar la API key" };

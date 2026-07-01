@@ -4,12 +4,18 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+import { assertRole, ForbiddenError } from "@/lib/auth-guard";
 import { currencySchema, type CurrencyInput } from "../lib/schemas";
 
 const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
+const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 
 function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
+}
+
+function isForbiddenError(error: unknown): boolean {
+  return error instanceof ForbiddenError;
 }
 
 const revalidateAll = () => {
@@ -150,6 +156,7 @@ export async function deleteCurrency(id: number): Promise<ActionResult<void>> {
       };
     }
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
     await db.$transaction(async (tx) => {
       const prev = await tx.currency.findUnique({ where: { currencyId: id } });
       await tx.currency.delete({ where: { currencyId: id } });
@@ -166,6 +173,7 @@ export async function deleteCurrency(id: number): Promise<ActionResult<void>> {
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    if (isForbiddenError(error)) return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     console.error("deleteCurrency:", error);
     return { success: false, error: "Error al eliminar la moneda" };
   }

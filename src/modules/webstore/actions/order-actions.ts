@@ -4,8 +4,11 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { requireCurrentUserId } from "@/lib/audit";
+import { assertRole, ForbiddenError } from "@/lib/auth-guard";
 import { webstoreOrderPayloadSchema } from "../lib/schemas";
 import { processWebstoreOrder, NeedsReviewError } from "../lib/process-order";
+
+const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 
 /**
  * Claim atómico previo al procesamiento: el enum WebstoreOrderStatus no tiene
@@ -37,6 +40,7 @@ export async function reprocessOrder(
 ): Promise<ActionResult<{ salesOrderId: number; invoiceId: number; folio: string }>> {
   try {
     const userId = await requireCurrentUserId();
+    await assertRole("admin", "dispatcher");
 
     const log = await db.webstoreOrderLog.findUnique({ where: { logId } });
     if (!log) return { success: false, error: "Orden no encontrada" };
@@ -73,6 +77,9 @@ export async function reprocessOrder(
   } catch (error) {
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción" };
+    }
+    if (error instanceof ForbiddenError) {
+      return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     }
     console.error("Error reprocessing webstore order:", error);
     return { success: false, error: "Error al reprocesar la orden" };

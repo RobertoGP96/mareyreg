@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+import { assertRole, ForbiddenError } from "@/lib/auth-guard";
 import {
   accountSchema,
   exchangeRateRuleSchema,
@@ -12,9 +13,14 @@ import {
 } from "../lib/schemas";
 
 const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
+const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 
 function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
+}
+
+function isForbiddenError(error: unknown): boolean {
+  return error instanceof ForbiddenError;
 }
 
 const revalidateAll = () => {
@@ -243,6 +249,7 @@ export async function createRuleAndAssign(
     }
     const data = parsed.data;
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
 
     const result = await db.$transaction(async (tx) => {
       const acc = await tx.account.findUnique({ where: { accountId } });
@@ -299,6 +306,7 @@ export async function createRuleAndAssign(
     return { success: true, data: result };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    if (isForbiddenError(error)) return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     if (error instanceof Error && error.message.includes("err_account_rates_overlap")) {
       return { success: false, error: "La nueva regla se solapa con otras reglas asignadas a la cuenta" };
     }
@@ -326,6 +334,7 @@ export async function deleteAccount(id: number): Promise<ActionResult<void>> {
       };
     }
     const userId = await requireCurrentUserId();
+    await assertRole("admin");
     await db.$transaction(async (tx) => {
       const prev = await tx.account.findUnique({ where: { accountId: id } });
       await tx.account.delete({ where: { accountId: id } });
@@ -342,6 +351,7 @@ export async function deleteAccount(id: number): Promise<ActionResult<void>> {
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
+    if (isForbiddenError(error)) return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     console.error("deleteAccount:", error);
     return { success: false, error: "Error al eliminar la cuenta" };
   }

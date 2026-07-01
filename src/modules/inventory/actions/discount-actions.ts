@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+import { assertRole, ForbiddenError } from "@/lib/auth-guard";
+
+const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 
 export interface DiscountInput {
   name: string;
@@ -41,6 +44,7 @@ export async function createDiscount(
     if (validationError) return { success: false, error: validationError };
 
     const userId = await requireCurrentUserId();
+    await assertRole("admin", "dispatcher");
     const discount = await db.$transaction(async (tx) => {
       const d = await tx.discount.create({
         data: {
@@ -73,6 +77,9 @@ export async function createDiscount(
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
     }
+    if (error instanceof ForbiddenError) {
+      return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
+    }
     console.error("Error creating discount:", error);
     return { success: false, error: "Error al crear el descuento" };
   }
@@ -87,6 +94,7 @@ export async function updateDiscount(
     if (validationError) return { success: false, error: validationError };
 
     const userId = await requireCurrentUserId();
+    await assertRole("admin", "dispatcher");
     await db.$transaction(async (tx) => {
       const prev = await tx.discount.findUnique({ where: { discountId: id } });
 
@@ -134,6 +142,9 @@ export async function updateDiscount(
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
     }
+    if (error instanceof ForbiddenError) {
+      return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
+    }
     console.error("Error updating discount:", error);
     return { success: false, error: "Error al actualizar el descuento" };
   }
@@ -142,6 +153,7 @@ export async function updateDiscount(
 export async function toggleDiscount(id: number, isActive: boolean): Promise<ActionResult<void>> {
   try {
     const userId = await requireCurrentUserId();
+    await assertRole("admin", "dispatcher");
     await db.$transaction(async (tx) => {
       await tx.discount.update({ where: { discountId: id }, data: { isActive } });
       await createAuditLog(tx, {
@@ -159,6 +171,9 @@ export async function toggleDiscount(id: number, isActive: boolean): Promise<Act
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
     }
+    if (error instanceof ForbiddenError) {
+      return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
+    }
     console.error("Error toggling discount:", error);
     return { success: false, error: "Error al cambiar el estado del descuento" };
   }
@@ -167,6 +182,7 @@ export async function toggleDiscount(id: number, isActive: boolean): Promise<Act
 export async function deleteDiscount(id: number): Promise<ActionResult<void>> {
   try {
     const userId = await requireCurrentUserId();
+    await assertRole("admin", "dispatcher");
     await db.$transaction(async (tx) => {
       const prev = await tx.discount.findUnique({ where: { discountId: id } });
       await tx.discount.delete({ where: { discountId: id } });
@@ -184,6 +200,9 @@ export async function deleteDiscount(id: number): Promise<ActionResult<void>> {
   } catch (error) {
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
+    if (error instanceof ForbiddenError) {
+      return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     }
     console.error("Error deleting discount:", error);
     return { success: false, error: "Error al eliminar el descuento" };
