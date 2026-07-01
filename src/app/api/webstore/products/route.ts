@@ -26,7 +26,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const products = await db.product.findMany({
     where: { webstoreEnabled: true, isActive: true },
     include: { stockLevels: { select: { currentQuantity: true } } },
-    orderBy: { name: "asc" },
+    orderBy: [{ webstoreFeatured: "desc" }, { webstoreSortOrder: "asc" }, { name: "asc" }],
   });
 
   const catalog = await Promise.all(
@@ -39,6 +39,8 @@ export async function GET(request: Request): Promise<NextResponse> {
         description: p.description,
         category: p.category,
         price: price.finalPrice,
+        compareAtPrice: price.finalPrice < price.basePrice ? price.basePrice : null,
+        featured: p.webstoreFeatured,
         stockAvailable,
         imageUrl: p.imageUrl,
       };
