@@ -282,6 +282,32 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
       ),
     },
     {
+      key: "visibilidad",
+      header: "Visibilidad",
+      cell: (row) => (
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-muted-foreground">En tienda</span>
+            <Switch
+              checked={row.webstoreEnabled}
+              disabled={pendingToggleId === row.productId}
+              onCheckedChange={(next) => onToggleEnabled(row, next)}
+              aria-label="Disponible en tienda"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-muted-foreground">Destacado</span>
+            <Switch
+              checked={row.webstoreFeatured}
+              disabled={pendingToggleId === row.productId}
+              onCheckedChange={(next) => onToggleFeatured(row, next)}
+              aria-label="Producto destacado"
+            />
+          </div>
+        </div>
+      ),
+    },
+    {
       key: "actions",
       header: "Acciones",
       align: "right",
