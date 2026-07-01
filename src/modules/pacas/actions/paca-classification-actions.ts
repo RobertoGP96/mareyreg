@@ -3,7 +3,11 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
 
 export interface PacaClassificationInput {
   name: string;
@@ -32,7 +36,7 @@ export async function createPacaClassification(
       return { success: false, error: `Ya existe una clasificación llamada "${data.name}"` };
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const created = await db.$transaction(async (tx) => {
       const c = await tx.pacaClassification.create({
         data: {
@@ -55,6 +59,9 @@ export async function createPacaClassification(
     revalidateAll();
     return { success: true, data: { classificationId: created.classificationId } };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para crear una clasificacion" };
+    }
     console.error("Error creating paca classification:", error);
     return { success: false, error: "Error al crear la clasificación" };
   }
@@ -75,7 +82,7 @@ export async function updatePacaClassification(
       if (dup) return { success: false, error: `Ya existe "${data.name}"` };
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.pacaClassification.findUnique({
         where: { classificationId: id },
@@ -104,6 +111,9 @@ export async function updatePacaClassification(
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para actualizar una clasificacion" };
+    }
     console.error("Error updating paca classification:", error);
     return { success: false, error: "Error al actualizar la clasificación" };
   }
@@ -120,7 +130,7 @@ export async function deletePacaClassification(
         error: `No se puede eliminar: ${linked} categoría(s) la usan. Reasigna o elimina primero.`,
       };
     }
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.pacaClassification.findUnique({
         where: { classificationId: id },
@@ -138,6 +148,9 @@ export async function deletePacaClassification(
     revalidateAll();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para eliminar una clasificacion" };
+    }
     console.error("Error deleting paca classification:", error);
     return { success: false, error: "Error al eliminar la clasificación" };
   }

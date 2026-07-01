@@ -3,7 +3,11 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
 
 export interface PacaClientInput {
   name: string;
@@ -22,7 +26,7 @@ export async function createPacaClient(
   data: PacaClientInput
 ): Promise<ActionResult<{ clientId: number; name: string; phone: string | null; email: string | null }>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const client = await db.$transaction(async (tx) => {
       const c = await tx.pacaClient.create({
         data: {
@@ -53,6 +57,9 @@ export async function createPacaClient(
       },
     };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para crear un cliente" };
+    }
     console.error("Error creating paca client:", error);
     return { success: false, error: "Error al crear el cliente" };
   }
@@ -63,7 +70,7 @@ export async function updatePacaClient(
   data: Partial<PacaClientInput> & { isActive?: boolean }
 ): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.pacaClient.findUnique({ where: { clientId: id } });
       await tx.pacaClient.update({
@@ -89,6 +96,9 @@ export async function updatePacaClient(
     revalidateClientPaths();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para actualizar un cliente" };
+    }
     console.error("Error updating paca client:", error);
     return { success: false, error: "Error al actualizar el cliente" };
   }
@@ -113,7 +123,7 @@ export async function deletePacaClients(
 
 export async function deletePacaClient(id: number): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.pacaClient.findUnique({ where: { clientId: id } });
       // Soft-delete to preserve FK integrity on historical reservations/sales
@@ -133,6 +143,9 @@ export async function deletePacaClient(id: number): Promise<ActionResult<void>> 
     revalidateClientPaths();
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para eliminar un cliente" };
+    }
     console.error("Error deleting paca client:", error);
     return { success: false, error: "Error al eliminar el cliente" };
   }

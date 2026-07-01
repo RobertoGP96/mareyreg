@@ -3,7 +3,11 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
 
 export async function createSale(data: {
   categoryId: number;
@@ -16,21 +20,43 @@ export async function createSale(data: {
   notes?: string;
 }): Promise<ActionResult<{ saleId: number }>> {
   try {
-    const inventory = await db.pacaInventory.findUnique({
-      where: { categoryId: data.categoryId },
-    });
-
-    if (!inventory || inventory.available < data.quantity) {
-      return { success: false, error: `No hay suficiente stock disponible. Disponible: ${inventory?.available ?? 0}` };
+    if (!Number.isInteger(data.quantity) || data.quantity < 1) {
+      return { success: false, error: "La cantidad debe ser un entero mayor o igual a 1" };
+    }
+    if (data.salePrice < 0) {
+      return { success: false, error: "El precio de venta no puede ser negativo" };
     }
 
-    // Calcular costo promedio por unidad para descontar del totalCost
-    const totalInStock = inventory.available + inventory.reserved;
-    const avgCost = totalInStock > 0 ? Number(inventory.totalCost) / totalInStock : 0;
-    const costToDeduct = avgCost * data.quantity;
+    const userId = await requireCurrentUserId();
 
-    const userId = await getCurrentUserId();
     const sale = await db.$transaction(async (tx) => {
+      // Costo promedio calculado dentro de la tx, antes del decremento atómico:
+      // usamos el snapshot pre-update porque avgCost representa el costo
+      // acumulado del lote actual; si otra tx concurrente ya lo modificó,
+      // el updateMany atómico de abajo fallará por la condición `available >= quantity`
+      // y reintentar recalcula un avgCost fresco.
+      const inventory = await tx.pacaInventory.findUnique({
+        where: { categoryId: data.categoryId },
+      });
+      if (!inventory) {
+        throw new Error("No hay inventario para esta categoria");
+      }
+      const totalInStock = inventory.available + inventory.reserved;
+      const avgCost = totalInStock > 0 ? Number(inventory.totalCost) / totalInStock : 0;
+      const costToDeduct = avgCost * data.quantity;
+
+      const updated = await tx.pacaInventory.updateMany({
+        where: { categoryId: data.categoryId, available: { gte: data.quantity } },
+        data: {
+          available: { decrement: data.quantity },
+          sold: { increment: data.quantity },
+          totalCost: { decrement: costToDeduct },
+        },
+      });
+      if (updated.count !== 1) {
+        throw new Error("No hay suficientes pacas disponibles");
+      }
+
       const s = await tx.pacaSale.create({
         data: {
           categoryId: data.categoryId,
@@ -41,15 +67,6 @@ export async function createSale(data: {
           paymentMethod: data.paymentMethod || null,
           saleDate: data.saleDate,
           notes: data.notes || null,
-        },
-      });
-
-      await tx.pacaInventory.update({
-        where: { categoryId: data.categoryId },
-        data: {
-          available: { decrement: data.quantity },
-          sold: { increment: data.quantity },
-          totalCost: { decrement: costToDeduct },
         },
       });
 
@@ -70,6 +87,12 @@ export async function createSale(data: {
     revalidatePath("/pacas/disponibilidad");
     return { success: true, data: { saleId: sale.saleId } };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para registrar una venta" };
+    }
+    if (error instanceof Error && error.message === "No hay suficientes pacas disponibles") {
+      return { success: false, error: error.message };
+    }
     console.error("Error creating sale:", error);
     return { success: false, error: "Error al registrar la venta" };
   }
@@ -94,23 +117,29 @@ export async function deleteSales(
 
 export async function deleteSale(id: number): Promise<ActionResult<void>> {
   try {
-    const sale = await db.pacaSale.findUnique({ where: { saleId: id } });
-    if (!sale) {
-      return { success: false, error: "Venta no encontrada" };
-    }
+    const userId = await requireCurrentUserId();
 
-    // Recalcular costo a devolver usando el precio de compra promedio historico
-    // Como no tenemos el costo exacto, usamos 0 (no afecta el totalCost al revertir)
-    const userId = await getCurrentUserId();
     await db.$transaction(async (tx) => {
+      const sale = await tx.pacaSale.findUnique({ where: { saleId: id } });
+      if (!sale) {
+        throw new Error("Venta no encontrada");
+      }
+
       await tx.pacaSale.delete({ where: { saleId: id } });
-      await tx.pacaInventory.update({
-        where: { categoryId: sale.categoryId },
+
+      // Recalcular costo a devolver usando el precio de compra promedio historico
+      // Como no tenemos el costo exacto, usamos 0 (no afecta el totalCost al revertir)
+      const updated = await tx.pacaInventory.updateMany({
+        where: { categoryId: sale.categoryId, sold: { gte: sale.quantity } },
         data: {
           sold: { decrement: sale.quantity },
           available: { increment: sale.quantity },
         },
       });
+      if (updated.count !== 1) {
+        throw new Error("No se pudo revertir la venta: inconsistencia de inventario");
+      }
+
       await createAuditLog(tx, {
         action: "delete",
         entityType: "PacaSale",
@@ -126,6 +155,12 @@ export async function deleteSale(id: number): Promise<ActionResult<void>> {
     revalidatePath("/pacas/disponibilidad");
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para eliminar una venta" };
+    }
+    if (error instanceof Error && error.message === "Venta no encontrada") {
+      return { success: false, error: error.message };
+    }
     console.error("Error deleting sale:", error);
     return { success: false, error: "Error al eliminar la venta" };
   }

@@ -3,7 +3,11 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
 
 export async function createPacaEntry(data: {
   categoryId: number;
@@ -15,12 +19,15 @@ export async function createPacaEntry(data: {
   notes?: string;
 }): Promise<ActionResult<{ entryId: number }>> {
   try {
-    if (data.quantity < 1) {
-      return { success: false, error: "La cantidad debe ser al menos 1" };
+    if (!Number.isInteger(data.quantity) || data.quantity < 1) {
+      return { success: false, error: "La cantidad debe ser un entero mayor o igual a 1" };
+    }
+    if (data.purchasePrice !== undefined && data.purchasePrice < 0) {
+      return { success: false, error: "El precio de compra no puede ser negativo" };
     }
 
     const entryCost = (data.purchasePrice ?? 0) * data.quantity;
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     const result = await db.$transaction(async (tx) => {
       const entry = await tx.pacaEntry.create({
@@ -66,6 +73,9 @@ export async function createPacaEntry(data: {
     revalidatePath("/pacas/disponibilidad");
     return { success: true, data: { entryId: result.entryId } };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para registrar una entrada" };
+    }
     console.error("Error creating paca entry:", error);
     return { success: false, error: "Error al registrar la entrada" };
   }
@@ -90,23 +100,30 @@ export async function deletePacaEntries(
 
 export async function deletePacaEntry(id: number): Promise<ActionResult<void>> {
   try {
-    const entry = await db.pacaEntry.findUnique({ where: { entryId: id } });
-    if (!entry) {
-      return { success: false, error: "Entrada no encontrada" };
-    }
-
-    const entryCost = Number(entry.purchasePrice ?? 0) * entry.quantity;
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
 
     await db.$transaction(async (tx) => {
-      await tx.pacaEntry.delete({ where: { entryId: id } });
-      await tx.pacaInventory.update({
-        where: { categoryId: entry.categoryId },
+      const entry = await tx.pacaEntry.findUnique({ where: { entryId: id } });
+      if (!entry) {
+        throw new Error("Entrada no encontrada");
+      }
+
+      const entryCost = Number(entry.purchasePrice ?? 0) * entry.quantity;
+
+      const updated = await tx.pacaInventory.updateMany({
+        where: { categoryId: entry.categoryId, available: { gte: entry.quantity } },
         data: {
           available: { decrement: entry.quantity },
           totalCost: { decrement: entryCost },
         },
       });
+      if (updated.count !== 1) {
+        throw new Error(
+          "No hay suficientes pacas disponibles para revertir esta entrada"
+        );
+      }
+
+      await tx.pacaEntry.delete({ where: { entryId: id } });
       await createAuditLog(tx, {
         action: "delete",
         entityType: "PacaEntry",
@@ -121,6 +138,16 @@ export async function deletePacaEntry(id: number): Promise<ActionResult<void>> {
     revalidatePath("/pacas/disponibilidad");
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para eliminar una entrada" };
+    }
+    if (
+      error instanceof Error &&
+      (error.message === "Entrada no encontrada" ||
+        error.message === "No hay suficientes pacas disponibles para revertir esta entrada")
+    ) {
+      return { success: false, error: error.message };
+    }
     console.error("Error deleting paca entry:", error);
     return { success: false, error: "Error al eliminar la entrada" };
   }

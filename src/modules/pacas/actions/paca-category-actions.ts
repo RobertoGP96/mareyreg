@@ -3,7 +3,11 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
+
+function isAuthError(error: unknown): boolean {
+  return error instanceof Error && error.message === "No autenticado";
+}
 
 export async function createPacaCategory(data: {
   name: string;
@@ -22,7 +26,7 @@ export async function createPacaCategory(data: {
       };
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     const category = await db.$transaction(async (tx) => {
       const c = await tx.pacaCategory.create({
         data: {
@@ -46,6 +50,9 @@ export async function createPacaCategory(data: {
     revalidatePath("/pacas/categorias");
     return { success: true, data: { categoryId: category.categoryId } };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para crear una categoria" };
+    }
     console.error("Error creating paca category:", error);
     return { success: false, error: "Error al crear la categoria" };
   }
@@ -83,7 +90,7 @@ export async function updatePacaCategory(
       }
     }
 
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.pacaCategory.findUnique({ where: { categoryId: id } });
       await tx.pacaCategory.update({
@@ -109,6 +116,9 @@ export async function updatePacaCategory(
     revalidatePath("/pacas/categorias");
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para actualizar una categoria" };
+    }
     console.error("Error updating paca category:", error);
     return { success: false, error: "Error al actualizar la categoria" };
   }
@@ -116,7 +126,7 @@ export async function updatePacaCategory(
 
 export async function deletePacaCategory(id: number): Promise<ActionResult<void>> {
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.pacaCategory.findUnique({ where: { categoryId: id } });
       await tx.pacaCategory.delete({ where: { categoryId: id } });
@@ -133,6 +143,9 @@ export async function deletePacaCategory(id: number): Promise<ActionResult<void>
     revalidatePath("/pacas/categorias");
     return { success: true, data: undefined };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para eliminar una categoria" };
+    }
     console.error("Error deleting paca category:", error);
     return { success: false, error: "Error al eliminar la categoria. Asegurese de que no tiene pacas asociadas." };
   }
