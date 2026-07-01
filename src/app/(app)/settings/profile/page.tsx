@@ -18,6 +18,7 @@ export default async function ProfileSettingsPage() {
           fullName: true,
           role: true,
           createdAt: true,
+          lastLoginAt: true,
         },
       })
     : null;
@@ -50,6 +51,7 @@ export default async function ProfileSettingsPage() {
           email: user.email,
           role: user.role,
           createdAt: user.createdAt.toISOString(),
+          lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,
         }}
       />
     </>
