@@ -17,6 +17,16 @@ export class NeedsReviewError extends Error {
   }
 }
 
+/** Tolerancia de redondeo para comparar montos monetarios (centavos). */
+const PAYMENT_ROUNDING_TOLERANCE = 0.01;
+
+export interface ProcessOrderAttribution {
+  /** Usuario que originó el reproceso manual desde el panel. */
+  userId?: number;
+  /** API key que originó la orden vía integración externa. */
+  apiKeyId?: number;
+}
+
 async function dispatchWebstoreLines(
   tx: PrismaTx,
   params: {
@@ -41,13 +51,23 @@ async function dispatchWebstoreLines(
 
     if (!product.isService) {
       if (!product.allowNegative) {
-        const level = await tx.stockLevel.findUnique({
+        // Decremento condicional atómico: evita la carrera findUnique + decrement
+        // ciego bajo concurrencia (Neon serverless no soporta SELECT FOR UPDATE).
+        const claim = await tx.stockLevel.updateMany({
           where: {
-            productId_warehouseId: { productId: line.productId, warehouseId: params.warehouseId },
+            productId: line.productId,
+            warehouseId: params.warehouseId,
+            currentQuantity: { gte: line.quantity },
           },
+          data: { currentQuantity: { decrement: line.quantity }, lastUpdated: new Date() },
         });
-        const current = level ? Number(level.currentQuantity) : 0;
-        if (current < line.quantity) {
+        if (claim.count !== 1) {
+          const level = await tx.stockLevel.findUnique({
+            where: {
+              productId_warehouseId: { productId: line.productId, warehouseId: params.warehouseId },
+            },
+          });
+          const current = level ? Number(level.currentQuantity) : 0;
           throw new Error(
             `Stock insuficiente para ${product.name}. Disponible: ${current}, solicitado: ${line.quantity}`
           );
@@ -73,12 +93,14 @@ async function dispatchWebstoreLines(
         },
       });
 
-      await tx.stockLevel.update({
-        where: {
-          productId_warehouseId: { productId: line.productId, warehouseId: params.warehouseId },
-        },
-        data: { currentQuantity: { decrement: line.quantity }, lastUpdated: new Date() },
-      });
+      if (product.allowNegative) {
+        await tx.stockLevel.update({
+          where: {
+            productId_warehouseId: { productId: line.productId, warehouseId: params.warehouseId },
+          },
+          data: { currentQuantity: { decrement: line.quantity }, lastUpdated: new Date() },
+        });
+      }
     }
 
     lineResults.push({
@@ -102,9 +124,18 @@ export async function processWebstoreOrder(
   logId: number,
   payload: WebstoreOrderPayload,
   /** Reasignación manual sku -> productId, usada al reprocesar una orden en needs_review. */
-  overrides?: Record<string, number>
+  overrides?: Record<string, number>,
+  attribution?: ProcessOrderAttribution
 ): Promise<{ salesOrderId: number; invoiceId: number; folio: string }> {
   return db.$transaction(async (tx) => {
+    const company = await tx.company.findUnique({ where: { id: 1 } });
+    const expectedCurrency = company?.currency ?? "USD";
+    if (payload.currency !== expectedCurrency) {
+      throw new Error(
+        `Moneda no soportada: se recibió ${payload.currency}, se esperaba ${expectedCurrency}`
+      );
+    }
+
     let customer = await tx.customer.findFirst({ where: { email: payload.customer.email } });
     if (!customer) {
       customer = await tx.customer.create({
@@ -218,6 +249,12 @@ export async function processWebstoreOrder(
     });
 
     if (payload.payment) {
+      if (payload.payment.amount > subtotal + PAYMENT_ROUNDING_TOLERANCE) {
+        throw new Error(
+          `El pago (${payload.payment.amount}) excede el total de la orden (${subtotal})`
+        );
+      }
+
       await tx.invoicePayment.create({
         data: {
           invoiceId: invoice.invoiceId,
@@ -253,11 +290,13 @@ export async function processWebstoreOrder(
       entityType: "WebstoreOrderLog",
       entityId: logId,
       module: "webstore",
+      userId: attribution?.userId ?? null,
       newValues: {
         externalOrderId: payload.externalOrderId,
         salesOrderId: order.orderId,
         invoiceId: invoice.invoiceId,
         folio: orderFolio,
+        apiKeyId: attribution?.apiKeyId,
       },
     });
 

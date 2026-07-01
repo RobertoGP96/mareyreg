@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { resolveApiKey } from "@/modules/webstore/lib/api-key";
 import { webstoreOrderPayloadSchema } from "@/modules/webstore/lib/schemas";
 import { processWebstoreOrder, NeedsReviewError } from "@/modules/webstore/lib/process-order";
-import type { Prisma } from "@/generated/prisma";
+import { Prisma } from "@/generated/prisma";
 
 export const runtime = "nodejs";
 
@@ -50,17 +50,45 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const log = await db.webstoreOrderLog.create({
-    data: {
-      externalOrderId: payload.externalOrderId,
-      apiKeyId: apiKey.apiKeyId,
-      status: "received",
-      rawPayload: payload as Prisma.InputJsonValue,
-    },
-  });
+  let log;
+  try {
+    log = await db.webstoreOrderLog.create({
+      data: {
+        externalOrderId: payload.externalOrderId,
+        apiKeyId: apiKey.apiKeyId,
+        status: "received",
+        rawPayload: payload as Prisma.InputJsonValue,
+      },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002" &&
+      (error.meta?.target as string[] | undefined)?.includes("external_order_id")
+    ) {
+      const existing = await db.webstoreOrderLog.findUnique({
+        where: { externalOrderId: payload.externalOrderId },
+      });
+      if (existing) {
+        return NextResponse.json(
+          {
+            status: existing.status,
+            logId: existing.logId,
+            salesOrderId: existing.salesOrderId,
+            invoiceId: existing.invoiceId,
+          },
+          { status: existing.status === "processed" ? 200 : 409 }
+        );
+      }
+    }
+    console.error("[webstore/orders] error creando el registro de la orden:", error);
+    return NextResponse.json({ error: "Error interno al procesar la orden" }, { status: 500 });
+  }
 
   try {
-    const result = await processWebstoreOrder(log.logId, payload);
+    const result = await processWebstoreOrder(log.logId, payload, undefined, {
+      apiKeyId: apiKey.apiKeyId,
+    });
     return NextResponse.json({ status: "processed", logId: log.logId, ...result }, { status: 201 });
   } catch (error) {
     if (error instanceof NeedsReviewError) {
@@ -74,8 +102,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const message = error instanceof Error ? error.message : "Error interno al procesar la orden";
     console.error("[webstore/orders] error procesando orden:", error);
+    const message = "Error interno al procesar la orden";
     await db.webstoreOrderLog.update({
       where: { logId: log.logId },
       data: { status: "error", errorMessage: message },

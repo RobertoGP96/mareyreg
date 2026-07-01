@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { createAuditLog, getCurrentUserId } from "@/lib/audit";
+import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import type { ActionResult } from "@/types";
 import { updateProduct } from "@/modules/inventory/actions/product-actions";
 import { updatePriceSchema, toggleFlagSchema } from "../lib/catalog-schemas";
@@ -17,7 +17,7 @@ export async function toggleWebstoreEnabled(
   const parsed = toggleFlagSchema.safeParse({ productId, value });
   if (!parsed.success) return { success: false, error: "Datos inválidos" };
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       await tx.product.update({
         where: { productId },
@@ -35,6 +35,9 @@ export async function toggleWebstoreEnabled(
     revalidatePath(CATALOG_PATH);
     return { success: true, data: undefined };
   } catch (e) {
+    if (e instanceof Error && e.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción" };
+    }
     console.error("toggleWebstoreEnabled:", e);
     return { success: false, error: "No se pudo actualizar la visibilidad del producto." };
   }
@@ -47,7 +50,7 @@ export async function toggleWebstoreFeatured(
   const parsed = toggleFlagSchema.safeParse({ productId, value });
   if (!parsed.success) return { success: false, error: "Datos inválidos" };
   try {
-    const userId = await getCurrentUserId();
+    const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       await tx.product.update({
         where: { productId },
@@ -65,6 +68,9 @@ export async function toggleWebstoreFeatured(
     revalidatePath(CATALOG_PATH);
     return { success: true, data: undefined };
   } catch (e) {
+    if (e instanceof Error && e.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción" };
+    }
     console.error("toggleWebstoreFeatured:", e);
     return { success: false, error: "No se pudo actualizar la oferta destacada." };
   }
