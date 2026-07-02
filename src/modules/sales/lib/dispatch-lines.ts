@@ -79,10 +79,17 @@ export async function dispatchLines(
   const lineResults: DispatchLineResult[] = [];
   const priceOverrides: PriceOverride[] = [];
 
+  // Batch: una sola query para todos los productos de las lineas, en vez de
+  // un findUnique por linea. Evita ademas el findUnique duplicado dentro de
+  // resolveMethod (valuation.ts) pasando el metodo ya resuelto.
+  const uniqueProductIds = [...new Set(lines.map((l) => l.productId))];
+  const products = await tx.product.findMany({
+    where: { productId: { in: uniqueProductIds } },
+  });
+  const productById = new Map(products.map((p) => [p.productId, p]));
+
   for (const line of lines) {
-    const product = allowManualPrice
-      ? await tx.product.findUnique({ where: { productId: line.productId } })
-      : await tx.product.findUniqueOrThrow({ where: { productId: line.productId } });
+    const product = productById.get(line.productId);
     if (!product) throw new Error(`Producto ${line.productId} no existe`);
 
     let unitPrice = line.unitPrice ?? 0;
@@ -162,12 +169,17 @@ export async function dispatchLines(
         });
       }
 
-      // Valuación: salida
-      const exit = await applyInventoryExit(tx, {
-        productId: line.productId,
-        warehouseId,
-        qty: line.quantity,
-      });
+      // Valuación: salida (metodo pre-resuelto desde el batch de arriba, evita
+      // el findUnique duplicado dentro de applyInventoryExit/resolveMethod)
+      const exit = await applyInventoryExit(
+        tx,
+        {
+          productId: line.productId,
+          warehouseId,
+          qty: line.quantity,
+        },
+        product.valuationMethod
+      );
       unitCost = exit.avgCostUsed;
 
       // StockMovement exit

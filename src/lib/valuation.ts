@@ -23,10 +23,20 @@ export interface ExitResult {
   totalCostConsumed: number;
 }
 
+/**
+ * Metodo de valuacion ya resuelto por el caller (p.ej. dispatchLines, que ya
+ * cargo el producto en batch), para evitar el findUnique duplicado que hace
+ * resolveMethod. Opcional: si se omite, el comportamiento es identico al
+ * anterior (resuelve el metodo con un round-trip propio).
+ */
+export type PreResolvedMethod = "fifo" | "average";
+
 async function resolveMethod(
   tx: PrismaTx,
-  productId: number
+  productId: number,
+  preResolvedMethod?: PreResolvedMethod
 ): Promise<"fifo" | "average"> {
+  if (preResolvedMethod) return preResolvedMethod;
   const product = await tx.product.findUnique({
     where: { productId },
     select: { valuationMethod: true },
@@ -39,9 +49,10 @@ async function resolveMethod(
 // -----------------------------------------------------------------------------
 export async function applyInventoryEntry(
   tx: PrismaTx,
-  input: EntryInput
+  input: EntryInput,
+  preResolvedMethod?: PreResolvedMethod
 ): Promise<void> {
-  const method = await resolveMethod(tx, input.productId);
+  const method = await resolveMethod(tx, input.productId, preResolvedMethod);
   const entryCost = input.qty * input.unitCost;
 
   // Average: mantener contadores globales por product+warehouse
@@ -85,9 +96,10 @@ export async function applyInventoryEntry(
 // -----------------------------------------------------------------------------
 export async function applyInventoryExit(
   tx: PrismaTx,
-  input: ExitInput
+  input: ExitInput,
+  preResolvedMethod?: PreResolvedMethod
 ): Promise<ExitResult> {
-  const method = await resolveMethod(tx, input.productId);
+  const method = await resolveMethod(tx, input.productId, preResolvedMethod);
 
   if (method === "fifo") {
     return consumeFifo(tx, input);

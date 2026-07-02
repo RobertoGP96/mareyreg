@@ -124,25 +124,33 @@ export async function createInvoice(
 
       // Validar el cobro inmediato contra el total ya calculado server-side
       // (no el total que hubiera enviado el cliente), con tolerancia minima
-      // de redondeo, igual que registerInvoicePayment.
+      // de redondeo, igual que registerInvoicePayment. Se valida ANTES de
+      // escribir nada de pago/totales.
       if (data.immediatePayment && data.immediatePayment.amount > total + ROUNDING_TOLERANCE) {
         throw new Error(
           `El monto del cobro excede el total de la factura (${total.toFixed(2)})`
         );
       }
 
+      // Cobro inmediato (POS) calculado en memoria antes de escribir, para
+      // fusionar el update de totales + paid/status en una sola escritura.
+      const paidAmount = data.immediatePayment ? data.immediatePayment.amount : 0;
+      const invoiceStatus: "pending" | "partial" | "paid" =
+        paidAmount <= 0 ? "pending" : paidAmount >= total ? "paid" : "partial";
+
       await tx.invoice.update({
         where: { invoiceId: invoice.invoiceId },
-        data: { subtotal, total },
+        data: { subtotal, total, paid: paidAmount, status: invoiceStatus },
       });
 
-      // Saldo del cliente
+      // Saldo del cliente: fusiona el incremento por el total y el decremento
+      // por el cobro inmediato en un solo update con el neto.
+      const netBalanceChange = total - paidAmount;
       await tx.customer.update({
         where: { customerId: data.customerId },
-        data: { currentBalance: { increment: total } },
+        data: { currentBalance: { increment: netBalanceChange } },
       });
 
-      // Cobro inmediato si aplica (POS)
       if (data.immediatePayment) {
         const p = data.immediatePayment;
         await tx.invoicePayment.create({
@@ -154,17 +162,6 @@ export async function createInvoice(
             reference: p.reference || null,
             createdBy: userId,
           },
-        });
-        await tx.invoice.update({
-          where: { invoiceId: invoice.invoiceId },
-          data: {
-            paid: p.amount,
-            status: p.amount >= total ? "paid" : "partial",
-          },
-        });
-        await tx.customer.update({
-          where: { customerId: data.customerId },
-          data: { currentBalance: { decrement: p.amount } },
         });
       }
 
