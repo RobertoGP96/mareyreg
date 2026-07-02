@@ -5,12 +5,15 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { calculateWeightedCost } from "@/modules/pacas/lib/weighted-cost";
+import { endOfLocalDay } from "@/modules/pacas/lib/reservation-expiration";
 
 function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
 }
 
 const INSUFFICIENT_STOCK = "No hay suficientes pacas disponibles";
+const RESERVATION_EXPIRED =
+  "La reservacion expiro y su inventario ya fue liberado automaticamente";
 
 const revalidateAll = () => {
   revalidatePath("/pacas");
@@ -59,6 +62,7 @@ export async function createReservation(data: {
           clientEmail: data.clientEmail || null,
           reservationDate: data.reservationDate,
           expirationDate: data.expirationDate || null,
+          expiresAt: data.expirationDate ? endOfLocalDay(data.expirationDate) : null,
           notes: data.notes || null,
         },
       });
@@ -121,7 +125,10 @@ export async function updateReservation(
         ...(data.clientPhone !== undefined && { clientPhone: data.clientPhone || null }),
         ...(data.clientEmail !== undefined && { clientEmail: data.clientEmail || null }),
         ...(data.reservationDate !== undefined && { reservationDate: data.reservationDate }),
-        ...(data.expirationDate !== undefined && { expirationDate: data.expirationDate || null }),
+        ...(data.expirationDate !== undefined && {
+          expirationDate: data.expirationDate || null,
+          expiresAt: data.expirationDate ? endOfLocalDay(data.expirationDate) : null,
+        }),
         ...(data.notes !== undefined && { notes: data.notes || null }),
       };
 
@@ -262,7 +269,13 @@ export async function cancelReservation(id: number): Promise<ActionResult<void>>
 
     await db.$transaction(async (tx) => {
       const reservation = await tx.pacaReservation.findUnique({ where: { reservationId: id } });
-      if (!reservation || reservation.status !== "active") {
+      if (!reservation) {
+        throw new Error("La reservacion no esta activa");
+      }
+      if (reservation.status === "expired") {
+        throw new Error(RESERVATION_EXPIRED);
+      }
+      if (reservation.status !== "active") {
         throw new Error("La reservacion no esta activa");
       }
 
@@ -298,7 +311,10 @@ export async function cancelReservation(id: number): Promise<ActionResult<void>>
     if (isAuthError(error)) {
       return { success: false, error: "Debes iniciar sesion para cancelar una reservacion" };
     }
-    if (error instanceof Error && error.message === "La reservacion no esta activa") {
+    if (
+      error instanceof Error &&
+      (error.message === "La reservacion no esta activa" || error.message === RESERVATION_EXPIRED)
+    ) {
       return { success: false, error: error.message };
     }
     console.error("Error cancelling reservation:", error);
@@ -325,7 +341,13 @@ export async function completeReservation(
 
     await db.$transaction(async (tx) => {
       const reservation = await tx.pacaReservation.findUnique({ where: { reservationId: id } });
-      if (!reservation || reservation.status !== "active") {
+      if (!reservation) {
+        throw new Error("La reservacion no esta activa");
+      }
+      if (reservation.status === "expired") {
+        throw new Error(RESERVATION_EXPIRED);
+      }
+      if (reservation.status !== "active") {
         throw new Error("La reservacion no esta activa");
       }
 
@@ -390,7 +412,8 @@ export async function completeReservation(
     if (
       error instanceof Error &&
       (error.message === "La reservacion no esta activa" ||
-        error.message === "No se pudo completar: inconsistencia de reservado")
+        error.message === "No se pudo completar: inconsistencia de reservado" ||
+        error.message === RESERVATION_EXPIRED)
     ) {
       return { success: false, error: error.message };
     }

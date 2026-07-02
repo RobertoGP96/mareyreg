@@ -12,7 +12,8 @@ export type OpsStatus =
   | "available"
   | "maintenance"
   | "active"
-  | "inactive";
+  | "inactive"
+  | "expired";
 
 const STATUS_TONE: Record<
   OpsStatus,
@@ -29,6 +30,7 @@ const STATUS_TONE: Record<
   maintenance: { label: "Mantenimiento",tone: "warning",  pulse: false },
   active:      { label: "Activo",       tone: "active",   pulse: false },
   inactive:    { label: "Inactivo",     tone: "idle",     pulse: false },
+  expired:     { label: "Expirada",     tone: "critical", pulse: false },
 };
 
 const TONE_STYLES: Record<string, string> = {

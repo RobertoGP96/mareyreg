@@ -68,7 +68,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   createReservation,
   updateReservation,
@@ -107,6 +107,7 @@ const STATUS_TO_OPS: Record<string, OpsStatus> = {
   active: "active",
   completed: "completed",
   cancelled: "cancelled",
+  expired: "expired",
 };
 
 export function ReservationListClient({
@@ -153,9 +154,9 @@ export function ReservationListClient({
 
   const today = new Date().toISOString().split("T")[0];
   const counts = useMemo(() => {
-    const c = { active: 0, completed: 0, cancelled: 0, expiringSoon: 0 };
+    const c = { active: 0, completed: 0, cancelled: 0, expired: 0, expiringSoon: 0 };
     for (const r of reservations) {
-      c[r.status as keyof typeof c]++;
+      if (r.status in c) c[r.status as "active" | "completed" | "cancelled" | "expired"]++;
       if (
         r.status === "active" &&
         r.expirationDate &&
@@ -428,7 +429,7 @@ export function ReservationListClient({
         }
       />
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         <MetricTile
           label="Activas"
           value={counts.active}
@@ -452,6 +453,14 @@ export function ReservationListClient({
           tone="critical"
           active={statusFilter === "cancelled"}
           onClick={() => setStatusFilter(statusFilter === "cancelled" ? ALL : "cancelled")}
+        />
+        <MetricTile
+          label="Expiradas"
+          value={counts.expired}
+          icon={AlertTriangle}
+          tone="critical"
+          active={statusFilter === "expired"}
+          onClick={() => setStatusFilter(statusFilter === "expired" ? ALL : "expired")}
         />
         <MetricTile
           label="Por vencer (14d)"
@@ -572,7 +581,7 @@ export function ReservationListClient({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={ALL}>Todos</SelectItem>
-                        {RESERVATION_STATUSES.filter((s) => s.value !== "expired").map((s) => (
+                        {RESERVATION_STATUSES.map((s) => (
                           <SelectItem key={s.value} value={s.value}>
                             {getStatusLabel(s.value)}
                           </SelectItem>
@@ -605,7 +614,7 @@ export function ReservationListClient({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL}>Todos los estados</SelectItem>
-                  {RESERVATION_STATUSES.filter((s) => s.value !== "expired").map((s) => (
+                  {RESERVATION_STATUSES.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {getStatusLabel(s.value)}
                     </SelectItem>

@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { tryExpireOverdueReservations } from "@/modules/pacas/lib/reservation-expiration";
 
 function daysAgoIso(days: number) {
   const d = new Date();
@@ -13,6 +14,7 @@ function daysAgoIso(days: number) {
  * for a data-dense control-room style dashboard.
  */
 export async function getPacaDashboard() {
+  await tryExpireOverdueReservations();
   const since30 = daysAgoIso(30);
 
   const [inventory, sales30, reservations, clientsActive, categoriesCount] =
@@ -93,7 +95,7 @@ export async function getPacaDashboard() {
       acc[r.status] = (acc[r.status] ?? 0) + 1;
       return acc;
     },
-    { active: 0, completed: 0, cancelled: 0 } as Record<string, number>
+    { active: 0, completed: 0, cancelled: 0, expired: 0 } as Record<string, number>
   );
 
   // Recent sales feed (8)
@@ -140,6 +142,7 @@ export async function getPacaDashboard() {
       active: reservationCounts.active,
       completed: reservationCounts.completed,
       cancelled: reservationCounts.cancelled,
+      expired: reservationCounts.expired,
       expiringSoon,
     },
     topCategories,

@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
+import { tryExpireOverdueReservations } from "@/modules/pacas/lib/reservation-expiration";
 
 export async function getAvailabilityByClassification() {
+  await tryExpireOverdueReservations();
   const classifications = await db.pacaClassification.findMany({
     orderBy: { sortOrder: "asc" },
     include: {
