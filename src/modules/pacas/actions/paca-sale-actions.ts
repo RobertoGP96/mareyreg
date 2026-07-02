@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { calculateWeightedCost } from "@/modules/pacas/lib/weighted-cost";
+import { recordShadowMovement } from "@/modules/pacas/lib/shadow-product";
 
 function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
@@ -68,6 +69,15 @@ export async function createSale(data: {
           saleDate: data.saleDate,
           notes: data.notes || null,
         },
+      });
+
+      await recordShadowMovement(tx, {
+        categoryId: data.categoryId,
+        quantity: data.quantity,
+        unitCost: data.quantity > 0 ? costToDeduct / data.quantity : 0,
+        movementType: "exit",
+        reference: `paca:venta #${s.saleId}`,
+        userId,
       });
 
       await createAuditLog(tx, {
@@ -138,6 +148,15 @@ export async function deleteSale(id: number): Promise<ActionResult<void>> {
       if (updated.count !== 1) {
         throw new Error("No se pudo revertir la venta: inconsistencia de inventario");
       }
+
+      await recordShadowMovement(tx, {
+        categoryId: sale.categoryId,
+        quantity: sale.quantity,
+        unitCost: sale.quantity > 0 ? Number(sale.costOfGoods) / sale.quantity : 0,
+        movementType: "entry",
+        reference: `paca:reverso-venta #${sale.saleId}`,
+        userId,
+      });
 
       await createAuditLog(tx, {
         action: "delete",

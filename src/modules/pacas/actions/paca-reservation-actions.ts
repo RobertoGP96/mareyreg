@@ -6,6 +6,7 @@ import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { calculateWeightedCost } from "@/modules/pacas/lib/weighted-cost";
 import { endOfLocalDay } from "@/modules/pacas/lib/reservation-expiration";
+import { recordShadowMovement } from "@/modules/pacas/lib/shadow-product";
 
 function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
@@ -390,6 +391,15 @@ export async function completeReservation(
           saleDate: saleData.saleDate,
           notes: saleData.notes || `Venta desde reservacion #${reservation.reservationId}`,
         },
+      });
+
+      await recordShadowMovement(tx, {
+        categoryId: reservation.categoryId,
+        quantity: reservation.quantity,
+        unitCost: reservation.quantity > 0 ? costToDeduct / reservation.quantity : 0,
+        movementType: "exit",
+        reference: `paca:venta #${sale.saleId} (reservacion #${reservation.reservationId})`,
+        userId,
       });
 
       await createAuditLog(tx, {
