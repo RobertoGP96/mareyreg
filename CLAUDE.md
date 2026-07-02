@@ -15,27 +15,42 @@ Este archivo lo lee Claude Code automáticamente al iniciar sesión en el repo. 
 
 
 
-## Estructura
+## Estructura (monorepo pnpm workspaces + Turborepo)
 
 ```
-prisma/
-  schema.prisma                   # único archivo de modelos (1k+ líneas, secciones por módulo)
-  sql/<modulo>-*.sql              # SQL crudo para CHECK / EXCLUDE / matviews (db push no los maneja)
-  seed-<modulo>.ts                # seeds opcionales por módulo
-src/
-  app/(app)/(<modulo>)/           # rutas autenticadas agrupadas por módulo
-    layout.tsx                    # SIEMPRE: await requireModule("<id>")
-    <ruta>/page.tsx
-  modules/<modulo>/
-    actions/*.ts                  # "use server" — mutaciones
-    queries/*.ts                  # lecturas (server-only, NO "use server")
-    components/*.tsx              # cliente; sub-carpetas por entidad si crece
-    lib/*.ts                      # utilidades del módulo (schemas Zod, format, helpers de tx)
-  components/ui/                  # shadcn + primitives compartidos (NO modificar sin razón)
-  lib/                            # helpers globales (db, auth, audit, module-registry)
-  types/index.ts                  # ActionResult<T>, re-exports de Prisma
-generated/prisma/                 # cliente generado — NO editar, NO commitear si hay .gitignore
+pnpm-workspace.yaml / turbo.json  # workspace: apps/*
+package.json                      # raíz: solo turbo + scripts proxy (dev:erp, dev:tienda, db:*)
+apps/
+  erp/                            # el ERP Mareyway (toda la app original vive aquí)
+    prisma/
+      schema.prisma               # único archivo de modelos (1.5k+ líneas, secciones por módulo)
+      sql/<modulo>-*.sql          # SQL crudo para CHECK / EXCLUDE / matviews (db push no los maneja)
+      seed-<modulo>.ts            # seeds opcionales por módulo
+    src/
+      app/(app)/(<modulo>)/       # rutas autenticadas agrupadas por módulo
+        layout.tsx                # SIEMPRE: await requireModule("<id>")
+        <ruta>/page.tsx
+      modules/<modulo>/
+        actions/*.ts              # "use server" — mutaciones
+        queries/*.ts              # lecturas (server-only, NO "use server")
+        components/*.tsx          # cliente; sub-carpetas por entidad si crece
+        lib/*.ts                  # utilidades del módulo (schemas Zod, format, helpers de tx)
+      components/ui/              # shadcn + primitives compartidos (NO modificar sin razón)
+      lib/                        # helpers globales (db, auth, audit, module-registry)
+      types/index.ts              # ActionResult<T>, re-exports de Prisma
+    generated/prisma/             # cliente generado — NO editar, NO commitear (gitignored)
+    .env / .env.local             # secretos del ERP (viven aquí, NO en la raíz)
+  tienda/                         # storefront público (puerto 3001)
+    src/lib/erp-client.ts         # cliente tipado hacia la API webstore del ERP
+    .env.example                  # WEBSTORE_API_URL + WEBSTORE_API_KEY
+docs/                             # documentación cross-app (WEBSTORE.md = contrato entre apps)
 ```
+
+Reglas del monorepo:
+- La tienda consume datos **solo vía HTTP** (`GET /api/webstore/products`, `POST /api/webstore/orders` con Bearer API key). **NO** importa Prisma, `@/lib/db` ni código del ERP.
+- Comandos por app: `pnpm --filter erp <script>` / `pnpm --filter tienda <script>`. Los comandos de DB (`db:push`, `db:generate`, `db:studio`) tienen proxy en la raíz y fijan el cwd en `apps/erp` (dotenv de `prisma.config.ts` carga el `.env` del cwd).
+- Dev: `pnpm dev:erp` (puerto 3000) y `pnpm dev:tienda` (puerto 3001).
+- Deploy: 2 proyectos Vercel sobre el mismo repo — Root Directory `apps/erp` y `apps/tienda`.
 
 Patrón a imitar: **`src/modules/pacas/`** (módulo más maduro). Todo módulo nuevo debe seguir su forma.
 
@@ -134,7 +149,7 @@ Skills útiles ya disponibles: `clean-code`, `senior-frontend`, `senior-fullstac
 1. **Entender** — explorar (Explore agent o Grep/Glob), leer ficheros clave, no asumir.
 2. **Planear** — para tareas no triviales, escribir un plan en `C:/Users/PC/.claude/plans/<slug>.md` y validar con el usuario (`AskUserQuestion` para ambigüedades) antes de tocar código.
 3. **Ejecutar** — implementar PR pequeños y verticales. Cada PR: schema/migración/registry → backend → UI → polish, según el módulo.
-4. **Verificar** — `pnpm prisma validate`, `pnpm prisma generate`, `npx tsc --noEmit`, `pnpm test` (vitest), idealmente `pnpm dev` y probar la ruta tocada.
+4. **Verificar** — `pnpm --filter erp exec prisma validate`, `pnpm db:generate`, `pnpm --filter erp exec tsc --noEmit`, `pnpm test` (turbo → vitest), idealmente `pnpm dev:erp` (o `dev:tienda`) y probar la ruta tocada.
 5. **Commitear** — `feat(<modulo>):`, `fix(<modulo>):`, `chore(<modulo>):`. Cuerpo en español, conciso, agrupando cambios por archivo o área. Co-Authored-By incluido.
 6. **Pushear** sólo cuando el usuario lo pida, o explícitamente lo confirme.
 
