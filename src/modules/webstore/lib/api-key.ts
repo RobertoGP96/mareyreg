@@ -4,6 +4,9 @@ import { db } from "@/lib/db";
 
 const KEY_PREFIX_LENGTH = 12;
 
+/** Umbral de throttle para el refresco de lastUsedAt (ver resolveApiKey). */
+const LAST_USED_AT_THROTTLE_MS = 60 * 60 * 1000;
+
 /** Scopes válidos para una API key de la tienda en línea. */
 export const WEBSTORE_API_KEY_SCOPES = ["read_catalog", "create_orders"] as const;
 export type WebstoreApiKeyScope = (typeof WEBSTORE_API_KEY_SCOPES)[number];
@@ -31,6 +34,15 @@ export interface ResolvedApiKey {
  * indirectamente vía isActive + pocas filas esperadas) y se compara con bcrypt.
  * Las keys expiradas (`expiresAt` en el pasado) se tratan como inválidas aunque
  * sigan `isActive`, sin revocarlas automáticamente.
+ *
+ * `lastUsedAt` se refresca con throttle (1h): en vez de escribir en cada
+ * request autenticada (hot path), solo se escribe si el valor ya cargado es
+ * null o tiene más de 1h de antigüedad. La comparación es en memoria contra
+ * el valor leído en este mismo request, así que `lastUsedAt` pasa a ser
+ * "última vez usada, con hasta 1h de rezago" en vez de exacto — aceptable
+ * porque es un campo informativo, no usado para lógica de negocio ni expiración.
+ * La condición `lastUsedAt: candidate.lastUsedAt` en el `updateMany` evita que
+ * dos requests concurrentes pisen el timestamp más nuevo con uno más viejo.
  */
 export async function resolveApiKey(rawKey: string): Promise<ResolvedApiKey | null> {
   const prefix = getKeyPrefix(rawKey);
@@ -43,10 +55,15 @@ export async function resolveApiKey(rawKey: string): Promise<ResolvedApiKey | nu
       if (candidate.expiresAt != null && candidate.expiresAt < now) {
         return null;
       }
-      await db.webstoreApiKey.update({
-        where: { apiKeyId: candidate.apiKeyId },
-        data: { lastUsedAt: new Date() },
-      });
+      const isStale =
+        candidate.lastUsedAt == null ||
+        now.getTime() - candidate.lastUsedAt.getTime() > LAST_USED_AT_THROTTLE_MS;
+      if (isStale) {
+        await db.webstoreApiKey.updateMany({
+          where: { apiKeyId: candidate.apiKeyId, lastUsedAt: candidate.lastUsedAt },
+          data: { lastUsedAt: now },
+        });
+      }
       return {
         apiKeyId: candidate.apiKeyId,
         scopes: candidate.scopes.filter(isWebstoreApiKeyScope),

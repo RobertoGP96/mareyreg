@@ -1,15 +1,5 @@
 import { db } from "@/lib/db";
-import { getEffectivePrice } from "@/modules/inventory/lib/effective-price";
-
-export type CatalogStatus = "all" | "enabled" | "hidden";
-
-export interface CatalogFilters {
-  search?: string;
-  category?: string;
-  status?: CatalogStatus;
-  onlyOnSale?: boolean;
-  onlyFeatured?: boolean;
-}
+import { getEffectivePrices } from "@/modules/inventory/lib/effective-price";
 
 export interface CatalogRow {
   productId: number;
@@ -29,23 +19,28 @@ export interface CatalogRow {
   stockAvailable: number;
 }
 
-export async function getWebstoreCatalog(filters: CatalogFilters = {}): Promise<CatalogRow[]> {
-  const { search, category, status = "all", onlyOnSale, onlyFeatured } = filters;
+export interface CatalogKpis {
+  enabled: number;
+  onSale: number;
+  featured: number;
+}
 
+export interface WebstoreCatalogResult {
+  rows: CatalogRow[];
+  kpis: CatalogKpis;
+}
+
+/**
+ * Catálogo completo (todos los productos activos) más KPIs, calculados en
+ * una sola pasada: los KPIs se derivan de las mismas filas ya cargadas en
+ * vez de re-ejecutar la query del catálogo. El cliente (webstore-catalog-client)
+ * recibe siempre el set completo y filtra en memoria, así que esta función
+ * no expone parámetros de filtro server-side (search/category/status/onSale/
+ * featured) — no tienen caller real hoy.
+ */
+export async function getWebstoreCatalogWithKpis(): Promise<WebstoreCatalogResult> {
   const products = await db.product.findMany({
-    where: {
-      isActive: true,
-      ...(status === "enabled" && { webstoreEnabled: true }),
-      ...(status === "hidden" && { webstoreEnabled: false }),
-      ...(onlyFeatured && { webstoreFeatured: true }),
-      ...(category && { category }),
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: "insensitive" as const } },
-          { sku: { contains: search, mode: "insensitive" as const } },
-        ],
-      }),
-    },
+    where: { isActive: true },
     include: {
       stockLevels: { select: { currentQuantity: true } },
       _count: { select: { discounts: { where: { isActive: true } } } },
@@ -53,46 +48,42 @@ export async function getWebstoreCatalog(filters: CatalogFilters = {}): Promise<
     orderBy: [{ webstoreFeatured: "desc" }, { name: "asc" }],
   });
 
-  const rows = await Promise.all(
-    products.map(async (p) => {
-      const price = await getEffectivePrice(db, { productId: p.productId, quantity: 1 });
-      const stockAvailable = p.stockLevels.reduce((sum, s) => sum + Number(s.currentQuantity), 0);
-      return {
-        productId: p.productId,
-        name: p.name,
-        sku: p.sku,
-        category: p.category,
-        imageUrl: p.imageUrl,
-        isActive: p.isActive,
-        webstoreEnabled: p.webstoreEnabled,
-        webstoreFeatured: p.webstoreFeatured,
-        webstoreSortOrder: p.webstoreSortOrder,
-        salePrice: p.salePrice != null ? p.salePrice.toString() : null,
-        basePrice: price.basePrice,
-        finalPrice: price.finalPrice,
-        onSale: price.finalPrice < price.basePrice,
-        discountCount: p._count.discounts,
-        stockAvailable,
-      };
-    })
+  const prices = await getEffectivePrices(
+    db,
+    products.map((p) => p.productId),
+    { quantity: 1 }
   );
 
-  return onlyOnSale ? rows.filter((r) => r.onSale) : rows;
-}
+  const rows: CatalogRow[] = products.map((p) => {
+    const price = prices.get(p.productId) ?? { basePrice: 0, finalPrice: 0, appliedDiscounts: [] };
+    const stockAvailable = p.stockLevels.reduce((sum, s) => sum + Number(s.currentQuantity), 0);
+    return {
+      productId: p.productId,
+      name: p.name,
+      sku: p.sku,
+      category: p.category,
+      imageUrl: p.imageUrl,
+      isActive: p.isActive,
+      webstoreEnabled: p.webstoreEnabled,
+      webstoreFeatured: p.webstoreFeatured,
+      webstoreSortOrder: p.webstoreSortOrder,
+      salePrice: p.salePrice != null ? p.salePrice.toString() : null,
+      basePrice: price.basePrice,
+      finalPrice: price.finalPrice,
+      onSale: price.finalPrice < price.basePrice,
+      discountCount: p._count.discounts,
+      stockAvailable,
+    };
+  });
 
-export interface CatalogKpis {
-  enabled: number;
-  onSale: number;
-  featured: number;
-}
-
-export async function getWebstoreCatalogKpis(): Promise<CatalogKpis> {
-  const rows = await getWebstoreCatalog({ status: "enabled" });
-  return {
-    enabled: rows.length,
-    onSale: rows.filter((r) => r.onSale).length,
-    featured: rows.filter((r) => r.webstoreFeatured).length,
+  const enabledRows = rows.filter((r) => r.webstoreEnabled);
+  const kpis: CatalogKpis = {
+    enabled: enabledRows.length,
+    onSale: enabledRows.filter((r) => r.onSale).length,
+    featured: enabledRows.filter((r) => r.webstoreFeatured).length,
   };
+
+  return { rows, kpis };
 }
 
 export interface ProductDiscountRow {

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { getOrderLogById } from "@/modules/webstore/queries/order-log-queries";
 import { getProducts } from "@/modules/inventory/queries/product-queries";
 import { webstoreOrderPayloadSchema } from "@/modules/webstore/lib/schemas";
+import { isSkuResolved, resolveSkusBatch } from "@/modules/webstore/lib/resolve-skus";
 import { OrderDetailClient } from "@/modules/webstore/components/order-detail-client";
 
 export default async function WebstoreOrderDetailPage({
@@ -20,15 +21,18 @@ export default async function WebstoreOrderDetailPage({
   const parsed = webstoreOrderPayloadSchema.safeParse(log.rawPayload);
   const payload = parsed.success ? parsed.data : null;
 
-  const lineStatuses = payload
-    ? await Promise.all(
-        payload.lines.map(async (line) => {
-          const product = await db.product.findUnique({ where: { sku: line.sku } });
-          const resolved = !!product && product.isActive && product.webstoreEnabled;
-          return { sku: line.sku, quantity: line.quantity, unitPrice: line.unitPrice, resolved };
-        })
-      )
-    : [];
+  let lineStatuses: Array<{ sku: string; quantity: number; unitPrice: number; resolved: boolean }> = [];
+  if (payload) {
+    const resolvedBySku = await resolveSkusBatch(
+      db,
+      payload.lines.map((line) => line.sku)
+    );
+    lineStatuses = payload.lines.map((line) => {
+      const product = resolvedBySku.get(line.sku);
+      const resolved = !!product && isSkuResolved(product);
+      return { sku: line.sku, quantity: line.quantity, unitPrice: line.unitPrice, resolved };
+    });
+  }
 
   const needsAttention = log.status === "needs_review" || log.status === "error";
   const products = needsAttention ? await getProducts() : [];

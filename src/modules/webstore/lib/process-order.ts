@@ -4,6 +4,7 @@ import { createAuditLog } from "@/lib/audit";
 import { getEffectivePrice } from "@/modules/inventory/lib/effective-price";
 import { dispatchLines } from "@/modules/sales/lib/dispatch-lines";
 import { getDefaultWebstoreWarehouseId } from "./dispatch-warehouse";
+import { isSkuResolved, resolveSkusBatch } from "./resolve-skus";
 import type { WebstoreOrderPayload } from "./schemas";
 
 export class NeedsReviewError extends Error {
@@ -55,6 +56,11 @@ export async function processWebstoreOrder(
       });
     }
 
+    const skusNeedingLookup = payload.lines
+      .filter((line) => !overrides?.[line.sku])
+      .map((line) => line.sku);
+    const resolvedBySku = await resolveSkusBatch(tx, skusNeedingLookup);
+
     const unresolvedSkus: string[] = [];
     const resolvedLines: Array<{ productId: number; quantity: number }> = [];
     for (const line of payload.lines) {
@@ -75,8 +81,8 @@ export async function processWebstoreOrder(
           continue;
         }
       }
-      const product = await tx.product.findUnique({ where: { sku: line.sku } });
-      if (!product || !product.isActive || !product.webstoreEnabled) {
+      const product = resolvedBySku.get(line.sku);
+      if (!product || !isSkuResolved(product)) {
         unresolvedSkus.push(line.sku);
         continue;
       }

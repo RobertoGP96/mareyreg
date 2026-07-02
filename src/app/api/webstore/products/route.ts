@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { resolveApiKey } from "@/modules/webstore/lib/api-key";
-import { getEffectivePrice } from "@/modules/inventory/lib/effective-price";
+import { getEffectivePrices } from "@/modules/inventory/lib/effective-price";
 import { getDefaultWebstoreWarehouseId } from "@/modules/webstore/lib/dispatch-warehouse";
 import {
   checkRateLimit,
@@ -71,26 +71,30 @@ export async function GET(request: Request): Promise<NextResponse> {
     orderBy: [{ webstoreFeatured: "desc" }, { webstoreSortOrder: "asc" }, { name: "asc" }],
   });
 
-  const catalog = await Promise.all(
-    products.map(async (p) => {
-      const price = await getEffectivePrice(db, { productId: p.productId, quantity: 1 });
-      // Mismo almacén que usa processWebstoreOrder para despachar (ver
-      // getDefaultWebstoreWarehouseId): así el stock mostrado nunca diverge
-      // del stock realmente disponible para el despacho de esta orden.
-      const stockAvailable = p.stockLevels.reduce((sum, s) => sum + Number(s.currentQuantity), 0);
-      return {
-        sku: p.sku,
-        name: p.name,
-        description: p.description,
-        category: p.category,
-        price: price.finalPrice,
-        compareAtPrice: price.finalPrice < price.basePrice ? price.basePrice : null,
-        featured: p.webstoreFeatured,
-        stockAvailable,
-        imageUrl: p.imageUrl,
-      };
-    })
+  const prices = await getEffectivePrices(
+    db,
+    products.map((p) => p.productId),
+    { quantity: 1 }
   );
+
+  const catalog = products.map((p) => {
+    const price = prices.get(p.productId) ?? { basePrice: 0, finalPrice: 0, appliedDiscounts: [] };
+    // Mismo almacén que usa processWebstoreOrder para despachar (ver
+    // getDefaultWebstoreWarehouseId): así el stock mostrado nunca diverge
+    // del stock realmente disponible para el despacho de esta orden.
+    const stockAvailable = p.stockLevels.reduce((sum, s) => sum + Number(s.currentQuantity), 0);
+    return {
+      sku: p.sku,
+      name: p.name,
+      description: p.description,
+      category: p.category,
+      price: price.finalPrice,
+      compareAtPrice: price.finalPrice < price.basePrice ? price.basePrice : null,
+      featured: p.webstoreFeatured,
+      stockAvailable,
+      imageUrl: p.imageUrl,
+    };
+  });
 
   return NextResponse.json(catalog);
 }
