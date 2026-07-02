@@ -3,6 +3,7 @@ import { nextFolio, DOC_TYPES } from "@/lib/folio";
 import { createAuditLog } from "@/lib/audit";
 import { getEffectivePrice } from "@/modules/inventory/lib/effective-price";
 import { dispatchLines } from "@/modules/sales/lib/dispatch-lines";
+import { getDefaultWebstoreWarehouseId } from "./dispatch-warehouse";
 import type { WebstoreOrderPayload } from "./schemas";
 
 export class NeedsReviewError extends Error {
@@ -61,6 +62,15 @@ export async function processWebstoreOrder(
       if (overrideProductId) {
         const overrideProduct = await tx.product.findUnique({ where: { productId: overrideProductId } });
         if (overrideProduct && overrideProduct.isActive) {
+          if (!overrideProduct.webstoreEnabled) {
+            // Coherente con la resolución automática: un producto oculto de
+            // la tienda no debe poder despacharse vía reasignación manual.
+            // Se manda a needs_review con un mensaje explícito en vez de
+            // fallar toda la transacción, para que el operador pueda elegir
+            // otro producto o habilitar este en el catálogo y reintentar.
+            unresolvedSkus.push(`${line.sku} (producto reasignado oculto de la tienda)`);
+            continue;
+          }
           resolvedLines.push({ productId: overrideProduct.productId, quantity: line.quantity });
           continue;
         }
@@ -78,12 +88,9 @@ export async function processWebstoreOrder(
 
     let warehouseId = payload.warehouseId;
     if (!warehouseId) {
-      const defaultWarehouse = await tx.warehouse.findFirst({
-        where: { isActive: true },
-        orderBy: { warehouseId: "asc" },
-      });
-      if (!defaultWarehouse) throw new Error("No hay almacenes activos configurados");
-      warehouseId = defaultWarehouse.warehouseId;
+      const defaultWarehouseId = await getDefaultWebstoreWarehouseId(tx);
+      if (!defaultWarehouseId) throw new Error("No hay almacenes activos configurados");
+      warehouseId = defaultWarehouseId;
     }
 
     const priced: Array<{ productId: number; quantity: number; unitPrice: number }> = [];

@@ -3,6 +3,12 @@ import { db } from "@/lib/db";
 import { resolveApiKey } from "@/modules/webstore/lib/api-key";
 import { webstoreOrderPayloadSchema } from "@/modules/webstore/lib/schemas";
 import { processWebstoreOrder, NeedsReviewError } from "@/modules/webstore/lib/process-order";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitExceededResponseInit,
+  WEBSTORE_RATE_LIMITS,
+} from "@/modules/webstore/lib/rate-limit";
 import { Prisma } from "@/generated/prisma";
 
 export const runtime = "nodejs";
@@ -14,9 +20,26 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  const ip = getClientIp(request);
+  const ipLimit = await checkRateLimit(`orders:ip:${ip}`, WEBSTORE_RATE_LIMITS.authAttemptsPerIp);
+  if (!ipLimit.allowed) {
+    return NextResponse.json(
+      { error: "Demasiadas solicitudes, intenta de nuevo más tarde" },
+      rateLimitExceededResponseInit(ipLimit.retryAfterSeconds)
+    );
+  }
+
   const apiKey = await resolveApiKey(rawKey);
   if (!apiKey) {
     return NextResponse.json({ error: "API key inválida o revocada" }, { status: 401 });
+  }
+
+  const keyLimit = await checkRateLimit(`orders:key:${apiKey.apiKeyId}`, WEBSTORE_RATE_LIMITS.ordersPerApiKey);
+  if (!keyLimit.allowed) {
+    return NextResponse.json(
+      { error: "Demasiadas solicitudes, intenta de nuevo más tarde" },
+      rateLimitExceededResponseInit(keyLimit.retryAfterSeconds)
+    );
   }
 
   let json: unknown;

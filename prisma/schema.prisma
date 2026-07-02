@@ -1417,6 +1417,7 @@ enum WebstoreOrderStatus {
   processed
   needs_review
   error
+  cancelled
 }
 
 model WebstoreApiKey {
@@ -1457,4 +1458,22 @@ model WebstoreOrderLog {
   @@index([status])
   @@index([receivedAt])
   @@map("webstore_order_logs")
+}
+
+/**
+ * Rate limiting de ventana fija para los endpoints públicos de la tienda en
+ * línea. Respaldado en DB porque Vercel/Neon serverless corre múltiples
+ * instancias sin memoria compartida; el costo de una escritura extra por
+ * request es aceptable dado el bajo volumen de esta API. La clave combina el
+ * bucket (identifica endpoint + apiKeyId o IP) con la ventana truncada al
+ * minuto; el contador se incrementa atómicamente con upsert.
+ */
+model WebstoreRateLimit {
+  bucketKey    String   @map("bucket_key")
+  windowStart  DateTime @map("window_start")
+  requestCount Int      @default(0) @map("request_count")
+
+  @@id([bucketKey, windowStart])
+  @@index([windowStart])
+  @@map("webstore_rate_limits")
 }

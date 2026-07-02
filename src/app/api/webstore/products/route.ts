@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { resolveApiKey } from "@/modules/webstore/lib/api-key";
 import { getEffectivePrice } from "@/modules/inventory/lib/effective-price";
+import { getDefaultWebstoreWarehouseId } from "@/modules/webstore/lib/dispatch-warehouse";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitExceededResponseInit,
+  WEBSTORE_RATE_LIMITS,
+} from "@/modules/webstore/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -18,20 +25,52 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
 
+  const ip = getClientIp(request);
+  const ipLimit = await checkRateLimit(
+    `products:ip:${ip}`,
+    WEBSTORE_RATE_LIMITS.authAttemptsPerIp
+  );
+  if (!ipLimit.allowed) {
+    return NextResponse.json(
+      { error: "Demasiadas solicitudes, intenta de nuevo más tarde" },
+      rateLimitExceededResponseInit(ipLimit.retryAfterSeconds)
+    );
+  }
+
   const apiKey = await resolveApiKey(rawKey);
   if (!apiKey) {
     return NextResponse.json({ error: "API key inválida o revocada" }, { status: 401 });
   }
 
+  const keyLimit = await checkRateLimit(
+    `products:key:${apiKey.apiKeyId}`,
+    WEBSTORE_RATE_LIMITS.productsPerApiKey
+  );
+  if (!keyLimit.allowed) {
+    return NextResponse.json(
+      { error: "Demasiadas solicitudes, intenta de nuevo más tarde" },
+      rateLimitExceededResponseInit(keyLimit.retryAfterSeconds)
+    );
+  }
+
+  const warehouseId = await getDefaultWebstoreWarehouseId(db);
+
   const products = await db.product.findMany({
     where: { webstoreEnabled: true, isActive: true },
-    include: { stockLevels: { select: { currentQuantity: true } } },
+    include: {
+      stockLevels: warehouseId
+        ? { where: { warehouseId }, select: { currentQuantity: true } }
+        : { select: { currentQuantity: true }, take: 0 },
+    },
     orderBy: [{ webstoreFeatured: "desc" }, { webstoreSortOrder: "asc" }, { name: "asc" }],
   });
 
   const catalog = await Promise.all(
     products.map(async (p) => {
       const price = await getEffectivePrice(db, { productId: p.productId, quantity: 1 });
+      // Mismo almacén que usa processWebstoreOrder para despachar (ver
+      // getDefaultWebstoreWarehouseId): así el stock mostrado nunca diverge
+      // del stock realmente disponible para el despacho de esta orden.
       const stockAvailable = p.stockLevels.reduce((sum, s) => sum + Number(s.currentQuantity), 0);
       return {
         sku: p.sku,
