@@ -93,6 +93,19 @@ export async function createProduct(data: {
           notes: data.notes || null,
         },
       });
+      await tx.productPresentation.create({
+        data: {
+          productId: p.productId,
+          name: data.unit,
+          factor: 1,
+          retailPrice: data.salePrice ?? 0,
+          wholesalePrice: data.secondaryPrice ?? null,
+          isBase: true,
+          isActive: true,
+          sortOrder: 0,
+        },
+      });
+
       await createAuditLog(tx, {
         action: "create",
         entityType: "Product",
@@ -150,14 +163,23 @@ export async function updateProduct(
     const previousImageUrl = await db.$transaction(async (tx) => {
       const prev = await tx.product.findUnique({ where: { productId: id } });
 
+      // secondaryPrice deprecado: ver ProductPresentation.wholesalePrice
       const priceChanged =
         (data.costPrice !== undefined && Number(prev?.costPrice ?? NaN) !== data.costPrice) ||
-        (data.salePrice !== undefined && Number(prev?.salePrice ?? NaN) !== data.salePrice) ||
-        (data.secondaryPrice !== undefined &&
-          Number(prev?.secondaryPrice ?? NaN) !== data.secondaryPrice);
+        (data.salePrice !== undefined && Number(prev?.salePrice ?? NaN) !== data.salePrice);
 
       if (priceChanged) {
         await assertRole("admin", "dispatcher");
+      }
+
+      const unitChanged = data.unit !== undefined && data.unit !== prev?.unit;
+      if (unitChanged) {
+        const collision = await tx.productPresentation.findUnique({
+          where: { productId_name: { productId: id, name: data.unit as string } },
+        });
+        if (collision) {
+          throw new Error(`UNIT_COLLISION:${data.unit}`);
+        }
       }
 
       await tx.product.update({
@@ -172,7 +194,6 @@ export async function updateProduct(
           ...(data.maxStock !== undefined && { maxStock: data.maxStock ?? null }),
           ...(data.costPrice !== undefined && { costPrice: data.costPrice ?? null }),
           ...(data.salePrice !== undefined && { salePrice: data.salePrice ?? null }),
-          ...(data.secondaryPrice !== undefined && { secondaryPrice: data.secondaryPrice ?? null }),
           ...(data.valuationMethod !== undefined && { valuationMethod: data.valuationMethod }),
           ...(data.tracksLots !== undefined && { tracksLots: data.tracksLots }),
           ...(data.allowNegative !== undefined && { allowNegative: data.allowNegative }),
@@ -204,6 +225,36 @@ export async function updateProduct(
         });
       }
 
+      const salePriceChanged =
+        data.salePrice !== undefined && Number(prev?.salePrice ?? NaN) !== data.salePrice;
+      if (salePriceChanged || unitChanged) {
+        const base = await tx.productPresentation.findFirst({
+          where: { productId: id, isBase: true },
+        });
+        if (base) {
+          await tx.productPresentation.update({
+            where: { presentationId: base.presentationId },
+            data: {
+              ...(salePriceChanged && { retailPrice: data.salePrice }),
+              ...(unitChanged && { name: data.unit }),
+            },
+          });
+
+          if (salePriceChanged) {
+            await tx.presentationPriceHistory.create({
+              data: {
+                presentationId: base.presentationId,
+                oldRetailPrice: base.retailPrice,
+                newRetailPrice: data.salePrice,
+                oldWholesalePrice: base.wholesalePrice ?? null,
+                newWholesalePrice: base.wholesalePrice ?? null,
+                changedBy: userId,
+              },
+            });
+          }
+        }
+      }
+
       await createAuditLog(tx, {
         action: "update",
         entityType: "Product",
@@ -230,6 +281,10 @@ export async function updateProduct(
     }
     if (error instanceof ForbiddenError) {
       return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
+    }
+    if (error instanceof Error && error.message.startsWith("UNIT_COLLISION:")) {
+      const unit = error.message.split(":")[1];
+      return { success: false, error: `Ya existe una presentación llamada '${unit}' para este producto` };
     }
     console.error("Error updating product:", error);
     return { success: false, error: "Error al actualizar el producto" };

@@ -1,8 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getEffectivePrice, getEffectivePrices } from "./effective-price";
+import {
+  getEffectivePrice,
+  getEffectivePrices,
+  getEffectiveLinePrices,
+  lineKey,
+} from "./effective-price";
 
 type MockDb = {
   product: { findMany: ReturnType<typeof vi.fn> };
+  productPresentation: { findMany: ReturnType<typeof vi.fn> };
   customer: { findUnique: ReturnType<typeof vi.fn> };
   priceListItem: { findMany: ReturnType<typeof vi.fn> };
   discount: { findMany: ReturnType<typeof vi.fn> };
@@ -11,9 +17,24 @@ type MockDb = {
 function createMockDb(): MockDb {
   return {
     product: { findMany: vi.fn() },
+    productPresentation: { findMany: vi.fn() },
     customer: { findUnique: vi.fn() },
     priceListItem: { findMany: vi.fn() },
     discount: { findMany: vi.fn() },
+  };
+}
+
+function presentation(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    presentationId: 10,
+    productId: 1,
+    name: "Caja 24",
+    factor: 24,
+    retailPrice: 550,
+    wholesalePrice: null,
+    isBase: false,
+    isActive: true,
+    ...overrides,
   };
 }
 
@@ -50,6 +71,7 @@ describe("effective-price", () => {
     db = createMockDb();
     db.customer.findUnique.mockResolvedValue(null);
     db.priceListItem.findMany.mockResolvedValue([]);
+    db.productPresentation.findMany.mockResolvedValue([]);
   });
 
   describe("sin descuentos", () => {
@@ -226,6 +248,128 @@ describe("effective-price", () => {
       await expect(
         getEffectivePrice(db as never, { productId: 999, quantity: 1 })
       ).rejects.toThrow("Producto 999 no encontrado");
+    });
+  });
+
+  describe("getEffectiveLinePrices (presentaciones)", () => {
+    it("línea sin presentación se comporta como el flujo actual (factor 1)", async () => {
+      db.product.findMany.mockResolvedValue([product({ salePrice: 25 })]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      const results = await getEffectiveLinePrices(db as never, [
+        { productId: 1, quantity: 3 },
+      ]);
+
+      const line = results.get(lineKey(1, null));
+      expect(line?.basePrice).toBe(25);
+      expect(line?.finalPrice).toBe(25);
+      expect(line?.factor).toBe(1);
+    });
+
+    it("presentación usa retailPrice y expone su factor", async () => {
+      db.product.findMany.mockResolvedValue([product({ salePrice: 25 })]);
+      db.productPresentation.findMany.mockResolvedValue([presentation()]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      const results = await getEffectiveLinePrices(db as never, [
+        { productId: 1, presentationId: 10, quantity: 2 },
+      ]);
+
+      const line = results.get(lineKey(1, 10));
+      expect(line?.basePrice).toBe(550);
+      expect(line?.factor).toBe(24);
+    });
+
+    it("cliente wholesale recibe wholesalePrice cuando la presentación lo define", async () => {
+      db.product.findMany.mockResolvedValue([product({ salePrice: 25 })]);
+      db.productPresentation.findMany.mockResolvedValue([
+        presentation({ wholesalePrice: 480 }),
+      ]);
+      db.customer.findUnique.mockResolvedValue({ priceListId: null, customerType: "wholesale" });
+      db.discount.findMany.mockResolvedValue([]);
+
+      const results = await getEffectiveLinePrices(
+        db as never,
+        [{ productId: 1, presentationId: 10, quantity: 1 }],
+        { customerId: 42 }
+      );
+
+      expect(results.get(lineKey(1, 10))?.basePrice).toBe(480);
+    });
+
+    it("cliente wholesale sin wholesalePrice definido cae a retailPrice", async () => {
+      db.product.findMany.mockResolvedValue([product({ salePrice: 25 })]);
+      db.productPresentation.findMany.mockResolvedValue([presentation({ wholesalePrice: null })]);
+      db.customer.findUnique.mockResolvedValue({ priceListId: null, customerType: "wholesale" });
+      db.discount.findMany.mockResolvedValue([]);
+
+      const results = await getEffectiveLinePrices(
+        db as never,
+        [{ productId: 1, presentationId: 10, quantity: 1 }],
+        { customerId: 42 }
+      );
+
+      expect(results.get(lineKey(1, 10))?.basePrice).toBe(550);
+    });
+
+    it("la lista de precios del cliente solo sobrescribe la presentación base", async () => {
+      db.product.findMany.mockResolvedValue([product({ salePrice: 25 })]);
+      db.productPresentation.findMany.mockResolvedValue([
+        presentation({ presentationId: 9, name: "lata", factor: 1, retailPrice: 25, isBase: true }),
+        presentation({ presentationId: 10 }),
+      ]);
+      db.customer.findUnique.mockResolvedValue({ priceListId: 7, customerType: "retail" });
+      db.priceListItem.findMany.mockResolvedValue([{ productId: 1, price: 20 }]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      const results = await getEffectiveLinePrices(
+        db as never,
+        [
+          { productId: 1, presentationId: 9, quantity: 1 },
+          { productId: 1, presentationId: 10, quantity: 1 },
+        ],
+        { customerId: 42 }
+      );
+
+      expect(results.get(lineKey(1, 9))?.basePrice).toBe(20); // lista gana en base
+      expect(results.get(lineKey(1, 10))?.basePrice).toBe(550); // no-base conserva su precio
+    });
+
+    it("minQty de descuentos por volumen se evalúa en unidades base", async () => {
+      db.product.findMany.mockResolvedValue([product({ salePrice: 25 })]);
+      db.productPresentation.findMany.mockResolvedValue([presentation()]);
+      // getEffectiveLinePrices NO filtra minQty en la query: lo evalúa por línea.
+      db.discount.findMany.mockResolvedValue([
+        discount({ type: "volume", value: 10, minQty: 24 }),
+      ]);
+
+      const results = await getEffectiveLinePrices(db as never, [
+        { productId: 1, presentationId: 10, quantity: 1 }, // 1 caja = 24 base → aplica
+        { productId: 1, quantity: 12 }, // 12 latas → no aplica
+      ]);
+
+      expect(results.get(lineKey(1, 10))?.appliedDiscounts).toHaveLength(1);
+      expect(results.get(lineKey(1, null))?.appliedDiscounts).toHaveLength(0);
+    });
+
+    it("presentación de otro producto lanza error", async () => {
+      db.product.findMany.mockResolvedValue([product({ productId: 2, salePrice: 30 })]);
+      db.productPresentation.findMany.mockResolvedValue([presentation({ productId: 1 })]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      await expect(
+        getEffectiveLinePrices(db as never, [{ productId: 2, presentationId: 10, quantity: 1 }])
+      ).rejects.toThrow("no corresponde al producto");
+    });
+
+    it("presentación inactiva lanza error", async () => {
+      db.product.findMany.mockResolvedValue([product({ salePrice: 25 })]);
+      db.productPresentation.findMany.mockResolvedValue([presentation({ isActive: false })]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      await expect(
+        getEffectiveLinePrices(db as never, [{ productId: 1, presentationId: 10, quantity: 1 }])
+      ).rejects.toThrow("inactiva");
     });
   });
 });

@@ -170,12 +170,19 @@ export async function cancelWebstoreOrder(logId: number): Promise<ActionResult<v
       const reversedLines = await reverseInvoiceStock(tx, {
         folio: invoice.folio,
         warehouseByProductId,
-        lines: invoice.lines.map((l) => ({
-          productId: l.productId,
-          quantity: Number(l.quantity),
-          unitCost: Number(l.unitCost),
-          lotId: l.lotId,
-        })),
+        lines: invoice.lines.map((l) => {
+          // Fallback defensivo: filas creadas antes del backfill de
+          // baseQuantity (o con baseQuantity 0 por algún motivo) reconstruyen
+          // el valor a partir de quantity × unitFactor.
+          const bq = Number(l.baseQuantity);
+          return {
+            productId: l.productId,
+            quantity: Number(l.quantity),
+            baseQuantity: bq > 0 ? bq : Number(l.quantity) * Number(l.unitFactor),
+            unitCost: Number(l.unitCost),
+            lotId: l.lotId,
+          };
+        }),
         userId,
         movementNotesPrefix: "Cancelación orden web",
       });

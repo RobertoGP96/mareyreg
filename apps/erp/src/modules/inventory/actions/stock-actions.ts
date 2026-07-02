@@ -9,6 +9,7 @@ import {
   applyInventoryExit,
   applyInventoryTransfer,
 } from "@/lib/valuation";
+import { toBaseQuantity, formatEquivalence } from "@/modules/inventory/lib/units";
 import type { Prisma } from "@/generated/prisma";
 
 type PrismaTx = Prisma.TransactionClient;
@@ -99,15 +100,58 @@ async function applyStockLevelDelta(
   }
 }
 
+interface ResolvedPresentation {
+  presentationId: number | null;
+  factor: number;
+  baseQuantity: number;
+  equivalenceNote: string;
+}
+
+/**
+ * Resuelve y valida server-side la presentaci\u00f3n (si viene una en el input):
+ * pertenencia al producto, activa, y factor SIEMPRE tomado de la BD (nunca
+ * del caller). Devuelve la cantidad ya convertida a unidad base y una nota de
+ * equivalencia lista para anexar al movimiento cuando factor !== 1.
+ */
+async function resolvePresentation(
+  tx: PrismaTx,
+  params: { productId: number; presentationId?: number; quantity: number; productUnit: string }
+): Promise<ResolvedPresentation> {
+  const { productId, presentationId, quantity, productUnit } = params;
+
+  if (presentationId == null) {
+    return { presentationId: null, factor: 1, baseQuantity: quantity, equivalenceNote: "" };
+  }
+
+  const presentation = await tx.productPresentation.findUnique({
+    where: { presentationId },
+  });
+  if (!presentation || presentation.productId !== productId) {
+    throw new Error(`La presentaci\u00f3n seleccionada no corresponde al producto ${productId}`);
+  }
+  if (!presentation.isActive) {
+    throw new Error(`La presentaci\u00f3n "${presentation.name}" est\u00e1 inactiva`);
+  }
+
+  const factor = Number(presentation.factor);
+  const baseQuantity = toBaseQuantity(quantity, factor);
+  const equivalenceNote =
+    factor !== 1 ? ` \u2014 ${formatEquivalence(quantity, factor, presentation.name, productUnit)}` : "";
+
+  return { presentationId: presentation.presentationId, factor, baseQuantity, equivalenceNote };
+}
+
 // -----------------------------------------------------------------------------
 // ENTRY / EXIT / ADJUSTMENT (single warehouse)
 // -----------------------------------------------------------------------------
 export async function createStockMovement(data: {
   productId: number;
   warehouseId: number;
-  quantity: number;               // Siempre positivo. El signo lo determina movementType.
+  quantity: number;               // Siempre positivo, en la unidad de `presentationId` (o base si se omite). El signo lo determina movementType.
+  presentationId?: number;
   movementType: "entry" | "exit" | "adjustment";
   adjustmentSign?: "positive" | "negative"; // requerido si movementType === "adjustment"
+  /** Costo por unidad. Si hay presentationId, se interpreta por unidad de PRESENTACI\u00d3N (se divide por el factor para obtener costo por unidad base). */
   unitCost?: number;
   referenceTripId?: number;
   referenceDoc?: string;
@@ -121,26 +165,38 @@ export async function createStockMovement(data: {
     const userId = await requireCurrentUserId();
 
     const result = await db.$transaction(async (tx) => {
-      // Calcular delta firmado sobre StockLevel
+      const product = await tx.product.findUnique({
+        where: { productId: data.productId },
+        select: { allowNegative: true, unit: true },
+      });
+      if (!product) throw new Error(`Producto ${data.productId} no existe`);
+      const allowNegative = product.allowNegative ?? false;
+
+      const { presentationId, factor, baseQuantity, equivalenceNote } = await resolvePresentation(tx, {
+        productId: data.productId,
+        presentationId: data.presentationId,
+        quantity: data.quantity,
+        productUnit: product.unit,
+      });
+
+      // Costo por unidad base: si el costo del input viene por presentaci\u00f3n,
+      // se divide por el factor (ej. $550 la caja de 24 = $22.9166... la lata).
+      const unitCostPerBase = data.unitCost != null ? data.unitCost / factor : undefined;
+
+      // Calcular delta firmado sobre StockLevel (en unidad base)
       let delta = 0;
       if (data.movementType === "entry") {
-        delta = data.quantity;
+        delta = baseQuantity;
       } else if (data.movementType === "exit") {
-        delta = -data.quantity;
+        delta = -baseQuantity;
       } else if (data.movementType === "adjustment") {
         if (!data.adjustmentSign) {
           throw new Error("Debe indicar si el ajuste es positivo o negativo");
         }
-        delta = data.adjustmentSign === "positive" ? data.quantity : -data.quantity;
+        delta = data.adjustmentSign === "positive" ? baseQuantity : -baseQuantity;
       } else {
         throw new Error(`Tipo de movimiento invalido: ${data.movementType}`);
       }
-
-      const product = await tx.product.findUnique({
-        where: { productId: data.productId },
-        select: { allowNegative: true },
-      });
-      const allowNegative = product?.allowNegative ?? false;
 
       // Aplicar el delta a StockLevel primero, de forma atomica: si delta es
       // negativo y el producto no permite negativo, esto falla (lanzando el
@@ -153,15 +209,15 @@ export async function createStockMovement(data: {
         allowNegative,
       });
 
-      let actualUnitCost = data.unitCost ?? null;
+      let actualUnitCost = unitCostPerBase ?? null;
 
       // Valuaci\u00f3n: entrada
       if (data.movementType === "entry") {
         await applyInventoryEntry(tx, {
           productId: data.productId,
           warehouseId: data.warehouseId,
-          qty: data.quantity,
-          unitCost: data.unitCost ?? 0,
+          qty: baseQuantity,
+          unitCost: unitCostPerBase ?? 0,
           sourceType: "adjustment_entry",
         });
       } else if (
@@ -171,7 +227,7 @@ export async function createStockMovement(data: {
         const exit = await applyInventoryExit(tx, {
           productId: data.productId,
           warehouseId: data.warehouseId,
-          qty: data.quantity,
+          qty: baseQuantity,
         });
         if (actualUnitCost == null) actualUnitCost = exit.avgCostUsed;
       } else if (data.movementType === "adjustment" && delta > 0) {
@@ -179,8 +235,8 @@ export async function createStockMovement(data: {
         await applyInventoryEntry(tx, {
           productId: data.productId,
           warehouseId: data.warehouseId,
-          qty: data.quantity,
-          unitCost: data.unitCost ?? 0,
+          qty: baseQuantity,
+          unitCost: unitCostPerBase ?? 0,
           sourceType: "adjustment_entry",
         });
       }
@@ -189,12 +245,12 @@ export async function createStockMovement(data: {
         data: {
           productId: data.productId,
           warehouseId: data.warehouseId,
-          quantity: data.quantity,
+          quantity: baseQuantity,
           movementType: data.movementType,
           unitCost: actualUnitCost,
           referenceTripId: data.referenceTripId ?? null,
           referenceDoc: data.referenceDoc || null,
-          notes: data.notes || null,
+          notes: data.notes ? `${data.notes}${equivalenceNote}` : equivalenceNote || null,
           createdBy: userId,
         },
       });
@@ -209,9 +265,12 @@ export async function createStockMovement(data: {
           productId: data.productId,
           warehouseId: data.warehouseId,
           quantity: data.quantity,
+          presentationId,
+          unitFactor: factor,
+          baseQuantity,
           movementType: data.movementType,
           delta,
-          unitCost: data.unitCost ?? null,
+          unitCost: unitCostPerBase ?? null,
         },
       });
 
@@ -235,6 +294,7 @@ export async function createStockTransfer(data: {
   warehouseIdFrom: number;
   warehouseIdTo: number;
   quantity: number;
+  presentationId?: number;
   referenceDoc?: string;
   notes?: string;
 }): Promise<ActionResult<{ outMovementId: number; inMovementId: number }>> {
@@ -251,30 +311,39 @@ export async function createStockTransfer(data: {
     const result = await db.$transaction(async (tx) => {
       const product = await tx.product.findUnique({
         where: { productId: data.productId },
-        select: { allowNegative: true },
+        select: { allowNegative: true, unit: true },
       });
-      const allowNegative = product?.allowNegative ?? false;
+      if (!product) throw new Error(`Producto ${data.productId} no existe`);
+      const allowNegative = product.allowNegative ?? false;
+
+      const { presentationId, factor, baseQuantity, equivalenceNote } = await resolvePresentation(tx, {
+        productId: data.productId,
+        presentationId: data.presentationId,
+        quantity: data.quantity,
+        productUnit: product.unit,
+      });
 
       // Descontar del almacen origen de forma atomica (salvo producto con
       // allowNegative). Si no alcanza, lanza el error de stock insuficiente
       // antes de tocar la valuacion, igual que el comportamiento anterior.
+      // Siempre en unidad base.
       await applyStockLevelDelta(tx, {
         productId: data.productId,
         warehouseId: data.warehouseIdFrom,
-        delta: -data.quantity,
+        delta: -baseQuantity,
         allowNegative,
       });
 
       const noteBase = data.notes
-        ? `${data.notes} | Transferencia`
-        : "Transferencia entre almacenes";
+        ? `${data.notes} | Transferencia${equivalenceNote}`
+        : `Transferencia entre almacenes${equivalenceNote}`;
 
-      // Valuaci\u00f3n: mover costo entre almacenes
+      // Valuaci\u00f3n: mover costo entre almacenes (en unidad base)
       const { avgCostUsed } = await applyInventoryTransfer(tx, {
         productId: data.productId,
         warehouseIdFrom: data.warehouseIdFrom,
         warehouseIdTo: data.warehouseIdTo,
-        qty: data.quantity,
+        qty: baseQuantity,
       });
 
       // Salida del almacen origen
@@ -282,7 +351,7 @@ export async function createStockTransfer(data: {
         data: {
           productId: data.productId,
           warehouseId: data.warehouseIdFrom,
-          quantity: data.quantity,
+          quantity: baseQuantity,
           movementType: "transfer",
           unitCost: avgCostUsed,
           referenceDoc: data.referenceDoc || null,
@@ -296,7 +365,7 @@ export async function createStockTransfer(data: {
         data: {
           productId: data.productId,
           warehouseId: data.warehouseIdTo,
-          quantity: data.quantity,
+          quantity: baseQuantity,
           movementType: "transfer",
           unitCost: avgCostUsed,
           referenceDoc: data.referenceDoc || null,
@@ -305,7 +374,7 @@ export async function createStockTransfer(data: {
         },
       });
 
-      await upsertStockLevel(tx, data.productId, data.warehouseIdTo, data.quantity);
+      await upsertStockLevel(tx, data.productId, data.warehouseIdTo, baseQuantity);
 
       await createAuditLog(tx, {
         action: "create",
@@ -318,6 +387,9 @@ export async function createStockTransfer(data: {
           warehouseIdFrom: data.warehouseIdFrom,
           warehouseIdTo: data.warehouseIdTo,
           quantity: data.quantity,
+          presentationId,
+          unitFactor: factor,
+          baseQuantity,
           outMovementId: outMovement.movementId,
           inMovementId: inMovement.movementId,
         },

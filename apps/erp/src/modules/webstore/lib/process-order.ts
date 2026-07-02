@@ -136,6 +136,10 @@ export async function processWebstoreOrder(
         discount: 0,
         fulfilledQty: l.quantity,
         subtotal: l.quantity * l.unitPrice,
+        // Sin presentación en el flujo webstore actual: factor 1 explícito,
+        // no depender del default de schema (0) para baseQuantity.
+        unitFactor: 1,
+        baseQuantity: l.quantity,
       })),
     });
 

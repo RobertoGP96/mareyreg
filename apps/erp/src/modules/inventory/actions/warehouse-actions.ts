@@ -5,8 +5,18 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { assertRole, ForbiddenError } from "@/lib/auth-guard";
+import type { LocationType } from "@/generated/prisma";
 
 const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
+const VALID_LOCATION_TYPES: LocationType[] = ["general", "store", "service_unit"];
+
+function validateLocationType(locationType: unknown): LocationType | undefined {
+  if (locationType === undefined) return undefined;
+  if (!VALID_LOCATION_TYPES.includes(locationType as LocationType)) {
+    throw new Error(`Tipo de ubicación inválido: ${String(locationType)}`);
+  }
+  return locationType as LocationType;
+}
 
 export async function createWarehouse(data: {
   name: string;
@@ -14,9 +24,11 @@ export async function createWarehouse(data: {
   province?: string;
   capacity?: number;
   warehouseType?: string;
+  locationType?: "general" | "store" | "service_unit";
   contactPhone?: string;
 }): Promise<ActionResult<{ warehouseId: number }>> {
   try {
+    const locationType = validateLocationType(data.locationType) ?? "general";
     const userId = await requireCurrentUserId();
     const warehouse = await db.$transaction(async (tx) => {
       const w = await tx.warehouse.create({
@@ -26,6 +38,7 @@ export async function createWarehouse(data: {
           province: data.province || null,
           capacity: data.capacity || null,
           warehouseType: data.warehouseType || null,
+          locationType,
           contactPhone: data.contactPhone || null,
         },
       });
@@ -46,6 +59,9 @@ export async function createWarehouse(data: {
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
     }
+    if (error instanceof Error && error.message.startsWith("Tipo de ubicación inválido")) {
+      return { success: false, error: error.message };
+    }
     console.error("Error creating warehouse:", error);
     return { success: false, error: "Error al crear el almacen" };
   }
@@ -59,11 +75,13 @@ export async function updateWarehouse(
     province?: string;
     capacity?: number;
     warehouseType?: string;
+    locationType?: "general" | "store" | "service_unit";
     contactPhone?: string;
     isActive?: boolean;
   }
 ): Promise<ActionResult<void>> {
   try {
+    const locationType = validateLocationType(data.locationType);
     const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.warehouse.findUnique({ where: { warehouseId: id } });
@@ -75,6 +93,7 @@ export async function updateWarehouse(
           ...(data.province !== undefined && { province: data.province }),
           ...(data.capacity !== undefined && { capacity: data.capacity }),
           ...(data.warehouseType !== undefined && { warehouseType: data.warehouseType || null }),
+          ...(locationType !== undefined && { locationType }),
           ...(data.contactPhone !== undefined && { contactPhone: data.contactPhone || null }),
           ...(data.isActive !== undefined && { isActive: data.isActive }),
         },
@@ -95,6 +114,9 @@ export async function updateWarehouse(
   } catch (error) {
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
+    if (error instanceof Error && error.message.startsWith("Tipo de ubicación inválido")) {
+      return { success: false, error: error.message };
     }
     console.error("Error updating warehouse:", error);
     return { success: false, error: "Error al actualizar el almacen" };
