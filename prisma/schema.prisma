@@ -363,6 +363,7 @@ enum ReservationStatus {
   active
   completed
   cancelled
+  expired
 }
 
 // Contact directory for paca-module clients (contact info only)
@@ -396,6 +397,7 @@ model PacaReservation {
   clientEmail     String?           @map("client_email")
   reservationDate String            @map("reservation_date")
   expirationDate  String?           @map("expiration_date")
+  expiresAt       DateTime?         @map("expires_at")
   notes           String?
   status          ReservationStatus @default(active)
   createdAt       DateTime          @default(now()) @map("created_at")
@@ -622,6 +624,7 @@ model Supplier {
   products       Product[]
   purchaseOrders PurchaseOrder[]
   lots           Lot[]
+  bills          SupplierBill[]
 
   @@index([isActive])
   @@map("suppliers")
@@ -691,6 +694,7 @@ model PurchaseOrder {
   warehouse Warehouse           @relation(fields: [warehouseId], references: [warehouseId])
   lines     PurchaseOrderLine[]
   receipts  GoodsReceipt[]
+  bills     SupplierBill[]
 
   @@index([supplierId])
   @@index([status])
@@ -742,6 +746,55 @@ model GoodsReceiptLine {
 
   @@index([receiptId])
   @@map("goods_receipt_lines")
+}
+
+enum SupplierBillStatus {
+  open
+  partial
+  paid
+  cancelled
+}
+
+model SupplierBill {
+  billId          Int                @id @default(autoincrement()) @map("bill_id")
+  supplierId      Int                @map("supplier_id")
+  purchaseOrderId Int?               @map("purchase_order_id")
+  folio           String             @unique
+  issueDate       DateTime           @map("issue_date")
+  dueDate         DateTime?          @map("due_date")
+  total           Decimal            @db.Decimal(20, 8)
+  paid            Decimal            @default(0) @db.Decimal(20, 8)
+  status          SupplierBillStatus @default(open)
+  version         Int                @default(0)
+  notes           String?
+  createdBy       Int?               @map("created_by")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @default(now()) @updatedAt @map("updated_at")
+
+  supplier      Supplier          @relation(fields: [supplierId], references: [supplierId], onDelete: Restrict)
+  purchaseOrder PurchaseOrder?    @relation(fields: [purchaseOrderId], references: [poId], onDelete: Restrict)
+  payments      SupplierPayment[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("supplier_bills")
+}
+
+model SupplierPayment {
+  paymentId   Int      @id @default(autoincrement()) @map("payment_id")
+  billId      Int      @map("bill_id")
+  amount      Decimal  @db.Decimal(20, 8)
+  method      String
+  paymentDate DateTime @map("payment_date")
+  notes       String?
+  createdBy   Int?     @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  bill SupplierBill @relation(fields: [billId], references: [billId], onDelete: Restrict)
+
+  @@index([billId])
+  @@map("supplier_payments")
 }
 
 // =============================================
@@ -1425,6 +1478,8 @@ model WebstoreApiKey {
   label      String
   keyHash    String    @map("key_hash")
   keyPrefix  String    @map("key_prefix")
+  scopes     String[]  @default(["read_catalog", "create_orders"])
+  expiresAt  DateTime? @map("expires_at")
   isActive   Boolean   @default(true) @map("is_active")
   revokedAt  DateTime? @map("revoked_at")
   lastUsedAt DateTime? @map("last_used_at")

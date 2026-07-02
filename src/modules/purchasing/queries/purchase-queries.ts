@@ -36,17 +36,3 @@ export async function getOpenPurchaseOrdersForSupplier(supplierId: number) {
     include: { lines: { include: { product: true } } },
   });
 }
-
-export async function getAccountsPayable() {
-  // MVP: OC recibidas (parcial o total) que no tienen pagos registrados en Payment.
-  // En Fase 4 se unir\u00e1 con un modelo de "Bill" separado.
-  return db.purchaseOrder.findMany({
-    where: {
-      status: { in: ["received", "partial"] },
-    },
-    include: {
-      supplier: { select: { name: true } },
-    },
-    orderBy: { orderDate: "desc" },
-  });
-}

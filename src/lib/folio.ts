@@ -10,6 +10,7 @@ export const DOC_TYPES = {
   INVOICE: "INV",
   RETURN: "RET",
   STOCK_COUNT: "COUNT",
+  SUPPLIER_BILL: "BILL",
 } as const;
 
 export type DocType = (typeof DOC_TYPES)[keyof typeof DOC_TYPES];
@@ -22,6 +23,7 @@ const DEFAULT_PREFIX: Record<string, string> = {
   INV: "FAC-",
   RET: "DEV-",
   COUNT: "CNT-",
+  BILL: "FPR-",
 };
 
 /**
