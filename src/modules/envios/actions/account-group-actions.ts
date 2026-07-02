@@ -18,7 +18,9 @@ function isForbiddenError(error: unknown): boolean {
   return error instanceof ForbiddenError;
 }
 
-const revalidateAll = () => {
+// AccountGroup afecta la lista de grupos y las cuentas que agrupa; el
+// dashboard tambien puede mostrar totales por grupo.
+const revalidateAccountGroups = () => {
   revalidatePath("/envios/grupos");
   revalidatePath("/envios/cuentas");
   revalidatePath("/envios/dashboard");
@@ -61,7 +63,7 @@ export async function createAccountGroup(
       return g;
     });
 
-    revalidateAll();
+    revalidateAccountGroups();
     return { success: true, data: { groupId: created.groupId } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -113,7 +115,7 @@ export async function updateAccountGroup(
       });
     });
 
-    revalidateAll();
+    revalidateAccountGroups();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -145,7 +147,7 @@ export async function toggleAccountGroup(
       });
       return updated.active;
     });
-    revalidateAll();
+    revalidateAccountGroups();
     return { success: true, data: { active: next } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -177,7 +179,7 @@ export async function deleteAccountGroup(id: number): Promise<ActionResult<void>
         oldValues: prev,
       });
     });
-    revalidateAll();
+    revalidateAccountGroups();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };

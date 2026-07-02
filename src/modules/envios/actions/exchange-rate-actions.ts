@@ -27,11 +27,18 @@ function isForbiddenError(error: unknown): boolean {
   return error instanceof ForbiddenError;
 }
 
-const revalidateAll = () => {
+// CRUD de reglas (create/update/toggle/delete) solo afecta el catalogo de
+// reglas; no cambia balances ni asignaciones existentes.
+const revalidateRules = () => {
+  revalidatePath("/envios/tasas");
+};
+
+// Asignar/quitar reglas de una cuenta afecta la vista de la cuenta y el
+// calculo de tasas en operaciones futuras.
+const revalidateRuleAssignment = () => {
   revalidatePath("/envios/tasas");
   revalidatePath("/envios/cuentas");
   revalidatePath("/envios/operaciones");
-  revalidatePath("/envios/dashboard");
 };
 
 function describeDbError(error: unknown, fallback: string): string {
@@ -91,7 +98,7 @@ export async function createExchangeRateRule(
       return r;
     });
 
-    revalidateAll();
+    revalidateRules();
     return { success: true, data: { ruleId: created.ruleId } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -142,7 +149,7 @@ export async function updateExchangeRateRule(
       });
     });
 
-    revalidateAll();
+    revalidateRules();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -184,7 +191,7 @@ export async function toggleExchangeRateRule(
       });
       return updated.active;
     });
-    revalidateAll();
+    revalidateRules();
     return { success: true, data: { active: next } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -217,7 +224,7 @@ export async function deleteExchangeRateRule(id: number): Promise<ActionResult<v
         oldValues: prev,
       });
     });
-    revalidateAll();
+    revalidateRules();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -278,7 +285,7 @@ export async function assignRulesToAccount(
       return { assigned: toAdd.length, removed: toRemove.length };
     });
 
-    revalidateAll();
+    revalidateRuleAssignment();
     return { success: true, data: result };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -308,7 +315,7 @@ export async function unassignRuleFromAccount(
         oldValues: { accountId, ruleId },
       });
     });
-    revalidateAll();
+    revalidateRuleAssignment();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };

@@ -23,11 +23,23 @@ function isForbiddenError(error: unknown): boolean {
   return error instanceof ForbiddenError;
 }
 
-const revalidateAll = () => {
+// Revalidacion selectiva por tipo de mutacion (en vez de invalidar las 5 rutas
+// del modulo en cada accion). Conservador: ante la duda se incluye la ruta.
+const revalidateAccount = () => {
   revalidatePath("/envios/cuentas");
-  revalidatePath("/envios/grupos");
   revalidatePath("/envios/dashboard");
+};
+
+// createAccount puede registrar un Operation de saldo inicial (adjustment),
+// por lo que tambien afecta operaciones/pendientes.
+const revalidateAccountWithOpeningBalance = () => {
+  revalidateAccount();
   revalidatePath("/envios/operaciones");
+};
+
+// createRuleAndAssign crea una ExchangeRateRule y la asigna a la cuenta.
+const revalidateAccountRuleAssignment = () => {
+  revalidateAccount();
   revalidatePath("/envios/tasas");
 };
 
@@ -119,7 +131,11 @@ export async function createAccount(
       return a;
     });
 
-    revalidateAll();
+    if (opening !== 0) {
+      revalidateAccountWithOpeningBalance();
+    } else {
+      revalidateAccount();
+    }
     return { success: true, data: { accountId: created.accountId } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -187,7 +203,7 @@ export async function updateAccount(
       });
     });
 
-    revalidateAll();
+    revalidateAccount();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -229,7 +245,7 @@ export async function toggleAccountActive(
       });
       return updated.active;
     });
-    revalidateAll();
+    revalidateAccount();
     return { success: true, data: { active: next } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -302,7 +318,7 @@ export async function createRuleAndAssign(
       return { ruleId: rule.ruleId };
     });
 
-    revalidateAll();
+    revalidateAccountRuleAssignment();
     return { success: true, data: result };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -347,7 +363,7 @@ export async function deleteAccount(id: number): Promise<ActionResult<void>> {
         oldValues: prev,
       });
     });
-    revalidateAll();
+    revalidateAccount();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };

@@ -30,7 +30,10 @@ function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
 }
 
-const revalidateAll = () => {
+// Todas las mutaciones de este archivo crean/actualizan Operation y afectan
+// el balance de cuentas; /envios/grupos/[id] tambien muestra balances por
+// cuenta dentro del grupo, asi que se incluye por conservadurismo.
+const revalidateOperations = () => {
   revalidatePath("/envios/operaciones");
   revalidatePath("/envios/pendientes");
   revalidatePath("/envios/cuentas");
@@ -121,7 +124,7 @@ export async function createOperation(
       return op;
     });
 
-    revalidateAll();
+    revalidateOperations();
     return { success: true, data: { operationId: created.operationId } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -179,7 +182,7 @@ export async function confirmOperation(
       return newBalance;
     });
 
-    revalidateAll();
+    revalidateOperations();
     return { success: true, data: { balanceAfter: result } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -374,7 +377,7 @@ export async function createOperationsBatch(
       return ids;
     });
 
-    revalidateAll();
+    revalidateOperations();
     return { success: true, data: { created } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -589,7 +592,7 @@ export async function createConversionOperation(
       return { operationId: op.operationId, rate, amountInAccountCurrency };
     });
 
-    revalidateAll();
+    revalidateOperations();
     return { success: true, data: { ...result, direction: data.direction } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -650,7 +653,7 @@ export async function cancelOperation(operationId: number): Promise<ActionResult
         newValues: { status: "cancelled" },
       });
     });
-    revalidateAll();
+    revalidateOperations();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };

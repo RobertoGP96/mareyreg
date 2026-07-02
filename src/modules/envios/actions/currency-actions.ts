@@ -18,7 +18,10 @@ function isForbiddenError(error: unknown): boolean {
   return error instanceof ForbiddenError;
 }
 
-const revalidateAll = () => {
+// Currency es referenciada por Account (cuentas) y ExchangeRateRule (tasas);
+// el dashboard tambien agrupa balances por moneda. Todas las mutaciones de
+// este archivo (crear/editar/activar/eliminar) comparten el mismo impacto.
+const revalidateCurrencies = () => {
   revalidatePath("/envios/monedas");
   revalidatePath("/envios/dashboard");
   revalidatePath("/envios/cuentas");
@@ -59,7 +62,7 @@ export async function createCurrency(
       return c;
     });
 
-    revalidateAll();
+    revalidateCurrencies();
     return { success: true, data: { currencyId: created.currencyId } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -107,7 +110,7 @@ export async function updateCurrency(
       });
     });
 
-    revalidateAll();
+    revalidateCurrencies();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -137,7 +140,7 @@ export async function toggleCurrency(id: number): Promise<ActionResult<{ active:
       });
       return updated.active;
     });
-    revalidateAll();
+    revalidateCurrencies();
     return { success: true, data: { active: next } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -169,7 +172,7 @@ export async function deleteCurrency(id: number): Promise<ActionResult<void>> {
         oldValues: prev,
       });
     });
-    revalidateAll();
+    revalidateCurrencies();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };

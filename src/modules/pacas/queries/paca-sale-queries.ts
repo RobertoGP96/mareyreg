@@ -33,9 +33,17 @@ export async function getSales() {
 export type PacaSaleRow = Awaited<ReturnType<typeof getSales>>[number];
 
 export async function getSalesStats() {
-  const sales = await db.pacaSale.findMany();
-  const totalUnits = sales.reduce((sum, s) => sum + s.quantity, 0);
-  const totalRevenue = sales.reduce(
+  // totalUnits se agrega en SQL (aggregate). totalRevenue = SUM(quantity*salePrice)
+  // no es agregable directamente en Prisma (no hay columna "total" persistida),
+  // asi que se reduce en memoria — pero solo trayendo los dos campos necesarios
+  // en vez de la fila completa, para acotar el payload consistente con
+  // getPacaInventoryStats.
+  const [totalsAgg, rows] = await Promise.all([
+    db.pacaSale.aggregate({ _sum: { quantity: true } }),
+    db.pacaSale.findMany({ select: { quantity: true, salePrice: true } }),
+  ]);
+  const totalUnits = totalsAgg._sum.quantity ?? 0;
+  const totalRevenue = rows.reduce(
     (sum, s) => sum + s.quantity * Number(s.salePrice),
     0
   );

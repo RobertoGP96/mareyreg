@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
+import type { Prisma } from "@/generated/prisma";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { recordShadowMovement } from "@/modules/pacas/lib/shadow-product";
 
@@ -91,20 +92,81 @@ export async function createPacaEntry(data: {
   }
 }
 
+async function deletePacaEntryInTx(
+  tx: Prisma.TransactionClient,
+  id: number,
+  userId: number
+): Promise<void> {
+  const entry = await tx.pacaEntry.findUnique({ where: { entryId: id } });
+  if (!entry) {
+    throw new Error("Entrada no encontrada");
+  }
+
+  const entryCost = Number(entry.purchasePrice ?? 0) * entry.quantity;
+
+  const updated = await tx.pacaInventory.updateMany({
+    where: { categoryId: entry.categoryId, available: { gte: entry.quantity } },
+    data: {
+      available: { decrement: entry.quantity },
+      totalCost: { decrement: entryCost },
+    },
+  });
+  if (updated.count !== 1) {
+    throw new Error(
+      "No hay suficientes pacas disponibles para revertir esta entrada"
+    );
+  }
+
+  await tx.pacaEntry.delete({ where: { entryId: id } });
+
+  await recordShadowMovement(tx, {
+    categoryId: entry.categoryId,
+    quantity: entry.quantity,
+    unitCost: entry.quantity > 0 ? entryCost / entry.quantity : 0,
+    movementType: "exit",
+    reference: `paca:reverso-entrada #${entry.entryId}`,
+    userId,
+  });
+
+  await createAuditLog(tx, {
+    action: "delete",
+    entityType: "PacaEntry",
+    entityId: id,
+    module: "pacas",
+    userId,
+    oldValues: entry,
+  });
+}
+
 export async function deletePacaEntries(
   ids: number[]
 ): Promise<ActionResult<{ deleted: number }>> {
   try {
     if (!ids.length) return { success: true, data: { deleted: 0 } };
-    let deleted = 0;
-    for (const id of ids) {
-      const r = await deletePacaEntry(id);
-      if (r.success) deleted++;
-    }
+    const userId = await requireCurrentUserId();
+
+    const deleted = await db.$transaction(async (tx) => {
+      for (const id of ids) {
+        try {
+          await deletePacaEntryInTx(tx, id, userId);
+        } catch (rowError) {
+          const reason = rowError instanceof Error ? rowError.message : "error desconocido";
+          throw new Error(`Fallo al eliminar la entrada #${id}: ${reason}`);
+        }
+      }
+      return ids.length;
+    });
+
+    revalidatePath("/pacas");
+    revalidatePath("/pacas/disponibilidad");
     return { success: true, data: { deleted } };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para eliminar entradas" };
+    }
     console.error("Error in bulk delete entries:", error);
-    return { success: false, error: "Error al eliminar entradas en lote" };
+    const message = error instanceof Error ? error.message : "Error al eliminar entradas en lote";
+    return { success: false, error: message };
   }
 }
 
@@ -113,45 +175,7 @@ export async function deletePacaEntry(id: number): Promise<ActionResult<void>> {
     const userId = await requireCurrentUserId();
 
     await db.$transaction(async (tx) => {
-      const entry = await tx.pacaEntry.findUnique({ where: { entryId: id } });
-      if (!entry) {
-        throw new Error("Entrada no encontrada");
-      }
-
-      const entryCost = Number(entry.purchasePrice ?? 0) * entry.quantity;
-
-      const updated = await tx.pacaInventory.updateMany({
-        where: { categoryId: entry.categoryId, available: { gte: entry.quantity } },
-        data: {
-          available: { decrement: entry.quantity },
-          totalCost: { decrement: entryCost },
-        },
-      });
-      if (updated.count !== 1) {
-        throw new Error(
-          "No hay suficientes pacas disponibles para revertir esta entrada"
-        );
-      }
-
-      await tx.pacaEntry.delete({ where: { entryId: id } });
-
-      await recordShadowMovement(tx, {
-        categoryId: entry.categoryId,
-        quantity: entry.quantity,
-        unitCost: entry.quantity > 0 ? entryCost / entry.quantity : 0,
-        movementType: "exit",
-        reference: `paca:reverso-entrada #${entry.entryId}`,
-        userId,
-      });
-
-      await createAuditLog(tx, {
-        action: "delete",
-        entityType: "PacaEntry",
-        entityId: id,
-        module: "pacas",
-        userId,
-        oldValues: entry,
-      });
+      await deletePacaEntryInTx(tx, id, userId);
     });
 
     revalidatePath("/pacas");

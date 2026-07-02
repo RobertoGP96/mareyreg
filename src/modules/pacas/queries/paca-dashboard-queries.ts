@@ -17,7 +17,7 @@ export async function getPacaDashboard() {
   await tryExpireOverdueReservations();
   const since30 = daysAgoIso(30);
 
-  const [inventory, sales30, reservations, clientsActive, categoriesCount] =
+  const [inventory, sales30, reservationStatusGroups, expiringCandidates, clientsActive, categoriesCount] =
     await Promise.all([
       db.pacaInventory.findMany({
         include: {
@@ -38,7 +38,15 @@ export async function getPacaDashboard() {
         },
         orderBy: { createdAt: "desc" },
       }),
+      // Conteo por status via groupBy en vez de traer hasta 200 filas completas.
+      db.pacaReservation.groupBy({
+        by: ["status"],
+        _count: { _all: true },
+      }),
+      // Solo reservaciones activas con vencimiento (candidatas a "expiringSoon");
+      // el filtro por rango de fecha se hace en memoria porque expirationDate es string.
       db.pacaReservation.findMany({
+        where: { status: "active", expirationDate: { not: null } },
         select: {
           reservationId: true,
           status: true,
@@ -49,7 +57,6 @@ export async function getPacaDashboard() {
           category: { select: { name: true } },
         },
         orderBy: { createdAt: "desc" },
-        take: 200,
       }),
       db.pacaClient.count({ where: { isActive: true } }),
       db.pacaCategory.count(),
@@ -90,9 +97,9 @@ export async function getPacaDashboard() {
     }));
 
   // Reservation status counts
-  const reservationCounts = reservations.reduce(
-    (acc, r) => {
-      acc[r.status] = (acc[r.status] ?? 0) + 1;
+  const reservationCounts = reservationStatusGroups.reduce(
+    (acc, g) => {
+      acc[g.status] = g._count._all;
       return acc;
     },
     { active: 0, completed: 0, cancelled: 0, expired: 0 } as Record<string, number>
@@ -114,8 +121,7 @@ export async function getPacaDashboard() {
   today.setHours(0, 0, 0, 0);
   const horizon = new Date(today);
   horizon.setDate(horizon.getDate() + 14);
-  const expiringSoon = reservations
-    .filter((r) => r.status === "active" && r.expirationDate)
+  const expiringSoon = expiringCandidates
     .filter((r) => {
       const exp = new Date(r.expirationDate as string);
       return exp >= today && exp <= horizon;

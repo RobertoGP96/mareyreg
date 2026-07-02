@@ -12,7 +12,9 @@ function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
 }
 
-const revalidateAll = () => {
+// Recipient afecta su propio listado y las entregas que lo referencian; no
+// aparece en el dashboard ni en otras rutas del modulo.
+const revalidateRecipients = () => {
   revalidatePath("/envios/destinatarios");
   revalidatePath("/envios/entregas");
 };
@@ -56,7 +58,7 @@ export async function createRecipient(
       return r;
     });
 
-    revalidateAll();
+    revalidateRecipients();
     return { success: true, data: { recipientId: created.recipientId } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -95,7 +97,7 @@ export async function updateRecipient(
       });
     });
 
-    revalidateAll();
+    revalidateRecipients();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -127,7 +129,7 @@ export async function toggleRecipientActive(
       });
       return updated.active;
     });
-    revalidateAll();
+    revalidateRecipients();
     return { success: true, data: { active: next } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -158,7 +160,7 @@ export async function deleteRecipient(id: number): Promise<ActionResult<void>> {
         oldValues: prev,
       });
     });
-    revalidateAll();
+    revalidateRecipients();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };

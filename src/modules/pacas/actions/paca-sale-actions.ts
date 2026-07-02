@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
+import type { Prisma } from "@/generated/prisma";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { calculateWeightedCost } from "@/modules/pacas/lib/weighted-cost";
 import { recordShadowMovement } from "@/modules/pacas/lib/shadow-product";
@@ -108,20 +109,79 @@ export async function createSale(data: {
   }
 }
 
+async function deleteSaleInTx(
+  tx: Prisma.TransactionClient,
+  id: number,
+  userId: number
+): Promise<void> {
+  const sale = await tx.pacaSale.findUnique({ where: { saleId: id } });
+  if (!sale) {
+    throw new Error("Venta no encontrada");
+  }
+
+  await tx.pacaSale.delete({ where: { saleId: id } });
+
+  const updated = await tx.pacaInventory.updateMany({
+    where: { categoryId: sale.categoryId, sold: { gte: sale.quantity } },
+    data: {
+      sold: { decrement: sale.quantity },
+      available: { increment: sale.quantity },
+      totalCost: { increment: sale.costOfGoods },
+    },
+  });
+  if (updated.count !== 1) {
+    throw new Error("No se pudo revertir la venta: inconsistencia de inventario");
+  }
+
+  await recordShadowMovement(tx, {
+    categoryId: sale.categoryId,
+    quantity: sale.quantity,
+    unitCost: sale.quantity > 0 ? Number(sale.costOfGoods) / sale.quantity : 0,
+    movementType: "entry",
+    reference: `paca:reverso-venta #${sale.saleId}`,
+    userId,
+  });
+
+  await createAuditLog(tx, {
+    action: "delete",
+    entityType: "PacaSale",
+    entityId: id,
+    module: "pacas",
+    userId,
+    oldValues: sale,
+  });
+}
+
 export async function deleteSales(
   ids: number[]
 ): Promise<ActionResult<{ deleted: number }>> {
   try {
     if (!ids.length) return { success: true, data: { deleted: 0 } };
-    let deleted = 0;
-    for (const id of ids) {
-      const r = await deleteSale(id);
-      if (r.success) deleted++;
-    }
+    const userId = await requireCurrentUserId();
+
+    const deleted = await db.$transaction(async (tx) => {
+      for (const id of ids) {
+        try {
+          await deleteSaleInTx(tx, id, userId);
+        } catch (rowError) {
+          const reason = rowError instanceof Error ? rowError.message : "error desconocido";
+          throw new Error(`Fallo al eliminar la venta #${id}: ${reason}`);
+        }
+      }
+      return ids.length;
+    });
+
+    revalidatePath("/pacas");
+    revalidatePath("/pacas/ventas");
+    revalidatePath("/pacas/disponibilidad");
     return { success: true, data: { deleted } };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para eliminar ventas" };
+    }
     console.error("Error bulk delete sales:", error);
-    return { success: false, error: "Error al eliminar ventas en lote" };
+    const message = error instanceof Error ? error.message : "Error al eliminar ventas en lote";
+    return { success: false, error: message };
   }
 }
 
@@ -130,42 +190,7 @@ export async function deleteSale(id: number): Promise<ActionResult<void>> {
     const userId = await requireCurrentUserId();
 
     await db.$transaction(async (tx) => {
-      const sale = await tx.pacaSale.findUnique({ where: { saleId: id } });
-      if (!sale) {
-        throw new Error("Venta no encontrada");
-      }
-
-      await tx.pacaSale.delete({ where: { saleId: id } });
-
-      const updated = await tx.pacaInventory.updateMany({
-        where: { categoryId: sale.categoryId, sold: { gte: sale.quantity } },
-        data: {
-          sold: { decrement: sale.quantity },
-          available: { increment: sale.quantity },
-          totalCost: { increment: sale.costOfGoods },
-        },
-      });
-      if (updated.count !== 1) {
-        throw new Error("No se pudo revertir la venta: inconsistencia de inventario");
-      }
-
-      await recordShadowMovement(tx, {
-        categoryId: sale.categoryId,
-        quantity: sale.quantity,
-        unitCost: sale.quantity > 0 ? Number(sale.costOfGoods) / sale.quantity : 0,
-        movementType: "entry",
-        reference: `paca:reverso-venta #${sale.saleId}`,
-        userId,
-      });
-
-      await createAuditLog(tx, {
-        action: "delete",
-        entityType: "PacaSale",
-        entityId: id,
-        module: "pacas",
-        userId,
-        oldValues: sale,
-      });
+      await deleteSaleInTx(tx, id, userId);
     });
 
     revalidatePath("/pacas");

@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
+import type { Prisma } from "@/generated/prisma";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { calculateWeightedCost } from "@/modules/pacas/lib/weighted-cost";
 import { endOfLocalDay } from "@/modules/pacas/lib/reservation-expiration";
@@ -198,20 +199,70 @@ export async function updateReservation(
   }
 }
 
+async function deleteReservationInTx(
+  tx: Prisma.TransactionClient,
+  id: number,
+  userId: number
+): Promise<void> {
+  const reservation = await tx.pacaReservation.findUnique({ where: { reservationId: id } });
+  if (!reservation) {
+    throw new Error("Reservacion no encontrada");
+  }
+
+  // Si estaba activa, devolver al inventario
+  if (reservation.status === "active") {
+    const updated = await tx.pacaInventory.updateMany({
+      where: { categoryId: reservation.categoryId, reserved: { gte: reservation.quantity } },
+      data: {
+        reserved: { decrement: reservation.quantity },
+        available: { increment: reservation.quantity },
+      },
+    });
+    if (updated.count !== 1) {
+      throw new Error("No se pudo liberar el inventario: inconsistencia de reservado");
+    }
+  }
+
+  await tx.pacaReservation.delete({ where: { reservationId: id } });
+  await createAuditLog(tx, {
+    action: "delete",
+    entityType: "PacaReservation",
+    entityId: id,
+    module: "pacas",
+    userId,
+    oldValues: reservation,
+  });
+}
+
 export async function deleteReservations(
   ids: number[]
 ): Promise<ActionResult<{ deleted: number }>> {
   try {
     if (!ids.length) return { success: true, data: { deleted: 0 } };
-    let deleted = 0;
-    for (const id of ids) {
-      const r = await deleteReservation(id);
-      if (r.success) deleted++;
-    }
+    const userId = await requireCurrentUserId();
+
+    const deleted = await db.$transaction(async (tx) => {
+      for (const id of ids) {
+        try {
+          await deleteReservationInTx(tx, id, userId);
+        } catch (rowError) {
+          const reason = rowError instanceof Error ? rowError.message : "error desconocido";
+          throw new Error(`Fallo al eliminar la reservacion #${id}: ${reason}`);
+        }
+      }
+      return ids.length;
+    });
+
+    revalidateAll();
     return { success: true, data: { deleted } };
   } catch (error) {
+    if (isAuthError(error)) {
+      return { success: false, error: "Debes iniciar sesion para eliminar reservaciones" };
+    }
     console.error("Error bulk delete reservations:", error);
-    return { success: false, error: "Error al eliminar reservaciones en lote" };
+    const message =
+      error instanceof Error ? error.message : "Error al eliminar reservaciones en lote";
+    return { success: false, error: message };
   }
 }
 
@@ -220,34 +271,7 @@ export async function deleteReservation(id: number): Promise<ActionResult<void>>
     const userId = await requireCurrentUserId();
 
     await db.$transaction(async (tx) => {
-      const reservation = await tx.pacaReservation.findUnique({ where: { reservationId: id } });
-      if (!reservation) {
-        throw new Error("Reservacion no encontrada");
-      }
-
-      // Si estaba activa, devolver al inventario
-      if (reservation.status === "active") {
-        const updated = await tx.pacaInventory.updateMany({
-          where: { categoryId: reservation.categoryId, reserved: { gte: reservation.quantity } },
-          data: {
-            reserved: { decrement: reservation.quantity },
-            available: { increment: reservation.quantity },
-          },
-        });
-        if (updated.count !== 1) {
-          throw new Error("No se pudo liberar el inventario: inconsistencia de reservado");
-        }
-      }
-
-      await tx.pacaReservation.delete({ where: { reservationId: id } });
-      await createAuditLog(tx, {
-        action: "delete",
-        entityType: "PacaReservation",
-        entityId: id,
-        module: "pacas",
-        userId,
-        oldValues: reservation,
-      });
+      await deleteReservationInTx(tx, id, userId);
     });
 
     revalidateAll();

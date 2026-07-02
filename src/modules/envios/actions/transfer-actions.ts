@@ -58,7 +58,10 @@ async function resolveTransferRate(
   };
 }
 
-const revalidateAll = () => {
+// Todas las mutaciones de este archivo crean/confirman/cancelan Operation
+// (pares de transferencia) y afectan balances de cuentas; /envios/grupos/[id]
+// tambien muestra balances por cuenta dentro del grupo.
+const revalidateTransfers = () => {
   revalidatePath("/envios/operaciones");
   revalidatePath("/envios/pendientes");
   revalidatePath("/envios/cuentas");
@@ -275,7 +278,7 @@ export async function createTransfer(
       return { reference, outId: outOp.operationId, inId: inOp.operationId, rate, amountTo };
     });
 
-    revalidateAll();
+    revalidateTransfers();
     return { success: true, data: result };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -340,7 +343,7 @@ export async function confirmTransfer(
       });
     });
 
-    revalidateAll();
+    revalidateTransfers();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -378,7 +381,7 @@ export async function cancelTransfer(reference: string): Promise<ActionResult<vo
         newValues: { status: "cancelled", reference },
       });
     });
-    revalidateAll();
+    revalidateTransfers();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -468,7 +471,7 @@ export async function bulkConfirmOperations(
       }
     }
 
-    revalidateAll();
+    revalidateTransfers();
     return { success: true, data: { confirmed, failed } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };

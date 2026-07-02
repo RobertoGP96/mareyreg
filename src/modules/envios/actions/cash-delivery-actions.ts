@@ -12,7 +12,9 @@ function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
 }
 
-const revalidateAll = () => {
+// CashDelivery afecta su propio listado y el dashboard (entregas pendientes);
+// no toca cuentas/operaciones/tasas/grupos.
+const revalidateCashDeliveries = () => {
   revalidatePath("/envios/entregas");
   revalidatePath("/envios/dashboard");
 };
@@ -75,7 +77,7 @@ export async function createCashDelivery(
       return d;
     });
 
-    revalidateAll();
+    revalidateCashDeliveries();
     return { success: true, data: { deliveryId: created.deliveryId } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -120,7 +122,7 @@ export async function updateCashDelivery(
       });
     });
 
-    revalidateAll();
+    revalidateCashDeliveries();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -162,7 +164,7 @@ export async function markCashDeliveryDelivered(
         newValues: { status: "delivered" },
       });
     });
-    revalidateAll();
+    revalidateCashDeliveries();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -201,7 +203,7 @@ export async function cancelCashDelivery(id: number): Promise<ActionResult<void>
         newValues: { status: "cancelled" },
       });
     });
-    revalidateAll();
+    revalidateCashDeliveries();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -233,7 +235,7 @@ export async function deleteCashDelivery(id: number): Promise<ActionResult<void>
         oldValues: prev,
       });
     });
-    revalidateAll();
+    revalidateCashDeliveries();
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
