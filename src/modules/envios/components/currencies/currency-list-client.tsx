@@ -29,7 +29,7 @@ import {
   CircleDollarSign, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2,
   Hash, Type, Calculator, ToggleLeft,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   createCurrency, updateCurrency, toggleCurrency, deleteCurrency,
 } from "../../actions/currency-actions";

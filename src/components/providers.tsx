@@ -1,7 +1,7 @@
 "use client";
 
 import { ThemeProvider } from "next-themes";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import { ColorThemeContext, useColorThemeState } from "@/hooks/use-color-theme";
 
 function ColorThemeProvider({ children }: { children: React.ReactNode }) {
@@ -18,7 +18,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <ColorThemeProvider>
         {children}
-        <Toaster position="top-right" richColors closeButton />
+        <Toaster />
       </ColorThemeProvider>
     </ThemeProvider>
   );

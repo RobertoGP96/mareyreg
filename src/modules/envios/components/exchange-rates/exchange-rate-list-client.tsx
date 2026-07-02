@@ -22,7 +22,7 @@ import {
   LineChart, Plus, Search, MoreHorizontal, SquarePen, Trash2,
   Calculator, ToggleLeft, ArrowRightLeft, Pin, BarChart3,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   createExchangeRateRule, updateExchangeRateRule, toggleExchangeRateRule, deleteExchangeRateRule,
 } from "../../actions/exchange-rate-actions";

@@ -25,7 +25,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { Plus, Trash2, ShoppingCart, Loader2, Search, Barcode } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { createInvoice } from "../actions/invoice-actions";
 import { getSuggestedUnitPriceAction } from "@/modules/inventory/actions/pricing-actions";
 

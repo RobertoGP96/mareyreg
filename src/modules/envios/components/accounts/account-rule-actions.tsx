@@ -9,7 +9,7 @@ import { Field, FormDialogHeader } from "@/components/ui/field";
 import {
   Plus, Trash2, SquarePen, Loader2, Link as LinkIcon, Check,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { formatBounds } from "../../lib/exchange-rate";
 import {
   createRuleAndAssign,

@@ -10,7 +10,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Loader2, ArrowRight, AtSign, KeyRound } from "lucide-react";
 import { loginUser, loginWithGoogle } from "../actions/auth-actions";
 

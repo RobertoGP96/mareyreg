@@ -34,7 +34,7 @@ import {
   Hash, Type, Users, CircleDollarSign, Calculator, ToggleLeft, MinusCircle,
   Eye, Sparkles,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   createAccount, updateAccount, toggleAccountActive, deleteAccount,
 } from "../../actions/account-actions";

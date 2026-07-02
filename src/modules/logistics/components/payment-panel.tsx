@@ -51,7 +51,7 @@ import {
   CircleX,
   CircleAlert,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { PAYMENT_METHODS } from "@/lib/constants";
 import type { PaymentStatus } from "@/generated/prisma";
 import {

@@ -55,7 +55,7 @@ import {
   Filter,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { createUser, updateUser, deleteUser } from "../actions/auth-actions";
 import { getEnabledModules } from "@/lib/module-registry";
 

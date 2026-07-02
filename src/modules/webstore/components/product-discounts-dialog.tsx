@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { z } from "zod";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { EmptyState } from "@/components/ui/empty-state";

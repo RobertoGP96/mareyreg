@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Search, Trash2, MoreHorizontal, Plus, SquarePen, Truck, SquareStack, UserRound, Eye } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   createVehicle,
   updateVehicle,

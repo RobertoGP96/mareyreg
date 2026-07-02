@@ -32,7 +32,7 @@ import {
   HandCoins, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2,
   Hash, FileText, Calendar, CircleDollarSign, CheckCircle2, XCircle, ExternalLink,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   createCashDelivery,
   updateCashDelivery,

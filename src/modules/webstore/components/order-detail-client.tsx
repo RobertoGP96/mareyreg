@@ -26,7 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Receipt, RefreshCw, Loader2, AlertTriangle, CheckCircle2, Ban } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { reprocessOrder, cancelWebstoreOrder } from "../actions/order-actions";
 
 const STATUS_MAP: Record<string, { status: OpsStatus; label: string }> = {

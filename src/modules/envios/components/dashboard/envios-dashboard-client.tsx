@@ -14,7 +14,7 @@ import {
   HandCoins, Clock, Check, ArrowRightLeft, Users, Wallet,
   CircleDollarSign, ArrowDownLeft, ArrowUpRight, Plus, Activity,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { confirmOperation } from "../../actions/operation-actions";
 import type { DashboardData } from "../../queries/dashboard-queries";
 import { CurrencyChip } from "../shared/currency-chip";

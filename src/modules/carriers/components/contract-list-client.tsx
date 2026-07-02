@@ -53,7 +53,7 @@ import {
   FileText,
   FileType2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { ContractForm } from "./contract-form";
 import { deleteContract, setContractStatus } from "../actions/contract-actions";

@@ -13,7 +13,7 @@ import {
   ArrowDownLeft, ArrowUpRight, ArrowRightLeft, Settings2, Wallet,
   Hash, FileText, Type, Calendar, Clock, Plus, Loader2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { createOperation } from "../../actions/operation-actions";
 import type { OperationFormAccount } from "../../queries/operation-queries";

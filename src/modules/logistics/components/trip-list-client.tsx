@@ -56,7 +56,7 @@ import {
   CheckCircle2,
   XCircle,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { createTrip, updateTrip, deleteTrip } from "../actions/trip-actions";
 import {
   createContainer,

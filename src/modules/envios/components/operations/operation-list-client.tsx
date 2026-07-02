@@ -34,7 +34,7 @@ import {
   Hash, Type, Calendar, FileText, Wallet, Check, Clock,
   ArrowDownLeft, ArrowUpRight, Settings2, Ban, Layers,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
   createOperation, confirmOperation, cancelOperation,

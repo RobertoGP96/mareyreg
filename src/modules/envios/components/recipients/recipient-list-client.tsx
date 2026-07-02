@@ -29,7 +29,7 @@ import {
   Users, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2,
   Phone, MapPin, Link as LinkIcon, ToggleLeft, UserRound, ExternalLink,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   createRecipient,
   updateRecipient,

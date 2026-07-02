@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Building2, MapPin, Globe, Save, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { updateCompany } from "@/modules/settings/actions/company-actions";
 import type { CompanyData } from "@/modules/settings/queries/company-queries";
 

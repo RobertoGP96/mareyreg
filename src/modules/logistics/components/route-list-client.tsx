@@ -38,7 +38,7 @@ import {
   Gauge,
   Clock,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { MetricTile } from "@/components/ui/metric-tile";
 import { RouteForm, type RouteForEdit } from "./route-form";

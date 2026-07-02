@@ -42,7 +42,7 @@ import {
   Building2,
   Contact,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   createDriver,
   updateDriver,

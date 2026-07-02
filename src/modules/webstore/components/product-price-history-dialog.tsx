@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { History, Loader2 } from "lucide-react";

@@ -16,7 +16,7 @@ import { FormSection } from "@/components/ui/form-section";
 import {
   ArrowDownLeft, ArrowUpRight, Wallet, Hash, FileText, Calendar, Loader2, Calculator, Clock, AlertTriangle,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
   createConversionOperation,

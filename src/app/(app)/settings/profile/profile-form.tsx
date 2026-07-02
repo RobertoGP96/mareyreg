@@ -15,7 +15,7 @@ import {
   ShieldCheck,
   Clock,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { updateUserProfile } from "@/modules/auth/actions/auth-actions";
 
 const ROLE_LABEL: Record<string, string> = {

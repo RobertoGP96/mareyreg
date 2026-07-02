@@ -26,7 +26,7 @@ import {
   AlertCircle,
   FileCheck2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { createContract } from "../actions/contract-actions";
 import type { ContractDriverOption } from "../queries/contract-queries";

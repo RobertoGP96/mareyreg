@@ -10,7 +10,7 @@ import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
 import { Checkbox } from "@/components/ui/checkbox";
 import { LineChart, Type, Hash, Pin, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { ExchangeRateRuleInput } from "../../lib/schemas";
 import type { ExchangeRateRuleRow } from "../../lib/types";
 

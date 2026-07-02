@@ -14,7 +14,7 @@ import {
 import {
   Check, ChevronsUpDown, Loader2, Plus, Search, UserRound,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { createRecipient } from "../../actions/recipient-actions";
 import type { RecipientPickerOption } from "../../queries/recipient-queries";

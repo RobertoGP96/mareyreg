@@ -17,7 +17,7 @@ import {
 import {
   Wallet, Hash, Type, MinusCircle, Loader2, Sparkles,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { updateAccount } from "../../actions/account-actions";
 import { generateUniqueAccountName } from "../../lib/account-name";
 

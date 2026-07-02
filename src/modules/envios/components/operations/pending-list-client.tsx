@@ -18,7 +18,7 @@ import { type DataTableColumn } from "@/components/ui/data-table";
 import {
   Clock, Check, Ban, CircleCheck, X, Loader2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { confirmOperation, cancelOperation } from "../../actions/operation-actions";
 import { bulkConfirmOperations } from "../../actions/transfer-actions";

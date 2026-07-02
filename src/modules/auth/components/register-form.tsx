@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/input-group";
 import { Field } from "@/components/ui/field";
 import { Checkbox } from "@/components/ui/checkbox";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   Loader2,
   AtSign,

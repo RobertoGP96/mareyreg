@@ -9,7 +9,7 @@ Este archivo lo lee Claude Code automáticamente al iniciar sesión en el repo. 
 - **Next.js 15.3** App Router · **React 19** · **TypeScript estricto**
 - **Prisma 7** + **Neon** serverless adapter (`@prisma/adapter-neon`)
 - **shadcn/ui** sobre **Radix** + **Tailwind 4**
-- **react-hook-form** + **Zod** + **Sonner** (toasts) + **Recharts**
+- **react-hook-form** + **Zod** + **Sileo** (toasts, vía adaptador `@/lib/toast`) + **Recharts**
 - **next-auth 5 beta** (sesiones)
 - Idioma de la UI: **español** (México). Identificadores y nombres de archivo en inglés.
 

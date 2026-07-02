@@ -49,7 +49,7 @@ import {
   Loader2,
   FileText,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   createPacaClassification,
   updatePacaClassification,

@@ -1,19 +1,19 @@
 ---
-name: notifying-with-sonner
+name: notifying-with-toasts
 description: Use when adding, editing, or reviewing user-facing toast notifications in Mareyway client components — showing success/error feedback after a server action, validating a form before submit, or handling an ActionResult in the UI.
 ---
 
-# Notificaciones con Sonner (Mareyway)
+# Notificaciones (toasts) en Mareyway
 
-Toda notificación al usuario en la plataforma usa **Sonner** vía `toast`. El `<Toaster />` ya está montado globalmente en `src/components/providers.tsx` (`position="top-right" richColors closeButton`) con estilos custom en `src/components/ui/sonner.tsx`. **No montar otro `<Toaster />` ni tocar ese setup.**
+Toda notificación al usuario usa el adaptador **`@/lib/toast`**, respaldado por **Sileo** (librería de toasts con animaciones spring). El `<Toaster />` ya está montado globalmente en `src/components/providers.tsx` vía `src/components/ui/toaster.tsx` (position top-right, tema sincronizado con next-themes). **No montar otro `<Toaster />`, no importar `sileo` directamente en componentes, no tocar ese setup.**
 
 ## Import
 
 ```ts
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 ```
 
-Solo se usa en componentes cliente (`"use client"`). Nunca en server actions ni queries.
+Solo se usa en componentes cliente (`"use client"`). Nunca en server actions ni queries. **Nunca** `import { sileo } from "sileo"` en componentes — cambios de librería se hacen solo en el adaptador.
 
 ## Patrón canónico: manejar un `ActionResult<T>`
 
@@ -49,6 +49,36 @@ if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
 }
 ```
 
+## Descripciones enriquecidas (JSX)
+
+`description` acepta `ReactNode`. Para eventos con datos que aportan (montos, deltas, listas de errores), usar los bloques de `src/components/ui/toast-content.tsx` en vez de concatenar strings:
+
+| Bloque | Uso |
+|---|---|
+| `ToastLines` | Contenedor apilado (columna, gap 1) |
+| `ToastDetail` | Par etiqueta/valor; `mono` para montos (`font-mono tabular-nums`) |
+| `ToastDelta` | Cambio de valor `anterior → nuevo` (precios, tasas) |
+| `ToastNote` | Línea secundaria muted |
+
+```tsx
+import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
+
+toast.success(`Factura ${result.data.folio} emitida`, {
+  description: (
+    <ToastLines>
+      <ToastDetail label={`${cart.length} artículos`} value={`$${total.toFixed(2)}`} mono />
+      {change > 0 && <ToastDetail label="Cambio" value={`$${change.toFixed(2)}`} mono />}
+    </ToastLines>
+  ),
+});
+```
+
+Reglas:
+- Sileo impone su tipografía; overrides con el modificador `!` de Tailwind (`text-xs!`, `text-muted-foreground!`) — los bloques ya lo hacen.
+- Contenido corto (máx ~3 líneas): el toast colapsa a pill y se expande solo unos segundos.
+- Solo cuando el dato enriquece el evento (montos, delta de precio, resumen de lote). Para un mensaje simple, string plano.
+- Ejemplos vivos: `pos-client.tsx` (venta), `webstore-catalog-client.tsx` (delta de precio), `envios/.../pending-list-client.tsx` (resumen de lote).
+
 ## Qué tipo usar
 
 | Situación | Llamada |
@@ -59,7 +89,7 @@ if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
 | Detalle secundario | `toast.error("Título", { description: "Detalle" })` |
 
 - Por defecto solo `success` y `error`. `warning` solo para avisos genuinos no-bloqueantes.
-- **No usar** `toast.loading` / `toast.promise` para el estado de carga: el repo usa un botón deshabilitado con `isSubmitting` + spinner (`Loader2`). Seguí ese patrón.
+- **No usar** estados de carga en toasts (`sileo.promise`): el repo usa un botón deshabilitado con `isSubmitting` + spinner (`Loader2`). Seguí ese patrón.
 - **No emojis** en los mensajes (regla del repo).
 
 ## Errores comunes
@@ -68,13 +98,14 @@ if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
 |---|---|
 | `toast.error("Error: " + e.message)` | `toast.error(result.error)` (mensaje en español de la action) |
 | Mensaje en inglés o con tecnicismos | Español, claro, sin nombres de campos técnicos |
-| `toast()` genérico sin tipo | `toast.success` / `toast.error` según corresponda |
+| `import { toast } from "sonner"` / `import { sileo } from "sileo"` | `import { toast } from "@/lib/toast"` |
 | Montar otro `<Toaster />` | Ya está global en `providers.tsx` |
 | Olvidar `router.refresh()` tras éxito | Refrescar salvo que la UI ya se actualice sola |
 | Cerrar el dialog después del toast | Cerrar el dialog **antes** del toast |
 
 ## Referencia
 
-- Setup: `src/components/ui/sonner.tsx`, `src/components/providers.tsx`.
+- Adaptador: `src/lib/toast.ts` (firma `toast.success(título, { description?, duration? })`).
+- Setup: `src/components/ui/toaster.tsx`, `src/components/providers.tsx`.
 - Ejemplos vivos del patrón: `src/modules/*/components/*-list-client.tsx` (p. ej. suppliers, pacas, envios).
 - `ActionResult<T>`: `src/types/index.ts`.

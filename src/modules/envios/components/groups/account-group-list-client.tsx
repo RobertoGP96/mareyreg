@@ -26,7 +26,7 @@ import {
   Users, Plus, Search, Loader2,
   Hash, Type, FileText, ToggleLeft, UserCircle, Wallet,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   createAccountGroup, updateAccountGroup, toggleAccountGroup, deleteAccountGroup,
 } from "../../actions/account-group-actions";

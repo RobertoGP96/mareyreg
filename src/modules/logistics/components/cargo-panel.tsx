@@ -40,7 +40,7 @@ import {
   Layers,
   FileText,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { CARGO_TYPES, PRODUCTS } from "@/lib/constants";
 import type { CargoType } from "@/generated/prisma";
 import { createCargo, deleteCargo } from "../actions/cargo-actions";

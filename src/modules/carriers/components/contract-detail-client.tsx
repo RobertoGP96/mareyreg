@@ -42,7 +42,7 @@ import {
   Ban,
   Loader2,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { ContractViewer } from "./contract-viewer";
 import { deleteContract, updateContract } from "../actions/contract-actions";
