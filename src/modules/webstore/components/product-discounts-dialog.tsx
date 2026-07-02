@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tag, Percent, Loader2, Plus, Pencil } from "lucide-react";
+import { Tag, Percent, Loader2, Plus, Pencil, History, Info } from "lucide-react";
 import {
   getProductDiscountsAction,
 } from "@/modules/webstore/actions/catalog-actions";
@@ -28,13 +28,31 @@ import {
   createDiscount,
   updateDiscount,
   toggleDiscount,
+  getDiscountHistoryAction,
   type DiscountInput,
 } from "@/modules/inventory/actions/discount-actions";
+import type { DiscountHistoryRow } from "@/modules/inventory/queries/discount-queries";
 
 const TYPE_LABELS: Record<string, string> = {
   percent: "Porcentaje",
   fixed: "Monto fijo",
   volume: "Por volumen",
+};
+
+const HISTORY_ACTION_LABELS: Record<string, string> = {
+  created: "Creado",
+  updated: "Editado",
+  activated: "Activado",
+  deactivated: "Desactivado",
+  deleted: "Eliminado",
+};
+
+const HISTORY_ACTION_STATUS: Record<string, "active" | "inactive" | "pending" | "cancelled"> = {
+  created: "active",
+  updated: "pending",
+  activated: "active",
+  deactivated: "inactive",
+  deleted: "cancelled",
 };
 
 const discountTypeSchema = z.enum(["percent", "fixed", "volume"]);
@@ -43,6 +61,34 @@ const toDateInputValue = (value: string | null) => {
   if (!value) return "";
   return value.slice(0, 10);
 };
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+
+function historyChangeSummary(row: DiscountHistoryRow): string | null {
+  if (row.action !== "updated") return null;
+  const oldValues = asRecord(row.oldValues);
+  const newValues = asRecord(row.newValues);
+  if (!oldValues || !newValues) return null;
+
+  const fields: { key: string; label: string }[] = [
+    { key: "name", label: "Nombre" },
+    { key: "value", label: "Valor" },
+    { key: "minQty", label: "Cant. mín" },
+  ];
+
+  const changes = fields
+    .filter(({ key }) => key in oldValues && key in newValues)
+    .map(({ key, label }) => {
+      const before = oldValues[key];
+      const after = newValues[key];
+      if (String(before ?? "—") === String(after ?? "—")) return null;
+      return `${label}: ${before ?? "—"} → ${after ?? "—"}`;
+    })
+    .filter((v): v is string => !!v);
+
+  return changes.length > 0 ? changes.join(" · ") : null;
+}
 
 interface Props {
   productId: number | null;
@@ -58,7 +104,9 @@ export function ProductDiscountsDialog({ productId, productName, onOpenChange }:
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingVersion, setEditingVersion] = useState<number | null>(null);
-  const [editingStackable, setEditingStackable] = useState(false);
+  const [history, setHistory] = useState<DiscountHistoryRow[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const loadDiscounts = useCallback(() => {
     if (productId == null) return;
@@ -72,13 +120,27 @@ export function ProductDiscountsDialog({ productId, productName, onOpenChange }:
       .finally(() => setIsLoading(false));
   }, [productId]);
 
+  const loadHistory = useCallback(() => {
+    if (productId == null) return;
+    setIsHistoryLoading(true);
+    getDiscountHistoryAction(productId)
+      .then((res) => {
+        if (res.success) setHistory(res.data);
+        else toast.error(res.error);
+      })
+      .catch(() => toast.error("No se pudo cargar el historial de descuentos."))
+      .finally(() => setIsHistoryLoading(false));
+  }, [productId]);
+
   useEffect(() => {
     if (productId == null) return;
     setShowForm(false);
     setEditingId(null);
     setEditingVersion(null);
+    setShowHistory(false);
     loadDiscounts();
-  }, [productId, loadDiscounts]);
+    loadHistory();
+  }, [productId, loadDiscounts, loadHistory]);
 
   const handleToggle = async (discountId: number, next: boolean) => {
     try {
@@ -86,6 +148,7 @@ export function ProductDiscountsDialog({ productId, productName, onOpenChange }:
       if (res.success) {
         toast.success(next ? "Descuento activado" : "Descuento desactivado");
         loadDiscounts();
+        loadHistory();
         router.refresh();
       } else {
         toast.error(res.error);
@@ -98,7 +161,6 @@ export function ProductDiscountsDialog({ productId, productName, onOpenChange }:
   const openEdit = (discount: ProductDiscountRow) => {
     setEditingId(discount.discountId);
     setEditingVersion(discount.version);
-    setEditingStackable(discount.stackable);
     setShowForm(true);
   };
 
@@ -127,7 +189,6 @@ export function ProductDiscountsDialog({ productId, productName, onOpenChange }:
       startsAt: (fd.get("startsAt") as string) || undefined,
       endsAt: (fd.get("endsAt") as string) || undefined,
       productId,
-      stackable: editingId != null ? editingStackable : false,
       ...(editingId != null && editingVersion != null ? { version: editingVersion } : {}),
     };
 
@@ -139,6 +200,7 @@ export function ProductDiscountsDialog({ productId, productName, onOpenChange }:
         toast.success(editingId != null ? "Descuento actualizado" : "Descuento creado");
         closeForm();
         loadDiscounts();
+        loadHistory();
         router.refresh();
       } else {
         toast.error(res.error);
@@ -164,6 +226,11 @@ export function ProductDiscountsDialog({ productId, productName, onOpenChange }:
       showHeader
     >
       <div className="space-y-4">
+        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          Solo un descuento puede estar activo a la vez. Al activar uno, los demás se desactivan automáticamente.
+        </p>
+
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -278,18 +345,6 @@ export function ProductDiscountsDialog({ productId, productName, onOpenChange }:
                   <Input name="endsAt" type="date" defaultValue={toDateInputValue(editingDiscount?.endsAt ?? null)} />
                 </Field>
               </div>
-              {editingId != null && (
-                <Field label="Combinable con otros descuentos">
-                  <div className="flex items-center gap-3">
-                    <Switch
-                      checked={editingStackable}
-                      onCheckedChange={setEditingStackable}
-                      aria-label="Combinable con otros descuentos"
-                    />
-                    <span className="text-sm text-muted-foreground">{editingStackable ? "Sí" : "No"}</span>
-                  </div>
-                </Field>
-              )}
             </FormSection>
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={closeForm}>
@@ -313,6 +368,66 @@ export function ProductDiscountsDialog({ productId, productName, onOpenChange }:
             Nuevo descuento
           </Button>
         )}
+
+        <div className="border-t border-border pt-4">
+          <button
+            type="button"
+            onClick={() => setShowHistory((v) => !v)}
+            className="flex w-full items-center gap-2 text-sm font-medium text-foreground"
+          >
+            <History className="h-4 w-4 text-muted-foreground" />
+            Historial
+            <span className="text-xs font-normal text-muted-foreground">
+              {showHistory ? "(ocultar)" : "(mostrar)"}
+            </span>
+          </button>
+
+          {showHistory && (
+            <div className="mt-3 space-y-2 max-h-[40vh] overflow-y-auto">
+              {isHistoryLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : history.length > 0 ? (
+                history.map((h) => {
+                  const summary = historyChangeSummary(h);
+                  return (
+                    <div
+                      key={h.historyId}
+                      className="rounded-lg border border-border bg-muted/20 p-3 text-sm"
+                    >
+                      <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                        <StatusPill
+                          status={HISTORY_ACTION_STATUS[h.action] ?? "inactive"}
+                          label={HISTORY_ACTION_LABELS[h.action] ?? h.action}
+                          size="sm"
+                        />
+                        <span className="font-medium text-foreground truncate">
+                          {h.discountName ?? "Descuento eliminado"}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {h.changedByName ?? "Sistema"} ·{" "}
+                        {new Date(h.changedAt).toLocaleString("es-MX")}
+                      </div>
+                      {summary && (
+                        <div className="mt-1 text-xs font-mono tabular-nums text-foreground">
+                          {summary}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <EmptyState
+                  icon={<History className="size-10" />}
+                  title="Sin historial"
+                  description="Este producto no tiene eventos de descuentos registrados."
+                />
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </ResponsiveFormDialog>
   );

@@ -27,8 +27,8 @@ export default async function DiscountsPage() {
     category: d.category,
     customerId: d.customerId,
     customerName: d.customer?.name ?? null,
-    stackable: d.stackable,
     isActive: d.isActive,
+    version: d.version,
   }));
 
   const productOptions = products.map((p) => ({

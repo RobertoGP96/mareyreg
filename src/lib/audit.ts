@@ -18,8 +18,9 @@ type PrismaTx = Prisma.TransactionClient;
 
 export async function getCurrentUserId(): Promise<number | null> {
   const session = await auth();
-  if (!session?.user?.id) return null;
-  const id = Number(session.user.id);
+  const raw = session?.user?.userId ?? session?.user?.id;
+  if (raw == null) return null;
+  const id = Number(raw);
   return Number.isFinite(id) ? id : null;
 }
 

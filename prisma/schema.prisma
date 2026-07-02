@@ -38,6 +38,7 @@ model User {
   cashDeliveriesConfirmed  CashDelivery[] @relation("CashDeliveryConfirmedBy")
   webstoreApiKeys          WebstoreApiKey[]
   productPriceChanges      ProductPriceHistory[]
+  discountHistory          DiscountHistory[]
 
   @@map("users")
 }
@@ -502,6 +503,7 @@ model Product {
   returnLines        ReturnLine[]
   stockCountLines    StockCountLine[]
   priceHistory       ProductPriceHistory[]
+  discountHistory    DiscountHistory[]
   pacaCategory       PacaCategory?
 
   @@index([category])
@@ -1120,18 +1122,44 @@ model Discount {
   productId  Int?         @map("product_id")
   category   String?
   customerId Int?         @map("customer_id")
-  stackable  Boolean      @default(false)
   isActive   Boolean      @default(true) @map("is_active")
   createdAt  DateTime     @default(now()) @map("created_at")
   version    Int           @default(0)
 
   product  Product?  @relation(fields: [productId], references: [productId])
   customer Customer? @relation(fields: [customerId], references: [customerId])
+  history  DiscountHistory[]
 
   @@index([productId])
   @@index([category])
   @@index([isActive])
   @@map("discounts")
+}
+
+enum DiscountHistoryAction {
+  created
+  updated
+  activated
+  deactivated
+  deleted
+}
+
+model DiscountHistory {
+  historyId  Int                   @id @default(autoincrement()) @map("history_id")
+  discountId Int?                  @map("discount_id")
+  productId  Int?                  @map("product_id")
+  action     DiscountHistoryAction
+  oldValues  Json?                 @map("old_values")
+  newValues  Json?                 @map("new_values")
+  changedBy  Int?                  @map("changed_by")
+  changedAt  DateTime              @default(now()) @map("changed_at")
+
+  discount      Discount? @relation(fields: [discountId], references: [discountId], onDelete: SetNull)
+  product       Product?  @relation(fields: [productId], references: [productId], onDelete: SetNull)
+  changedByUser User?     @relation(fields: [changedBy], references: [userId], onDelete: SetNull)
+
+  @@index([productId, changedAt])
+  @@map("discount_history")
 }
 
 model ProductPriceHistory {

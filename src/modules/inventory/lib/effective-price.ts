@@ -31,42 +31,29 @@ type DiscountLike = {
   name: string;
   type: string;
   value: Prisma.Decimal | number;
-  stackable: boolean;
 };
 
 /**
  * Lógica pura de resolución de precio dado el precio base ya determinado
  * (lista de cliente aplicada o no) y los descuentos ya filtrados por scope
- * (producto/categoría/global), vigencia y minQty para ese producto. Única
- * función que decide cómo se combinan descuentos no-acumulables/acumulables,
- * para que la variante unitaria y la batch nunca diverjan.
+ * (producto/categoría/global), vigencia y minQty para ese producto. Regla de
+ * negocio: solo se aplica UN descuento a la vez — el de mayor beneficio para
+ * el cliente — para que la variante unitaria y la batch nunca diverjan.
  */
 function resolvePriceFromDiscounts(
   basePrice: number,
   discounts: DiscountLike[]
 ): EffectivePriceResult {
-  const nonStackable = discounts.filter((d) => !d.stackable);
-  const stackable = discounts.filter((d) => d.stackable);
-
   const appliedDiscounts: AppliedDiscount[] = [];
   let finalPrice = basePrice;
 
-  if (nonStackable.length > 0) {
-    const best = nonStackable.reduce((a, b) =>
+  if (discounts.length > 0) {
+    const best = discounts.reduce((a, b) =>
       discountAmount(b, basePrice) > discountAmount(a, basePrice) ? b : a
     );
     const amount = discountAmount(best, basePrice);
     finalPrice = Math.max(0, basePrice - amount);
     appliedDiscounts.push({ discountId: best.discountId, name: best.name, discountAmount: amount });
-  } else if (stackable.length > 0) {
-    let total = 0;
-    for (const d of stackable) {
-      const amount = discountAmount(d, basePrice);
-      total += amount;
-      appliedDiscounts.push({ discountId: d.discountId, name: d.name, discountAmount: amount });
-    }
-    total = Math.min(total, basePrice);
-    finalPrice = Math.max(0, basePrice - total);
   }
 
   return { basePrice, finalPrice, appliedDiscounts };
@@ -76,9 +63,8 @@ function resolvePriceFromDiscounts(
  * Única fuente de verdad del precio de venta de un producto. Considera el
  * precio de lista del cliente (si tiene una asignada) como precio base, y
  * aplica los descuentos activos que correspondan (por producto, categoría o
- * globales, y opcionalmente por cliente). Si hay descuentos no acumulables
- * que aplican, se usa solo el de mayor descuento resultante; si todos los
- * que aplican son acumulables, se suman (capados para no superar el precio base).
+ * globales, y opcionalmente por cliente). Solo se aplica un descuento a la
+ * vez: el de mayor beneficio para el cliente entre los aplicables.
  *
  * Delega en `getEffectivePrices` (variante batch) con un solo id, así ambas
  * nunca divergen. Para cálculos de más de un producto usar la batch

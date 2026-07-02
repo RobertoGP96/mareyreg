@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -67,8 +66,8 @@ interface DiscountItem {
   category: string | null;
   customerId: number | null;
   customerName: string | null;
-  stackable: boolean;
   isActive: boolean;
+  version: number;
 }
 
 interface ProductOption {
@@ -109,7 +108,6 @@ export function DiscountListClient({
   const [toDelete, setToDelete] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scope, setScope] = useState<"all" | "product" | "category">("all");
-  const [stackable, setStackable] = useState(false);
 
   const categories = Array.from(
     new Set(products.map((p) => p.category).filter((c): c is string => !!c))
@@ -117,14 +115,12 @@ export function DiscountListClient({
 
   const openCreate = () => {
     setScope("all");
-    setStackable(false);
     setIsCreateOpen(true);
   };
 
   const openEdit = (d: DiscountItem) => {
     setToEdit(d);
     setScope(d.productId ? "product" : d.category ? "category" : "all");
-    setStackable(d.stackable);
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, editId?: number) => {
@@ -141,7 +137,7 @@ export function DiscountListClient({
       productId: scope === "product" && fd.get("productId") ? Number(fd.get("productId")) : undefined,
       category: scope === "category" ? (fd.get("category") as string) || undefined : undefined,
       customerId: fd.get("customerId") ? Number(fd.get("customerId")) : undefined,
-      stackable,
+      ...(editId != null && toEdit != null ? { version: toEdit.version } : {}),
     };
 
     const result = editId ? await updateDiscount(editId, data) : await createDiscount(data);
@@ -257,12 +253,6 @@ export function DiscountListClient({
             </SelectContent>
           </Select>
         </Field>
-        <Field label="Acumulable" hint="Si está activado, se puede combinar con otros descuentos activos.">
-          <div className="flex items-center gap-3">
-            <Switch checked={stackable} onCheckedChange={setStackable} aria-label="Acumulable" />
-            <span className="text-sm text-muted-foreground">{stackable ? "Sí" : "No"}</span>
-          </div>
-        </Field>
       </FormSection>
     </div>
   );
@@ -300,7 +290,6 @@ export function DiscountListClient({
                     <Badge variant="info">
                       {d.type === "fixed" ? `$${d.value}` : `${d.value}%`}
                     </Badge>
-                    {d.stackable && <Badge variant="secondary">Acumulable</Badge>}
                     {!d.isActive && <Badge variant="destructive">Inactivo</Badge>}
                   </div>
                   <div className="flex flex-wrap gap-x-5 gap-y-1 text-[0.82rem] text-muted-foreground">

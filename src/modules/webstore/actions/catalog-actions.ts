@@ -101,9 +101,13 @@ export async function getProductDiscountsAction(
   productId: number
 ): Promise<ActionResult<ProductDiscountRow[]>> {
   try {
+    await requireCurrentUserId();
     const rows = await getDiscountsByProduct(productId);
     return { success: true, data: rows };
   } catch (e) {
+    if (e instanceof Error && e.message === "No autenticado") {
+      return { success: false, error: "Debes iniciar sesión para realizar esta acción" };
+    }
     console.error("getProductDiscountsAction:", e);
     return { success: false, error: "No se pudieron cargar los descuentos del producto." };
   }

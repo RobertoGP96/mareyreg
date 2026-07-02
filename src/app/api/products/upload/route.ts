@@ -36,7 +36,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       request,
       onBeforeGenerateToken: async () => {
         const session = await auth();
-        const userId = session?.user?.id ?? null;
+        const userId = session?.user?.userId ?? session?.user?.id ?? null;
         if (!userId) {
           throw new Error("No autenticado. Recarga la página e inicia sesión.");
         }

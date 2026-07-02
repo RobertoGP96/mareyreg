@@ -94,7 +94,6 @@ export interface ProductDiscountRow {
   minQty: string | null;
   startsAt: string | null;
   endsAt: string | null;
-  stackable: boolean;
   isActive: boolean;
   version: number;
 }
@@ -112,7 +111,6 @@ export async function getDiscountsByProduct(productId: number): Promise<ProductD
     minQty: d.minQty != null ? d.minQty.toString() : null,
     startsAt: d.startsAt ? d.startsAt.toISOString() : null,
     endsAt: d.endsAt ? d.endsAt.toISOString() : null,
-    stackable: d.stackable,
     isActive: d.isActive,
     version: d.version,
   }));

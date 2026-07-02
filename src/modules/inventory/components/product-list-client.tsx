@@ -62,6 +62,7 @@ import {
   History,
   Globe,
   ImagePlus,
+  Tag,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import {
@@ -71,6 +72,7 @@ import {
   getProductPriceHistoryAction,
   type ProductPriceHistoryEntry,
 } from "../actions/product-actions";
+import { ProductDiscountsDialog } from "@/modules/webstore/components/product-discounts-dialog";
 import { PRODUCT_IMAGE_ACCEPT_ATTR, PRODUCT_IMAGE_MAX_BYTES } from "../lib/schemas";
 import {
   PRODUCT_UNITS,
@@ -112,6 +114,7 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
   const [historyProduct, setHistoryProduct] = useState<ProductItem | null>(null);
   const [history, setHistory] = useState<ProductPriceHistoryEntry[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [discountsProduct, setDiscountsProduct] = useState<{ id: number; name: string } | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -443,6 +446,9 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
                     <DropdownMenuItem onClick={() => openHistory(p)}>
                       <History className="h-4 w-4" /> Historial de precios
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setDiscountsProduct({ id: p.productId, name: p.name })}>
+                      <Tag className="h-4 w-4" /> Descuentos
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => setToDelete(p.productId)}
                       className="text-destructive focus:text-destructive"
@@ -572,6 +578,12 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
           )}
         </DialogContent>
       </Dialog>
+
+      <ProductDiscountsDialog
+        productId={discountsProduct?.id ?? null}
+        productName={discountsProduct?.name}
+        onOpenChange={(open) => !open && setDiscountsProduct(null)}
+      />
     </div>
   );
 }
