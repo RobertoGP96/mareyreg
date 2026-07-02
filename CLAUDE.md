@@ -91,6 +91,8 @@ Reglas:
 - IDs y rutas se declaran en `src/lib/module-registry.ts` (sidebar lo lee).
 - Usuario actual: `getCurrentUserId()` (devuelve `number | null`) o `requireCurrentUserId()` (lanza si no hay sesión).
 - Roles: `admin`, `dispatcher`, `viewer`. Admin pasa todos los `requireModule`.
+- **Server actions que mutan** exigen `requireCurrentUserId()` (lanza "No autenticado"); operaciones sensibles añaden `await assertRole("admin", ...)` (`src/lib/auth-guard.ts`, lanza `ForbiddenError` — no usar `requireRole`, que hace redirect y es solo para layouts).
+- Stock/inventario: nunca `decrement` ciego — `updateMany` condicional (`{ gte: qty }`) + verificar `count`, o el helper compartido `dispatchLines`/`reverseInvoiceStock` de `src/modules/sales/lib/dispatch-lines.ts` (lo usan POS y webstore).
 
 ## UI (mobile-first, premium)
 
