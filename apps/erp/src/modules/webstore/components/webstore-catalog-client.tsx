@@ -259,7 +259,14 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
             </div>
           )}
           <div className="min-w-0">
-            <div className="font-medium text-foreground truncate">{row.name}</div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-medium text-foreground truncate">{row.name}</span>
+              {row.presentationCount > 0 && (
+                <Badge variant="outline" className="shrink-0 text-[10px]" title="Presentaciones activas">
+                  {row.presentationCount} present.
+                </Badge>
+              )}
+            </div>
             {row.sku && <div className="text-xs text-muted-foreground truncate">{row.sku}</div>}
           </div>
         </div>
@@ -369,6 +376,11 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
             size="sm"
           />
           {row.webstoreFeatured && <Badge variant="brand">Destacado</Badge>}
+          {row.presentationCount > 0 && (
+            <Badge variant="outline" className="text-[10px]">
+              {row.presentationCount} present.
+            </Badge>
+          )}
           <span className="text-xs text-muted-foreground">Stock: {row.stockAvailable}</span>
         </>
       }

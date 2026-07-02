@@ -109,6 +109,7 @@ Reglas:
 - Roles: `admin`, `dispatcher`, `viewer`. Admin pasa todos los `requireModule`.
 - **Server actions que mutan** exigen `requireCurrentUserId()` (lanza "No autenticado"); operaciones sensibles añaden `await assertRole("admin", ...)` (`src/lib/auth-guard.ts`, lanza `ForbiddenError` — no usar `requireRole`, que hace redirect y es solo para layouts).
 - Stock/inventario: nunca `decrement` ciego — `updateMany` condicional (`{ gte: qty }`) + verificar `count`, o el helper compartido `dispatchLines`/`reverseInvoiceStock` de `src/modules/sales/lib/dispatch-lines.ts` (lo usan POS y webstore).
+- **Inventario multi-unidad**: stock, kardex (`StockMovement`) y valuación van SIEMPRE en **unidad base**. Las líneas de venta/compra guardan `quantity` en la unidad vendida/comprada + snapshot `unitFactor`/`baseQuantity`. El factor se resuelve SIEMPRE server-side desde `ProductPresentation` (nunca del cliente); conversión única en `src/modules/inventory/lib/units.ts` (`toBaseQuantity`). Precios menudeo/mayoreo por presentación vía `getEffectiveLinePrices` (`effective-price.ts`); `Product.secondaryPrice` está DEPRECADO. Cambios de precio escriben `PresentationPriceHistory`/`ProductPriceHistory`; ajuste masivo solo admin (`pricing-actions.ts`). `Warehouse.locationType` (`general|store|service_unit`) es el tipo operativo — el POS despacha del `store`; `warehouseType` es el tipo físico. Tras `db push` aplicar `prisma/sql/inventory-presentations.sql`, `inventory-locations.sql` y `purchasing-presentations.sql`.
 
 ## UI (mobile-first, premium)
 

@@ -18,9 +18,13 @@ export async function getPurchaseOrder(poId: number) {
     include: {
       supplier: true,
       warehouse: true,
-      lines: { include: { product: true } },
+      lines: { include: { product: true, presentation: true } },
       receipts: {
-        include: { lines: { include: { lot: true, poLine: { include: { product: true } } } } },
+        include: {
+          lines: {
+            include: { lot: true, presentation: true, poLine: { include: { product: true } } },
+          },
+        },
         orderBy: { receivedAt: "desc" },
       },
     },

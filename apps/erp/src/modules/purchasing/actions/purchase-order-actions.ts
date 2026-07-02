@@ -5,6 +5,10 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
+import { toBaseQuantity } from "@/modules/inventory/lib/units";
+import type { Prisma } from "@/generated/prisma";
+
+type PrismaTx = Prisma.TransactionClient;
 
 function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
@@ -17,8 +21,9 @@ const BUSINESS_ERRORS = new Set([
 ]);
 
 function toUserMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && BUSINESS_ERRORS.has(error.message)) {
-    return error.message;
+  if (error instanceof Error) {
+    if (BUSINESS_ERRORS.has(error.message)) return error.message;
+    if (error.message.startsWith("La presentación")) return error.message;
   }
   return fallback;
 }
@@ -27,6 +32,47 @@ export interface POLineInput {
   productId: number;
   quantity: number;
   unitCost: number;
+  presentationId?: number;
+}
+
+interface ResolvedLinePresentation {
+  presentationId: number | null;
+  unitFactor: number;
+  baseQuantity: number;
+}
+
+/**
+ * Valida server-side la presentación de una línea de OC (pertenece al
+ * producto, está activa) y calcula el snapshot que se guarda en la línea:
+ * el factor nunca se toma del caller, siempre se lee de la BD en el momento
+ * de crear la OC (igual que resolvePresentation en stock-actions.ts).
+ */
+async function resolveLinePresentation(
+  tx: PrismaTx,
+  params: { productId: number; presentationId?: number; quantity: number }
+): Promise<ResolvedLinePresentation> {
+  const { productId, presentationId, quantity } = params;
+
+  if (presentationId == null) {
+    return { presentationId: null, unitFactor: 1, baseQuantity: quantity };
+  }
+
+  const presentation = await tx.productPresentation.findUnique({
+    where: { presentationId },
+  });
+  if (!presentation || presentation.productId !== productId) {
+    throw new Error(
+      `La presentación seleccionada no corresponde al producto ${productId}`
+    );
+  }
+  if (!presentation.isActive) {
+    throw new Error(`La presentación "${presentation.name}" está inactiva`);
+  }
+
+  const unitFactor = Number(presentation.factor);
+  const baseQuantity = toBaseQuantity(quantity, unitFactor);
+
+  return { presentationId: presentation.presentationId, unitFactor, baseQuantity };
 }
 
 export interface POInput {
@@ -60,6 +106,25 @@ export async function createPurchaseOrder(
 
     const po = await db.$transaction(async (tx) => {
       const folio = await nextFolio(tx, DOC_TYPES.PURCHASE_ORDER);
+
+      const resolvedLines = await Promise.all(
+        data.lines.map(async (l) => {
+          const { presentationId, unitFactor, baseQuantity } = await resolveLinePresentation(tx, {
+            productId: l.productId,
+            presentationId: l.presentationId,
+            quantity: l.quantity,
+          });
+          return {
+            productId: l.productId,
+            quantity: l.quantity,
+            unitCost: l.unitCost,
+            presentationId,
+            unitFactor,
+            baseQuantity,
+          };
+        })
+      );
+
       const created = await tx.purchaseOrder.create({
         data: {
           folio,
@@ -73,11 +138,7 @@ export async function createPurchaseOrder(
           notes: data.notes || null,
           createdBy: userId,
           lines: {
-            create: data.lines.map((l) => ({
-              productId: l.productId,
-              quantity: l.quantity,
-              unitCost: l.unitCost,
-            })),
+            create: resolvedLines,
           },
         },
       });

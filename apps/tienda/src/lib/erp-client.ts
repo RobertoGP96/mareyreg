@@ -8,6 +8,16 @@ import "server-only";
 const BASE_URL = process.env.WEBSTORE_API_URL;
 const API_KEY = process.env.WEBSTORE_API_KEY;
 
+export interface WebstoreProductPresentation {
+  sku: string;
+  name: string;
+  factor: number;
+  retailPrice: number;
+  wholesalePrice: number | null;
+  barcode: string | null;
+  isBase: boolean;
+}
+
 export interface WebstoreProduct {
   sku: string;
   name: string;
@@ -18,6 +28,8 @@ export interface WebstoreProduct {
   featured: boolean;
   stockAvailable: number;
   imageUrl: string | null;
+  /** Presentaciones activas del producto (ej. caja, paquete). Vacío si no tiene. */
+  presentations: WebstoreProductPresentation[];
 }
 
 export interface OrderCustomer {

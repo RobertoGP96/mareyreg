@@ -67,6 +67,19 @@ export async function GET(request: Request): Promise<NextResponse> {
       stockLevels: warehouseId
         ? { where: { warehouseId }, select: { currentQuantity: true } }
         : { select: { currentQuantity: true }, take: 0 },
+      presentations: {
+        where: { isActive: true },
+        select: {
+          sku: true,
+          name: true,
+          factor: true,
+          retailPrice: true,
+          wholesalePrice: true,
+          barcode: true,
+          isBase: true,
+        },
+        orderBy: { sortOrder: "asc" },
+      },
     },
     orderBy: [{ webstoreFeatured: "desc" }, { webstoreSortOrder: "asc" }, { name: "asc" }],
   });
@@ -93,6 +106,17 @@ export async function GET(request: Request): Promise<NextResponse> {
       featured: p.webstoreFeatured,
       stockAvailable,
       imageUrl: p.imageUrl,
+      presentations: p.presentations
+        .filter((pr): pr is typeof pr & { sku: string } => pr.sku != null)
+        .map((pr) => ({
+          sku: pr.sku,
+          name: pr.name,
+          factor: Number(pr.factor),
+          retailPrice: Number(pr.retailPrice),
+          wholesalePrice: pr.wholesalePrice != null ? Number(pr.wholesalePrice) : null,
+          barcode: pr.barcode,
+          isBase: pr.isBase,
+        })),
     };
   });
 

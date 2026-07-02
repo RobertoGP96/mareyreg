@@ -14,6 +14,10 @@ export interface AbcRow {
  * Clasifica productos en A (80% ingresos), B (15% siguientes) y C (ultimo 5%)
  * segun las ventas del periodo (InvoiceLine, qty*precio-descuento). Las ventas
  * del modulo de pacas viven en su propio dashboard y no participan del ranking.
+ *
+ * `qty` usa `baseQuantity` (unidad base) y no `quantity` (unidad vendida,
+ * que puede ser una presentacion como "caja") para que el ranking de
+ * unidades sea comparable entre productos vendidos en distintas presentaciones.
  */
 export async function getAbcAnalysis(from: Date, to: Date): Promise<AbcRow[]> {
   const lines = await db.invoiceLine.findMany({
@@ -31,7 +35,7 @@ export async function getAbcAnalysis(from: Date, to: Date): Promise<AbcRow[]> {
     const rev = Number(l.quantity) * Number(l.unitPrice) - Number(l.discount);
     const cur = byProduct.get(l.productId) ?? { name: l.product.name, revenue: 0, qty: 0 };
     cur.revenue += rev;
-    cur.qty += Number(l.quantity);
+    cur.qty += Number(l.baseQuantity);
     byProduct.set(l.productId, cur);
   }
 

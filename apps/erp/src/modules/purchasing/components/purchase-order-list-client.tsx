@@ -46,6 +46,7 @@ import {
 import Link from "next/link";
 import { toast } from "@/lib/toast";
 import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
+import { toBaseQuantity, formatEquivalence } from "@/modules/inventory/lib/units";
 import {
   createPurchaseOrder,
   updatePurchaseOrderStatus,
@@ -76,11 +77,19 @@ interface WarehouseOption {
   name: string;
 }
 
+interface PresentationOption {
+  presentationId: number;
+  name: string;
+  factor: number;
+  isBase: boolean;
+}
+
 interface ProductOption {
   productId: number;
   name: string;
   unit: string;
-  costPrice: unknown;
+  costPrice: number | null;
+  presentations: PresentationOption[];
 }
 
 interface Props {
@@ -335,54 +344,98 @@ export function PurchaseOrderListClient({ orders, suppliers, warehouses, product
                 {lines.length === 0 && (
                   <p className="text-sm text-muted-foreground">Sin lineas. Agrega productos.</p>
                 )}
-                {lines.map((l, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-end">
-                    <div className="col-span-6 space-y-1">
-                      <Select
-                        value={l.productId ? String(l.productId) : ""}
-                        onValueChange={(v) => {
-                          const p = products.find((x) => x.productId === Number(v));
-                          updateLine(i, {
-                            productId: Number(v),
-                            unitCost: p?.costPrice != null ? Number(p.costPrice) : l.unitCost,
-                          });
-                        }}
-                      >
-                        <SelectTrigger><SelectValue placeholder="Producto" /></SelectTrigger>
-                        <SelectContent>
-                          {products.map((p) => (
-                            <SelectItem key={p.productId} value={String(p.productId)}>{p.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                {lines.map((l, i) => {
+                  const product = products.find((x) => x.productId === l.productId);
+                  const activePresentations = product?.presentations ?? [];
+                  const showPresentationPicker = activePresentations.length > 1;
+                  const selectedPresentation = activePresentations.find(
+                    (p) => p.presentationId === l.presentationId
+                  );
+                  const factor = selectedPresentation?.factor ?? 1;
+                  const costLabel = selectedPresentation && !selectedPresentation.isBase
+                    ? `Costo por ${selectedPresentation.name}`
+                    : "Costo";
+
+                  return (
+                    <div key={i} className="grid grid-cols-12 gap-2 items-end">
+                      <div className={showPresentationPicker ? "col-span-4 space-y-1" : "col-span-6 space-y-1"}>
+                        <Select
+                          value={l.productId ? String(l.productId) : ""}
+                          onValueChange={(v) => {
+                            const p = products.find((x) => x.productId === Number(v));
+                            const basePresentation = p?.presentations.find((pr) => pr.isBase);
+                            updateLine(i, {
+                              productId: Number(v),
+                              unitCost: p?.costPrice != null ? p.costPrice : l.unitCost,
+                              presentationId: basePresentation?.presentationId,
+                            });
+                          }}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Producto" /></SelectTrigger>
+                          <SelectContent>
+                            {products.map((p) => (
+                              <SelectItem key={p.productId} value={String(p.productId)}>{p.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {showPresentationPicker && (
+                        <div className="col-span-2 space-y-1">
+                          <Select
+                            value={l.presentationId ? String(l.presentationId) : ""}
+                            onValueChange={(v) => updateLine(i, { presentationId: Number(v) })}
+                          >
+                            <SelectTrigger><SelectValue placeholder="Presentacion" /></SelectTrigger>
+                            <SelectContent>
+                              {activePresentations.map((p) => (
+                                <SelectItem key={p.presentationId} value={String(p.presentationId)}>
+                                  {p.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      <div className={showPresentationPicker ? "col-span-2 space-y-1" : "col-span-2 space-y-1"}>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          placeholder="Cant"
+                          value={l.quantity || ""}
+                          onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className={showPresentationPicker ? "col-span-3 space-y-1" : "col-span-3 space-y-1"}>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder={costLabel}
+                          value={l.unitCost || ""}
+                          onChange={(e) => updateLine(i, { unitCost: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <Button type="button" variant="outline" size="icon" onClick={() => removeLine(i)}>
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                      {showPresentationPicker && factor !== 1 && l.quantity > 0 && (
+                        <div className="col-span-12 -mt-1">
+                          <p className="text-xs text-muted-foreground">
+                            {formatEquivalence(
+                              l.quantity,
+                              factor,
+                              selectedPresentation?.name ?? "",
+                              product?.unit ?? ""
+                            )}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    <div className="col-span-2 space-y-1">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        placeholder="Cant"
-                        value={l.quantity || ""}
-                        onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
-                      />
-                    </div>
-                    <div className="col-span-3 space-y-1">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="Costo"
-                        value={l.unitCost || ""}
-                        onChange={(e) => updateLine(i, { unitCost: Number(e.target.value) })}
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      <Button type="button" variant="outline" size="icon" onClick={() => removeLine(i)}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               {lines.length > 0 && (
                 <div className="mt-3 flex justify-end text-sm">

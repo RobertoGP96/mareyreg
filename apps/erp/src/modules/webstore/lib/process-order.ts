@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
 import { createAuditLog } from "@/lib/audit";
-import { getEffectivePrice } from "@/modules/inventory/lib/effective-price";
+import { getEffectiveLinePrices, lineKey } from "@/modules/inventory/lib/effective-price";
+import { toBaseQuantity } from "@/modules/inventory/lib/units";
 import { dispatchLines } from "@/modules/sales/lib/dispatch-lines";
 import { getDefaultWebstoreWarehouseId } from "./dispatch-warehouse";
 import { isSkuResolved, resolveSkusBatch } from "./resolve-skus";
@@ -62,7 +63,11 @@ export async function processWebstoreOrder(
     const resolvedBySku = await resolveSkusBatch(tx, skusNeedingLookup);
 
     const unresolvedSkus: string[] = [];
-    const resolvedLines: Array<{ productId: number; quantity: number }> = [];
+    const resolvedLines: Array<{
+      productId: number;
+      quantity: number;
+      presentationId?: number;
+    }> = [];
     for (const line of payload.lines) {
       const overrideProductId = overrides?.[line.sku];
       if (overrideProductId) {
@@ -77,6 +82,8 @@ export async function processWebstoreOrder(
             unresolvedSkus.push(`${line.sku} (producto reasignado oculto de la tienda)`);
             continue;
           }
+          // La reasignación manual siempre apunta al producto base (nunca a
+          // una presentación específica): factor 1, igual que antes.
           resolvedLines.push({ productId: overrideProduct.productId, quantity: line.quantity });
           continue;
         }
@@ -86,7 +93,11 @@ export async function processWebstoreOrder(
         unresolvedSkus.push(line.sku);
         continue;
       }
-      resolvedLines.push({ productId: product.productId, quantity: line.quantity });
+      resolvedLines.push({
+        productId: product.productId,
+        quantity: line.quantity,
+        presentationId: product.presentationId,
+      });
     }
     if (unresolvedSkus.length > 0) {
       throw new NeedsReviewError(unresolvedSkus);
@@ -99,14 +110,36 @@ export async function processWebstoreOrder(
       warehouseId = defaultWarehouseId;
     }
 
-    const priced: Array<{ productId: number; quantity: number; unitPrice: number }> = [];
+    const effectivePrices = await getEffectiveLinePrices(
+      tx,
+      resolvedLines.map((l) => ({
+        productId: l.productId,
+        presentationId: l.presentationId,
+        quantity: l.quantity,
+      })),
+      { customerId: customer.customerId }
+    );
+
+    const priced: Array<{
+      productId: number;
+      presentationId?: number;
+      quantity: number;
+      unitPrice: number;
+      unitFactor: number;
+      baseQuantity: number;
+    }> = [];
     for (const line of resolvedLines) {
-      const price = await getEffectivePrice(tx, {
+      const key = lineKey(line.productId, line.presentationId);
+      const price = effectivePrices.get(key);
+      if (!price) throw new Error(`Producto ${line.productId} no encontrado`);
+      priced.push({
         productId: line.productId,
+        presentationId: line.presentationId,
         quantity: line.quantity,
-        customerId: customer.customerId,
+        unitPrice: price.finalPrice,
+        unitFactor: price.factor,
+        baseQuantity: toBaseQuantity(line.quantity, price.factor),
       });
-      priced.push({ productId: line.productId, quantity: line.quantity, unitPrice: price.finalPrice });
     }
 
     const subtotal = priced.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
@@ -131,15 +164,17 @@ export async function processWebstoreOrder(
       data: priced.map((l) => ({
         orderId: order.orderId,
         productId: l.productId,
+        presentationId: l.presentationId ?? null,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
         discount: 0,
         fulfilledQty: l.quantity,
         subtotal: l.quantity * l.unitPrice,
-        // Sin presentación en el flujo webstore actual: factor 1 explícito,
-        // no depender del default de schema (0) para baseQuantity.
-        unitFactor: 1,
-        baseQuantity: l.quantity,
+        // factor/baseQuantity resueltos server-side (ver getEffectiveLinePrices
+        // arriba): 1 y quantity respectivamente cuando la línea no trae
+        // presentación, igual que el comportamiento anterior.
+        unitFactor: l.unitFactor,
+        baseQuantity: l.baseQuantity,
       })),
     });
 
@@ -162,7 +197,12 @@ export async function processWebstoreOrder(
       folio: invoiceFolio,
       warehouseId,
       customerId: customer.customerId,
-      lines: priced,
+      lines: priced.map((l) => ({
+        productId: l.productId,
+        presentationId: l.presentationId,
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+      })),
       allowManualPrice: false,
       movementNotesPrefix: "Venta tienda en línea",
     });

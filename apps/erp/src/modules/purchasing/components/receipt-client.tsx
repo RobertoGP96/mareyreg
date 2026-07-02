@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, PackageCheck } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
+import { formatEquivalence } from "@/modules/inventory/lib/units";
 import {
   createGoodsReceipt,
   type ReceiptLineInput,
@@ -19,6 +20,8 @@ interface POLine {
   quantity: unknown;
   receivedQty: unknown;
   unitCost: unknown;
+  unitFactor: unknown;
+  presentation: { presentationId: number; name: string } | null;
   product: { productId: number; name: string; unit: string; tracksLots: boolean };
 }
 
@@ -96,16 +99,19 @@ export function ReceiptClient({ poId, folio, lines }: Props) {
         {lines.map((l) => {
           const pending = Number(l.quantity) - Number(l.receivedQty);
           const row = rows[l.lineId];
+          const factor = Number(l.unitFactor);
+          const presentationName = l.presentation?.name ?? l.product.unit;
+          const costLabel = factor !== 1 ? `Costo por ${presentationName}` : "Costo unit.";
           return (
             <div key={l.lineId} className="border rounded p-3 grid grid-cols-12 gap-2 items-end">
               <div className="col-span-12 sm:col-span-4">
                 <p className="font-medium">{l.product.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  Pendiente: {pending} {l.product.unit}
+                  Pendiente: {pending} {presentationName}
                 </p>
               </div>
               <div className="col-span-6 sm:col-span-2 space-y-1">
-                <Label className="text-xs">Cantidad</Label>
+                <Label className="text-xs">Cantidad ({presentationName})</Label>
                 <Input
                   type="number"
                   min="0"
@@ -116,7 +122,7 @@ export function ReceiptClient({ poId, folio, lines }: Props) {
                 />
               </div>
               <div className="col-span-6 sm:col-span-2 space-y-1">
-                <Label className="text-xs">Costo unit.</Label>
+                <Label className="text-xs">{costLabel}</Label>
                 <Input
                   type="number"
                   min="0"
@@ -143,6 +149,13 @@ export function ReceiptClient({ poId, folio, lines }: Props) {
                     />
                   </div>
                 </>
+              )}
+              {factor !== 1 && row.quantity > 0 && (
+                <div className="col-span-12 -mt-1">
+                  <p className="text-xs text-muted-foreground">
+                    {formatEquivalence(row.quantity, factor, presentationName, l.product.unit)}
+                  </p>
+                </div>
               )}
             </div>
           );

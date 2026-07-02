@@ -52,12 +52,16 @@ export default async function PurchaseOrderDetailPage({
         <div className="p-4 grid gap-2">
           {po.lines.map((l) => {
             const pending = Number(l.quantity) - Number(l.receivedQty);
+            const unitLabel = l.presentation?.name ?? l.product.unit;
             return (
               <div key={l.lineId} className="flex flex-wrap items-center justify-between gap-2 border rounded px-3 py-2">
                 <div>
                   <p className="font-medium">{l.product.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {String(l.quantity)} {l.product.unit} x ${String(l.unitCost)} = ${(Number(l.quantity) * Number(l.unitCost)).toFixed(2)}
+                    {String(l.quantity)} {unitLabel} x ${String(l.unitCost)} = ${(Number(l.quantity) * Number(l.unitCost)).toFixed(2)}
+                    {Number(l.unitFactor) !== 1 && (
+                      <span> ({(Number(l.quantity) * Number(l.unitFactor)).toString()} {l.product.unit})</span>
+                    )}
                   </p>
                 </div>
                 <div className="text-sm">

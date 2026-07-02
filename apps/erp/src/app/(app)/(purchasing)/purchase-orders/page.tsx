@@ -17,10 +17,31 @@ export default async function PurchaseOrdersPage() {
     }),
     db.product.findMany({
       where: { isActive: true, isService: false },
-      select: { productId: true, name: true, unit: true, costPrice: true },
+      select: {
+        productId: true,
+        name: true,
+        unit: true,
+        costPrice: true,
+        presentations: {
+          where: { isActive: true },
+          select: { presentationId: true, name: true, factor: true, isBase: true },
+          orderBy: [{ isBase: "desc" }, { sortOrder: "asc" }],
+        },
+      },
       orderBy: { name: "asc" },
     }),
   ]);
+
+  const productsForClient = products.map((p) => ({
+    ...p,
+    costPrice: p.costPrice != null ? Number(p.costPrice) : null,
+    presentations: p.presentations.map((pr) => ({
+      presentationId: pr.presentationId,
+      name: pr.name,
+      factor: Number(pr.factor),
+      isBase: pr.isBase,
+    })),
+  }));
 
   return (
     <div className="space-y-4">
@@ -32,7 +53,7 @@ export default async function PurchaseOrdersPage() {
         orders={orders as Parameters<typeof PurchaseOrderListClient>[0]["orders"]}
         suppliers={suppliers}
         warehouses={warehouses}
-        products={products}
+        products={productsForClient}
       />
     </div>
   );

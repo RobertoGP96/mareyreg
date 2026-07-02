@@ -531,10 +531,12 @@ model ProductPresentation {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
 
-  product         Product                    @relation(fields: [productId], references: [productId], onDelete: Restrict)
-  invoiceLines    InvoiceLine[]
-  salesOrderLines SalesOrderLine[]
-  priceHistory    PresentationPriceHistory[]
+  product            Product                    @relation(fields: [productId], references: [productId], onDelete: Restrict)
+  invoiceLines       InvoiceLine[]
+  salesOrderLines    SalesOrderLine[]
+  purchaseOrderLines PurchaseOrderLine[]
+  goodsReceiptLines  GoodsReceiptLine[]
+  priceHistory       PresentationPriceHistory[]
 
   @@unique([productId, name])
   @@index([productId, isActive])
@@ -747,13 +749,17 @@ model PurchaseOrderLine {
   lineId      Int     @id @default(autoincrement()) @map("line_id")
   poId        Int     @map("po_id")
   productId   Int     @map("product_id")
-  quantity    Decimal
-  unitCost    Decimal @map("unit_cost")
-  receivedQty Decimal @default(0) @map("received_qty")
+  quantity    Decimal // Cantidad en la unidad comprada (presentación)
+  unitCost    Decimal @map("unit_cost") // Costo por unidad comprada (presentación)
+  receivedQty Decimal @default(0) @map("received_qty") // En la misma unidad que quantity
+  presentationId Int?    @map("presentation_id")
+  unitFactor     Decimal @default(1) @map("unit_factor")
+  baseQuantity   Decimal @default(0) @map("base_quantity") // quantity × unitFactor, en unidad base
 
-  po       PurchaseOrder      @relation(fields: [poId], references: [poId], onDelete: Cascade)
-  product  Product            @relation(fields: [productId], references: [productId])
-  receipts GoodsReceiptLine[]
+  po           PurchaseOrder        @relation(fields: [poId], references: [poId], onDelete: Cascade)
+  product      Product              @relation(fields: [productId], references: [productId])
+  presentation ProductPresentation? @relation(fields: [presentationId], references: [presentationId], onDelete: Restrict)
+  receipts     GoodsReceiptLine[]
 
   @@index([poId])
   @@map("purchase_order_lines")
@@ -778,13 +784,17 @@ model GoodsReceiptLine {
   lineId    Int     @id @default(autoincrement()) @map("line_id")
   receiptId Int     @map("receipt_id")
   poLineId  Int     @map("po_line_id")
-  quantity  Decimal
+  quantity  Decimal // Cantidad en la unidad recibida (presentación)
   lotId     Int?    @map("lot_id")
-  unitCost  Decimal @map("unit_cost")
+  unitCost  Decimal @map("unit_cost") // Costo por unidad recibida (presentación)
+  presentationId Int?    @map("presentation_id")
+  unitFactor     Decimal @default(1) @map("unit_factor")
+  baseQuantity   Decimal @default(0) @map("base_quantity") // quantity × unitFactor, en unidad base
 
-  receipt GoodsReceipt      @relation(fields: [receiptId], references: [receiptId], onDelete: Cascade)
-  poLine  PurchaseOrderLine @relation(fields: [poLineId], references: [lineId])
-  lot     Lot?              @relation(fields: [lotId], references: [lotId])
+  receipt      GoodsReceipt         @relation(fields: [receiptId], references: [receiptId], onDelete: Cascade)
+  poLine       PurchaseOrderLine    @relation(fields: [poLineId], references: [lineId])
+  presentation ProductPresentation? @relation(fields: [presentationId], references: [presentationId], onDelete: Restrict)
+  lot          Lot?                 @relation(fields: [lotId], references: [lotId])
 
   @@index([receiptId])
   @@map("goods_receipt_lines")

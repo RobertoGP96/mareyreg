@@ -17,6 +17,7 @@ export interface CatalogRow {
   onSale: boolean;
   discountCount: number;
   stockAvailable: number;
+  presentationCount: number;
 }
 
 export interface CatalogKpis {
@@ -43,7 +44,12 @@ export async function getWebstoreCatalogWithKpis(): Promise<WebstoreCatalogResul
     where: { isActive: true },
     include: {
       stockLevels: { select: { currentQuantity: true } },
-      _count: { select: { discounts: { where: { isActive: true } } } },
+      _count: {
+        select: {
+          discounts: { where: { isActive: true } },
+          presentations: { where: { isActive: true } },
+        },
+      },
     },
     orderBy: [{ webstoreFeatured: "desc" }, { name: "asc" }],
   });
@@ -73,6 +79,7 @@ export async function getWebstoreCatalogWithKpis(): Promise<WebstoreCatalogResul
       onSale: price.finalPrice < price.basePrice,
       discountCount: p._count.discounts,
       stockAvailable,
+      presentationCount: p._count.presentations,
     };
   });
 
