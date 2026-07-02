@@ -127,6 +127,6 @@ export async function deleteWarehouse(id: number): Promise<ActionResult<void>> {
       return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
     }
     console.error("Error deleting warehouse:", error);
-    return { success: false, error: "Error al eliminar el almacen. Verifique que no tiene stock o pacas asociadas." };
+    return { success: false, error: "Error al eliminar el almacen. Verifique que no tiene stock asociado." };
   }
 }

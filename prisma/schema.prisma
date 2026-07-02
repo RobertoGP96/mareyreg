@@ -317,11 +317,9 @@ model PacaCategory {
   name             String
   classificationId Int?     @map("classification_id")
   description      String?
-  productId        Int?     @unique @map("product_id")
   createdAt        DateTime @default(now()) @map("created_at")
 
   classification PacaClassification? @relation(fields: [classificationId], references: [classificationId])
-  product        Product?             @relation(fields: [productId], references: [productId], onDelete: Restrict)
   inventory      PacaInventory?
   entries        PacaEntry[]
   reservations   PacaReservation[]
@@ -504,7 +502,6 @@ model Product {
   stockCountLines    StockCountLine[]
   priceHistory       ProductPriceHistory[]
   discountHistory    DiscountHistory[]
-  pacaCategory       PacaCategory?
 
   @@index([category])
   @@index([isActive])

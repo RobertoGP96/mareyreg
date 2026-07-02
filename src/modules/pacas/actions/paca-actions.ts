@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import type { Prisma } from "@/generated/prisma";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
-import { recordShadowMovement } from "@/modules/pacas/lib/shadow-product";
 
 function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
@@ -59,15 +58,6 @@ export async function createPacaEntry(data: {
         },
       });
 
-      await recordShadowMovement(tx, {
-        categoryId: data.categoryId,
-        quantity: data.quantity,
-        unitCost: data.purchasePrice ?? 0,
-        movementType: "entry",
-        reference: `paca:entrada #${entry.entryId}`,
-        userId,
-      });
-
       await createAuditLog(tx, {
         action: "create",
         entityType: "PacaEntry",
@@ -118,15 +108,6 @@ async function deletePacaEntryInTx(
   }
 
   await tx.pacaEntry.delete({ where: { entryId: id } });
-
-  await recordShadowMovement(tx, {
-    categoryId: entry.categoryId,
-    quantity: entry.quantity,
-    unitCost: entry.quantity > 0 ? entryCost / entry.quantity : 0,
-    movementType: "exit",
-    reference: `paca:reverso-entrada #${entry.entryId}`,
-    userId,
-  });
 
   await createAuditLog(tx, {
     action: "delete",

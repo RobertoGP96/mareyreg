@@ -6,7 +6,6 @@ import type { ActionResult } from "@/types";
 import type { Prisma } from "@/generated/prisma";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { calculateWeightedCost } from "@/modules/pacas/lib/weighted-cost";
-import { recordShadowMovement } from "@/modules/pacas/lib/shadow-product";
 
 function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
@@ -72,15 +71,6 @@ export async function createSale(data: {
         },
       });
 
-      await recordShadowMovement(tx, {
-        categoryId: data.categoryId,
-        quantity: data.quantity,
-        unitCost: data.quantity > 0 ? costToDeduct / data.quantity : 0,
-        movementType: "exit",
-        reference: `paca:venta #${s.saleId}`,
-        userId,
-      });
-
       await createAuditLog(tx, {
         action: "create",
         entityType: "PacaSale",
@@ -132,15 +122,6 @@ async function deleteSaleInTx(
   if (updated.count !== 1) {
     throw new Error("No se pudo revertir la venta: inconsistencia de inventario");
   }
-
-  await recordShadowMovement(tx, {
-    categoryId: sale.categoryId,
-    quantity: sale.quantity,
-    unitCost: sale.quantity > 0 ? Number(sale.costOfGoods) / sale.quantity : 0,
-    movementType: "entry",
-    reference: `paca:reverso-venta #${sale.saleId}`,
-    userId,
-  });
 
   await createAuditLog(tx, {
     action: "delete",
