@@ -226,7 +226,6 @@ export function PacaClassificationListClient({ initialClassifications }: Props) 
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Tags}
         title="Clasificaciones"
         description="Agrupadores padres de las categorías de pacas (p. ej. Hombre, Mujer, Mixto)."
         badge={`${initialClassifications.length} clasificaciones`}

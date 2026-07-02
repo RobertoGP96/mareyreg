@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Inbox, Clock, AlertTriangle, CircleCheck, ChevronRight } from "lucide-react";
+import { Clock, AlertTriangle, CircleCheck, ChevronRight } from "lucide-react";
 
 export interface OrderLogItem {
   logId: number;
@@ -48,7 +48,6 @@ export function OrderInboxClient({
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Inbox}
         title="Órdenes de la tienda en línea"
         description="Ventas recibidas desde la tienda web, con su estado de procesamiento."
         badge={`${orders.length} órdenes`}

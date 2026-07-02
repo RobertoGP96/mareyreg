@@ -229,7 +229,6 @@ export function RecipientListClient({ initialRecipients }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Users}
         title="Destinatarios"
         description="Catálogo de personas que reciben entregas de efectivo. Reusa estos contactos en cada entrega."
         badge={`${initialRecipients.length} destinatarios`}

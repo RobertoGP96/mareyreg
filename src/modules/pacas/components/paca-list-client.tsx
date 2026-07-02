@@ -332,7 +332,6 @@ export function PacaListClient({ inventory, entries, categories }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Package2}
         title="Inventario de pacas"
         description="Stock por categoría con seguimiento de disponibles, reservadas y vendidas."
         actions={

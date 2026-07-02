@@ -179,7 +179,6 @@ export function ApiKeyListClient({ apiKeys }: { apiKeys: ApiKeyItem[] }) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={KeyRound}
         title="API keys de la tienda en línea"
         description="Credenciales que usa la tienda web para enviar ventas y consultar el catálogo de Mareyway."
         badge={`${apiKeys.length} keys`}

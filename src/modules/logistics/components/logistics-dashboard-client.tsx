@@ -34,7 +34,6 @@ export function LogisticsDashboardClient({ data }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Activity}
         title="Cockpit logístico"
         description="Estado en vivo de la operación: viajes activos, flota y pagos."
         badge="Últimos 30 días"

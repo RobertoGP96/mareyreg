@@ -291,7 +291,6 @@ export function ContractListClient({ initialContracts, drivers }: Props) {
   return (
     <>
       <PageHeader
-        icon={FileSignature}
         title="Contratos"
         description="Documentos contractuales firmados con conductores."
         actions={

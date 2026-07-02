@@ -366,7 +366,6 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Package}
         title="Productos"
         description="Catálogo de productos, componentes y materiales del inventario."
         badge={`${products.length} productos`}

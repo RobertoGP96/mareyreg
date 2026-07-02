@@ -118,7 +118,6 @@ export function OrderDetailClient({
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Receipt}
         title={`Orden ${log.externalOrderId}`}
         description={`Recibida el ${new Date(log.receivedAt).toLocaleString("es-MX")} vía ${log.apiKeyLabel}`}
         meta={<StatusPill status={cfg.status} label={cfg.label} />}

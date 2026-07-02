@@ -108,7 +108,6 @@ export function VehicleDetailsClient({
       </div>
 
       <PageHeader
-        icon={Truck}
         title={vehicle.name || `Vehiculo #${vehicle.vehicleId}`}
         description={driver ? `Conductor: ${driver.fullName}` : "Sin conductor asignado"}
         badge={statusMeta.label}

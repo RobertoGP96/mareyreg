@@ -413,7 +413,6 @@ export function ReservationListClient({
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={BookmarkCheck}
         title="Reservaciones"
         description="Gestiona reservaciones de pacas por cliente y completa ventas cuando se cierran."
         badge={`${reservations.length} reservaciones`}

@@ -260,7 +260,6 @@ export function DiscountListClient({
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Tag}
         title="Descuentos"
         description="Reglas de rebaja aplicables en todos los canales de venta (POS, B2B y tienda en línea)."
         badge={`${discounts.length} descuentos`}

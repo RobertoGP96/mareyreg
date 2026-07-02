@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { db } from "@/lib/db";
 import { PosClient } from "@/modules/sales/components/pos-client";
+import { PageHeader } from "@/components/ui/page-header";
 import { getActiveCustomersForPicker } from "@/modules/customers/queries/customer-queries";
 
 export default async function PosPage() {
@@ -55,9 +56,7 @@ export default async function PosPage() {
 
   return (
     <div className="h-full">
-      <div className="mb-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Punto de Venta</h1>
-      </div>
+      <PageHeader title="Punto de Venta" className="mb-3" />
       <PosClient
         products={products}
         customers={customers}

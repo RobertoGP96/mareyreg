@@ -307,7 +307,6 @@ export function OperationListClient({ initialOperations, accounts, currencies }:
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={ArrowRightLeft}
         title="Operaciones"
         description="Depósitos, retiros y ajustes. Las pendientes no afectan saldo hasta confirmarse."
         badge={`${counts.total} operaciones`}

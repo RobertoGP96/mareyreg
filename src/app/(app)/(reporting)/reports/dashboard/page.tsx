@@ -14,7 +14,6 @@ import { MetricTile } from "@/components/ui/metric-tile";
 import { Spark } from "@/components/ui/spark";
 import { StatusPill } from "@/components/ui/status-pill";
 import {
-  BarChart3,
   Package,
   ShoppingCart,
   AlertTriangle,
@@ -65,7 +64,6 @@ export default async function ReportsDashboardPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={BarChart3}
         title="Cockpit de reportes"
         description="Resumen consolidado de inventario, ventas y alertas operativas."
         badge="Vista ejecutiva"

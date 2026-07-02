@@ -186,7 +186,6 @@ export function TripDetailsClient({
       </div>
 
       <PageHeader
-        icon={RouteIcon}
         title={`Viaje #${trip.tripId}`}
         description={driver.fullName}
         badge={statusMeta.label}

@@ -11,8 +11,15 @@ import { MobileListCard } from "@/components/ui/mobile-list-card";
 import { ResponsiveListView } from "@/components/ui/responsive-list-view";
 import { type DataTableColumn } from "@/components/ui/data-table";
 import {
-  Users, ArrowLeft, ChevronRight, Wallet, Calculator, ArrowRightLeft,
-  Settings2, CircleDollarSign, MinusCircle, ExternalLink,
+  ArrowLeft,
+  ChevronRight,
+  Wallet,
+  Calculator,
+  ArrowRightLeft,
+  Settings2,
+  CircleDollarSign,
+  MinusCircle,
+  ExternalLink,
 } from "lucide-react";
 import { CurrencyChip } from "../shared/currency-chip";
 import { AmountDisplay } from "../shared/amount-display";
@@ -156,7 +163,6 @@ export function AccountGroupDetailsClient({ group, operations }: Props) {
       </div>
 
       <PageHeader
-        icon={Users}
         title={group.name}
         description={
           group.description ??

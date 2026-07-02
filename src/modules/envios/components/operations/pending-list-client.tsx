@@ -190,7 +190,6 @@ export function PendingListClient({ initialPending, summary }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Clock}
         title="Pendientes"
         description="Operaciones registradas que aún no afectan el saldo. Confírmalas individualmente o en lote."
         badge={`${initialPending.length} pendientes`}

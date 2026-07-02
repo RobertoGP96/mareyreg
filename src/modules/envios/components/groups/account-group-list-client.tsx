@@ -153,7 +153,6 @@ export function AccountGroupListClient({ initialGroups, users }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Users}
         title="Grupos"
         description="Cada grupo agrupa cuentas multi-moneda por persona o tarea (equivalente a una hoja del Excel)."
         badge={`${initialGroups.length} grupos`}

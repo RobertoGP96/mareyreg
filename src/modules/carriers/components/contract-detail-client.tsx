@@ -31,7 +31,6 @@ import {
   Download,
   SquarePen,
   Trash2,
-  FileSignature,
   Calendar,
   User,
   Building2,
@@ -158,7 +157,6 @@ export function ContractDetailClient({ contract }: Props) {
   return (
     <>
       <PageHeader
-        icon={FileSignature}
         title={contract.contractNo}
         description={`Contrato de ${contract.driverName}`}
         meta={

@@ -384,7 +384,6 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Tags}
         title="Catálogo de tienda"
         description="Gestiona precios, ofertas y visibilidad de los productos en la tienda en línea."
         badge={`${rows.length} productos`}

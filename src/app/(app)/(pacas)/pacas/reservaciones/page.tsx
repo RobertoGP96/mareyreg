@@ -25,12 +25,6 @@ export default async function ReservacionesPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold font-headline tracking-tight text-foreground">Reservaciones</h1>
-        <p className="text-muted-foreground mt-1">
-          Gestiona las reservaciones de pacas
-        </p>
-      </div>
       <ReservationListClient
         reservations={reservations as Parameters<typeof ReservationListClient>[0]["reservations"]}
         availableCategories={availableCategories}

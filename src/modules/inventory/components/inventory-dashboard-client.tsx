@@ -9,7 +9,6 @@ import { MetricTile } from "@/components/ui/metric-tile";
 import { Spark } from "@/components/ui/spark";
 import { StatusPill } from "@/components/ui/status-pill";
 import {
-  Boxes,
   Package,
   Warehouse,
   CircleDollarSign,
@@ -60,7 +59,6 @@ export function InventoryDashboardClient({ data }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Boxes}
         title="Cockpit de inventario"
         description="Stock, valuación y movimientos en tiempo real — control operativo de productos y almacenes."
         badge="Últimos 30 días"

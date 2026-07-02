@@ -132,7 +132,6 @@ export function VehicleListClient({ initialVehicles, drivers }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Truck}
         title="Vehículos"
         description="Flota de vehículos con placas, documentación y conductores asignados."
         badge={`${initialVehicles.length} vehículos`}

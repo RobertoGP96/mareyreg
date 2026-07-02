@@ -210,7 +210,6 @@ export function RouteListClient({ initialRoutes }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={RouteIcon}
         title="Rutas"
         description="Catálogo de rutas operativas con distancia y duración estimada."
         badge={`${initialRoutes.length} rutas`}

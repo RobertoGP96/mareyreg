@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiCard } from "@/components/ui/kpi-card";
-import { BarChart3, Trophy, Layers, Archive, CircleDollarSign } from "lucide-react";
+import { Trophy, Layers, Archive, CircleDollarSign } from "lucide-react";
 
 const CLASS_BG: Record<"A" | "B" | "C", string> = {
   A: "bg-[var(--ops-success)]/12 text-[var(--ops-success)] ring-1 ring-inset ring-[var(--ops-success)]/30",
@@ -40,7 +40,6 @@ export default async function AbcPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={BarChart3}
         title="Análisis ABC"
         description="Clasificación de productos por contribución a ingresos en los últimos 90 días."
         badge={`${rows.length} productos`}

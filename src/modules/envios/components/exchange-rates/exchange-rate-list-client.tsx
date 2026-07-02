@@ -112,7 +112,6 @@ export function ExchangeRateListClient({ initialRules, currencies }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={LineChart}
         title="Tasas de cambio"
         description="Reglas con rangos por par de monedas. Solapes bloqueados a nivel base de datos."
         badge={`${initialRules.length} reglas`}

@@ -40,7 +40,6 @@ import {
   Eye,
   Copy,
   Building2,
-  Contact,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import {
@@ -149,7 +148,6 @@ export function DriverListClient({ initialDrivers, entities }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Contact}
         title="Conductores"
         description="Gestiona los conductores asignados a tu flota y sus datos de contacto."
         badge={`${initialDrivers.length} registrados`}

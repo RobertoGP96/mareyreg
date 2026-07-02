@@ -14,6 +14,15 @@ import {
   Users,
   Warehouse,
   Building2,
+  HandCoins,
+  ClipboardList,
+  FileSignature,
+  CircleDollarSign,
+  Receipt,
+  FileText,
+  BarChart3,
+  KeyRound,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 import { getAllNavigationRoutes } from "./module-registry";
@@ -55,6 +64,13 @@ const ROUTE_LABELS: Record<string, string> = {
   kardex: "Kardex",
   abc: "Analisis ABC",
   sales: "Ventas",
+  "pacas-clientes": "Clientes de pacas",
+  contracts: "Contratos",
+  discounts: "Descuentos",
+  envios: "Envios",
+  inventory: "Inventario",
+  payments: "Pagos",
+  webstore: "Tienda web",
 };
 
 const ROUTE_ICONS: Record<string, LucideIcon> = {
@@ -72,6 +88,21 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   stock: PackageOpen,
   settings: Settings2,
   users: Users,
+  "accounts-payable": HandCoins,
+  "accounts-receivable": ClipboardList,
+  contracts: FileSignature,
+  customers: Users,
+  discounts: Tags,
+  envios: CircleDollarSign,
+  inventory: LayoutDashboard,
+  invoices: Receipt,
+  "pacas-clientes": Users,
+  payments: CircleDollarSign,
+  pos: CreditCard,
+  "purchase-orders": FileText,
+  reports: BarChart3,
+  suppliers: Building2,
+  webstore: KeyRound,
 };
 
 export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {

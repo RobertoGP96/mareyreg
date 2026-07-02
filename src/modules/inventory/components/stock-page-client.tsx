@@ -213,7 +213,6 @@ export function StockPageClient({
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={PackageOpen}
         title="Stock"
         description="Niveles de stock por producto y almacén con histórico de movimientos."
         badge={`${stockLevels.length} niveles`}

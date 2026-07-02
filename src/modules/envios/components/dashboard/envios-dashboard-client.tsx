@@ -11,8 +11,16 @@ import { BentoGrid, BentoCell } from "@/components/ui/bento-grid";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { FadeStagger, FadeStaggerItem } from "@/components/ui/motion";
 import {
-  HandCoins, Clock, Check, ArrowRightLeft, Users, Wallet,
-  CircleDollarSign, ArrowDownLeft, ArrowUpRight, Plus, Activity,
+  Clock,
+  Check,
+  ArrowRightLeft,
+  Users,
+  Wallet,
+  CircleDollarSign,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Plus,
+  Activity,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { confirmOperation } from "../../actions/operation-actions";
@@ -55,7 +63,6 @@ export function EnviosDashboardClient({ data }: Props) {
       <PageHeader
         variant="editorial"
         accentTitle="Envíos"
-        icon={HandCoins}
         title="Tesorería · Envíos"
         description={
           generated

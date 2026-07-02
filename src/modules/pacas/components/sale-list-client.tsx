@@ -282,7 +282,6 @@ export function SaleListClient({ sales, availableCategories, stats }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={ShoppingBag}
         title="Ventas de pacas"
         description="Historial de ventas con cliente, categoría y método de pago."
         badge={`${sales.length} ventas`}

@@ -361,7 +361,6 @@ export function TripListClient({ initialTrips, drivers, routes = [] }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={RouteIcon}
         title="Viajes"
         description="Programación y seguimiento de viajes con conductor, ruta y carga."
         badge={`${initialTrips.length} viajes`}

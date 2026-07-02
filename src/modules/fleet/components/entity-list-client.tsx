@@ -91,7 +91,6 @@ export function EntityListClient({ initialEntities }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Building2}
         title="Entidades"
         description="Organizaciones o empresas que operan dentro del sistema."
         badge={`${initialEntities.length} registradas`}

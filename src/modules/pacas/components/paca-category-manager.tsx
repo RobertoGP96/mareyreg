@@ -245,7 +245,6 @@ export function PacaCategoryManager({ categories, classifications }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Tags}
         title="Categorías de pacas"
         description="Catálogo de categorías SKU. Cada categoría puede agruparse bajo una clasificación."
         badge={`${categories.length} categorías`}

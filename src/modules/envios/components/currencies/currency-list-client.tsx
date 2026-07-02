@@ -211,7 +211,6 @@ export function CurrencyListClient({ initialCurrencies }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={CircleDollarSign}
         title="Monedas"
         description="Catálogo de divisas con código, símbolo y precisión decimal."
         badge={`${initialCurrencies.length} monedas`}

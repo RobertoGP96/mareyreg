@@ -94,7 +94,6 @@ export function AvailabilityView({ data }: Props) {
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={PackageCheck}
         title="Disponibilidad"
         description="Stock disponible agrupado por clasificación. Solo categorías con disponibilidad &gt; 0."
         badge={`${filtered.length} clasificaciones`}

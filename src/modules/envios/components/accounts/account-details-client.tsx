@@ -18,10 +18,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { type DataTableColumn } from "@/components/ui/data-table";
 import {
-  Wallet, ArrowLeft, ArrowRightLeft, ArrowDownLeft, ArrowUpRight,
-  Calculator, MoreHorizontal, MinusCircle, Pin, BarChart3, Clock,
-  CircleDollarSign, Settings2, ChevronRight, Layers, SquarePen,
-  Plus, ChevronDown,
+  ArrowLeft,
+  ArrowRightLeft,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Calculator,
+  MoreHorizontal,
+  MinusCircle,
+  Pin,
+  BarChart3,
+  Clock,
+  CircleDollarSign,
+  Settings2,
+  ChevronRight,
+  Layers,
+  SquarePen,
+  Plus,
+  ChevronDown,
 } from "lucide-react";
 import { formatBounds } from "../../lib/exchange-rate";
 import { CurrencyChip } from "../shared/currency-chip";
@@ -232,7 +245,6 @@ export function AccountDetailsClient({ account, operations, rules, currencies, a
       </div>
 
       <PageHeader
-        icon={Wallet}
         title={account.name}
         description={`${account.groupName} · ${account.accountNumber}`}
         badge={account.currencyCode}

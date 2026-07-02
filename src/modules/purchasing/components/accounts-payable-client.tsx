@@ -319,7 +319,6 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Receipt}
         title="Cuentas por pagar"
         description="Facturas de proveedor, saldos pendientes y pagos registrados."
         badge={`${bills.length} facturas`}

@@ -317,7 +317,6 @@ export function CashDeliveryListClient({ initialDeliveries, recipients, currenci
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={HandCoins}
         title="Entregas de efectivo"
         description="Registra entregas de efectivo a destinatarios y da seguimiento a su estado."
         badge={`${initialDeliveries.length} entregas`}

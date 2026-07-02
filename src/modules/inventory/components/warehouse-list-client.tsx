@@ -162,7 +162,6 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={WarehouseIcon}
         title="Almacenes"
         description="Puntos de almacenamiento y distribución con ubicación y capacidad."
         badge={`${warehouses.length} almacenes`}

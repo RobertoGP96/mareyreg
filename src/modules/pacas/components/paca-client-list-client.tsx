@@ -271,7 +271,6 @@ export function PacaClientListClient({ clients }: { clients: PacaClientItem[] })
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Users}
         title="Clientes de pacas"
         description="Directorio de clientes para reservaciones y ventas. La eliminación es lógica."
         badge={`${clients.length} clientes`}

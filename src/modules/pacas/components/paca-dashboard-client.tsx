@@ -43,7 +43,6 @@ export function PacaDashboardClient({ data }: Props) {
       <PageHeader
         variant="editorial"
         accentTitle="pacas"
-        icon={ShoppingBag}
         title="Cockpit de pacas"
         description="Inventario, ventas y reservaciones de pacas — vista operativa en tiempo real."
         badge="Últimos 30 días"

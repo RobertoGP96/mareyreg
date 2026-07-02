@@ -422,7 +422,6 @@ export function AccountListClient({
   return (
     <div className="space-y-5">
       <PageHeader
-        icon={Wallet}
         title="Cuentas"
         description="Una cuenta por moneda dentro de cada grupo. El saldo cambia con depósitos, retiros y transferencias confirmadas."
         badge={`${initialAccounts.length} cuentas`}
