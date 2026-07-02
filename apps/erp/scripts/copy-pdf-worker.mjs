@@ -8,7 +8,17 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// pdfjs-dist es dependencia transitiva de react-pdf; con el node_modules
+// aislado de pnpm no es resoluble desde este script, así que se resuelve
+// desde el contexto de react-pdf.
 const require = createRequire(import.meta.url);
+const requireFromReactPdf = (() => {
+  try {
+    return createRequire(require.resolve("react-pdf/package.json"));
+  } catch {
+    return require;
+  }
+})();
 
 const root = join(__dirname, "..");
 const publicDir = join(root, "public", "pdfjs");
@@ -22,7 +32,7 @@ const candidates = [
 let source = null;
 for (const c of candidates) {
   try {
-    source = require.resolve(c);
+    source = requireFromReactPdf.resolve(c);
     if (existsSync(source)) break;
   } catch {
     // sigue probando

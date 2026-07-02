@@ -46,6 +46,9 @@ next-env.d.ts
 # Drizzle
 drizzle/meta
 
-/generated/prisma
+**/generated/prisma
+
+# Turborepo
+.turbo
 
 .env*.local
