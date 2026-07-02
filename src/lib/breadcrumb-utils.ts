@@ -118,6 +118,7 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
   let currentPath = "";
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i];
+    const parentPath = currentPath;
     currentPath += `/${segment}`;
     const isLast = i === segments.length - 1;
 
@@ -125,10 +126,16 @@ export function getBreadcrumbs(pathname: string): BreadcrumbItem[] {
     const label = matchedRoute?.name || ROUTE_LABELS[segment] || segment;
     const icon = matchedRoute?.icon ?? ROUTE_ICONS[segment];
 
+    // Segmentos como /envios o /reports agrupan rutas pero no tienen page.tsx;
+    // solo se enlaza lo registrado en module-registry o detalles [id] cuyo listado existe.
+    const isDetailPage =
+      /^\d+$/.test(segment) && navRoutes.some((r) => r.href === parentPath);
+    const isNavigable = Boolean(matchedRoute) || isDetailPage;
+
     items.push({
       label,
       icon,
-      href: isLast ? undefined : currentPath,
+      href: isLast || !isNavigable ? undefined : currentPath,
     });
   }
 

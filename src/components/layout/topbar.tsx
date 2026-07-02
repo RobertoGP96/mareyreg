@@ -49,7 +49,7 @@ export function Topbar() {
                         {crumb.label}
                       </span>
                     </BreadcrumbLink>
-                  ) : (
+                  ) : isLast ? (
                     <BreadcrumbPage
                       title={crumb.label}
                       aria-label={crumb.label}
@@ -58,6 +58,14 @@ export function Topbar() {
                       {Icon && <Icon className="size-4 shrink-0" aria-hidden="true" />}
                       <span className="inline">{crumb.label}</span>
                     </BreadcrumbPage>
+                  ) : (
+                    <span
+                      title={crumb.label}
+                      className="text-muted-foreground font-medium flex items-center gap-1.5"
+                    >
+                      {Icon && <Icon className="size-4 shrink-0" aria-hidden="true" />}
+                      <span className="hidden sm:inline">{crumb.label}</span>
+                    </span>
                   )}
                 </BreadcrumbItem>
               </Fragment>
