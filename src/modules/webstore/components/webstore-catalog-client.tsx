@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
+import { ToastDelta } from "@/components/ui/toast-content";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiCard } from "@/components/ui/kpi-card";
 import { StatusPill } from "@/components/ui/status-pill";
@@ -153,7 +154,18 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
     try {
       const res = await updateWebstorePrice(priceRow.productId, parsed);
       if (res.success) {
-        toast.success("Precio actualizado");
+        const previous =
+          priceRow.salePrice && priceRow.salePrice !== ""
+            ? Number(priceRow.salePrice)
+            : priceRow.basePrice;
+        toast.success("Precio actualizado", {
+          description: (
+            <ToastDelta
+              from={formatAmount(previous)}
+              to={formatAmount(parsed)}
+            />
+          ),
+        });
         setPriceRow(null);
         router.refresh();
       } else {

@@ -19,6 +19,7 @@ import {
   Clock, Check, Ban, CircleCheck, X, Loader2,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { ToastLines, ToastNote } from "@/components/ui/toast-content";
 import { cn } from "@/lib/utils";
 import { confirmOperation, cancelOperation } from "../../actions/operation-actions";
 import { bulkConfirmOperations } from "../../actions/transfer-actions";
@@ -90,7 +91,20 @@ export function PendingListClient({ initialPending, summary }: Props) {
         toast.success(`${confirmed} operación(es) confirmadas`);
       } else {
         toast.warning(`${confirmed} confirmadas · ${failed.length} con error`, {
-          description: failed.slice(0, 3).map((f) => `#${f.id}: ${f.error}`).join(" · "),
+          description: (
+            <ToastLines>
+              {failed.slice(0, 3).map((f) => (
+                <ToastNote key={f.id}>
+                  <span className="font-mono tabular-nums">#{f.id}</span>
+                  {": "}
+                  {f.error}
+                </ToastNote>
+              ))}
+              {failed.length > 3 && (
+                <ToastNote>y {failed.length - 3} más…</ToastNote>
+              )}
+            </ToastLines>
+          ),
         });
       }
       setSelected(new Set());

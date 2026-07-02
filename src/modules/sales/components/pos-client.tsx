@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/input-group";
 import { Plus, Trash2, ShoppingCart, Loader2, Search, Barcode } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
 import { createInvoice } from "../actions/invoice-actions";
 import { getSuggestedUnitPriceAction } from "@/modules/inventory/actions/pricing-actions";
 
@@ -261,7 +262,20 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
     });
     setIsSubmitting(false);
     if (result.success) {
-      toast.success(`Factura ${result.data.folio} emitida`);
+      toast.success(`Factura ${result.data.folio} emitida`, {
+        description: (
+          <ToastLines>
+            <ToastDetail
+              label={`${cart.length} ${cart.length === 1 ? "artículo" : "artículos"}`}
+              value={`$${total.toFixed(2)}`}
+              mono
+            />
+            {change > 0 && (
+              <ToastDetail label="Cambio" value={`$${change.toFixed(2)}`} mono />
+            )}
+          </ToastLines>
+        ),
+      });
       setCart([]);
       setCashReceived("");
       setIsCheckoutOpen(false);
