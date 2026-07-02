@@ -461,8 +461,9 @@
 }
 
 /* Sileo (toasts): tokens del design system.
-   El pill es una superficie invertida respecto al tema (foreground como
-   fondo), por eso la descripción usa --background como color de texto. */
+   El pill usa la superficie popover del tema (no el look invertido de la
+   librería); la elevación va como drop-shadow sobre el toast porque el
+   filtro gooey del canvas es inline y no se puede componer con él. */
 [data-sileo-viewport] {
   --sileo-state-success: var(--success);
   --sileo-state-error: var(--destructive);
@@ -474,13 +475,24 @@
 
 [data-sileo-pill],
 [data-sileo-body] {
-  fill: var(--foreground);
+  fill: var(--popover);
 }
 
-[data-sileo-title] {
+[data-sileo-toast] {
+  filter: drop-shadow(0 0 1px var(--border))
+    drop-shadow(0 4px 12px rgb(15 23 42 / 0.12));
+}
+
+.dark [data-sileo-toast] {
+  filter: drop-shadow(0 0 1px var(--border))
+    drop-shadow(0 6px 16px rgb(0 0 0 / 0.5));
+}
+
+/* Sileo inyecta su CSS en runtime; hay que ganarle en especificidad */
+[data-sileo-viewport] [data-sileo-title] {
   text-transform: none;
 }
 
 [data-sileo-viewport][data-theme] [data-sileo-content] [data-sileo-description] {
-  color: color-mix(in oklch, var(--background) 72%, transparent);
+  color: var(--muted-foreground);
 }

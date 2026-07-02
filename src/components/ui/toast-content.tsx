@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 
 // Bloques para descripciones JSX de toasts (se renderizan dentro de
 // [data-sileo-description]). Sileo aplica su propia tipografía, por eso
-// los overrides llevan el modificador "!" de Tailwind. El pill del toast
-// es una superficie invertida (fondo --foreground), así que el énfasis
-// usa text-background y lo secundario hereda el color atenuado que
+// los overrides llevan el modificador "!" de Tailwind. El pill usa la
+// superficie popover del tema (globals.css): el énfasis va con
+// text-foreground y lo secundario hereda el muted-foreground que
 // globals.css fija para la descripción. Mantener el contenido corto:
 // el toast colapsa a pill y expande unos segundos.
 
@@ -28,7 +28,7 @@ export function ToastDetail({
       <span>{label}</span>
       <span
         className={
-          mono ? "font-mono tabular-nums text-background!" : "text-background!"
+          mono ? "font-mono tabular-nums text-foreground!" : "text-foreground!"
         }
       >
         {value}
@@ -42,7 +42,7 @@ export function ToastDelta({ from, to }: { from: string; to: string }) {
     <span className="flex items-center gap-1.5 font-mono tabular-nums text-xs!">
       <span className="line-through">{from}</span>
       <span aria-hidden>→</span>
-      <span className="font-semibold text-background!">{to}</span>
+      <span className="font-semibold text-foreground!">{to}</span>
     </span>
   );
 }
