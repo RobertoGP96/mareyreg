@@ -32,7 +32,6 @@ export default async function PosPage() {
         barcode: true,
         unit: true,
         salePrice: true,
-        costPrice: true,
         isService: true,
         stockLevels: {
           where: { warehouseId: warehouse.warehouseId },
@@ -50,8 +49,7 @@ export default async function PosPage() {
     sku: p.sku,
     barcode: p.barcode,
     unit: p.unit,
-    salePrice: p.salePrice,
-    costPrice: p.costPrice,
+    salePrice: p.salePrice != null ? Number(p.salePrice) : null,
     stock: p.isService ? 9999 : p.stockLevels[0] ? Number(p.stockLevels[0].currentQuantity) : 0,
   }));
 

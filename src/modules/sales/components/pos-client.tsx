@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +35,7 @@ interface ProductOption {
   sku: string | null;
   barcode: string | null;
   unit: string;
-  salePrice: unknown;
-  costPrice: unknown;
+  salePrice: number | null;
   stock: number;
 }
 
@@ -60,6 +59,7 @@ interface CartLine {
   unitPrice: number;
   unit: string;
   stock: number;
+  priceEdited: boolean;
 }
 
 const PAYMENT_METHODS = [
@@ -81,6 +81,41 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Token por linea: cada solicitud de precio sugerido incrementa el contador de su
+  // linea; solo la respuesta cuyo token coincide con el actual se aplica (descarta
+  // respuestas obsoletas si la cantidad vuelve a cambiar antes de que resuelva).
+  const priceRequestTokens = useRef<Map<number, number>>(new Map());
+  const debounceTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    const timers = debounceTimers.current;
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
+    };
+  }, []);
+
+  const requestSuggestedPrice = (productId: number, quantity: number) => {
+    const token = (priceRequestTokens.current.get(productId) ?? 0) + 1;
+    priceRequestTokens.current.set(productId, token);
+    const custId = customerId ? Number(customerId) : undefined;
+
+    getSuggestedUnitPriceAction(productId, quantity, custId).then((result) => {
+      if (priceRequestTokens.current.get(productId) !== token) return; // respuesta obsoleta
+      if (!result.success) return;
+      setCart((prev) =>
+        prev.map((l) =>
+          l.productId === productId &&
+          !l.priceEdited &&
+          l.quantity === quantity &&
+          l.unitPrice !== result.data.finalPrice
+            ? { ...l, unitPrice: result.data.finalPrice }
+            : l
+        )
+      );
+    });
+  };
+
   const results = useMemo(() => {
     if (!search.trim()) return products.slice(0, 20);
     const q = search.toLowerCase();
@@ -98,12 +133,20 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
     const existing = cart.find((l) => l.productId === p.productId);
     const price = p.salePrice != null ? Number(p.salePrice) : 0;
     const nextQty = existing ? existing.quantity + 1 : 1;
+    // Cualquier alta o incremento por el buscador resetea la edicion manual: el
+    // cajero espera ver de nuevo el precio sugerido para la nueva cantidad.
     if (existing) {
       if (existing.quantity + 1 > p.stock) {
         toast.error(`Sin stock suficiente de ${p.name}`);
         return;
       }
-      setCart(cart.map((l) => (l.productId === p.productId ? { ...l, quantity: l.quantity + 1 } : l)));
+      setCart(
+        cart.map((l) =>
+          l.productId === p.productId
+            ? { ...l, quantity: l.quantity + 1, priceEdited: false }
+            : l
+        )
+      );
     } else {
       if (p.stock < 1) {
         toast.error(`Sin stock de ${p.name}`);
@@ -118,22 +161,14 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
           unitPrice: price,
           unit: p.unit,
           stock: p.stock,
+          priceEdited: false,
         },
       ]);
     }
     setSearch("");
 
     // Precio sugerido con descuentos activos (no bloquea el flujo; el cajero puede editarlo después).
-    const custId = customerId ? Number(customerId) : undefined;
-    getSuggestedUnitPriceAction(p.productId, nextQty, custId).then((result) => {
-      if (result.success && result.data.finalPrice !== price) {
-        setCart((prev) =>
-          prev.map((l) =>
-            l.productId === p.productId ? { ...l, unitPrice: result.data.finalPrice } : l
-          )
-        );
-      }
-    });
+    requestSuggestedPrice(p.productId, nextQty);
   };
 
   const handleBarcode = (code: string) => {
@@ -143,6 +178,8 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
   };
 
   const updateQty = (productId: number, qty: number) => {
+    const clampedQty = Math.max(1, qty);
+    let shouldRequestPrice = false;
     setCart(
       cart.map((l) => {
         if (l.productId !== productId) return l;
@@ -150,13 +187,40 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
           toast.error(`Maximo disponible: ${l.stock}`);
           return l;
         }
-        return { ...l, quantity: Math.max(1, qty) };
+        shouldRequestPrice = !l.priceEdited;
+        return { ...l, quantity: clampedQty };
       })
     );
+
+    // Re-evalua el descuento por volumen con la nueva cantidad, con debounce corto
+    // para no disparar una server action por cada tap de +/-. Solo si el cajero no
+    // edito el precio manualmente en esta linea.
+    if (shouldRequestPrice) {
+      const existingTimer = debounceTimers.current.get(productId);
+      if (existingTimer) clearTimeout(existingTimer);
+      const timer = setTimeout(() => {
+        debounceTimers.current.delete(productId);
+        requestSuggestedPrice(productId, clampedQty);
+      }, 300);
+      debounceTimers.current.set(productId, timer);
+    }
   };
 
   const updatePrice = (productId: number, price: number) => {
-    setCart(cart.map((l) => (l.productId === productId ? { ...l, unitPrice: Math.max(0, price) } : l)));
+    setCart(
+      cart.map((l) =>
+        l.productId === productId
+          ? { ...l, unitPrice: Math.max(0, price), priceEdited: true }
+          : l
+      )
+    );
+    // El cajero tomo control del precio: cancela cualquier sugerencia pendiente.
+    const existingTimer = debounceTimers.current.get(productId);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      debounceTimers.current.delete(productId);
+    }
+    priceRequestTokens.current.set(productId, (priceRequestTokens.current.get(productId) ?? 0) + 1);
   };
 
   const removeLine = (productId: number) => {
