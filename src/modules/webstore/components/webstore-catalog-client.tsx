@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { ToastDelta } from "@/components/ui/toast-content";
 import { PageHeader } from "@/components/ui/page-header";
@@ -33,6 +34,8 @@ import {
   History,
   Tag,
   Loader2,
+  Store,
+  Star,
 } from "lucide-react";
 import { formatAmount } from "@/modules/envios/lib/format";
 import {
@@ -298,8 +301,14 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
       header: "Visibilidad",
       cell: (row) => (
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-muted-foreground">En tienda</span>
+          <div className="flex items-center gap-1.5" title="Disponible en tienda">
+            <Store
+              aria-hidden
+              className={cn(
+                "h-3.5 w-3.5",
+                row.webstoreEnabled ? "text-[var(--brand)]" : "text-muted-foreground"
+              )}
+            />
             <Switch
               checked={row.webstoreEnabled}
               disabled={pendingToggleId === row.productId}
@@ -307,8 +316,16 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
               aria-label="Disponible en tienda"
             />
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-muted-foreground">Destacado</span>
+          <div className="flex items-center gap-1.5" title="Producto destacado">
+            <Star
+              aria-hidden
+              className={cn(
+                "h-3.5 w-3.5",
+                row.webstoreFeatured
+                  ? "fill-[var(--warning)] text-[var(--warning)]"
+                  : "text-muted-foreground"
+              )}
+            />
             <Switch
               checked={row.webstoreFeatured}
               disabled={pendingToggleId === row.productId}
@@ -357,8 +374,14 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
       }
       actions={
         <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground">Tienda</span>
+          <div className="flex items-center gap-2" title="Disponible en tienda">
+            <Store
+              aria-hidden
+              className={cn(
+                "h-3.5 w-3.5",
+                row.webstoreEnabled ? "text-[var(--brand)]" : "text-muted-foreground"
+              )}
+            />
             <Switch
               checked={row.webstoreEnabled}
               disabled={pendingToggleId === row.productId}
@@ -366,8 +389,16 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
               aria-label="Disponible en tienda"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground">Destacado</span>
+          <div className="flex items-center gap-2" title="Producto destacado">
+            <Star
+              aria-hidden
+              className={cn(
+                "h-3.5 w-3.5",
+                row.webstoreFeatured
+                  ? "fill-[var(--warning)] text-[var(--warning)]"
+                  : "text-muted-foreground"
+              )}
+            />
             <Switch
               checked={row.webstoreFeatured}
               disabled={pendingToggleId === row.productId}
