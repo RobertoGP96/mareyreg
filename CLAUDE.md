@@ -134,7 +134,7 @@ Skills útiles ya disponibles: `clean-code`, `senior-frontend`, `senior-fullstac
 1. **Entender** — explorar (Explore agent o Grep/Glob), leer ficheros clave, no asumir.
 2. **Planear** — para tareas no triviales, escribir un plan en `C:/Users/PC/.claude/plans/<slug>.md` y validar con el usuario (`AskUserQuestion` para ambigüedades) antes de tocar código.
 3. **Ejecutar** — implementar PR pequeños y verticales. Cada PR: schema/migración/registry → backend → UI → polish, según el módulo.
-4. **Verificar** — `pnpm prisma validate`, `pnpm prisma generate`, `npx tsc --noEmit`, idealmente `pnpm dev` y probar la ruta tocada.
+4. **Verificar** — `pnpm prisma validate`, `pnpm prisma generate`, `npx tsc --noEmit`, `pnpm test` (vitest), idealmente `pnpm dev` y probar la ruta tocada.
 5. **Commitear** — `feat(<modulo>):`, `fix(<modulo>):`, `chore(<modulo>):`. Cuerpo en español, conciso, agrupando cambios por archivo o área. Co-Authored-By incluido.
 6. **Pushear** sólo cuando el usuario lo pida, o explícitamente lo confirme.
 
