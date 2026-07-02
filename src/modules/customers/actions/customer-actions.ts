@@ -42,7 +42,7 @@ export async function createCustomer(
         action: "create",
         entityType: "Customer",
         entityId: c.customerId,
-        module: "sales",
+        module: "partners",
         userId,
         newValues: data,
       });
@@ -87,7 +87,7 @@ export async function updateCustomer(
         action: "update",
         entityType: "Customer",
         entityId: id,
-        module: "sales",
+        module: "partners",
         userId,
         oldValues: prev,
         newValues: data,
@@ -114,7 +114,7 @@ export async function deleteCustomer(id: number): Promise<ActionResult<void>> {
         action: "delete",
         entityType: "Customer",
         entityId: id,
-        module: "sales",
+        module: "partners",
         userId,
         oldValues: prev,
       });

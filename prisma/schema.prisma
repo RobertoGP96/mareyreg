@@ -52,6 +52,7 @@ model Company {
   address     String?
   description String?
   timezone    String   @default("America/Mexico_City")
+  // Excepción a la regla de usar el modelo Currency: es la moneda de referencia de la empresa/tienda, no un monto transaccional; convertir a FK requiere migración de datos — ver plan Fase 4.
   currency    String   @default("MXN")
   language    String   @default("es-MX")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")

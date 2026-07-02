@@ -38,7 +38,7 @@ export async function createSupplier(
         action: "create",
         entityType: "Supplier",
         entityId: s.supplierId,
-        module: "purchasing",
+        module: "partners",
         userId,
         newValues: data,
       });
@@ -81,7 +81,7 @@ export async function updateSupplier(
         action: "update",
         entityType: "Supplier",
         entityId: id,
-        module: "purchasing",
+        module: "partners",
         userId,
         oldValues: prev,
         newValues: data,
@@ -108,7 +108,7 @@ export async function deleteSupplier(id: number): Promise<ActionResult<void>> {
         action: "delete",
         entityType: "Supplier",
         entityId: id,
-        module: "purchasing",
+        module: "partners",
         userId,
         oldValues: prev,
       });
