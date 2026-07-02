@@ -6,6 +6,7 @@ dist
 dist-ssr
 .next
 out
+coverage
 
 # Environment variables
 .env
