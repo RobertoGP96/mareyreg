@@ -1,5 +1,6 @@
 "use server";
 
+import { del } from "@vercel/blob";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
@@ -7,6 +8,19 @@ import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { assertRole, ForbiddenError } from "@/lib/auth-guard";
 
 const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
+
+/**
+ * Best-effort: la foto ya no se referencia en DB, así que un fallo aquí solo
+ * deja un blob huérfano (no debe tumbar la mutación que ya se commiteó).
+ */
+async function deleteProductImageBlob(url: string): Promise<void> {
+  if (!url.includes(".blob.vercel-storage.com/")) return;
+  try {
+    await del(url);
+  } catch (error) {
+    console.error("No se pudo borrar el blob de la foto de producto:", url, error);
+  }
+}
 
 export async function createProduct(data: {
   name: string;
@@ -133,7 +147,7 @@ export async function updateProduct(
 ): Promise<ActionResult<void>> {
   try {
     const userId = await requireCurrentUserId();
-    await db.$transaction(async (tx) => {
+    const previousImageUrl = await db.$transaction(async (tx) => {
       const prev = await tx.product.findUnique({ where: { productId: id } });
 
       const priceChanged =
@@ -199,7 +213,14 @@ export async function updateProduct(
         oldValues: prev,
         newValues: data,
       });
+
+      return prev?.imageUrl ?? null;
     });
+
+    const newImageUrl = data.imageUrl !== undefined ? data.imageUrl || null : undefined;
+    if (newImageUrl !== undefined && previousImageUrl && previousImageUrl !== newImageUrl) {
+      await deleteProductImageBlob(previousImageUrl);
+    }
 
     revalidatePath("/products");
     return { success: true, data: undefined };

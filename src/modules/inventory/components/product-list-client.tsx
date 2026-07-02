@@ -117,6 +117,7 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
   const [discountsProduct, setDiscountsProduct] = useState<{ id: number; name: string } | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
@@ -138,65 +139,79 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
     }
     setImageFile(f);
     setImagePreview(URL.createObjectURL(f));
+    setImageRemoved(false);
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setImageRemoved(true);
+    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, editId?: number) => {
     e.preventDefault();
+    // React anula e.currentTarget al salir del dispatch (primer await), hay
+    // que capturar el form antes de subir la imagen.
+    const form = e.currentTarget;
     setIsSubmitting(true);
-
-    let uploadedImageUrl: string | undefined;
-    if (imageFile) {
-      setIsUploadingImage(true);
-      try {
-        const safeName = imageFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const blob = await upload(`products/${Date.now()}-${safeName}`, imageFile, {
-          access: "public",
-          handleUploadUrl: "/api/products/upload",
-          contentType: imageFile.type,
-        });
-        uploadedImageUrl = blob.url;
-      } catch (err) {
-        setIsSubmitting(false);
-        setIsUploadingImage(false);
-        toast.error(err instanceof Error ? err.message : "Error al subir la imagen");
-        return;
+    try {
+      let uploadedImageUrl: string | undefined;
+      if (imageFile) {
+        setIsUploadingImage(true);
+        try {
+          const safeName = imageFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+          const blob = await upload(`products/${Date.now()}-${safeName}`, imageFile, {
+            access: "public",
+            handleUploadUrl: "/api/products/upload",
+            contentType: imageFile.type,
+          });
+          uploadedImageUrl = blob.url;
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Error al subir la imagen");
+          return;
+        } finally {
+          setIsUploadingImage(false);
+        }
       }
-      setIsUploadingImage(false);
+
+      const fd = new FormData(form);
+      const data = {
+        name: fd.get("name") as string,
+        sku: (fd.get("sku") as string) || undefined,
+        barcode: (fd.get("barcode") as string) || undefined,
+        category: (fd.get("category") as string) || undefined,
+        unit: fd.get("unit") as string,
+        minStock: fd.get("minStock") ? Number(fd.get("minStock")) : 0,
+        maxStock: fd.get("maxStock") ? Number(fd.get("maxStock")) : undefined,
+        costPrice: fd.get("costPrice") ? Number(fd.get("costPrice")) : undefined,
+        salePrice: fd.get("salePrice") ? Number(fd.get("salePrice")) : undefined,
+        webstoreEnabled,
+        // "" limpia la foto en el server (imageUrl || null); undefined la deja intacta.
+        imageUrl: uploadedImageUrl ?? (imageRemoved ? "" : undefined),
+        brand: (fd.get("brand") as string) || undefined,
+        supplier: (fd.get("supplier") as string) || undefined,
+        supplierRef: (fd.get("supplierRef") as string) || undefined,
+        description: (fd.get("description") as string) || undefined,
+        notes: (fd.get("notes") as string) || undefined,
+      };
+
+      const result = editId
+        ? await updateProduct(editId, data)
+        : await createProduct(data);
+
+      if (result.success) {
+        setIsCreateOpen(false);
+        setToEdit(null);
+        setImageFile(null);
+        setImagePreview(null);
+        setImageRemoved(false);
+        toast.success(editId ? "Producto actualizado" : "Producto creado");
+        router.refresh();
+      } else toast.error(result.error);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const fd = new FormData(e.currentTarget);
-    const data = {
-      name: fd.get("name") as string,
-      sku: (fd.get("sku") as string) || undefined,
-      barcode: (fd.get("barcode") as string) || undefined,
-      category: (fd.get("category") as string) || undefined,
-      unit: fd.get("unit") as string,
-      minStock: fd.get("minStock") ? Number(fd.get("minStock")) : 0,
-      maxStock: fd.get("maxStock") ? Number(fd.get("maxStock")) : undefined,
-      costPrice: fd.get("costPrice") ? Number(fd.get("costPrice")) : undefined,
-      salePrice: fd.get("salePrice") ? Number(fd.get("salePrice")) : undefined,
-      webstoreEnabled,
-      imageUrl: uploadedImageUrl,
-      brand: (fd.get("brand") as string) || undefined,
-      supplier: (fd.get("supplier") as string) || undefined,
-      supplierRef: (fd.get("supplierRef") as string) || undefined,
-      description: (fd.get("description") as string) || undefined,
-      notes: (fd.get("notes") as string) || undefined,
-    };
-
-    const result = editId
-      ? await updateProduct(editId, data)
-      : await createProduct(data);
-
-    setIsSubmitting(false);
-    if (result.success) {
-      setIsCreateOpen(false);
-      setToEdit(null);
-      setImageFile(null);
-      setImagePreview(null);
-      toast.success(editId ? "Producto actualizado" : "Producto creado");
-      router.refresh();
-    } else toast.error(result.error);
   };
 
   const handleDelete = async () => {
@@ -219,12 +234,14 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
     setWebstoreEnabled(p.webstoreEnabled);
     setImageFile(null);
     setImagePreview(p.imageUrl);
+    setImageRemoved(false);
   };
 
   const openCreate = () => {
     setWebstoreEnabled(false);
     setImageFile(null);
     setImagePreview(null);
+    setImageRemoved(false);
     setIsCreateOpen(true);
   };
 
@@ -333,6 +350,18 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
             className="sr-only"
             onChange={(e) => onImageChange(e.target.files?.[0] ?? null)}
           />
+          {imagePreview && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="mt-1.5 h-8 px-2 text-muted-foreground hover:text-destructive"
+              onClick={removeImage}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Quitar foto
+            </Button>
+          )}
         </Field>
       </FormSection>
 
