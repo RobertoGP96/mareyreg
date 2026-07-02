@@ -2,18 +2,18 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { db } from "@/lib/db";
 
+import {
+  WEBSTORE_API_KEY_SCOPES,
+  isWebstoreApiKeyScope,
+  type WebstoreApiKeyScope,
+} from "./api-key-scopes";
+
+export { WEBSTORE_API_KEY_SCOPES, isWebstoreApiKeyScope, type WebstoreApiKeyScope };
+
 const KEY_PREFIX_LENGTH = 12;
 
 /** Umbral de throttle para el refresco de lastUsedAt (ver resolveApiKey). */
 const LAST_USED_AT_THROTTLE_MS = 60 * 60 * 1000;
-
-/** Scopes válidos para una API key de la tienda en línea. */
-export const WEBSTORE_API_KEY_SCOPES = ["read_catalog", "create_orders"] as const;
-export type WebstoreApiKeyScope = (typeof WEBSTORE_API_KEY_SCOPES)[number];
-
-export function isWebstoreApiKeyScope(value: unknown): value is WebstoreApiKeyScope {
-  return WEBSTORE_API_KEY_SCOPES.includes(value as WebstoreApiKeyScope);
-}
 
 export function generateRawKey(): string {
   return `wsk_${randomBytes(24).toString("base64url")}`;

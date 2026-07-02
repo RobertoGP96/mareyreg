@@ -31,7 +31,7 @@ import { Field, FormDialogHeader } from "@/components/ui/field";
 import { KeyRound, Plus, Ban, Copy, Loader2, Check, RefreshCw, ShieldCheck, CalendarClock } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { createWebstoreApiKey, revokeWebstoreApiKey } from "../actions/api-key-actions";
-import { WEBSTORE_API_KEY_SCOPES, type WebstoreApiKeyScope } from "../lib/api-key";
+import { WEBSTORE_API_KEY_SCOPES, type WebstoreApiKeyScope } from "../lib/api-key-scopes";
 
 const SCOPE_LABELS: Record<WebstoreApiKeyScope, string> = {
   read_catalog: "Leer catálogo",
