@@ -18,6 +18,7 @@ Este archivo lo lee Claude Code automáticamente al iniciar sesión en el repo. 
 ## Estructura (monorepo pnpm workspaces + Turborepo)
 
 ```
+
 pnpm-workspace.yaml / turbo.json  # workspace: apps/*
 package.json                      # raíz: solo turbo + scripts proxy (dev:erp, dev:tienda, db:*)
 apps/
