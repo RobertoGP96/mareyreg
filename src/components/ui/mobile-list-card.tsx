@@ -23,11 +23,14 @@ export function MobileListCard({
   className,
 }: Props) {
   const interactive = !!onClick;
-  const Comp = interactive ? "button" : "div";
 
+  // div[role=button] en vez de <button>: el slot de actions suele traer
+  // botones reales (DropdownMenuTrigger) y un button anidado es HTML
+  // inválido que rompe la hidratación.
   return (
-    <Comp
-      type={interactive ? "button" : undefined}
+    <div
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
       onClick={
         onClick
           ? (e: React.MouseEvent<HTMLElement>) => {
@@ -42,9 +45,20 @@ export function MobileListCard({
             }
           : undefined
       }
+      onKeyDown={
+        onClick
+          ? (e: React.KeyboardEvent<HTMLElement>) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              if (e.target !== e.currentTarget) return;
+              e.preventDefault();
+              onClick();
+            }
+          : undefined
+      }
       className={cn(
         "group relative flex w-full min-h-[64px] flex-col gap-1.5 rounded-xl border border-border bg-card p-3 text-left shadow-xs transition-colors",
-        interactive && "cursor-pointer hover:border-[var(--brand)]/40 hover:bg-muted/30",
+        interactive &&
+          "cursor-pointer hover:border-[var(--brand)]/40 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         selected && "border-[var(--brand)]/60 bg-[var(--brand)]/5",
         className
       )}
@@ -76,6 +90,6 @@ export function MobileListCard({
       {meta && (
         <div className="flex flex-wrap items-center gap-1.5 pt-1">{meta}</div>
       )}
-    </Comp>
+    </div>
   );
 }
