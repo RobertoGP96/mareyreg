@@ -90,3 +90,11 @@ WHERE base_quantity = 0;
 UPDATE sales_order_lines
 SET base_quantity = quantity
 WHERE base_quantity = 0;
+
+-- Auditoria post-backfill: productos sin precio de venta quedan con base a $0
+-- (COALESCE de sale_price). Revisar estas filas y asignarles precio real antes
+-- de venderlos por presentacion.
+SELECT pp.presentation_id, pp.product_id, p.name, pp.retail_price
+FROM product_presentations pp
+JOIN products p ON p.product_id = pp.product_id
+WHERE pp.is_base AND pp.retail_price = 0;

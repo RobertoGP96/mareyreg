@@ -49,7 +49,7 @@ import {
   updateWarehouse,
   deleteWarehouse,
 } from "../actions/warehouse-actions";
-import { CUBAN_PROVINCES, WAREHOUSE_TYPES } from "@/lib/constants";
+import { CUBAN_PROVINCES, WAREHOUSE_TYPES, LOCATION_TYPES, type LocationTypeValue } from "@/lib/constants";
 
 interface WarehouseItem {
   warehouseId: number;
@@ -58,6 +58,7 @@ interface WarehouseItem {
   province: string | null;
   capacity: number | null;
   warehouseType: string | null;
+  locationType: string;
   contactPhone: string | null;
   isActive: boolean;
 }
@@ -80,6 +81,9 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
   const getWarehouseTypeLabel = (value: string) =>
     WAREHOUSE_TYPES.find((t) => t.value === value)?.label ?? value;
 
+  const getLocationTypeLabel = (value: string) =>
+    LOCATION_TYPES.find((t) => t.value === value)?.label ?? value;
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, editId?: number) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -90,6 +94,7 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
       province: (fd.get("province") as string) || undefined,
       capacity: fd.get("capacity") ? Number(fd.get("capacity")) : undefined,
       warehouseType: (fd.get("warehouseType") as string) || undefined,
+      locationType: (fd.get("locationType") as LocationTypeValue) || undefined,
       contactPhone: (fd.get("contactPhone") as string) || undefined,
     };
 
@@ -137,7 +142,7 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
             </SelectContent>
           </Select>
         </Field>
-        <Field label="Tipo de almacén" icon={PackageCheck}>
+        <Field label="Tipo de almacenamiento" icon={PackageCheck}>
           <Select name="warehouseType" defaultValue={warehouse?.warehouseType ?? undefined}>
             <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
             <SelectContent>
@@ -149,13 +154,23 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
         </Field>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Tipo de ubicación" icon={WarehouseIcon}>
+          <Select name="locationType" defaultValue={warehouse?.locationType ?? "general"}>
+            <SelectTrigger className="w-full"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+            <SelectContent>
+              {LOCATION_TYPES.map((t) => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
         <Field label="Capacidad" icon={PackageCheck}>
           <Input name="capacity" type="number" defaultValue={warehouse?.capacity ? String(warehouse.capacity) : ""} />
         </Field>
-        <Field label="Teléfono de contacto" icon={Phone}>
-          <Input name="contactPhone" defaultValue={warehouse?.contactPhone ?? ""} placeholder="+53 …" />
-        </Field>
       </div>
+      <Field label="Teléfono de contacto" icon={Phone}>
+        <Input name="contactPhone" defaultValue={warehouse?.contactPhone ?? ""} placeholder="+53 …" />
+      </Field>
     </div>
   );
 
@@ -203,6 +218,7 @@ export function WarehouseListClient({ warehouses }: { warehouses: WarehouseItem[
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <h3 className="font-semibold text-foreground truncate">{w.name}</h3>
+                    <Badge variant="secondary">{getLocationTypeLabel(w.locationType)}</Badge>
                     {w.warehouseType && (
                       <Badge variant="info">{getWarehouseTypeLabel(w.warehouseType)}</Badge>
                     )}

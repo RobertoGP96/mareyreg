@@ -20,7 +20,7 @@ export async function getInvoice(invoiceId: number) {
     where: { invoiceId },
     include: {
       customer: true,
-      lines: { include: { product: true, lot: true } },
+      lines: { include: { product: true, lot: true, presentation: { select: { name: true } } } },
       payments: { orderBy: { paidAt: "desc" } },
     },
   });

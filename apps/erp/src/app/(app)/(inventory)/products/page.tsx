@@ -2,9 +2,11 @@ export const dynamic = "force-dynamic";
 
 import { getProducts } from "@/modules/inventory/queries/product-queries";
 import { ProductListClient } from "@/modules/inventory/components/product-list-client";
+import { auth } from "@/lib/auth";
 
 export default async function ProductsPage() {
-  const products = await getProducts();
+  const [session, products] = await Promise.all([auth(), getProducts()]);
+  const isAdmin = session?.user?.role === "admin";
 
   const serialized = products.map((p) => ({
     productId: p.productId,
@@ -29,7 +31,7 @@ export default async function ProductsPage() {
 
   return (
     <div className="space-y-4">
-      <ProductListClient products={serialized} />
+      <ProductListClient products={serialized} isAdmin={isAdmin} />
     </div>
   );
 }

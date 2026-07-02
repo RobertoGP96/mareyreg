@@ -51,6 +51,14 @@ import {
   createStockTransfer,
 } from "../actions/stock-actions";
 import { MOVEMENT_TYPES, getUnitAbbreviation } from "@/lib/constants";
+import { formatEquivalence } from "../lib/units";
+
+interface PresentationItem {
+  presentationId: number;
+  name: string;
+  factor: number;
+  isBase: boolean;
+}
 
 interface StockLevelItem {
   productId: number;
@@ -62,6 +70,7 @@ interface StockLevelItem {
     maxStock: number | null;
     unit: string;
     costPrice: number | null;
+    largestPresentation: { name: string; factor: number } | null;
   };
   warehouse: { name: string };
 }
@@ -82,6 +91,7 @@ interface ProductItem {
   productId: number;
   name: string;
   unit: string;
+  presentations: PresentationItem[];
 }
 
 interface WarehouseItem {
@@ -131,6 +141,49 @@ export function StockPageClient({
   const [adjustmentSign, setAdjustmentSign] = useState<"positive" | "negative">(
     "positive"
   );
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [selectedPresentationId, setSelectedPresentationId] = useState<string>("base");
+  const [quantityInput, setQuantityInput] = useState<string>("");
+
+  const selectedProduct = useMemo(
+    () => products.find((p) => String(p.productId) === selectedProductId) ?? null,
+    [products, selectedProductId]
+  );
+
+  const nonBasePresentations = useMemo(
+    () => selectedProduct?.presentations.filter((pr) => !pr.isBase) ?? [],
+    [selectedProduct]
+  );
+
+  const showPresentationSelect =
+    !!selectedProduct && selectedProduct.presentations.length > 1;
+
+  const activePresentation = useMemo(() => {
+    if (selectedPresentationId === "base") return null;
+    return (
+      selectedProduct?.presentations.find(
+        (pr) => String(pr.presentationId) === selectedPresentationId
+      ) ?? null
+    );
+  }, [selectedProduct, selectedPresentationId]);
+
+  const equivalenceText = useMemo(() => {
+    if (!activePresentation || !selectedProduct) return null;
+    const qty = Number(quantityInput);
+    if (!quantityInput || Number.isNaN(qty) || qty <= 0) return null;
+    return formatEquivalence(
+      qty,
+      activePresentation.factor,
+      activePresentation.name,
+      selectedProduct.unit
+    );
+  }, [activePresentation, selectedProduct, quantityInput]);
+
+  const resetPresentationState = () => {
+    setSelectedProductId("");
+    setSelectedPresentationId("base");
+    setQuantityInput("");
+  };
 
   const summary = useMemo(() => {
     let totalValue = 0;
@@ -172,6 +225,7 @@ export function StockPageClient({
 
     const productId = Number(fd.get("productId"));
     const quantity = Number(fd.get("quantity"));
+    const presentationId = activePresentation ? activePresentation.presentationId : undefined;
 
     let result;
     if (movementType === "transfer") {
@@ -182,6 +236,7 @@ export function StockPageClient({
         warehouseIdFrom,
         warehouseIdTo,
         quantity,
+        presentationId,
         referenceDoc: (fd.get("referenceDoc") as string) || undefined,
         notes: (fd.get("notes") as string) || undefined,
       });
@@ -191,6 +246,7 @@ export function StockPageClient({
         productId,
         warehouseId,
         quantity,
+        presentationId,
         movementType,
         adjustmentSign:
           movementType === "adjustment" ? adjustmentSign : undefined,
@@ -203,6 +259,7 @@ export function StockPageClient({
     setIsSubmitting(false);
     if (result.success) {
       setIsCreateOpen(false);
+      resetPresentationState();
       toast.success("Movimiento registrado");
       router.refresh();
     } else {
@@ -294,6 +351,11 @@ export function StockPageClient({
               const abbr = getUnitAbbreviation(sl.product.unit);
               const cost = sl.product.costPrice ?? 0;
               const value = qty * cost;
+              const largest = sl.product.largestPresentation;
+              const presentationEquivalence =
+                largest && largest.factor > 1 && qty >= largest.factor
+                  ? `${Math.floor(qty / largest.factor)} ${largest.name}`
+                  : null;
 
               return (
                 <div
@@ -326,6 +388,12 @@ export function StockPageClient({
                         <span className="font-mono tabular-nums font-medium text-foreground">
                           {qty} {abbr}
                         </span>
+                        {presentationEquivalence && (
+                          <span className="font-mono tabular-nums text-muted-foreground">
+                            {" "}
+                            ({presentationEquivalence})
+                          </span>
+                        )}
                       </span>
                       <span>
                         Min:{" "}
@@ -455,7 +523,13 @@ export function StockPageClient({
       </div>
 
       {/* New Movement Dialog */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+      <Dialog
+        open={isCreateOpen}
+        onOpenChange={(o) => {
+          setIsCreateOpen(o);
+          if (!o) resetPresentationState();
+        }}
+      >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <FormDialogHeader
@@ -492,7 +566,14 @@ export function StockPageClient({
                   </Select>
                 </Field>
                 <Field label="Producto" icon={Package} required>
-                  <Select name="productId">
+                  <Select
+                    name="productId"
+                    value={selectedProductId}
+                    onValueChange={(v) => {
+                      setSelectedProductId(v);
+                      setSelectedPresentationId("base");
+                    }}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Seleccionar..." />
                     </SelectTrigger>
@@ -508,6 +589,31 @@ export function StockPageClient({
                     </SelectContent>
                   </Select>
                 </Field>
+                {showPresentationSelect && (
+                  <Field label="Presentación" icon={Package}>
+                    <Select
+                      value={selectedPresentationId}
+                      onValueChange={setSelectedPresentationId}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="base">
+                          Unidad base ({getUnitAbbreviation(selectedProduct?.unit ?? "")})
+                        </SelectItem>
+                        {nonBasePresentations.map((pr) => (
+                          <SelectItem
+                            key={pr.presentationId}
+                            value={String(pr.presentationId)}
+                          >
+                            {pr.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                )}
               </FormSection>
 
               <FormSection
@@ -590,7 +696,14 @@ export function StockPageClient({
                       step="0.01"
                       required
                       min="0.01"
+                      value={quantityInput}
+                      onChange={(e) => setQuantityInput(e.target.value)}
                     />
+                    {equivalenceText && (
+                      <p className="mt-1.5 text-xs text-muted-foreground font-mono tabular-nums">
+                        {equivalenceText}
+                      </p>
+                    )}
                   </Field>
                   {movementType === "adjustment" && (
                     <Field label="Signo del ajuste" icon={Wrench} required>
@@ -611,7 +724,14 @@ export function StockPageClient({
                     </Field>
                   )}
                   {movementType === "entry" && (
-                    <Field label="Costo unitario" icon={CircleDollarSign}>
+                    <Field
+                      label={
+                        activePresentation
+                          ? `Costo por ${activePresentation.name}`
+                          : "Costo unitario"
+                      }
+                      icon={CircleDollarSign}
+                    >
                       <Input
                         name="unitCost"
                         type="number"
@@ -645,7 +765,10 @@ export function StockPageClient({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  resetPresentationState();
+                }}
               >
                 Cancelar
               </Button>

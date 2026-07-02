@@ -1,5 +1,18 @@
 import { db } from "@/lib/db";
 
+export async function getProductsForStock(includeInactive = false) {
+  return db.product.findMany({
+    where: includeInactive ? {} : { isActive: true },
+    orderBy: { name: "asc" },
+    include: {
+      presentations: {
+        where: { isActive: true },
+        orderBy: [{ isBase: "desc" }, { sortOrder: "asc" }],
+      },
+    },
+  });
+}
+
 export async function getStockMovements() {
   return db.stockMovement.findMany({
     orderBy: { createdAt: "desc" },
@@ -10,7 +23,17 @@ export async function getStockMovements() {
 
 export async function getStockLevels() {
   return db.stockLevel.findMany({
-    include: { product: true, warehouse: true },
+    include: {
+      product: {
+        include: {
+          presentations: {
+            where: { isActive: true, isBase: false },
+            orderBy: { factor: "desc" },
+          },
+        },
+      },
+      warehouse: true,
+    },
     orderBy: { product: { name: "asc" } },
   });
 }

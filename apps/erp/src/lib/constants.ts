@@ -165,3 +165,13 @@ export const WAREHOUSE_TYPES = [
   { value: "transito", label: "En Transito" },
   { value: "combustible", label: "Deposito de Combustible" },
 ] as const;
+
+// Tipo operativo de la ubicación (Warehouse.locationType) — ortogonal a
+// WAREHOUSE_TYPES, que describe el almacenamiento físico.
+export const LOCATION_TYPES = [
+  { value: "general", label: "Almacén general" },
+  { value: "store", label: "Tienda" },
+  { value: "service_unit", label: "Unidad de servicio" },
+] as const;
+
+export type LocationTypeValue = (typeof LOCATION_TYPES)[number]["value"];

@@ -1,7 +1,10 @@
 export const dynamic = "force-dynamic";
 
-import { getStockLevels, getStockMovements } from "@/modules/inventory/queries/stock-queries";
-import { getProducts } from "@/modules/inventory/queries/product-queries";
+import {
+  getStockLevels,
+  getStockMovements,
+  getProductsForStock,
+} from "@/modules/inventory/queries/stock-queries";
 import { getWarehouses } from "@/modules/inventory/queries/warehouse-queries";
 import { StockPageClient } from "@/modules/inventory/components/stock-page-client";
 
@@ -9,7 +12,7 @@ export default async function StockPage() {
   const [stockLevels, movements, products, warehouses] = await Promise.all([
     getStockLevels(),
     getStockMovements(),
-    getProducts(),
+    getProductsForStock(),
     getWarehouses(),
   ]);
 
@@ -23,6 +26,13 @@ export default async function StockPage() {
       minStock: Number(sl.product.minStock),
       maxStock: sl.product.maxStock != null ? Number(sl.product.maxStock) : null,
       costPrice: sl.product.costPrice != null ? Number(sl.product.costPrice) : null,
+      largestPresentation:
+        sl.product.presentations.length > 0
+          ? {
+              name: sl.product.presentations[0].name,
+              factor: Number(sl.product.presentations[0].factor),
+            }
+          : null,
     },
     warehouse: { name: sl.warehouse.name },
   }));
@@ -48,6 +58,12 @@ export default async function StockPage() {
           productId: p.productId,
           name: p.name,
           unit: p.unit,
+          presentations: p.presentations.map((pr) => ({
+            presentationId: pr.presentationId,
+            name: pr.name,
+            factor: Number(pr.factor),
+            isBase: pr.isBase,
+          })),
         }))}
         warehouses={warehouses.map((w) => ({
           warehouseId: w.warehouseId,

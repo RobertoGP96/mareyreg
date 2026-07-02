@@ -63,6 +63,7 @@ import {
   Globe,
   ImagePlus,
   Tag,
+  Layers,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import {
@@ -73,6 +74,8 @@ import {
   type ProductPriceHistoryEntry,
 } from "../actions/product-actions";
 import { ProductDiscountsDialog } from "@/modules/webstore/components/product-discounts-dialog";
+import { PresentationManagerDialog } from "./presentation-manager-dialog";
+import { BulkPriceDialog } from "./bulk-price-dialog";
 import { PRODUCT_IMAGE_ACCEPT_ATTR, PRODUCT_IMAGE_MAX_BYTES } from "../lib/schemas";
 import {
   PRODUCT_UNITS,
@@ -103,7 +106,13 @@ interface ProductItem {
   notes: string | null;
 }
 
-export function ProductListClient({ products }: { products: ProductItem[] }) {
+export function ProductListClient({
+  products,
+  isAdmin = false,
+}: {
+  products: ProductItem[];
+  isAdmin?: boolean;
+}) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -115,6 +124,8 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
   const [history, setHistory] = useState<ProductPriceHistoryEntry[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [discountsProduct, setDiscountsProduct] = useState<{ id: number; name: string } | null>(null);
+  const [presentationsProduct, setPresentationsProduct] = useState<ProductItem | null>(null);
+  const [isBulkPriceOpen, setIsBulkPriceOpen] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageRemoved, setImageRemoved] = useState(false);
@@ -399,10 +410,18 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
         description="Catálogo de productos, componentes y materiales del inventario."
         badge={`${products.length} productos`}
         actions={
-          <Button variant="brand" onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            Nuevo producto
-          </Button>
+          <>
+            {isAdmin && (
+              <Button variant="outline" onClick={() => setIsBulkPriceOpen(true)}>
+                <CircleDollarSign className="h-4 w-4" />
+                Ajustar precios
+              </Button>
+            )}
+            <Button variant="brand" onClick={openCreate}>
+              <Plus className="h-4 w-4" />
+              Nuevo producto
+            </Button>
+          </>
         }
       />
 
@@ -473,6 +492,9 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => openHistory(p)}>
                       <History className="h-4 w-4" /> Historial de precios
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setPresentationsProduct(p)}>
+                      <Layers className="h-4 w-4" /> Presentaciones
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setDiscountsProduct({ id: p.productId, name: p.name })}>
                       <Tag className="h-4 w-4" /> Descuentos
@@ -612,6 +634,17 @@ export function ProductListClient({ products }: { products: ProductItem[] }) {
         productName={discountsProduct?.name}
         onOpenChange={(open) => !open && setDiscountsProduct(null)}
       />
+
+      <PresentationManagerDialog
+        productId={presentationsProduct?.productId ?? null}
+        productName={presentationsProduct?.name}
+        productUnit={presentationsProduct?.unit}
+        onOpenChange={(open) => !open && setPresentationsProduct(null)}
+      />
+
+      {isAdmin && (
+        <BulkPriceDialog open={isBulkPriceOpen} onOpenChange={setIsBulkPriceOpen} />
+      )}
     </div>
   );
 }

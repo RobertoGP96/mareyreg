@@ -11,6 +11,22 @@ import {
   type PresentationCreateInput,
   type PresentationUpdateInput,
 } from "../lib/presentation-schemas";
+import {
+  getProductPresentations,
+  type ProductPresentationRow,
+} from "../queries/presentation-queries";
+
+export async function getProductPresentationsAction(
+  productId: number
+): Promise<ActionResult<ProductPresentationRow[]>> {
+  try {
+    const rows = await getProductPresentations(productId);
+    return { success: true, data: rows };
+  } catch (error) {
+    console.error("Error fetching product presentations:", error);
+    return { success: false, error: "Error al obtener las presentaciones" };
+  }
+}
 
 const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 const GENERIC_INVALID_MESSAGE = "Datos de presentación inválidos";

@@ -13,6 +13,7 @@ export default async function WarehousesPage() {
     province: w.province,
     capacity: w.capacity != null ? Number(w.capacity) : null,
     warehouseType: w.warehouseType,
+    locationType: w.locationType,
     contactPhone: w.contactPhone,
     isActive: w.isActive,
   }));

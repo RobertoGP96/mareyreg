@@ -314,7 +314,10 @@ export interface ReverseInvoiceStockOptions {
 export interface ReverseInvoiceLineResult {
   productId: number;
   warehouseId: number;
+  /** Cantidad en la unidad vendida (presentación) de la línea original. */
   quantity: number;
+  /** Cantidad en unidad base realmente reingresada a stock/kardex. */
+  baseQuantity: number;
   unitCost: number;
 }
 
@@ -381,7 +384,13 @@ export async function reverseInvoiceStock(
       });
     }
 
-    results.push({ productId: line.productId, warehouseId, quantity: line.quantity, unitCost: line.unitCost });
+    results.push({
+      productId: line.productId,
+      warehouseId,
+      quantity: line.quantity,
+      baseQuantity: baseQty,
+      unitCost: line.unitCost,
+    });
   }
 
   return results;

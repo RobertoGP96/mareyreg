@@ -311,7 +311,7 @@ describe("reverseInvoiceStock", () => {
     expect(tx.stockMovement.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ quantity: 48 }) })
     );
-    expect(results).toEqual([{ productId: 1, warehouseId: 1, quantity: 2, unitCost: 5 }]);
+    expect(results).toEqual([{ productId: 1, warehouseId: 1, quantity: 2, baseQuantity: 48, unitCost: 5 }]);
   });
 
   it("omite líneas de servicio (unitCost <= 0)", async () => {

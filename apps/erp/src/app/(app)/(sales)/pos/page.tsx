@@ -6,12 +6,20 @@ import { PageHeader } from "@/components/ui/page-header";
 import { getActiveCustomersForPicker } from "@/modules/customers/queries/customer-queries";
 
 export default async function PosPage() {
-  // Por ahora usamos el primer almac\u00e9n activo. En F3 se conecta a CashRegister/Session.
-  const warehouse = await db.warehouse.findFirst({
-    where: { isActive: true },
-    select: { warehouseId: true, name: true },
-    orderBy: { warehouseId: "asc" },
-  });
+  // Preferimos un almac\u00e9n tipo "store" (punto de venta f\u00edsico). Si no hay
+  // ninguno configurado, caemos al primer almac\u00e9n activo (comportamiento
+  // previo) para no bloquear el POS en instalaciones sin ese tipo definido.
+  const warehouse =
+    (await db.warehouse.findFirst({
+      where: { isActive: true, locationType: "store" },
+      select: { warehouseId: true, name: true },
+      orderBy: { warehouseId: "asc" },
+    })) ??
+    (await db.warehouse.findFirst({
+      where: { isActive: true },
+      select: { warehouseId: true, name: true },
+      orderBy: { warehouseId: "asc" },
+    }));
 
   if (!warehouse) {
     return (
@@ -38,6 +46,20 @@ export default async function PosPage() {
           where: { warehouseId: warehouse.warehouseId },
           select: { currentQuantity: true },
         },
+        presentations: {
+          where: { isActive: true },
+          select: {
+            presentationId: true,
+            name: true,
+            factor: true,
+            retailPrice: true,
+            wholesalePrice: true,
+            barcode: true,
+            sku: true,
+            isBase: true,
+          },
+          orderBy: [{ isBase: "desc" }, { sortOrder: "asc" }],
+        },
       },
       orderBy: { name: "asc" },
     }),
@@ -52,6 +74,16 @@ export default async function PosPage() {
     unit: p.unit,
     salePrice: p.salePrice != null ? Number(p.salePrice) : null,
     stock: p.isService ? 9999 : p.stockLevels[0] ? Number(p.stockLevels[0].currentQuantity) : 0,
+    presentations: p.presentations.map((pr) => ({
+      presentationId: pr.presentationId,
+      name: pr.name,
+      factor: Number(pr.factor),
+      retailPrice: Number(pr.retailPrice),
+      wholesalePrice: pr.wholesalePrice != null ? Number(pr.wholesalePrice) : null,
+      barcode: pr.barcode,
+      sku: pr.sku,
+      isBase: pr.isBase,
+    })),
   }));
 
   return (
