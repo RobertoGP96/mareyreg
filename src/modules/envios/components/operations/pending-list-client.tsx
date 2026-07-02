@@ -19,7 +19,7 @@ import {
   Clock, Check, Ban, CircleCheck, X, Loader2,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
-import { ToastLines, ToastNote } from "@/components/ui/toast-content";
+import { ToastDetail, ToastLines, ToastNote } from "@/components/ui/toast-content";
 import { cn } from "@/lib/utils";
 import { confirmOperation, cancelOperation } from "../../actions/operation-actions";
 import { bulkConfirmOperations } from "../../actions/transfer-actions";
@@ -72,13 +72,33 @@ export function PendingListClient({ initialPending, summary }: Props) {
 
   const handleConfirmOne = async (op: OperationRow) => {
     const r = await confirmOperation(op.operationId);
-    if (r.success) { toast.success("Confirmada"); router.refresh(); }
-    else toast.error(r.error);
+    if (r.success) {
+      toast.success("Confirmada", {
+        description: (
+          <ToastDetail
+            label={op.accountName}
+            value={op.amount.toLocaleString("es-MX", { maximumFractionDigits: 2 }) + " " + op.currencyCode}
+            mono
+          />
+        ),
+      });
+      router.refresh();
+    } else toast.error(r.error);
   };
   const handleCancelOne = async (op: OperationRow) => {
     const r = await cancelOperation(op.operationId);
-    if (r.success) { toast.success("Cancelada"); router.refresh(); }
-    else toast.error(r.error);
+    if (r.success) {
+      toast.success("Cancelada", {
+        description: (
+          <ToastDetail
+            label={op.accountName}
+            value={op.amount.toLocaleString("es-MX", { maximumFractionDigits: 2 }) + " " + op.currencyCode}
+            mono
+          />
+        ),
+      });
+      router.refresh();
+    } else toast.error(r.error);
   };
   const handleBulkConfirm = async () => {
     setSubmitting(true);

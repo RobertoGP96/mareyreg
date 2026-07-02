@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "@/lib/toast";
+import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
 import {
   createPurchaseOrder,
   updatePurchaseOrderStatus,
@@ -166,7 +167,17 @@ export function PurchaseOrderListClient({ orders, suppliers, warehouses, product
     if (result.success) {
       setIsCreateOpen(false);
       resetForm();
-      toast.success(`OC ${result.data.folio} creada`);
+      toast.success(`OC ${result.data.folio} creada`, {
+        description: (
+          <ToastLines>
+            <ToastDetail
+              label={`${lines.length} ${lines.length === 1 ? "linea" : "lineas"}`}
+              value={`$${total.toFixed(2)}`}
+              mono
+            />
+          </ToastLines>
+        ),
+      });
       router.refresh();
     } else toast.error(result.error);
   };

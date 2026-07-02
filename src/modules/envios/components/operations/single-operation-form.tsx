@@ -14,6 +14,7 @@ import {
   Hash, FileText, Type, Calendar, Clock, Plus, Loader2,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { ToastDetail } from "@/components/ui/toast-content";
 import { cn } from "@/lib/utils";
 import { createOperation } from "../../actions/operation-actions";
 import type { OperationFormAccount } from "../../queries/operation-queries";
@@ -80,7 +81,10 @@ export function SingleOperationForm({ open, onOpenChange, account, initialKind =
     });
     setSubmitting(false);
     if (r.success) {
-      toast.success(statusPending ? "Pendiente registrada" : "Operación confirmada");
+      const amountFmt = Number(amount).toLocaleString("es-MX", { maximumFractionDigits: 2 });
+      toast.success(statusPending ? "Pendiente registrada" : "Operación confirmada", {
+        description: <ToastDetail label={account.name} value={`${amountFmt} ${account.currencyCode}`} mono />,
+      });
       if (continueRegistering) {
         setAmount(""); setDescription(""); setReference("");
         router.refresh();

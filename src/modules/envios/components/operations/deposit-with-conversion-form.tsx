@@ -17,6 +17,7 @@ import {
   ArrowDownLeft, ArrowUpRight, Wallet, Hash, FileText, Calendar, Loader2, Calculator, Clock, AlertTriangle,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { ToastDelta, ToastDetail, ToastLines } from "@/components/ui/toast-content";
 import { cn } from "@/lib/utils";
 import {
   createConversionOperation,
@@ -182,12 +183,22 @@ export function DepositWithConversionForm({
     if (r.success) {
       const accountCode = preview.state === "ok" ? preview.accountCode : "";
       const amountFmt = r.data.amountInAccountCurrency.toLocaleString("es-MX", { maximumFractionDigits: 2 });
+      const description = preview.state === "ok" ? (
+        <ToastLines>
+          <ToastDelta
+            from={`${externalAmount} ${preview.externalCode}`}
+            to={`${amountFmt} ${preview.accountCode}`}
+          />
+          <ToastDetail label="Tasa" value={preview.rate.toLocaleString("es-MX", { maximumFractionDigits: 6 })} mono />
+        </ToastLines>
+      ) : undefined;
       toast.success(
         statusPending
           ? `Conversión pendiente registrada (${isCredit ? "crédito" : "débito"})`
           : isCredit
             ? `Acreditados ${amountFmt} ${accountCode}`
-            : `Debitados ${amountFmt} ${accountCode}`
+            : `Debitados ${amountFmt} ${accountCode}`,
+        description ? { description } : undefined
       );
       onOpenChange(false);
       reset();

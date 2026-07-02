@@ -35,6 +35,7 @@ import {
   ArrowDownLeft, ArrowUpRight, Settings2, Ban, Layers,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { ToastDetail } from "@/components/ui/toast-content";
 import { cn } from "@/lib/utils";
 import {
   createOperation, confirmOperation, cancelOperation,
@@ -147,7 +148,12 @@ export function OperationListClient({ initialOperations, accounts, currencies }:
     });
     setSubmitting(false);
     if (r.success) {
-      toast.success(statusPending ? "Pendiente registrada" : "Operación confirmada");
+      const amountFmt = Number(amount).toLocaleString("es-MX", { maximumFractionDigits: 2 });
+      toast.success(statusPending ? "Pendiente registrada" : "Operación confirmada", {
+        description: selectedAccount ? (
+          <ToastDetail label={selectedAccount.name} value={`${amountFmt} ${selectedAccount.currencyCode}`} mono />
+        ) : undefined,
+      });
       if (continueRegistering) {
         // Mantener cuenta y kind, limpiar resto
         setAmount(""); setDescription(""); setReference("");

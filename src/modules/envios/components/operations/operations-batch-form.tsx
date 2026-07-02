@@ -15,6 +15,7 @@ import {
   Settings2, ArrowRightLeft, AlertTriangle, RotateCcw,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
 import { cn } from "@/lib/utils";
 import {
   createOperationsBatch,
@@ -473,7 +474,23 @@ export function OperationsBatchForm({
       toast.success(
         statusPending
           ? `${r.data.created.length} operaciones pendientes registradas`
-          : `${r.data.created.length} operaciones confirmadas`
+          : `${r.data.created.length} operaciones confirmadas`,
+        projectedBalances.length > 0
+          ? {
+              description: (
+                <ToastLines>
+                  {projectedBalances.slice(0, 3).map((b) => (
+                    <ToastDetail
+                      key={b.accountId}
+                      label={b.name}
+                      value={fmt(b.final, b.currencyDecimals) + " " + b.currencyCode}
+                      mono
+                    />
+                  ))}
+                </ToastLines>
+              ),
+            }
+          : undefined
       );
       reset();
       onOpenChange(false);

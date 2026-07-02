@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
+import { ToastDetail, ToastLines, ToastNote } from "@/components/ui/toast-content";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -145,17 +146,24 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
     e.preventDefault();
     setIsSubmitting(true);
     const fd = new FormData(e.currentTarget);
+    const total = Number(fd.get("total"));
     const result = await createSupplierBill({
       supplierId: Number(fd.get("supplierId")),
       issueDate: fd.get("issueDate") as string,
       dueDate: (fd.get("dueDate") as string) || undefined,
-      total: Number(fd.get("total")),
+      total,
       notes: (fd.get("notes") as string) || undefined,
     });
     setIsSubmitting(false);
     if (result.success) {
       setIsCreateOpen(false);
-      toast.success(`Factura ${result.data.folio} creada`);
+      toast.success(`Factura ${result.data.folio} creada`, {
+        description: (
+          <ToastLines>
+            <ToastDetail label="Total" value={`$${money(total)}`} mono />
+          </ToastLines>
+        ),
+      });
       router.refresh();
     } else toast.error(result.error);
   };
@@ -182,7 +190,13 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
     setIsSubmitting(false);
     if (result.success) {
       setIsFromPoOpen(false);
-      toast.success(`Factura ${result.data.folio} generada desde ${po.folio}`);
+      toast.success(`Factura ${result.data.folio} generada desde ${po.folio}`, {
+        description: (
+          <ToastLines>
+            <ToastDetail label="Total" value={`$${money(po.total)}`} mono />
+          </ToastLines>
+        ),
+      });
       router.refresh();
     } else toast.error(result.error);
   };
@@ -192,17 +206,27 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
     if (!payTarget) return;
     setIsSubmitting(true);
     const fd = new FormData(e.currentTarget);
+    const amount = Number(fd.get("amount"));
+    const method = fd.get("method") as string;
     const result = await registerSupplierPayment({
       billId: payTarget.billId,
-      amount: Number(fd.get("amount")),
-      method: fd.get("method") as string,
+      amount,
+      method,
       paymentDate: fd.get("paymentDate") as string,
       notes: (fd.get("notes") as string) || undefined,
     });
     setIsSubmitting(false);
     if (result.success) {
       setPayTarget(null);
-      toast.success("Pago registrado");
+      const methodLabel = PAYMENT_METHODS.find((m) => m.value === method)?.label ?? method;
+      toast.success("Pago registrado", {
+        description: (
+          <ToastLines>
+            <ToastDetail label={`Factura ${payTarget.folio}`} value={`$${money(amount)}`} mono />
+            <ToastNote>{methodLabel}</ToastNote>
+          </ToastLines>
+        ),
+      });
       router.refresh();
     } else toast.error(result.error);
   };

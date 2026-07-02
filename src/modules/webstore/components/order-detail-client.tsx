@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Receipt, RefreshCw, Loader2, AlertTriangle, CheckCircle2, Ban } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
 import { reprocessOrder, cancelWebstoreOrder } from "../actions/order-actions";
 
 const STATUS_MAP: Record<string, { status: OpsStatus; label: string }> = {
@@ -95,7 +96,18 @@ export function OrderDetailClient({
     const result = await reprocessOrder(log.logId, overrideMap);
     setIsReprocessing(false);
     if (result.success) {
-      toast.success(`Orden procesada — folio ${result.data.folio}`);
+      const orderTotal = lineStatuses.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+      toast.success(`Orden procesada — folio ${result.data.folio}`, {
+        description: (
+          <ToastLines>
+            <ToastDetail
+              label={`${lineStatuses.length} ${lineStatuses.length === 1 ? "artículo" : "artículos"}`}
+              value={`$${orderTotal.toFixed(2)}`}
+              mono
+            />
+          </ToastLines>
+        ),
+      });
       router.refresh();
     } else {
       toast.error(result.error);

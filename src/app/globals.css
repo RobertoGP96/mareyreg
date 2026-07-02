@@ -459,3 +459,28 @@
     color-mix(in oklch, var(--ops-track) 50%, transparent)
   );
 }
+
+/* Sileo (toasts): tokens del design system.
+   El pill es una superficie invertida respecto al tema (foreground como
+   fondo), por eso la descripción usa --background como color de texto. */
+[data-sileo-viewport] {
+  --sileo-state-success: var(--success);
+  --sileo-state-error: var(--destructive);
+  --sileo-state-warning: var(--warning);
+  --sileo-state-info: var(--info);
+  --sileo-state-action: var(--primary);
+  --sileo-state-loading: var(--muted-foreground);
+}
+
+[data-sileo-pill],
+[data-sileo-body] {
+  fill: var(--foreground);
+}
+
+[data-sileo-title] {
+  text-transform: none;
+}
+
+[data-sileo-viewport][data-theme] [data-sileo-content] [data-sileo-description] {
+  color: color-mix(in oklch, var(--background) 72%, transparent);
+}

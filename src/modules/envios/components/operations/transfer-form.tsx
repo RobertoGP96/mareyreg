@@ -16,6 +16,7 @@ import {
   ArrowRightLeft, Wallet, Hash, FileText, Calendar, Loader2, Calculator, Clock,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { ToastDelta, ToastDetail, ToastLines } from "@/components/ui/toast-content";
 import { cn } from "@/lib/utils";
 import { createTransfer, previewTransferRate } from "../../actions/transfer-actions";
 import { CurrencyChip } from "../shared/currency-chip";
@@ -111,10 +112,20 @@ export function TransferForm({ open, onOpenChange, accounts }: Props) {
     });
     setSubmitting(false);
     if (r.success) {
+      const amountToFmt = r.data.amountTo.toLocaleString("es-MX", { maximumFractionDigits: 2 });
+      const quoteCode = preview.state === "ok" ? preview.quoteCode : "";
       toast.success(
         statusPending
           ? `Transferencia pendiente · ${r.data.reference}`
-          : `Transferencia confirmada · ${r.data.amountTo.toLocaleString("es-MX", { maximumFractionDigits: 2 })} ${preview.state === "ok" ? preview.quoteCode : ""}`
+          : `Transferencia confirmada · ${amountToFmt} ${quoteCode}`,
+        {
+          description: (
+            <ToastLines>
+              <ToastDelta from={`${amount} ${fromAccount?.currencyCode ?? ""}`} to={`${amountToFmt} ${quoteCode}`} />
+              <ToastDetail label="Referencia" value={r.data.reference} mono />
+            </ToastLines>
+          ),
+        }
       );
       onOpenChange(false); reset(); router.refresh();
     } else toast.error(r.error);

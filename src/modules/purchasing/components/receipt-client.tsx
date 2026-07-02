@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, PackageCheck } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
 import {
   createGoodsReceipt,
   type ReceiptLineInput,
@@ -65,7 +66,18 @@ export function ReceiptClient({ poId, folio, lines }: Props) {
     });
     setIsSubmitting(false);
     if (result.success) {
-      toast.success(`Recepcion ${result.data.folio} registrada`);
+      const totalUnits = payload.reduce((s, l) => s + l.quantity, 0);
+      toast.success(`Recepcion ${result.data.folio} registrada`, {
+        description: (
+          <ToastLines>
+            <ToastDetail
+              label={`${payload.length} ${payload.length === 1 ? "linea" : "lineas"}`}
+              value={`${totalUnits} u.`}
+              mono
+            />
+          </ToastLines>
+        ),
+      });
       router.push(`/purchase-orders/${poId}`);
       router.refresh();
     } else toast.error(result.error);
