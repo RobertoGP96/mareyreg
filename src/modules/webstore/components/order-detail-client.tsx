@@ -15,15 +15,26 @@ import {
 } from "@/components/ui/select";
 import { Field } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
-import { Receipt, RefreshCw, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Receipt, RefreshCw, Loader2, AlertTriangle, CheckCircle2, Ban } from "lucide-react";
 import { toast } from "sonner";
-import { reprocessOrder } from "../actions/order-actions";
+import { reprocessOrder, cancelWebstoreOrder } from "../actions/order-actions";
 
 const STATUS_MAP: Record<string, { status: OpsStatus; label: string }> = {
   received: { status: "pending", label: "Recibida" },
   processed: { status: "completed", label: "Procesada" },
   needs_review: { status: "delayed", label: "Requiere revisión" },
   error: { status: "cancelled", label: "Error" },
+  cancelled: { status: "cancelled", label: "Cancelada" },
 };
 
 interface OrderLogDetail {
@@ -67,10 +78,13 @@ export function OrderDetailClient({
 }) {
   const router = useRouter();
   const [isReprocessing, setIsReprocessing] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
 
   const cfg = STATUS_MAP[log.status] ?? { status: "pending" as OpsStatus, label: log.status };
   const needsAttention = log.status === "needs_review" || log.status === "error";
+  const canCancel = log.status === "processed";
 
   const handleReprocess = async () => {
     setIsReprocessing(true);
@@ -88,6 +102,19 @@ export function OrderDetailClient({
     }
   };
 
+  const handleCancel = async () => {
+    setIsCancelling(true);
+    const result = await cancelWebstoreOrder(log.logId);
+    setIsCancelling(false);
+    setConfirmCancel(false);
+    if (result.success) {
+      toast.success("Orden cancelada — stock, pagos y saldo revertidos");
+      router.refresh();
+    } else {
+      toast.error(result.error);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -96,12 +123,25 @@ export function OrderDetailClient({
         description={`Recibida el ${new Date(log.receivedAt).toLocaleString("es-MX")} vía ${log.apiKeyLabel}`}
         meta={<StatusPill status={cfg.status} label={cfg.label} />}
         actions={
-          needsAttention && (
-            <Button variant="brand" onClick={handleReprocess} disabled={isReprocessing}>
-              {isReprocessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              {isReprocessing ? "Reprocesando…" : "Reprocesar"}
-            </Button>
-          )
+          <>
+            {needsAttention && (
+              <Button variant="brand" onClick={handleReprocess} disabled={isReprocessing}>
+                {isReprocessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                {isReprocessing ? "Reprocesando…" : "Reprocesar"}
+              </Button>
+            )}
+            {canCancel && (
+              <Button
+                variant="outline"
+                className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                onClick={() => setConfirmCancel(true)}
+                disabled={isCancelling}
+              >
+                {isCancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}
+                {isCancelling ? "Cancelando…" : "Cancelar orden"}
+              </Button>
+            )}
+          </>
         }
       />
 
@@ -182,6 +222,30 @@ export function OrderDetailClient({
           </pre>
         </Field>
       </FormSection>
+
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cancelar esta orden?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se revertirá el stock y la valuación de los productos vendidos, se anulará cualquier
+              pago registrado y se ajustará el saldo del cliente. La factura{" "}
+              <strong>{log.invoiceFolio}</strong> quedará marcada como cancelada. Esta acción no se
+              puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancelling}>Volver</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCancel}
+              disabled={isCancelling}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {isCancelling ? "Cancelando…" : "Sí, cancelar orden"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
