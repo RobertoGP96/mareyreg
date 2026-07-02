@@ -6,6 +6,8 @@ export async function getWebstoreApiKeys() {
       apiKeyId: true,
       label: true,
       keyPrefix: true,
+      scopes: true,
+      expiresAt: true,
       isActive: true,
       revokedAt: true,
       lastUsedAt: true,

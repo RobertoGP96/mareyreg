@@ -33,6 +33,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!apiKey) {
     return NextResponse.json({ error: "API key inválida o revocada" }, { status: 401 });
   }
+  if (!apiKey.scopes.includes("create_orders")) {
+    return NextResponse.json(
+      { error: "La API key no tiene permiso para crear órdenes" },
+      { status: 403 }
+    );
+  }
 
   const keyLimit = await checkRateLimit(`orders:key:${apiKey.apiKeyId}`, WEBSTORE_RATE_LIMITS.ordersPerApiKey);
   if (!keyLimit.allowed) {

@@ -41,6 +41,12 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (!apiKey) {
     return NextResponse.json({ error: "API key inválida o revocada" }, { status: 401 });
   }
+  if (!apiKey.scopes.includes("read_catalog")) {
+    return NextResponse.json(
+      { error: "La API key no tiene permiso para consultar el catálogo" },
+      { status: 403 }
+    );
+  }
 
   const keyLimit = await checkRateLimit(
     `products:key:${apiKey.apiKeyId}`,

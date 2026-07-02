@@ -10,6 +10,8 @@ export default async function WebstoreApiKeysPage() {
     apiKeyId: k.apiKeyId,
     label: k.label,
     keyPrefix: k.keyPrefix,
+    scopes: k.scopes,
+    expiresAt: k.expiresAt ? k.expiresAt.toISOString() : null,
     isActive: k.isActive,
     revokedAt: k.revokedAt ? k.revokedAt.toISOString() : null,
     lastUsedAt: k.lastUsedAt ? k.lastUsedAt.toISOString() : null,
