@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Heart, ShoppingCart, Star } from "lucide-react";
+import { ArrowLeft, Heart, ShoppingCart, Star, Truck } from "lucide-react";
 import type {
   WebstoreCurrency,
   WebstoreProduct,
   WebstoreProductPresentation,
 } from "@/lib/erp-client";
 import { discountPct, fmt, stockInfo } from "@/lib/format";
+import { FREE_SHIPPING_TARGET } from "@/lib/cart-totals";
 import { useStore, useSyncCurrency, type CartLine } from "@/lib/store";
 import { ProductImage } from "@/components/product-image";
 import { QtyStepper } from "@/components/qty-stepper";
@@ -220,12 +221,13 @@ export function ProductDetailClient({
           </div>
         )}
 
-        <div className="mt-5 flex items-center gap-4">
+        {/* En md+ la cantidad vive en el panel de compra de la derecha */}
+        <div className="mt-5 flex items-center gap-4 md:hidden">
           <div className="text-[13.5px] font-semibold text-navy">Cantidad</div>
           <QtyStepper
             qty={qty}
-            onInc={() => setQty(qty + 1)}
-            onDec={() => setQty(Math.max(1, qty - 1))}
+            onInc={() => setQty((q) => q + 1)}
+            onDec={() => setQty((q) => Math.max(1, q - 1))}
             size="lg"
           />
         </div>
@@ -260,7 +262,7 @@ export function ProductDetailClient({
         )}
       </div>
 
-      <div className="sticky bottom-0 flex items-center gap-3 border-t border-line-2 bg-white px-5 pt-4 pb-6 md:static md:mt-6 md:self-start md:rounded-2xl md:border md:border-line md:p-5 md:shadow-[0_3px_12px_rgba(10,31,63,.05)]">
+      <div className="sticky bottom-0 flex items-center gap-3 border-t border-line-2 bg-white px-5 pt-4 pb-6 md:hidden">
         <div className="flex-1">
           <div className="text-xs text-muted">Total</div>
           <div className="text-[19px] font-bold text-navy">
@@ -278,6 +280,71 @@ export function ProductDetailClient({
           {soldOut ? "Agotado" : "Añadir al carrito"}
         </button>
       </div>
+
+      <aside
+        aria-label="Resumen de compra"
+        className="hidden w-[290px] flex-none flex-col self-start rounded-2xl border border-line bg-white p-5 shadow-[0_3px_12px_rgba(10,31,63,.05)] md:sticky md:top-24 md:flex"
+      >
+        <div className="flex items-baseline gap-2">
+          <div className="text-[22px] font-bold text-navy">
+            {fmt(unitPrice, currency)}
+          </div>
+          <div className="text-[12.5px] text-muted">/ {unitLabel}</div>
+        </div>
+        {showCompare && product.compareAtPrice != null && (
+          <div className="mt-0.5 text-[13px] text-muted-2 line-through">
+            {fmt(product.compareAtPrice, currency)}
+          </div>
+        )}
+        <div
+          className="mt-1.5 text-xs font-medium"
+          style={{ color: stock.color }}
+        >
+          {stock.label}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between border-t border-line-2 pt-4">
+          <div className="text-[13.5px] font-semibold text-navy">Cantidad</div>
+          <QtyStepper
+            qty={qty}
+            onInc={() => setQty((q) => q + 1)}
+            onDec={() => setQty((q) => Math.max(1, q - 1))}
+          />
+        </div>
+
+        <div className="mt-4 flex items-baseline justify-between border-t border-line-2 pt-4">
+          <div className="text-[13px] text-muted">
+            Total{" "}
+            <span className="text-muted-2">
+              ({qty} × {fmt(unitPrice, currency)})
+            </span>
+          </div>
+          <div className="font-mono text-[19px] font-bold tabular-nums text-navy">
+            {fmt(unitPrice * qty, currency)}
+          </div>
+        </div>
+        {product.isCatchWeight && (
+          <div className="mt-1 text-[11.5px] text-brand-mid">
+            El total se ajusta al peso real al preparar tu pedido
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={handleAdd}
+          className={`mt-4 flex w-full items-center justify-center gap-2 rounded-[13px] px-[26px] py-3.5 text-[14.5px] font-semibold text-white transition-colors ${
+            soldOut ? "bg-disabled" : "grad-cta hover:opacity-90"
+          }`}
+        >
+          {soldOut ? null : <ShoppingCart className="h-[17px] w-[17px]" />}
+          {soldOut ? "Agotado" : "Añadir al carrito"}
+        </button>
+
+        <div className="mt-3.5 flex items-center gap-2 text-[11.5px] text-muted">
+          <Truck className="h-3.5 w-3.5 flex-none text-brand-mid" />
+          Envío gratis en pedidos desde {fmt(FREE_SHIPPING_TARGET, currency)}
+        </div>
+      </aside>
     </div>
   );
 }
