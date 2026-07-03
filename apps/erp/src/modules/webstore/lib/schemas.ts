@@ -31,3 +31,12 @@ export const webstoreOrderPayloadSchema = z.object({
 });
 
 export type WebstoreOrderPayload = z.infer<typeof webstoreOrderPayloadSchema>;
+
+export const webstoreCustomerUpsertSchema = z.object({
+  name: z.string().trim().min(1, "El nombre es requerido"),
+  phone: z.string().trim().min(5, "El teléfono debe tener al menos 5 caracteres"),
+  email: z.string().trim().email("Email inválido").optional(),
+  address: z.string().trim().optional(),
+});
+
+export type WebstoreCustomerUpsertInput = z.infer<typeof webstoreCustomerUpsertSchema>;

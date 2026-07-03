@@ -17,6 +17,7 @@ Plan completo de diseño: `C:/Users/usuario/.claude/plans/necesito-crear-un-modu
 | 7 | Foto de producto (Vercel Blob) + catálogo `GET /api/webstore/products` | ✅ |
 | 8 | `getEffectivePrice` aplicado como precio sugerido en POS (B2B: sin UI de carrito propia todavía, pendiente cuando exista) | ✅ |
 | 9 | Esta documentación | ✅ |
+| 10 | Ofertas (`WebstoreOffer` + materialización en `Discount`), badge/filtro "Ofertas" en la tienda, endpoint `POST /api/webstore/customers` y sincronización de perfil desde la tienda | ✅ |
 | — | Hardening (rate limiting del webhook, comparación automática precio-tienda-vs-Mareyway, HMAC de payload) | ⏳ v2 |
 
 ## Decisiones clave
@@ -46,8 +47,21 @@ psql "$DATABASE_URL" -f prisma/sql/webstore-constraints.sql
 2. **Descuentos** (`/discounts`): crear reglas por producto, categoría o globales, con vigencia, cantidad mínima y si son acumulables. Aplican en todos los canales.
 3. **API keys** (`/webstore/api-keys`): generar una key para la tienda (se muestra una sola vez), revocar cuando ya no se use.
 4. **Webhook de órdenes** (`POST /api/webstore/orders`): la tienda manda `externalOrderId`, cliente, líneas (`sku`, `quantity`, `unitPrice` informativo) y pago opcional. Respuestas: `201` procesada, `200` ya procesada (idempotente), `202` requiere revisión manual, `400` payload inválido, `401` key inválida, `409` ya existe en error/revisión, `500` error interno.
-5. **Catálogo de lectura** (`GET /api/webstore/products`): la tienda consulta sku, nombre, categoría, precio efectivo, stock disponible y foto de los productos habilitados.
+5. **Catálogo de lectura** (`GET /api/webstore/products`): la tienda consulta sku, nombre, categoría, precio efectivo, stock disponible, foto y oferta vigente (si aplica) de los productos habilitados. Cada producto incluye:
+
+   ```ts
+   offer: { name: string; type: "percent" | "fixed"; value: number; endsAt: string | null } | null
+   ```
+
+   `offer` refleja la `WebstoreOffer` que generó el `Discount` aplicado al precio del producto (null si no tiene ninguno vigente). El `%` que muestra el badge de la tienda se calcula siempre desde `price`/`compareAtPrice` (funciona igual para ofertas `percent` y `fixed`); `offer.name` y `offer.endsAt` son solo para el mensaje descriptivo en el detalle de producto.
 6. **Bandeja de órdenes** (`/webstore/ordenes`): KPIs (recibidas hoy, requieren revisión, con error, procesadas hoy), lista filtrable por estado, detalle con payload crudo, líneas resueltas/sin resolver, movimientos de stock generados y botón "Reprocesar" (con reasignación de producto por línea cuando aplica).
+7. **Clientes** (`POST /api/webstore/customers`): la tienda registra o actualiza un cliente en el ERP al crear/editar el perfil local (registro y "Mis datos"), sin login con contraseña. Requiere API key con scope `manage_customers`. Body:
+
+   ```ts
+   { name: string; phone: string; email?: string; address?: string }
+   ```
+
+   (`name` mínimo 1 carácter, `phone` mínimo 5). Respuestas: `201 { customerId, created: true }` (cliente nuevo), `200 { customerId, created: false }` (match por teléfono/email existente, idempotente), `400 { error, details }` (payload inválido), `401`/`403` (key inválida o sin el scope), `429` (rate limit), `500 { error }`. La tienda trata esta llamada como **best-effort**: si falla por cualquier motivo, el perfil/registro local de la tienda se guarda igual (ver `syncProfile` en `apps/tienda/src/app/actions/customer-actions.ts`).
 
 ## Riesgos / pendientes
 
@@ -69,5 +83,11 @@ psql "$DATABASE_URL" -f prisma/sql/webstore-constraints.sql
   - [src/modules/webstore/lib/process-order.ts](../src/modules/webstore/lib/process-order.ts) — `processWebstoreOrder`, transacción completa (cliente, líneas, orden, factura, inventario, pago).
   - [src/modules/webstore/lib/api-key.ts](../src/modules/webstore/lib/api-key.ts) — generación/resolución de API keys.
   - [src/modules/webstore/lib/schemas.ts](../src/modules/webstore/lib/schemas.ts) — Zod del payload del webhook.
-- Endpoints: [src/app/api/webstore/orders/route.ts](../src/app/api/webstore/orders/route.ts), [src/app/api/webstore/products/route.ts](../src/app/api/webstore/products/route.ts), [src/app/api/products/upload/route.ts](../src/app/api/products/upload/route.ts).
+- Endpoints: [src/app/api/webstore/orders/route.ts](../src/app/api/webstore/orders/route.ts), [src/app/api/webstore/products/route.ts](../src/app/api/webstore/products/route.ts), [src/app/api/webstore/customers/route.ts](../src/app/api/webstore/customers/route.ts), [src/app/api/products/upload/route.ts](../src/app/api/products/upload/route.ts).
 - Patrón a imitar para futuros módulos: [src/modules/pacas/](../src/modules/pacas/); patrón de descuento de inventario reutilizado desde [src/modules/sales/actions/invoice-actions.ts](../src/modules/sales/actions/invoice-actions.ts) (`dispatchLines`).
+- Scope de API key `manage_customers`: [src/modules/webstore/lib/api-key-scopes.ts](../src/modules/webstore/lib/api-key-scopes.ts) (necesario para `POST /api/webstore/customers`).
+- Lado tienda (`apps/tienda/`, consume todo vía HTTP — nunca importa código del ERP):
+  - [apps/tienda/src/lib/erp-client.ts](../apps/tienda/src/lib/erp-client.ts) — `WebstoreProductOffer`, campo `offer` en `WebstoreProduct`, `upsertCustomer()`.
+  - [apps/tienda/src/app/actions/customer-actions.ts](../apps/tienda/src/app/actions/customer-actions.ts) — `syncProfile`, best-effort (nunca lanza).
+  - [apps/tienda/src/app/registro/page.tsx](../apps/tienda/src/app/registro/page.tsx), [apps/tienda/src/app/perfil/datos/page.tsx](../apps/tienda/src/app/perfil/datos/page.tsx) — puntos donde se llama `syncProfile`.
+  - [apps/tienda/src/app/catalogo/catalog-client.tsx](../apps/tienda/src/app/catalogo/catalog-client.tsx) — chip "Ofertas" (`?ofertas=1`) filtrando por `compareAtPrice != null`.

@@ -6,6 +6,7 @@ import { toBaseQuantity } from "@/modules/inventory/lib/units";
 import { dispatchLines } from "@/modules/sales/lib/dispatch-lines";
 import { getDefaultWebstoreWarehouseId } from "./dispatch-warehouse";
 import { isSkuResolved, resolveSkusBatch } from "./resolve-skus";
+import { normalizePhone } from "./normalize-phone";
 import type { WebstoreOrderPayload } from "./schemas";
 
 export class NeedsReviewError extends Error {
@@ -43,16 +44,31 @@ export async function processWebstoreOrder(
       );
     }
 
+    const normalizedPhone = normalizePhone(payload.customer.phone);
+
     let customer = await tx.customer.findFirst({ where: { email: payload.customer.email } });
+    if (!customer && normalizedPhone) {
+      customer = await tx.customer.findFirst({
+        where: { source: "webstore", normalizedPhone },
+      });
+      if (customer && !customer.email) {
+        customer = await tx.customer.update({
+          where: { customerId: customer.customerId },
+          data: { email: payload.customer.email },
+        });
+      }
+    }
     if (!customer) {
       customer = await tx.customer.create({
         data: {
           name: payload.customer.name,
           email: payload.customer.email,
           phone: payload.customer.phone || null,
+          normalizedPhone,
           taxId: payload.customer.taxId || null,
           address: payload.customer.address || null,
           customerType: "retail",
+          source: "webstore",
         },
       });
     }

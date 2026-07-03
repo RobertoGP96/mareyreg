@@ -30,6 +30,7 @@ export interface StoredProfile {
   phone: string;
   email?: string;
   address?: string;
+  erpCustomerId?: number;
 }
 
 export interface StoredOrder {

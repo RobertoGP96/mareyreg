@@ -46,7 +46,7 @@ apps/
     src/lib/store.tsx             # estado cliente (carrito/favoritos/perfil/pedidos) persistido en localStorage
     src/lib/cart-totals.ts        # reglas: envío gratis ≥$100, envío $5 domicilio, cupón AZUL10 −10%
     src/app/actions/order-actions.ts  # server action → POST /api/webstore/orders (Zod, externalOrderId idempotente)
-    src/app/                      # rutas: / catalogo producto/[sku] favoritos carrito checkout pedido-confirmado perfil(/pedidos) login registro
+    src/app/                      # rutas: / catalogo(?ofertas=1) producto/[sku] favoritos carrito checkout pedido-confirmado perfil(/pedidos,/datos) login registro
     .env.example                  # WEBSTORE_API_URL + WEBSTORE_API_KEY (generar key en ERP /webstore/api-keys, scopes read_catalog+create_orders)
 docs/                             # documentación cross-app (WEBSTORE.md = contrato entre apps)
 ```
@@ -114,6 +114,7 @@ Reglas:
 - **Server actions que mutan** exigen `requireCurrentUserId()` (lanza "No autenticado"); operaciones sensibles añaden `await assertRole("admin", ...)` (`src/lib/auth-guard.ts`, lanza `ForbiddenError` — no usar `requireRole`, que hace redirect y es solo para layouts).
 - Stock/inventario: nunca `decrement` ciego — `updateMany` condicional (`{ gte: qty }`) + verificar `count`, o el helper compartido `dispatchLines`/`reverseInvoiceStock` de `src/modules/sales/lib/dispatch-lines.ts` (lo usan POS y webstore).
 - **Inventario multi-unidad**: stock, kardex (`StockMovement`) y valuación van SIEMPRE en **unidad base**. Las líneas de venta/compra guardan `quantity` en la unidad vendida/comprada + snapshot `unitFactor`/`baseQuantity`. El factor se resuelve SIEMPRE server-side desde `ProductPresentation` (nunca del cliente); conversión única en `src/modules/inventory/lib/units.ts` (`toBaseQuantity`). Precios menudeo/mayoreo por presentación vía `getEffectiveLinePrices` (`effective-price.ts`); `Product.secondaryPrice` está DEPRECADO. Cambios de precio escriben `PresentationPriceHistory`/`ProductPriceHistory`; ajuste masivo solo admin (`pricing-actions.ts`). `Warehouse.locationType` (`general|store|service_unit`) es el tipo operativo — el POS despacha del `store`; `warehouseType` es el tipo físico. Tras `db push` aplicar `prisma/sql/inventory-presentations.sql`, `inventory-locations.sql` y `purchasing-presentations.sql`.
+- **Webstore ofertas/clientes**: una oferta (`WebstoreOffer`) materializa filas `Discount` (una por producto, ligadas por `offerId`) vía `src/modules/webstore/lib/sync-offer-discounts.ts` — no editar esos discounts desde inventario ni tocar `effective-price.ts` (el pricing las aplica sin cambios; sigue rigiendo "1 descuento activo por producto"). Clientes de la tienda: `Customer.source = 'webstore'` con matching por `normalizedPhone` (índice único parcial); el registro/perfil de la tienda sincroniza vía `POST /api/webstore/customers` (scope `manage_customers`, best-effort — nunca romper el flujo local si el ERP no responde). Tras `db push` aplicar `prisma/sql/webstore-offers.sql` y `webstore-customers.sql`.
 
 ## UI (mobile-first, premium)
 

@@ -1,5 +1,5 @@
 /** Scopes válidos para una API key de la tienda en línea. */
-export const WEBSTORE_API_KEY_SCOPES = ["read_catalog", "create_orders"] as const;
+export const WEBSTORE_API_KEY_SCOPES = ["read_catalog", "create_orders", "manage_customers"] as const;
 export type WebstoreApiKeyScope = (typeof WEBSTORE_API_KEY_SCOPES)[number];
 
 export function isWebstoreApiKeyScope(value: unknown): value is WebstoreApiKeyScope {

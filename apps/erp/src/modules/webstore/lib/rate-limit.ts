@@ -9,6 +9,8 @@ export const WEBSTORE_RATE_LIMITS = {
   ordersPerApiKey: 30,
   /** Por API key, endpoint de catálogo (lectura, más permisivo). */
   productsPerApiKey: 120,
+  /** Por API key, endpoint de registro/actualización de clientes. */
+  customersPerApiKey: 30,
   /**
    * Por IP, aplicado ANTES de resolver la API key. Protege resolveApiKey
    * (bcrypt.compare en loop) de fuerza bruta con keys inválidas.

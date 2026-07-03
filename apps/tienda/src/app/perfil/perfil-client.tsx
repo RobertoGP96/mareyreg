@@ -73,6 +73,16 @@ export function PerfilClient() {
 
         <div className="mt-2 text-sm font-semibold text-navy">Cuenta</div>
         <div className="overflow-hidden rounded-[15px] bg-white shadow-[0_3px_12px_rgba(10,31,63,.05)]">
+          {profile && (
+            <Link
+              href="/perfil/datos"
+              className="flex items-center gap-3 border-b border-app px-4 py-3.5"
+            >
+              <span className="text-brand">◐</span>
+              <span className="flex-1 text-[13.5px] text-ink">Mis datos</span>
+              <span className="text-muted-2">›</span>
+            </Link>
+          )}
           <div className="flex items-center gap-3 border-b border-app px-4 py-3.5">
             <span className="text-brand">➤</span>
             <span className="flex-1 text-[13.5px] text-ink">

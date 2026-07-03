@@ -36,6 +36,7 @@ import { WEBSTORE_API_KEY_SCOPES, type WebstoreApiKeyScope } from "../lib/api-ke
 const SCOPE_LABELS: Record<WebstoreApiKeyScope, string> = {
   read_catalog: "Leer catálogo",
   create_orders: "Crear órdenes",
+  manage_customers: "Gestionar clientes",
 };
 
 const EXPIRY_OPTIONS = [

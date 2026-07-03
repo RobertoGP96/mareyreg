@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { syncProfile } from "@/app/actions/customer-actions";
 import { useStore } from "@/lib/store";
 
 const inputClass =
@@ -14,14 +15,32 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [sending, setSending] = useState(false);
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
+    if (sending) return;
     if (!name.trim() || !phone.trim()) {
       showToast("Completa nombre y teléfono");
       return;
     }
-    setProfile({ name: name.trim(), phone: phone.trim() });
+    const profile = { name: name.trim(), phone: phone.trim() };
+    setProfile(profile);
     showToast("Cuenta creada, bienvenido");
+
+    setSending(true);
+    try {
+      const result = await syncProfile(profile);
+      if (result.success) {
+        setProfile({ ...profile, erpCustomerId: result.data.customerId });
+      } else {
+        console.warn("syncProfile en registro falló:", result.error);
+      }
+    } catch (e) {
+      console.warn("syncProfile en registro lanzó:", e);
+    } finally {
+      setSending(false);
+    }
+
     router.push("/perfil");
   };
 
@@ -71,9 +90,12 @@ export default function RegisterPage() {
         <button
           type="button"
           onClick={handleRegister}
-          className="grad-cta mt-1.5 rounded-[13px] p-[15px] text-center text-[15px] font-semibold text-white"
+          disabled={sending}
+          className={`grad-cta mt-1.5 rounded-[13px] p-[15px] text-center text-[15px] font-semibold text-white ${
+            sending ? "opacity-60" : ""
+          }`}
         >
-          Crear cuenta
+          {sending ? "Creando cuenta…" : "Crear cuenta"}
         </button>
         <div className="mt-2 text-center text-[13px] text-muted">
           ¿Ya tienes cuenta?{" "}

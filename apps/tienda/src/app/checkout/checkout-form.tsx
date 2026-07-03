@@ -44,7 +44,7 @@ function OptionCard({
 
 export function CheckoutForm() {
   const router = useRouter();
-  const { state, addOrder, clearCart, showToast } = useStore();
+  const { state, addOrder, clearCart, setProfile, showToast } = useStore();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -130,6 +130,15 @@ export function CheckoutForm() {
             ? "En preparación"
             : "En revisión",
       });
+      if (state.profile) {
+        setProfile({
+          ...state.profile,
+          name: name.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          ...(delivery === "domicilio" ? { address: address.trim() } : {}),
+        });
+      }
       clearCart();
       router.push(
         `/pedido-confirmado?no=${encodeURIComponent(result.data.orderNo)}`
