@@ -7,17 +7,18 @@ export const DEFAULT_CURRENCY: WebstoreCurrency = {
   decimalPlaces: 0,
 };
 
-// Miles con espacio + símbolo + código (ej. "4 750 CUP"): igual que el resto
-// de la app espera, y evita el ambiguo "$" solo cuando decimalPlaces=0
-// (pesos enteros) para no confundir con USD.
+// Miles con espacio + código (ej. "4 750 CUP"): evita el ambiguo "$" solo.
+// Los decimales reales siempre se muestran ("250.50 CUP") aunque la moneda
+// declare 0 decimales (estimados catch-weight, etc.); se omiten solo cuando
+// son todo ceros ("250 CUP", nunca "250.00 CUP").
 export function fmt(n: number, currency: WebstoreCurrency = DEFAULT_CURRENCY): string {
-  const rounded =
-    currency.decimalPlaces > 0
-      ? n.toFixed(currency.decimalPlaces)
-      : Math.round(n).toString();
-  const [intPart, decimalPart] = rounded.split(".");
+  const decimals = Math.max(2, currency.decimalPlaces);
+  const [intPart, decimalPart] = n.toFixed(decimals).split(".");
   const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  const amount = decimalPart ? `${withThousands}.${decimalPart}` : withThousands;
+  const amount =
+    decimalPart && Number(decimalPart) !== 0
+      ? `${withThousands}.${decimalPart}`
+      : withThousands;
   return `${amount} ${currency.code}`;
 }
 
