@@ -41,9 +41,13 @@ apps/
       types/index.ts              # ActionResult<T>, re-exports de Prisma
     generated/prisma/             # cliente generado — NO editar, NO commitear (gitignored)
     .env / .env.local             # secretos del ERP (viven aquí, NO en la raíz)
-  tienda/                         # storefront público (puerto 3001)
+  tienda/                         # storefront público (puerto 3001) — diseño "Tienda Completa v2" (azul/gris, Space Grotesk, mobile 430px)
     src/lib/erp-client.ts         # cliente tipado hacia la API webstore del ERP
-    .env.example                  # WEBSTORE_API_URL + WEBSTORE_API_KEY
+    src/lib/store.tsx             # estado cliente (carrito/favoritos/perfil/pedidos) persistido en localStorage
+    src/lib/cart-totals.ts        # reglas: envío gratis ≥$100, envío $5 domicilio, cupón AZUL10 −10%
+    src/app/actions/order-actions.ts  # server action → POST /api/webstore/orders (Zod, externalOrderId idempotente)
+    src/app/                      # rutas: / catalogo producto/[sku] favoritos carrito checkout pedido-confirmado perfil(/pedidos) login registro
+    .env.example                  # WEBSTORE_API_URL + WEBSTORE_API_KEY (generar key en ERP /webstore/api-keys, scopes read_catalog+create_orders)
 docs/                             # documentación cross-app (WEBSTORE.md = contrato entre apps)
 ```
 
