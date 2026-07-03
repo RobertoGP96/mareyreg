@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { createOrder } from "@/lib/erp-client";
-import { fmt } from "@/lib/format";
+import { DEFAULT_CURRENCY, fmt } from "@/lib/format";
 
 const submitOrderSchema = z.object({
   customer: z.object({
@@ -24,6 +24,8 @@ const submitOrderSchema = z.object({
   payment: z.enum(["efectivo", "transferencia"]),
   couponApplied: z.boolean(),
   total: z.number().nonnegative(),
+  /** Moneda del catálogo guardada en el store (ver useSyncCurrency). ISO 4217, 3 letras. */
+  currency: z.string().length(3),
 });
 
 export type SubmitOrderInput = z.infer<typeof submitOrderSchema>;
@@ -50,6 +52,9 @@ export async function submitOrder(
       return { success: false, error: "Revisa los datos del pedido." };
     }
     const order = parsed.data;
+    // fmt de la nota interna solo necesita code (viene del store; symbol/
+    // decimalPlaces no afectan el mensaje si el ERP ya redondeó el total).
+    const noteCurrency = { ...DEFAULT_CURRENCY, code: order.currency };
 
     const deliveryLabel =
       order.delivery === "domicilio" ? "domicilio" : "recogida en tienda";
@@ -57,11 +62,12 @@ export async function submitOrder(
       `Entrega: ${deliveryLabel}`,
       `Pago: ${order.payment}`,
       ...(order.couponApplied ? ["Cupón: AZUL10 (−10%)"] : []),
-      `Total tienda: ${fmt(order.total)}`,
+      `Total tienda: ${fmt(order.total, noteCurrency)}`,
     ].join(" · ");
 
     const result = await createOrder({
       externalOrderId: `tienda-${crypto.randomUUID()}`,
+      currency: order.currency,
       customer: {
         email: order.customer.email,
         name: order.customer.name,

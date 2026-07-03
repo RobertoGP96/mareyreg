@@ -1,8 +1,9 @@
-import { fmt } from "@/lib/format";
+import { FREE_SHIPPING_TARGET, SHIPPING_COST } from "@/lib/config";
+import type { WebstoreCurrency } from "@/lib/erp-client";
+import { DEFAULT_CURRENCY, fmt } from "@/lib/format";
 import type { CartLine } from "@/lib/store";
 
-export const FREE_SHIPPING_TARGET = 100;
-export const SHIPPING_COST = 5;
+export { FREE_SHIPPING_TARGET, SHIPPING_COST };
 export const COUPON_CODE = "AZUL10";
 export const COUPON_RATE = 0.1;
 
@@ -34,8 +35,11 @@ export function computeTotals(
   return { subtotal, discount, shipping, total, freeShipping, shippingPct };
 }
 
-export function shippingMessage(totals: CartTotals): string {
+export function shippingMessage(
+  totals: CartTotals,
+  currency: WebstoreCurrency = DEFAULT_CURRENCY
+): string {
   return totals.freeShipping
     ? "¡Tienes envío gratis!"
-    : `Te faltan ${fmt(FREE_SHIPPING_TARGET - totals.subtotal)} para envío gratis`;
+    : `Te faltan ${fmt(FREE_SHIPPING_TARGET - totals.subtotal, currency)} para envío gratis`;
 }

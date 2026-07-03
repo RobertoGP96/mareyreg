@@ -21,6 +21,7 @@ export default function CartPage() {
     couponApplied: state.couponApplied,
     pickup: false,
   });
+  const currency = state.currency;
 
   const handleCoupon = () => {
     const code = couponInput.trim().toUpperCase();
@@ -55,7 +56,7 @@ export default function CartPage() {
             <div className="rounded-[14px] bg-white px-[15px] py-[13px] shadow-[0_3px_12px_rgba(10,31,63,.05)]">
               <div className="mb-2 flex justify-between text-xs">
                 <span className="font-medium text-ink-soft">
-                  {shippingMessage(totals)}
+                  {shippingMessage(totals, currency)}
                 </span>
                 <span className="font-semibold text-brand-mid">
                   {totals.shippingPct}%
@@ -88,7 +89,7 @@ export default function CartPage() {
                       : line.name}
                   </div>
                   <div className="mt-1 text-sm font-bold text-navy">
-                    {fmt(line.unitPrice * line.qty)}
+                    {fmt(line.unitPrice * line.qty, currency)}
                   </div>
                   {line.isCatchWeight && (
                     <div className="mt-0.5 text-[11px] text-brand-mid">
@@ -134,21 +135,21 @@ export default function CartPage() {
           <div className="rounded-t-[22px] border-t border-line-2 bg-white px-5 pt-[18px] pb-6 md:sticky md:top-6 md:w-[360px] md:flex-none md:rounded-[22px] md:border md:border-line-2 md:px-5 md:pt-5">
             <div className="mb-1.5 flex justify-between text-[13.5px] text-ink-soft">
               <span>Subtotal</span>
-              <span>{fmt(totals.subtotal)}</span>
+              <span>{fmt(totals.subtotal, currency)}</span>
             </div>
             {totals.discount > 0 && (
               <div className="mb-1.5 flex justify-between text-[13.5px] text-ok">
                 <span>Descuento AZUL10 (−10%)</span>
-                <span>−{fmt(totals.discount)}</span>
+                <span>−{fmt(totals.discount, currency)}</span>
               </div>
             )}
             <div className="mb-2.5 flex justify-between text-[13.5px] text-ink-soft">
               <span>Envío</span>
-              <span>{totals.shipping === 0 ? "Gratis" : fmt(totals.shipping)}</span>
+              <span>{totals.shipping === 0 ? "Gratis" : fmt(totals.shipping, currency)}</span>
             </div>
             <div className="flex justify-between border-t border-dashed border-line pt-2.5 text-base font-bold text-navy">
               <span>Total</span>
-              <span>{fmt(totals.total)}</span>
+              <span>{fmt(totals.total, currency)}</span>
             </div>
             <Link
               href="/checkout"

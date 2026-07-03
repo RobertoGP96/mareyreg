@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import type { WebstoreProduct } from "@/lib/erp-client";
+import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
+import { useSyncCurrency } from "@/lib/store";
 import { ProductCard } from "@/components/product-card";
 
 type SortKey = "rel" | "asc" | "desc";
@@ -17,6 +18,7 @@ const OFERTAS = "Ofertas";
 
 interface CatalogClientProps {
   products: WebstoreProduct[];
+  currency: WebstoreCurrency;
   initialCategory: string;
   initialQuery: string;
   autoFocus: boolean;
@@ -25,11 +27,13 @@ interface CatalogClientProps {
 
 export function CatalogClient({
   products,
+  currency,
   initialCategory,
   initialQuery,
   autoFocus,
   initialOfertas,
 }: CatalogClientProps) {
+  useSyncCurrency(currency);
   const categories = useMemo(
     () =>
       Array.from(

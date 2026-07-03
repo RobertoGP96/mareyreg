@@ -1,16 +1,16 @@
-import { getProducts, type WebstoreProduct } from "@/lib/erp-client";
+import { getCatalog, type CatalogResponse } from "@/lib/erp-client";
 import { CatalogError } from "@/components/catalog-error";
 import { HomeClient } from "./home-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  let products: WebstoreProduct[];
+  let catalog: CatalogResponse;
   try {
-    products = await getProducts();
+    catalog = await getCatalog();
   } catch (e) {
-    console.error("HomePage getProducts:", e);
+    console.error("HomePage getCatalog:", e);
     return <CatalogError retryHref="/" />;
   }
-  return <HomeClient products={products} />;
+  return <HomeClient products={catalog.products} currency={catalog.currency} />;
 }

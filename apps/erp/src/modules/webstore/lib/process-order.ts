@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
 import { createAuditLog } from "@/lib/audit";
+import { getBaseCurrency } from "@/lib/currency";
 import { getEffectiveLinePrices, lineKey } from "@/modules/inventory/lib/effective-price";
 import { toBaseQuantity, piecesFor } from "@/modules/inventory/lib/units";
 import { dispatchLines } from "@/modules/sales/lib/dispatch-lines";
@@ -15,6 +16,14 @@ export class NeedsReviewError extends Error {
     super(`SKU no disponibles para la tienda: ${unresolvedSkus.join(", ")}`);
     this.name = "NeedsReviewError";
     this.unresolvedSkus = unresolvedSkus;
+  }
+}
+
+/** Payload rechazado antes de intentar resolver la orden (moneda distinta a la base configurada): el integrador debe corregir y reenviar, no es un error interno ni requiere revisión manual. */
+export class UnsupportedCurrencyError extends Error {
+  constructor(received: string, expected: string) {
+    super(`Moneda no soportada: se recibió ${received}, se esperaba ${expected}`);
+    this.name = "UnsupportedCurrencyError";
   }
 }
 
@@ -54,12 +63,9 @@ export async function processWebstoreOrder(
   attribution?: ProcessOrderAttribution
 ): Promise<ProcessOrderResult> {
   return db.$transaction(async (tx) => {
-    const company = await tx.company.findUnique({ where: { id: 1 } });
-    const expectedCurrency = company?.currency ?? "USD";
-    if (payload.currency !== expectedCurrency) {
-      throw new Error(
-        `Moneda no soportada: se recibió ${payload.currency}, se esperaba ${expectedCurrency}`
-      );
+    const baseCurrency = await getBaseCurrency(tx);
+    if (payload.currency !== baseCurrency.code) {
+      throw new UnsupportedCurrencyError(payload.currency, baseCurrency.code);
     }
 
     const normalizedPhone = normalizePhone(payload.customer.phone);

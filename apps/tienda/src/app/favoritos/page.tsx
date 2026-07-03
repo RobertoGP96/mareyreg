@@ -1,16 +1,18 @@
-import { getProducts, type WebstoreProduct } from "@/lib/erp-client";
+import { getCatalog, type CatalogResponse } from "@/lib/erp-client";
 import { CatalogError } from "@/components/catalog-error";
 import { FavoritesClient } from "./favorites-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function FavoritesPage() {
-  let products: WebstoreProduct[];
+  let catalog: CatalogResponse;
   try {
-    products = await getProducts();
+    catalog = await getCatalog();
   } catch (e) {
-    console.error("FavoritesPage getProducts:", e);
+    console.error("FavoritesPage getCatalog:", e);
     return <CatalogError retryHref="/favoritos" />;
   }
-  return <FavoritesClient products={products} />;
+  return (
+    <FavoritesClient products={catalog.products} currency={catalog.currency} />
+  );
 }

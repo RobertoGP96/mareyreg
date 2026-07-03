@@ -54,6 +54,18 @@ export interface WebstoreProduct {
   pricePerKg: number | null;
 }
 
+/** Moneda base del ERP (getBaseCurrency). Todos los montos del catálogo ya vienen convertidos a esta moneda — la tienda nunca convierte ni conoce tasas de cambio. */
+export interface WebstoreCurrency {
+  code: string;
+  symbol: string;
+  decimalPlaces: number;
+}
+
+export interface CatalogResponse {
+  currency: WebstoreCurrency;
+  products: WebstoreProduct[];
+}
+
 export interface OrderCustomer {
   email: string;
   name: string;
@@ -77,8 +89,8 @@ export interface OrderPayment {
 
 export interface CreateOrderInput {
   externalOrderId: string;
-  /** ISO 4217, 3 letras. El ERP asume "USD" si se omite. */
-  currency?: string;
+  /** ISO 4217, 3 letras. Requerido: debe coincidir exactamente con la moneda base del ERP (ver WebstoreCurrency.code del catálogo). */
+  currency: string;
   customer: OrderCustomer;
   lines: OrderLine[];
   payment?: OrderPayment;
@@ -155,8 +167,8 @@ async function erpFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export async function getProducts(): Promise<WebstoreProduct[]> {
-  return erpFetch<WebstoreProduct[]>("/api/webstore/products", {
+export async function getCatalog(): Promise<CatalogResponse> {
+  return erpFetch<CatalogResponse>("/api/webstore/products", {
     // El catálogo cambia con precios/stock; no cachear en el server de la tienda.
     cache: "no-store",
   });

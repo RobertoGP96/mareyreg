@@ -1,4 +1,4 @@
-import { getProducts, type WebstoreProduct } from "@/lib/erp-client";
+import { getCatalog, type CatalogResponse } from "@/lib/erp-client";
 import { CatalogError } from "@/components/catalog-error";
 import { CatalogClient } from "./catalog-client";
 
@@ -15,16 +15,17 @@ function firstValue(value: string | string[] | undefined): string {
 
 export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const params = await searchParams;
-  let products: WebstoreProduct[];
+  let catalog: CatalogResponse;
   try {
-    products = await getProducts();
+    catalog = await getCatalog();
   } catch (e) {
-    console.error("CatalogPage getProducts:", e);
+    console.error("CatalogPage getCatalog:", e);
     return <CatalogError retryHref="/catalogo" />;
   }
   return (
     <CatalogClient
-      products={products}
+      products={catalog.products}
+      currency={catalog.currency}
       initialCategory={firstValue(params.cat)}
       initialQuery={firstValue(params.q)}
       autoFocus={firstValue(params.focus) === "1"}

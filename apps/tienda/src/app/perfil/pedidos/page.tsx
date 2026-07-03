@@ -25,6 +25,7 @@ function statusClasses(status: StoredOrder["status"]): string {
 export default function OrdersPage() {
   const { state } = useStore();
   const orders = state.orders;
+  const currency = state.currency;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -55,7 +56,7 @@ export default function OrdersPage() {
                   </div>
                   <div className="mt-0.5 text-xs text-muted">
                     {formatOrderDate(order.dateIso)} · {order.itemsCount}{" "}
-                    artículos · {fmt(order.total)}
+                    artículos · {fmt(order.total, currency)}
                   </div>
                 </div>
                 <div

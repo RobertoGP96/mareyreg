@@ -47,8 +47,19 @@ psql "$DATABASE_URL" -f prisma/sql/webstore-constraints.sql
 1. **Productos** (`/products`): habilitar `webstoreEnabled` por producto (default `false`), cargar precio de venta y foto, ver historial de precios (timeline de solo lectura).
 2. **Descuentos** (`/discounts`): crear reglas por producto, categoría o globales, con vigencia, cantidad mínima y si son acumulables. Aplican en todos los canales.
 3. **API keys** (`/webstore/api-keys`): generar una key para la tienda (se muestra una sola vez), revocar cuando ya no se use.
-4. **Webhook de órdenes** (`POST /api/webstore/orders`): la tienda manda `externalOrderId`, cliente, líneas (`sku`, `quantity`, `unitPrice` informativo) y pago opcional. Respuestas: `201` procesada, `200` ya procesada (idempotente), `202` requiere revisión manual, `400` payload inválido, `401` key inválida, `409` ya existe en error/revisión, `500` error interno. El body de `201` ahora incluye `status: "processed" | "awaiting_weighing"` y `lines: { sku, priceIsEstimated, estimatedWeightKg? }[]` (ver sección "Peso variable" abajo).
-5. **Catálogo de lectura** (`GET /api/webstore/products`): la tienda consulta sku, nombre, categoría, precio efectivo, stock disponible, foto y oferta vigente (si aplica) de los productos habilitados. Cada producto incluye:
+4. **Webhook de órdenes** (`POST /api/webstore/orders`): la tienda manda `externalOrderId`, `currency` (ISO 4217, **requerido** desde la Fase 5 — sin default), cliente, líneas (`sku`, `quantity`, `unitPrice` informativo) y pago opcional. Respuestas: `201` procesada, `200` ya procesada (idempotente), `202` requiere revisión manual, `400` payload inválido — incluye tanto `currency` ausente/con formato Zod inválido (rechazado antes de crear el `WebstoreOrderLog`) como una moneda válida pero distinta a la base del ERP (rechazado dentro de `processWebstoreOrder`, con el log ya creado en estado `error`); el mensaje siempre indica cuál se esperaba, ej. `"Moneda no soportada: se recibió USD, se esperaba CUP"` — `401` key inválida, `409` ya existe en error/revisión, `500` error interno. El body de `201` ahora incluye `status: "processed" | "awaiting_weighing"` y `lines: { sku, priceIsEstimated, estimatedWeightKg? }[]` (ver sección "Peso variable" abajo).
+
+   > **Nota para integradores externos (v2 de este contrato, jul 2026)**: `currency` pasó de opcional (default `"USD"`) a **obligatorio**, y debe coincidir exactamente con la moneda base configurada en el ERP (`getBaseCurrency`, hoy `CUP`). Un valor distinto lanza `UnsupportedCurrencyError` (`process-order.ts`) y el endpoint responde `400 { status: "error", logId, error: "Moneda no soportada: se recibió X, se esperaba CUP" }` — no es un `NeedsReviewError` (no llega a intentar resolver SKUs) ni un `500` (no es un error interno, es payload incorrecto). Los pagos (`InvoicePayment`) que registra `processWebstoreOrder` quedan siempre en moneda base (`currencyId`/`amountTendered`/`exchangeRate` en `null`), por convención — nunca en la moneda "entregada" del payload.
+5. **Catálogo de lectura** (`GET /api/webstore/products`): la tienda consulta sku, nombre, categoría, precio efectivo, stock disponible, foto y oferta vigente (si aplica) de los productos habilitados. Desde la Fase 5 (multi-moneda) la respuesta es un envelope `{ currency, products }` en vez de un array desnudo:
+
+   ```ts
+   {
+     currency: { code: string; symbol: string; decimalPlaces: number }; // moneda BASE del ERP (getBaseCurrency), ej. { code: "CUP", symbol: "$", decimalPlaces: 0 }
+     products: WebstoreProduct[];
+   }
+   ```
+
+   Todos los montos (`price`, `compareAtPrice`, `pricePerKg`, `presentations[].retailPrice/wholesalePrice/estimatedPrice`) ya vienen convertidos y redondeados a la moneda base — la tienda **nunca** convierte ni conoce tasas de cambio, solo muestra `currency` tal cual la declara el ERP. Cada producto incluye además:
 
    ```ts
    offer: { name: string; type: "percent" | "fixed"; value: number; endsAt: string | null } | null

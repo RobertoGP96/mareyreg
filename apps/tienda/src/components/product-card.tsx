@@ -36,6 +36,7 @@ const IMAGE_HEIGHT: Record<CardVariant, string> = {
 
 export function ProductCard({ product, variant = "grid" }: ProductCardProps) {
   const { state, toggleFav, addToCart, showToast } = useStore();
+  const currency = state.currency;
   const isFav = state.favs.includes(product.sku);
   const soldOut = product.stockAvailable <= 0;
   const stock = stockInfo(product.stockAvailable);
@@ -114,11 +115,11 @@ export function ProductCard({ product, variant = "grid" }: ProductCardProps) {
         <div className="mt-[7px] flex items-center justify-between">
           <div>
             <div className="text-[15px] font-bold text-navy">
-              {fmt(product.price)}
+              {fmt(product.price, currency)}
             </div>
             {variant === "grid" && product.compareAtPrice != null && (
               <div className="text-[11px] text-muted-2 line-through">
-                {fmt(product.compareAtPrice)}
+                {fmt(product.compareAtPrice, currency)}
               </div>
             )}
           </div>

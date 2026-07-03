@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getProducts, type WebstoreProduct } from "@/lib/erp-client";
+import { getCatalog, type CatalogResponse } from "@/lib/erp-client";
 import { CatalogError } from "@/components/catalog-error";
 import { ProductDetailClient } from "./product-detail-client";
 
@@ -13,18 +13,18 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const { sku } = await params;
   const decodedSku = decodeURIComponent(sku);
 
-  let products: WebstoreProduct[];
+  let catalog: CatalogResponse;
   try {
-    products = await getProducts();
+    catalog = await getCatalog();
   } catch (e) {
-    console.error("ProductPage getProducts:", e);
+    console.error("ProductPage getCatalog:", e);
     return <CatalogError retryHref="/catalogo" />;
   }
 
-  const product = products.find((p) => p.sku === decodedSku);
+  const product = catalog.products.find((p) => p.sku === decodedSku);
   if (!product) notFound();
 
-  const related = products
+  const related = catalog.products
     .filter(
       (p) =>
         p.sku !== product.sku &&
@@ -33,5 +33,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
     )
     .slice(0, 3);
 
-  return <ProductDetailClient product={product} related={related} />;
+  return (
+    <ProductDetailClient
+      product={product}
+      related={related}
+      currency={catalog.currency}
+    />
+  );
 }

@@ -22,7 +22,7 @@ export const webstorePaymentSchema = z.object({
 
 export const webstoreOrderPayloadSchema = z.object({
   externalOrderId: z.string().min(1),
-  currency: z.string().length(3).default("USD"),
+  currency: z.string().length(3),
   customer: webstoreCustomerSchema,
   lines: z.array(webstoreOrderLineSchema).min(1),
   payment: webstorePaymentSchema.optional(),

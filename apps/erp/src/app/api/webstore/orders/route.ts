@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { resolveApiKey } from "@/modules/webstore/lib/api-key";
 import { webstoreOrderPayloadSchema } from "@/modules/webstore/lib/schemas";
-import { processWebstoreOrder, NeedsReviewError } from "@/modules/webstore/lib/process-order";
+import {
+  processWebstoreOrder,
+  NeedsReviewError,
+  UnsupportedCurrencyError,
+} from "@/modules/webstore/lib/process-order";
 import {
   checkRateLimit,
   getClientIp,
@@ -128,6 +132,19 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json(
         { status: "needs_review", logId: log.logId, unresolvedSkus: error.unresolvedSkus },
         { status: 202 }
+      );
+    }
+
+    if (error instanceof UnsupportedCurrencyError) {
+      // Error del integrador (payload mal formado), no interno: 400 en vez
+      // de 500, con el mensaje explícito de qué moneda se esperaba.
+      await db.webstoreOrderLog.update({
+        where: { logId: log.logId },
+        data: { status: "error", errorMessage: error.message },
+      });
+      return NextResponse.json(
+        { status: "error", logId: log.logId, error: error.message },
+        { status: 400 }
       );
     }
 

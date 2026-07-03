@@ -1,17 +1,20 @@
 "use client";
 
 import { Heart } from "lucide-react";
-import type { WebstoreProduct } from "@/lib/erp-client";
-import { useStore } from "@/lib/store";
+import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
+import { useStore, useSyncCurrency } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
 import { ProductCard } from "@/components/product-card";
 import { ScreenHeader } from "@/components/screen-header";
 
 export function FavoritesClient({
   products,
+  currency,
 }: {
   products: WebstoreProduct[];
+  currency: WebstoreCurrency;
 }) {
+  useSyncCurrency(currency);
   const { state } = useStore();
   const favorites = products.filter((p) => state.favs.includes(p.sku));
 

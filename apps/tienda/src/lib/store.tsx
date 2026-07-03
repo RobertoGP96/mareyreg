@@ -10,6 +10,8 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import type { WebstoreCurrency } from "@/lib/erp-client";
+import { DEFAULT_CURRENCY } from "@/lib/format";
 
 const STORAGE_KEY = "tienda-store-v1";
 const TOAST_MS = 1800;
@@ -51,11 +53,13 @@ export interface StoreState {
   orders: StoredOrder[];
   couponApplied: boolean;
   toast: string | null;
+  /** Moneda del catálogo (getBaseCurrency en el ERP). DEFAULT_CURRENCY mientras carga la primera página. */
+  currency: WebstoreCurrency;
 }
 
 type PersistedState = Pick<
   StoreState,
-  "cart" | "favs" | "profile" | "orders" | "couponApplied"
+  "cart" | "favs" | "profile" | "orders" | "couponApplied" | "currency"
 >;
 
 type Action =
@@ -70,7 +74,8 @@ type Action =
   | { type: "clearProfile" }
   | { type: "addOrder"; order: StoredOrder }
   | { type: "applyCoupon" }
-  | { type: "setToast"; toast: string | null };
+  | { type: "setToast"; toast: string | null }
+  | { type: "setCurrency"; currency: WebstoreCurrency };
 
 const initialState: StoreState = {
   hydrated: false,
@@ -80,6 +85,7 @@ const initialState: StoreState = {
   orders: [],
   couponApplied: false,
   toast: null,
+  currency: DEFAULT_CURRENCY,
 };
 
 function reducer(state: StoreState, action: Action): StoreState {
@@ -136,6 +142,8 @@ function reducer(state: StoreState, action: Action): StoreState {
       return { ...state, couponApplied: true };
     case "setToast":
       return { ...state, toast: action.toast };
+    case "setCurrency":
+      return { ...state, currency: action.currency };
     default:
       return state;
   }
@@ -166,6 +174,13 @@ function readPersisted(): Partial<PersistedState> {
     if (typeof data.couponApplied === "boolean") {
       result.couponApplied = data.couponApplied;
     }
+    if (
+      typeof data.currency === "object" &&
+      data.currency !== null &&
+      typeof (data.currency as Record<string, unknown>).code === "string"
+    ) {
+      result.currency = data.currency as WebstoreCurrency;
+    }
     return result;
   } catch {
     return {};
@@ -185,6 +200,7 @@ export interface StoreApi {
   addOrder: (order: StoredOrder) => void;
   applyCoupon: () => void;
   showToast: (msg: string) => void;
+  setCurrency: (currency: WebstoreCurrency) => void;
 }
 
 const StoreContext = createContext<StoreApi | null>(null);
@@ -205,6 +221,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       profile: state.profile,
       orders: state.orders,
       couponApplied: state.couponApplied,
+      currency: state.currency,
     };
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
@@ -218,6 +235,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     state.profile,
     state.orders,
     state.couponApplied,
+    state.currency,
   ]);
 
   const showToast = useCallback((msg: string) => {
@@ -243,6 +261,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       addOrder: (order) => dispatch({ type: "addOrder", order }),
       applyCoupon: () => dispatch({ type: "applyCoupon" }),
       showToast,
+      setCurrency: (currency) => dispatch({ type: "setCurrency", currency }),
     }),
     [state, showToast]
   );
@@ -256,6 +275,26 @@ export function useStore(): StoreApi {
     throw new Error("useStore debe usarse dentro de <StoreProvider>");
   }
   return ctx;
+}
+
+/**
+ * Sincroniza al store la moneda que trae el catálogo de esta carga de
+ * página (cada page server-side hace su propio getCatalog()). Se llama una
+ * vez por page-client; evita enhebrar `currency` como prop por todo el
+ * árbol — los componentes de precio simplemente leen `state.currency`.
+ */
+export function useSyncCurrency(currency: WebstoreCurrency): void {
+  const { state, setCurrency } = useStore();
+  useEffect(() => {
+    if (
+      state.currency.code !== currency.code ||
+      state.currency.symbol !== currency.symbol ||
+      state.currency.decimalPlaces !== currency.decimalPlaces
+    ) {
+      setCurrency(currency);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo re-sincroniza cuando cambia la currency recibida, no en cada render del store
+  }, [currency.code, currency.symbol, currency.decimalPlaces]);
 }
 
 export function cartLines(state: StoreState): CartLine[] {

@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { submitOrder } from "@/app/actions/order-actions";
-import { computeTotals } from "@/lib/cart-totals";
+import { computeTotals, SHIPPING_COST } from "@/lib/cart-totals";
 import { fmt } from "@/lib/format";
 import { cartCount, cartLines, useStore } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
@@ -89,6 +89,7 @@ export function CheckoutForm() {
     couponApplied: state.couponApplied,
     pickup: delivery === "recogida",
   });
+  const currency = state.currency;
   const hasCatchWeightLines = lines.some((line) => line.isCatchWeight);
 
   const handleSubmit = async () => {
@@ -132,6 +133,7 @@ export function CheckoutForm() {
         payment,
         couponApplied: state.couponApplied,
         total: totals.total,
+        currency: currency.code,
       });
 
       if (!result.success) {
@@ -235,7 +237,7 @@ export function CheckoutForm() {
           <div className="flex gap-2.5">
             <OptionCard
               title="A domicilio"
-              subtitle="$5.00 · 24–48 h"
+              subtitle={`${fmt(SHIPPING_COST, currency)} · 24–48 h`}
               active={delivery === "domicilio"}
               onSelect={() => setDelivery("domicilio")}
               icon={Truck}
@@ -280,21 +282,21 @@ export function CheckoutForm() {
           </div>
           <div className="mb-[5px] flex justify-between text-[13px] text-ink-soft">
             <span>Subtotal</span>
-            <span>{fmt(totals.subtotal)}</span>
+            <span>{fmt(totals.subtotal, currency)}</span>
           </div>
           {totals.discount > 0 && (
             <div className="mb-[5px] flex justify-between text-[13px] text-ok">
               <span>Descuento</span>
-              <span>−{fmt(totals.discount)}</span>
+              <span>−{fmt(totals.discount, currency)}</span>
             </div>
           )}
           <div className="mb-[9px] flex justify-between text-[13px] text-ink-soft">
             <span>Envío</span>
-            <span>{totals.shipping === 0 ? "Gratis" : fmt(totals.shipping)}</span>
+            <span>{totals.shipping === 0 ? "Gratis" : fmt(totals.shipping, currency)}</span>
           </div>
           <div className="flex justify-between border-t border-dashed border-line pt-[9px] text-[15px] font-bold text-navy">
             <span>Total</span>
-            <span>{fmt(totals.total)}</span>
+            <span>{fmt(totals.total, currency)}</span>
           </div>
           <div className="mt-2.5 text-xs text-muted">
             {delivery === "domicilio"
@@ -320,7 +322,7 @@ export function CheckoutForm() {
           {sending && <Loader2 className="h-4 w-4 animate-spin" />}
           {sending
             ? "Enviando…"
-            : `Confirmar pedido · ${fmt(totals.total)}`}
+            : `Confirmar pedido · ${fmt(totals.total, currency)}`}
         </button>
         </div>
       </div>
@@ -337,7 +339,7 @@ export function CheckoutForm() {
           {sending && <Loader2 className="h-4 w-4 animate-spin" />}
           {sending
             ? "Enviando…"
-            : `Confirmar pedido · ${fmt(totals.total)}`}
+            : `Confirmar pedido · ${fmt(totals.total, currency)}`}
         </button>
       </div>
     </div>

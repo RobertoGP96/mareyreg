@@ -16,6 +16,7 @@ const { tx, mocks } = vi.hoisted(() => {
   const mocks = {
     nextFolio: vi.fn(),
     createAuditLog: vi.fn().mockResolvedValue(undefined),
+    getBaseCurrency: vi.fn(),
     getEffectiveLinePrices: vi.fn(),
     getDefaultWebstoreWarehouseId: vi.fn(),
     resolveSkusBatch: vi.fn(),
@@ -40,6 +41,10 @@ vi.mock("@/lib/audit", () => ({
   createAuditLog: mocks.createAuditLog,
 }));
 
+vi.mock("@/lib/currency", () => ({
+  getBaseCurrency: mocks.getBaseCurrency,
+}));
+
 vi.mock("@/modules/inventory/lib/effective-price", () => ({
   getEffectiveLinePrices: mocks.getEffectiveLinePrices,
   lineKey: (productId: number, presentationId?: number | null) =>
@@ -60,13 +65,17 @@ vi.mock("./resolve-skus", () => ({
   resolveSkusBatch: mocks.resolveSkusBatch,
 }));
 
-import { processWebstoreOrder, NeedsReviewError } from "./process-order";
+import {
+  processWebstoreOrder,
+  NeedsReviewError,
+  UnsupportedCurrencyError,
+} from "./process-order";
 import type { WebstoreOrderPayload } from "./schemas";
 
 function basePayload(overrides: Partial<WebstoreOrderPayload> = {}): WebstoreOrderPayload {
   return {
     externalOrderId: "ext-1",
-    currency: "USD",
+    currency: "CUP",
     customer: {
       email: "cliente@test.com",
       name: "Cliente Test",
@@ -80,7 +89,12 @@ function basePayload(overrides: Partial<WebstoreOrderPayload> = {}): WebstoreOrd
 describe("processWebstoreOrder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    tx.company.findUnique.mockResolvedValue({ id: 1, currency: "USD" });
+    mocks.getBaseCurrency.mockResolvedValue({
+      currencyId: 1,
+      code: "CUP",
+      symbol: "$",
+      decimalPlaces: 0,
+    });
     tx.customer.findFirst.mockResolvedValue(null);
     tx.customer.create.mockResolvedValue({ customerId: 99, email: "cliente@test.com" });
     tx.salesOrder.create.mockResolvedValue({ orderId: 500 });
@@ -188,5 +202,33 @@ describe("processWebstoreOrder", () => {
     });
 
     await expect(processWebstoreOrder(1, payload)).rejects.toThrow(NeedsReviewError);
+  });
+
+  it("moneda distinta a la base configurada: rechaza con UnsupportedCurrencyError", async () => {
+    const payload = basePayload({ currency: "USD" });
+
+    await expect(processWebstoreOrder(1, payload)).rejects.toThrow(
+      UnsupportedCurrencyError
+    );
+    await expect(processWebstoreOrder(1, payload)).rejects.toThrow(
+      "Moneda no soportada: se recibió USD, se esperaba CUP"
+    );
+  });
+
+  it("moneda igual a la base configurada: no rechaza por moneda", async () => {
+    mocks.resolveSkusBatch.mockResolvedValue(
+      new Map([["SKU-1", { productId: 1, sku: "SKU-1", isActive: true, webstoreEnabled: true }]])
+    );
+    tx.product.findMany.mockResolvedValue([{ productId: 1, isCatchWeight: false }]);
+    tx.productPresentation.findMany.mockResolvedValue([]);
+    mocks.getEffectiveLinePrices.mockResolvedValue(
+      new Map([["1:base", { basePrice: 10, finalPrice: 10, appliedDiscounts: [], factor: 1 }]])
+    );
+    tx.invoice.create.mockResolvedValue({ invoiceId: 700 });
+    mocks.dispatchLines.mockResolvedValue({ lineResults: [], priceOverrides: [] });
+
+    const result = await processWebstoreOrder(1, basePayload({ currency: "CUP" }));
+
+    expect(result.status).toBe("processed");
   });
 });

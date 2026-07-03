@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { resolveApiKey } from "@/modules/webstore/lib/api-key";
+import { getBaseCurrency } from "@/lib/currency";
 import { getEffectiveLinePrices, lineKey } from "@/modules/inventory/lib/effective-price";
 import { getDefaultWebstoreWarehouseId } from "@/modules/webstore/lib/dispatch-warehouse";
 import {
@@ -59,6 +60,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     );
   }
 
+  const baseCurrency = await getBaseCurrency(db);
   const warehouseId = await getDefaultWebstoreWarehouseId(db);
 
   const products = await db.product.findMany({
@@ -180,5 +182,12 @@ export async function GET(request: Request): Promise<NextResponse> {
     };
   });
 
-  return NextResponse.json(catalog);
+  return NextResponse.json({
+    currency: {
+      code: baseCurrency.code,
+      symbol: baseCurrency.symbol,
+      decimalPlaces: baseCurrency.decimalPlaces,
+    },
+    products: catalog,
+  });
 }

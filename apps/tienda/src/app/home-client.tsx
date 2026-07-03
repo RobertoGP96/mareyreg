@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { Heart, Repeat2, Search, ShoppingCart, Truck } from "lucide-react";
-import type { WebstoreProduct } from "@/lib/erp-client";
+import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
 import { STORE_NAME } from "@/lib/config";
 import { categoryIcon } from "@/lib/category-icons";
-import { discountPct } from "@/lib/format";
-import { cartCount, useStore } from "@/lib/store";
+import { discountPct, fmt } from "@/lib/format";
+import { cartCount, useStore, useSyncCurrency } from "@/lib/store";
+import { FREE_SHIPPING_TARGET } from "@/lib/cart-totals";
 import { ProductCard } from "@/components/product-card";
 
 function bestOffer(products: WebstoreProduct[]): WebstoreProduct | null {
@@ -17,7 +18,14 @@ function bestOffer(products: WebstoreProduct[]): WebstoreProduct | null {
   );
 }
 
-export function HomeClient({ products }: { products: WebstoreProduct[] }) {
+export function HomeClient({
+  products,
+  currency,
+}: {
+  products: WebstoreProduct[];
+  currency: WebstoreCurrency;
+}) {
+  useSyncCurrency(currency);
   const { state } = useStore();
   const count = cartCount(state);
 
@@ -167,7 +175,7 @@ export function HomeClient({ products }: { products: WebstoreProduct[] }) {
               Envío gratis
             </div>
             <div className="text-[11.5px] leading-[1.4] text-muted md:text-[13px]">
-              En pedidos desde $100
+              En pedidos desde {fmt(FREE_SHIPPING_TARGET, state.currency)}
             </div>
           </div>
         </div>

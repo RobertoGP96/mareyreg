@@ -5,23 +5,27 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { ArrowLeft, Heart, ShoppingCart } from "lucide-react";
 import type {
+  WebstoreCurrency,
   WebstoreProduct,
   WebstoreProductPresentation,
 } from "@/lib/erp-client";
 import { discountPct, fmt, stockInfo } from "@/lib/format";
-import { useStore, type CartLine } from "@/lib/store";
+import { useStore, useSyncCurrency, type CartLine } from "@/lib/store";
 import { ProductImage } from "@/components/product-image";
 import { QtyStepper } from "@/components/qty-stepper";
 
 interface ProductDetailClientProps {
   product: WebstoreProduct;
   related: WebstoreProduct[];
+  currency: WebstoreCurrency;
 }
 
 export function ProductDetailClient({
   product,
   related,
+  currency,
 }: ProductDetailClientProps) {
+  useSyncCurrency(currency);
   const router = useRouter();
   const { state, toggleFav, addToCart, showToast } = useStore();
 
@@ -136,10 +140,10 @@ export function ProductDetailClient({
           {product.name}
         </div>
         <div className="mt-2.5 flex items-baseline gap-2.5">
-          <div className="text-2xl font-bold text-navy">{fmt(unitPrice)}</div>
+          <div className="text-2xl font-bold text-navy">{fmt(unitPrice, currency)}</div>
           {showCompare && product.compareAtPrice != null && (
             <div className="text-[15px] text-muted-2 line-through">
-              {fmt(product.compareAtPrice)}
+              {fmt(product.compareAtPrice, currency)}
             </div>
           )}
           <div className="text-[13px] text-muted">/ {unitLabel}</div>
@@ -192,14 +196,14 @@ export function ProductDetailClient({
                         : "border-line bg-white text-ink-soft hover:border-brand-mid"
                     }`}
                   >
-                    {pres.name} · {fmt(pres.retailPrice)}
+                    {pres.name} · {fmt(pres.retailPrice, currency)}
                   </button>
                 );
               })}
             </div>
             {selected?.wholesalePrice != null && (
               <div className="mt-1.5 text-xs text-muted">
-                Mayoreo: {fmt(selected.wholesalePrice)}
+                Mayoreo: {fmt(selected.wholesalePrice, currency)}
               </div>
             )}
           </div>
@@ -235,7 +239,7 @@ export function ProductDetailClient({
                       {r.name}
                     </div>
                     <div className="mt-1 text-[13px] font-bold text-navy">
-                      {fmt(r.price)}
+                      {fmt(r.price, currency)}
                     </div>
                   </div>
                 </Link>
@@ -249,7 +253,7 @@ export function ProductDetailClient({
         <div className="flex-1">
           <div className="text-xs text-muted">Total</div>
           <div className="text-[19px] font-bold text-navy">
-            {fmt(unitPrice * qty)}
+            {fmt(unitPrice * qty, currency)}
           </div>
         </div>
         <button
