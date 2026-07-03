@@ -24,9 +24,10 @@ export default async function PurchaseOrdersPage() {
         name: true,
         unit: true,
         costPrice: true,
+        isCatchWeight: true,
         presentations: {
           where: { isActive: true },
-          select: { presentationId: true, name: true, factor: true, isBase: true },
+          select: { presentationId: true, name: true, factor: true, isBase: true, piecesPerUnit: true },
           orderBy: [{ isBase: "desc" }, { sortOrder: "asc" }],
         },
       },
@@ -66,6 +67,7 @@ export default async function PurchaseOrdersPage() {
       name: pr.name,
       factor: Number(pr.factor),
       isBase: pr.isBase,
+      piecesPerUnit: pr.piecesPerUnit,
     })),
   }));
 

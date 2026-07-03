@@ -15,6 +15,8 @@ import {
   getProductPresentations,
   type ProductPresentationRow,
 } from "../queries/presentation-queries";
+import { safePriceMarginData, type PriceMarginData } from "../lib/margin";
+import { getRateToBase, GlobalRateNotConfiguredError } from "@/lib/currency";
 
 export async function getProductPresentationsAction(
   productId: number
@@ -39,7 +41,7 @@ function revalidatePresentationSurfaces(): void {
 export async function createPresentation(
   productId: number,
   input: PresentationCreateInput
-): Promise<ActionResult<{ presentationId: number }>> {
+): Promise<ActionResult<{ presentationId: number } & PriceMarginData>> {
   try {
     const parsed = presentationCreateSchema.safeParse(input);
     if (!parsed.success) {
@@ -81,6 +83,12 @@ export async function createPresentation(
 
     const userId = await requireCurrentUserId();
     const presentation = await db.$transaction(async (tx) => {
+      // Guardar un precio en una moneda sin tasa configurada dejaría el
+      // producto invendible (effective-price lanza al cotizar); mejor
+      // rechazar aquí con el mensaje accionable de GlobalRateNotConfiguredError.
+      if (data.priceCurrencyId != null) {
+        await getRateToBase(tx, data.priceCurrencyId);
+      }
       const p = await tx.productPresentation.create({
         data: {
           productId,
@@ -90,6 +98,7 @@ export async function createPresentation(
           barcode: data.barcode || null,
           retailPrice: data.retailPrice,
           wholesalePrice: data.wholesalePrice ?? null,
+          priceCurrencyId: data.priceCurrencyId ?? null,
           isBase: false,
           isActive: true,
           sortOrder: data.sortOrder ?? 0,
@@ -106,11 +115,21 @@ export async function createPresentation(
       return p;
     });
 
+    const margin = await safePriceMarginData(db, {
+      productId,
+      presentationId: presentation.presentationId,
+      priceAmount: data.retailPrice,
+      priceCurrencyId: data.priceCurrencyId ?? null,
+    });
+
     revalidatePresentationSurfaces();
-    return { success: true, data: { presentationId: presentation.presentationId } };
+    return { success: true, data: { presentationId: presentation.presentationId, ...margin } };
   } catch (error) {
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
+    if (error instanceof GlobalRateNotConfiguredError) {
+      return { success: false, error: error.message };
     }
     console.error("Error creating presentation:", error);
     return { success: false, error: "Error al crear la presentación" };
@@ -120,7 +139,7 @@ export async function createPresentation(
 export async function updatePresentation(
   presentationId: number,
   input: PresentationUpdateInput
-): Promise<ActionResult<void>> {
+): Promise<ActionResult<PriceMarginData>> {
   try {
     const parsed = presentationUpdateSchema.safeParse(input);
     if (!parsed.success) {
@@ -131,7 +150,7 @@ export async function updatePresentation(
 
     const userId = await requireCurrentUserId();
 
-    await db.$transaction(async (tx) => {
+    const saved = await db.$transaction(async (tx) => {
       const prev = await tx.productPresentation.findUnique({
         where: { presentationId },
         include: { product: true },
@@ -177,10 +196,20 @@ export async function updatePresentation(
       const prevWholesale = prev.wholesalePrice != null ? Number(prev.wholesalePrice) : null;
       const wholesaleChanged =
         data.wholesalePrice !== undefined && prevWholesale !== (data.wholesalePrice ?? null);
-      const priceChanged = retailChanged || wholesaleChanged;
+      const currencyChanged =
+        data.priceCurrencyId !== undefined &&
+        (prev.priceCurrencyId ?? null) !== (data.priceCurrencyId ?? null);
+      // Cambiar la moneda cambia el precio efectivo aunque el número no cambie.
+      const priceChanged = retailChanged || wholesaleChanged || currencyChanged;
 
       if (priceChanged) {
         await assertRole("admin", "dispatcher");
+      }
+
+      const newCurrencyId =
+        data.priceCurrencyId !== undefined ? data.priceCurrencyId ?? null : prev.priceCurrencyId;
+      if (currencyChanged && newCurrencyId != null) {
+        await getRateToBase(tx, newCurrencyId);
       }
 
       await tx.productPresentation.update({
@@ -192,6 +221,7 @@ export async function updatePresentation(
           ...(data.barcode !== undefined && { barcode: data.barcode || null }),
           ...(data.retailPrice !== undefined && { retailPrice: data.retailPrice }),
           ...(data.wholesalePrice !== undefined && { wholesalePrice: data.wholesalePrice ?? null }),
+          ...(data.priceCurrencyId !== undefined && { priceCurrencyId: data.priceCurrencyId ?? null }),
           ...(data.sortOrder !== undefined && { sortOrder: data.sortOrder }),
         },
       });
@@ -205,16 +235,21 @@ export async function updatePresentation(
             oldWholesalePrice: prev.wholesalePrice ?? null,
             newWholesalePrice:
               data.wholesalePrice !== undefined ? data.wholesalePrice : prev.wholesalePrice ?? null,
+            oldCurrencyId: prev.priceCurrencyId,
+            newCurrencyId,
             changedBy: userId,
             reason: data.reason ?? null,
           },
         });
       }
 
-      if (prev.isBase && retailChanged) {
+      if (prev.isBase && (retailChanged || currencyChanged)) {
         await tx.product.update({
           where: { productId: prev.productId },
-          data: { salePrice: data.retailPrice },
+          data: {
+            ...(retailChanged && { salePrice: data.retailPrice }),
+            ...(currencyChanged && { saleCurrencyId: newCurrencyId }),
+          },
         });
         await tx.productPriceHistory.create({
           data: {
@@ -222,7 +257,9 @@ export async function updatePresentation(
             oldCostPrice: prev.product.costPrice,
             newCostPrice: prev.product.costPrice,
             oldSalePrice: prev.product.salePrice,
-            newSalePrice: data.retailPrice,
+            newSalePrice: retailChanged ? data.retailPrice : prev.product.salePrice,
+            oldCurrencyId: prev.product.saleCurrencyId,
+            newCurrencyId,
             changedBy: userId,
           },
         });
@@ -237,16 +274,32 @@ export async function updatePresentation(
         oldValues: prev,
         newValues: data,
       });
+
+      return {
+        productId: prev.productId,
+        retailPrice: data.retailPrice !== undefined ? data.retailPrice : Number(prev.retailPrice),
+        priceCurrencyId: newCurrencyId,
+      };
+    });
+
+    const margin = await safePriceMarginData(db, {
+      productId: saved.productId,
+      presentationId,
+      priceAmount: saved.retailPrice,
+      priceCurrencyId: saved.priceCurrencyId,
     });
 
     revalidatePresentationSurfaces();
-    return { success: true, data: undefined };
+    return { success: true, data: margin };
   } catch (error) {
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
     }
     if (error instanceof ForbiddenError) {
       return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
+    }
+    if (error instanceof GlobalRateNotConfiguredError) {
+      return { success: false, error: error.message };
     }
     if (error instanceof Error && error.message === "NOT_FOUND") {
       return { success: false, error: "La presentación no existe" };

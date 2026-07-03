@@ -20,7 +20,12 @@ export async function getPurchaseOrder(poId: number) {
       supplier: true,
       warehouse: true,
       currency: true,
-      lines: { include: { product: true, presentation: true } },
+      lines: {
+        include: {
+          product: { select: { productId: true, name: true, unit: true, tracksLots: true, isCatchWeight: true } },
+          presentation: true,
+        },
+      },
       receipts: {
         include: {
           currency: { select: { code: true, symbol: true } },

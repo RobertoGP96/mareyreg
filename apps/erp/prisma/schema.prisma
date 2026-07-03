@@ -470,6 +470,7 @@ model Product {
   maxStock        Decimal?        @map("max_stock")
   costPrice       Decimal?        @map("cost_price")
   salePrice       Decimal?        @map("sale_price")
+  saleCurrencyId  Int?            @map("sale_currency_id") // null = moneda base (CUP)
   secondaryPrice  Decimal?        @map("secondary_price") // DEPRECATED: usar ProductPresentation.wholesalePrice
   valuationMethod ValuationMethod @default(average) @map("valuation_method")
   tracksLots      Boolean         @default(false) @map("tracks_lots")
@@ -482,6 +483,9 @@ model Product {
   reorderPoint    Decimal?        @map("reorder_point")
   reorderQuantity Decimal?        @map("reorder_quantity")
   isService       Boolean         @default(false) @map("is_service")
+  // Producto de peso variable (ej. queso): la baseQuantity real de cada línea
+  // viene del peso capturado, no del factor nominal de la presentación.
+  isCatchWeight   Boolean         @default(false) @map("is_catch_weight")
   brand           String?
   supplier        String?
   supplierRef     String?         @map("supplier_ref")
@@ -497,6 +501,7 @@ model Product {
   inventoryLayers    InventoryLayer[]
   lots               Lot[]
   supplierRel        Supplier?           @relation(fields: [supplierId], references: [supplierId])
+  saleCurrency       Currency?           @relation("ProductSaleCurrency", fields: [saleCurrencyId], references: [currencyId], onDelete: Restrict)
   purchaseOrderLines PurchaseOrderLine[]
   quoteLines         QuoteLine[]
   salesOrderLines    SalesOrderLine[]
@@ -527,10 +532,16 @@ model ProductPresentation {
   productId      Int      @map("product_id")
   name           String
   factor         Decimal  @default(1)
+  // Piezas fungibles por unidad de esta presentación. null en la presentación
+  // base y en productos normales; >=1 en Pieza/Caja de productos catch-weight
+  // (Caja = N piezas). En catch-weight, factor es el peso NOMINAL en kg — solo
+  // estima, la baseQuantity real de cada línea viene del peso capturado.
+  piecesPerUnit  Int?     @map("pieces_per_unit")
   sku            String?  @unique
   barcode        String?  @unique
   retailPrice    Decimal  @map("retail_price")
   wholesalePrice Decimal? @map("wholesale_price")
+  priceCurrencyId Int?    @map("price_currency_id") // null = moneda base (CUP); aplica a retail y wholesale
   isBase         Boolean  @default(false) @map("is_base")
   isActive       Boolean  @default(true) @map("is_active")
   sortOrder      Int      @default(0) @map("sort_order")
@@ -538,6 +549,7 @@ model ProductPresentation {
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
 
   product            Product                    @relation(fields: [productId], references: [productId], onDelete: Restrict)
+  priceCurrency      Currency?                  @relation("PresentationPriceCurrency", fields: [priceCurrencyId], references: [currencyId], onDelete: Restrict)
   invoiceLines       InvoiceLine[]
   salesOrderLines    SalesOrderLine[]
   purchaseOrderLines PurchaseOrderLine[]
@@ -587,6 +599,9 @@ model StockMovement {
   productId       Int          @map("product_id")
   warehouseId     Int          @map("warehouse_id")
   quantity        Decimal
+  // Piezas fungibles movidas (catch-weight), siempre positivo — el signo lo
+  // da movementType, igual que quantity.
+  pieces          Int?         @map("pieces")
   movementType    MovementType @map("movement_type")
   // unitCost SIEMPRE en CUP (moneda base). Si el movimiento se originó en otra
   // moneda, origCurrencyId/origUnitCost/exchangeRate guardan el snapshot original.
@@ -616,6 +631,9 @@ model StockLevel {
   productId       Int      @map("product_id")
   warehouseId     Int      @map("warehouse_id")
   currentQuantity Decimal  @default(0) @map("current_quantity")
+  // Contador de piezas fungibles (catch-weight). No participa en valuación —
+  // el stock valuado sigue siendo currentQuantity en kg (unidad base).
+  currentPieces   Int      @default(0) @map("current_pieces")
   lastUpdated     DateTime @default(now()) @map("last_updated")
 
   product   Product   @relation(fields: [productId], references: [productId])
@@ -851,6 +869,10 @@ model GoodsReceiptLine {
   presentationId Int?    @map("presentation_id")
   unitFactor     Decimal @default(1) @map("unit_factor")
   baseQuantity   Decimal @default(0) @map("base_quantity") // quantity × unitFactor, en unidad base
+  // Piezas recibidas (catch-weight) y su desglose de peso individual (kg por
+  // pieza, en el mismo orden) para trazabilidad/auditoría del pesaje.
+  pieces         Int?    @map("pieces")
+  pieceWeights   Json?   @map("piece_weights")
 
   receipt      GoodsReceipt         @relation(fields: [receiptId], references: [receiptId], onDelete: Cascade)
   poLine       PurchaseOrderLine    @relation(fields: [poLineId], references: [lineId])
@@ -1070,6 +1092,8 @@ model SalesOrderLine {
   presentationId Int?    @map("presentation_id")
   unitFactor     Decimal @default(1) @map("unit_factor")
   baseQuantity   Decimal @default(0) @map("base_quantity") // quantity × unitFactor, en unidad base
+  // Piezas vendidas (catch-weight). pieces IS NOT NULL ⇒ línea catch-weight.
+  pieces         Int?    @map("pieces")
 
   order        SalesOrder           @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
   product      Product              @relation(fields: [productId], references: [productId])
@@ -1122,6 +1146,9 @@ model InvoiceLine {
   presentationId Int?    @map("presentation_id")
   unitFactor     Decimal @default(1) @map("unit_factor")
   baseQuantity   Decimal @default(0) @map("base_quantity") // quantity × unitFactor, en unidad base
+  // Piezas vendidas (catch-weight). pieces IS NOT NULL ⇒ línea catch-weight;
+  // baseQuantity en ese caso viene del peso real capturado, no del factor.
+  pieces         Int?    @map("pieces")
 
   invoice      Invoice              @relation(fields: [invoiceId], references: [invoiceId], onDelete: Cascade)
   product      Product              @relation(fields: [productId], references: [productId])
@@ -1226,9 +1253,11 @@ model PriceListItem {
   priceListId Int     @map("price_list_id")
   productId   Int     @map("product_id")
   price       Decimal
+  currencyId  Int?    @map("currency_id") // null = moneda base (CUP)
 
   priceList PriceList @relation(fields: [priceListId], references: [priceListId], onDelete: Cascade)
   product   Product   @relation(fields: [productId], references: [productId])
+  currency  Currency? @relation("PriceListItemCurrency", fields: [currencyId], references: [currencyId], onDelete: Restrict)
 
   @@id([priceListId, productId])
   @@map("price_list_items")
@@ -1301,6 +1330,10 @@ model ProductPriceHistory {
   newCostPrice Decimal? @map("new_cost_price")
   oldSalePrice Decimal? @map("old_sale_price")
   newSalePrice Decimal? @map("new_sale_price")
+  // Histórico puro: sin FK a Currency (la moneda pudo desactivarse/borrarse
+  // desde entonces). null = moneda base (CUP) en ese momento.
+  oldCurrencyId Int?    @map("old_currency_id")
+  newCurrencyId Int?    @map("new_currency_id")
   changedBy    Int?     @map("changed_by")
   changedAt    DateTime @default(now()) @map("changed_at")
   reason       String?
@@ -1320,6 +1353,9 @@ model PresentationPriceHistory {
   newRetailPrice    Decimal? @map("new_retail_price")
   oldWholesalePrice Decimal? @map("old_wholesale_price")
   newWholesalePrice Decimal? @map("new_wholesale_price")
+  // Histórico puro: sin FK a Currency. null = moneda base (CUP) en ese momento.
+  oldCurrencyId     Int?     @map("old_currency_id")
+  newCurrencyId     Int?     @map("new_currency_id")
   changedBy         Int?     @map("changed_by")
   changedAt         DateTime @default(now()) @map("changed_at")
   reason            String?
@@ -1401,6 +1437,11 @@ model StockCountLine {
   countedQty  Decimal? @map("counted_qty")
   difference  Decimal?
   lotId       Int?     @map("lot_id")
+  // Conteo de piezas fungibles (catch-weight), paralelo a expectedQty/countedQty
+  // que siguen en kg (unidad base).
+  expectedPieces   Int? @map("expected_pieces")
+  countedPieces    Int? @map("counted_pieces")
+  piecesDifference Int? @map("pieces_difference")
 
   count   StockCount @relation(fields: [countId], references: [countId], onDelete: Cascade)
   product Product    @relation(fields: [productId], references: [productId])
@@ -1478,6 +1519,9 @@ model Currency {
   stockMovements      StockMovement[]    @relation("StockMovementOrigCurrency")
   inventoryLayers     InventoryLayer[]   @relation("InventoryLayerOrigCurrency")
   productCosts        ProductCost[]      @relation("ProductCostCurrency")
+  productsSalePriced  Product[]          @relation("ProductSaleCurrency")
+  presentationsPriced ProductPresentation[] @relation("PresentationPriceCurrency")
+  priceListItems      PriceListItem[]    @relation("PriceListItemCurrency")
 
   @@map("currencies")
 }
@@ -1698,6 +1742,7 @@ enum WebstoreOrderStatus {
   needs_review
   error
   cancelled
+  awaiting_weighing
 }
 
 model WebstoreApiKey {

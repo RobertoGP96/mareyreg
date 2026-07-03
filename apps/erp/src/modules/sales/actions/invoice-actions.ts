@@ -27,7 +27,13 @@ function toUserMessage(error: unknown, genericMessage: string): string {
       error.message === "Ya cancelada" ||
       error.message.startsWith("El monto excede el saldo pendiente") ||
       error.message.startsWith("El monto del cobro excede el total") ||
-      error.message.startsWith("No se puede cancelar una factura con pagos")
+      error.message.startsWith("No se puede cancelar una factura con pagos") ||
+      // Validaciones de líneas catch-weight (peso variable), en español,
+      // seguras de mostrar tal cual — ver dispatch-lines.ts.
+      error.message.startsWith("El producto ") ||
+      error.message.startsWith("La cantidad de ") ||
+      error.message.startsWith("Captura el peso real de ") ||
+      error.message.endsWith("no es un producto de peso variable")
     ) {
       return error.message;
     }
@@ -42,6 +48,8 @@ export interface InvoiceLineInput {
   unitPrice: number;
   discount?: number;
   lotId?: number;
+  /** Peso real capturado en báscula (kg). Solo productos catch-weight. */
+  actualWeightKg?: number;
 }
 
 export interface InvoiceInput {
@@ -308,6 +316,7 @@ export async function cancelInvoice(invoiceId: number): Promise<ActionResult<voi
             baseQuantity: bq > 0 ? bq : Number(l.quantity) * Number(l.unitFactor),
             unitCost: Number(l.unitCost),
             lotId: l.lotId,
+            pieces: l.pieces,
           };
         }),
         userId,

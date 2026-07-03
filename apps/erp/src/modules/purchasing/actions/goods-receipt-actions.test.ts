@@ -491,3 +491,190 @@ describe("createGoodsReceipt — costos duales USD/CUP (Fase 2)", () => {
     expect(tx.goodsReceiptLine.create).not.toHaveBeenCalled();
   });
 });
+
+describe("createGoodsReceipt — catch-weight (peso variable)", () => {
+  function catchWeightPoLine(overrides: Partial<Record<string, unknown>> = {}) {
+    return poLine({
+      productId: 1,
+      quantity: 5,
+      unitCost: 8, // $/kg
+      presentationId: 20,
+      unitFactor: 5, // peso nominal por caja (kg) — solo estimacion
+      presentation: { presentationId: 20, name: "Caja", factor: 5, piecesPerUnit: 2 },
+      product: {
+        productId: 1,
+        name: "Queso gouda",
+        unit: "kg",
+        tracksLots: false,
+        isCatchWeight: true,
+      },
+      ...overrides,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) => cb(tx));
+    requireCurrentUserId.mockResolvedValue(1);
+    nextFolio.mockResolvedValue("REC-0001");
+    applyInventoryEntry.mockResolvedValue(undefined);
+
+    tx.purchaseOrder.findUnique.mockResolvedValue(
+      purchaseOrder({ lines: [catchWeightPoLine()] })
+    );
+    tx.goodsReceipt.create.mockResolvedValue({
+      receiptId: 1,
+      folio: "REC-0001",
+      receivedAt: new Date("2026-01-01"),
+    });
+    tx.purchaseOrderLine.updateMany.mockResolvedValue({ count: 1 });
+    tx.purchaseOrderLine.findMany.mockResolvedValue([catchWeightPoLine({ receivedQty: 2 })]);
+    tx.goodsReceiptLine.create.mockResolvedValue({ lineId: 1 });
+    tx.stockMovement.create.mockResolvedValue({ movementId: 1 });
+    tx.stockLevel.upsert.mockResolvedValue({});
+    tx.purchaseOrder.update.mockResolvedValue({});
+    tx.productCost.upsert.mockResolvedValue({});
+    tx.product.update.mockResolvedValue({});
+    tx.company.findUnique.mockResolvedValue(CUP_BASE);
+  });
+
+  it("2 cajas (2 pzas c/u) con pesos reales: baseQuantity = suma de pesos, pieces = 4, unitCost pasa tal cual ($/kg)", async () => {
+    const result = await createGoodsReceipt({
+      poId: 1,
+      lines: [
+        {
+          poLineId: 1,
+          quantity: 2,
+          unitCost: 8,
+          pieceWeights: [4.2, 3.8, 4.5, 4.15],
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+
+    const totalWeight = 4.2 + 3.8 + 4.5 + 4.15; // 16.65
+    expect(applyInventoryEntry).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        productId: 1,
+        warehouseId: 1,
+        qty: totalWeight,
+        unitCost: 8, // no se divide entre el factor nominal
+      })
+    );
+
+    expect(tx.goodsReceiptLine.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        quantity: 2,
+        pieces: 4,
+        pieceWeights: [4.2, 3.8, 4.5, 4.15],
+        baseQuantity: totalWeight,
+      }),
+    });
+
+    expect(tx.stockLevel.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ currentQuantity: totalWeight, currentPieces: 4 }),
+        update: expect.objectContaining({
+          currentQuantity: { increment: totalWeight },
+          currentPieces: { increment: 4 },
+        }),
+      })
+    );
+
+    expect(tx.stockMovement.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ quantity: totalWeight, pieces: 4, unitCost: 8 }),
+      })
+    );
+  });
+
+  it("pieceWeights.length distinto al esperado retorna error claro", async () => {
+    const result = await createGoodsReceipt({
+      poId: 1,
+      lines: [
+        {
+          poLineId: 1,
+          quantity: 2,
+          unitCost: 8,
+          pieceWeights: [4.2, 3.8, 4.5], // se esperaban 4
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("Se esperaban 4 pesos");
+    }
+    expect(tx.goodsReceiptLine.create).not.toHaveBeenCalled();
+  });
+
+  it("peso <= 0 en alguna pieza retorna error claro", async () => {
+    const result = await createGoodsReceipt({
+      poId: 1,
+      lines: [
+        {
+          poLineId: 1,
+          quantity: 2,
+          unitCost: 8,
+          pieceWeights: [4.2, 0, 4.5, 4.15],
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("Captura el peso de cada pieza");
+    }
+    expect(tx.goodsReceiptLine.create).not.toHaveBeenCalled();
+  });
+
+  it("producto catch-weight sin pieceWeights retorna error claro", async () => {
+    const result = await createGoodsReceipt({
+      poId: 1,
+      lines: [{ poLineId: 1, quantity: 2, unitCost: 8 }],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("Captura el peso de cada pieza");
+    }
+    expect(tx.goodsReceiptLine.create).not.toHaveBeenCalled();
+  });
+
+  it("producto normal con pieceWeights retorna error claro (regresion)", async () => {
+    tx.purchaseOrder.findUnique.mockResolvedValue(purchaseOrder({ lines: [poLine()] }));
+    tx.purchaseOrderLine.findMany.mockResolvedValue([poLine({ receivedQty: 2 })]);
+
+    const result = await createGoodsReceipt({
+      poId: 1,
+      lines: [{ poLineId: 1, quantity: 2, unitCost: 240, pieceWeights: [1, 2] }],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("no es de peso variable");
+    }
+    expect(tx.goodsReceiptLine.create).not.toHaveBeenCalled();
+  });
+
+  it("producto normal (no catch-weight) sigue funcionando igual: pieces null, pieceWeights undefined", async () => {
+    tx.purchaseOrder.findUnique.mockResolvedValue(purchaseOrder({ lines: [poLine()] }));
+    tx.purchaseOrderLine.findMany.mockResolvedValue([poLine({ receivedQty: 2 })]);
+
+    await createGoodsReceipt({
+      poId: 1,
+      lines: [{ poLineId: 1, quantity: 2, unitCost: 240 }],
+    });
+
+    expect(tx.goodsReceiptLine.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ pieces: null, pieceWeights: undefined, baseQuantity: 48 }),
+    });
+    expect(tx.stockLevel.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ currentPieces: 0 }),
+      })
+    );
+  });
+});

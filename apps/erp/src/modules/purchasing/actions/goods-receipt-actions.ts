@@ -6,7 +6,13 @@ import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
 import { applyInventoryEntry } from "@/lib/valuation";
-import { toBaseQuantity, formatEquivalence } from "@/modules/inventory/lib/units";
+import {
+  toBaseQuantity,
+  formatEquivalence,
+  piecesFor,
+  catchWeightBaseQuantity,
+  formatCatchWeight,
+} from "@/modules/inventory/lib/units";
 import { getBaseCurrency, getRateToBase, GlobalRateNotConfiguredError } from "@/lib/currency";
 
 function isAuthError(error: unknown): boolean {
@@ -26,6 +32,9 @@ function toUserMessage(error: unknown, fallback: string): string {
     if (error.message.startsWith("Linea de OC")) return error.message;
     if (error.message.startsWith("La OC esta en estado")) return error.message;
     if (error.message.startsWith("La presentación")) return error.message;
+    if (error.message.startsWith("El producto")) return error.message;
+    if (error.message.startsWith("Captura el peso")) return error.message;
+    if (error.message.startsWith("Se esperaban")) return error.message;
     if (error.message === "No se puede recibir la misma linea de OC dos veces en una recepcion") {
       return error.message;
     }
@@ -41,6 +50,10 @@ export interface ReceiptLineInput {
   lotCode?: string;        // para productos con tracksLots
   expirationDate?: string;
   manufactureDate?: string;
+  // Peso real (kg) de cada pieza recibida, en orden — solo para productos
+  // catch-weight con presentación de piezas. length debe ser exactamente
+  // piecesFor(quantity, piecesPerUnit); cada valor > 0.
+  pieceWeights?: number[];
 }
 
 export interface ReceiptInput {
@@ -141,20 +154,74 @@ export async function createGoodsReceipt(
           unitFactor = Number(presentation.factor);
         }
 
-        // baseQuantity: SIEMPRE lo que entra a stock/valuacion/kardex.
-        const baseQuantity = toBaseQuantity(rl.quantity, unitFactor);
+        // Catch-weight: el peso real se pesa pieza por pieza al recibir, la
+        // baseQuantity NUNCA viene del factor nominal (solo estima). Requiere
+        // una presentación con piezas (piecesPerUnit) — nunca la unidad base.
+        const isCatchWeight = poLine.product.isCatchWeight;
+        let piecesPerUnit: number | null = null;
+        if (isCatchWeight) {
+          if (presentationId == null) {
+            throw new Error(
+              `El producto ${poLine.product.name} es de peso variable: la recepción requiere una presentación con piezas`
+            );
+          }
+          // presentationId pudo venir de poLine (herencia) o del override de
+          // arriba; en ambos casos necesitamos su piecesPerUnit fresco de BD.
+          const presentation =
+            rl.presentationId != null && rl.presentationId !== poLine.presentationId
+              ? await tx.productPresentation.findUnique({ where: { presentationId } })
+              : poLine.presentation;
+          piecesPerUnit = presentation?.piecesPerUnit ?? null;
+          if (piecesPerUnit == null) {
+            throw new Error(
+              `El producto ${poLine.product.name} es de peso variable: la presentación seleccionada no tiene piezas configuradas`
+            );
+          }
+        } else if (rl.pieceWeights != null) {
+          throw new Error(
+            `El producto ${poLine.product.name} no es de peso variable: no debe capturar pesos por pieza`
+          );
+        }
+
+        let pieces: number | null = null;
+        let pieceWeights: number[] | null = null;
+        let baseQuantity: number;
+
+        if (isCatchWeight) {
+          pieces = piecesFor(rl.quantity, piecesPerUnit!);
+          if (!rl.pieceWeights) {
+            throw new Error(`Captura el peso de cada pieza para ${poLine.product.name}`);
+          }
+          if (rl.pieceWeights.length !== pieces) {
+            throw new Error(
+              `Se esperaban ${pieces} pesos para ${poLine.product.name}, se recibieron ${rl.pieceWeights.length}`
+            );
+          }
+          if (rl.pieceWeights.some((w) => !Number.isFinite(w) || w <= 0)) {
+            throw new Error(`Captura el peso de cada pieza para ${poLine.product.name}: cada peso debe ser mayor a 0`);
+          }
+          pieceWeights = rl.pieceWeights;
+          const totalWeightKg = pieceWeights.reduce((s, w) => s + w, 0);
+          baseQuantity = catchWeightBaseQuantity(totalWeightKg);
+        } else {
+          // baseQuantity: SIEMPRE lo que entra a stock/valuacion/kardex.
+          baseQuantity = toBaseQuantity(rl.quantity, unitFactor);
+        }
+
         // Costo por unidad base: si el costo capturado es por presentacion
         // (ej. $240 la caja de 24), se divide por el factor ($10 la unidad base).
-        // Esto queda en la moneda del documento (unitCostPerBase); el costo
-        // que valua inventario SIEMPRE es en CUP (unitCostBasePerBaseUnit).
-        const unitCostPerBase = unitCost / unitFactor;
+        // En catch-weight, unitCost YA viene capturado en $/kg (unidad base) —
+        // no se divide entre el factor nominal, que solo estima el peso, no el
+        // costo real de la línea.
+        const unitCostPerBase = isCatchWeight ? unitCost : unitCost / unitFactor;
         const unitCostBasePerBaseUnit = isBaseCurrency
           ? unitCostPerBase
           : unitCostPerBase * receiptExchangeRate!;
-        const equivalenceNote =
-          unitFactor !== 1
-            ? ` — ${formatEquivalence(rl.quantity, unitFactor, poLine.presentation?.name ?? "presentación", poLine.product.unit)}`
-            : "";
+        const equivalenceNote = isCatchWeight
+          ? ` — ${formatCatchWeight(rl.quantity, poLine.presentation?.name ?? "presentación", pieces!, baseQuantity)}`
+          : unitFactor !== 1
+          ? ` — ${formatEquivalence(rl.quantity, unitFactor, poLine.presentation?.name ?? "presentación", poLine.product.unit)}`
+          : "";
 
         // Incremento atomico de receivedQty condicionado a no exceder quantity.
         // Prisma updateMany no permite comparar dos columnas entre si, asi que
@@ -218,6 +285,8 @@ export async function createGoodsReceipt(
             presentationId,
             unitFactor,
             baseQuantity,
+            pieces,
+            pieceWeights: pieceWeights ?? undefined,
           },
         });
 
@@ -240,11 +309,13 @@ export async function createGoodsReceipt(
         // StockMovement: cantidad en unidad base, con nota de equivalencia
         // cuando la presentacion no es la base (factor !== 1). unitCost SIEMPRE
         // en CUP; el trio original se persiste solo si el documento no es la base.
+        // pieces solo se llena en catch-weight, para el kardex de piezas.
         await tx.stockMovement.create({
           data: {
             productId: poLine.productId,
             warehouseId: po.warehouseId,
             quantity: baseQuantity,
+            pieces,
             movementType: "entry",
             unitCost: unitCostBasePerBaseUnit,
             origCurrencyId: isBaseCurrency ? null : po.currencyId,
@@ -256,7 +327,9 @@ export async function createGoodsReceipt(
           },
         });
 
-        // StockLevel: SIEMPRE en unidad base.
+        // StockLevel: SIEMPRE en unidad base (kg en catch-weight). currentPieces
+        // es un contador auxiliar (no participa en valuación) que solo se
+        // incrementa para productos catch-weight.
         await tx.stockLevel.upsert({
           where: {
             productId_warehouseId: {
@@ -268,9 +341,11 @@ export async function createGoodsReceipt(
             productId: poLine.productId,
             warehouseId: po.warehouseId,
             currentQuantity: baseQuantity,
+            currentPieces: pieces ?? 0,
           },
           update: {
             currentQuantity: { increment: baseQuantity },
+            ...(pieces != null ? { currentPieces: { increment: pieces } } : {}),
             lastUpdated: new Date(),
           },
         });

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildPriceExpression,
   buildScopeCondition,
+  buildCurrencyCondition,
   bulkPriceAdjustmentSchema,
 } from "./bulk-price";
 
@@ -125,6 +126,46 @@ describe("buildPriceExpression", () => {
       })
     ).toThrow();
   });
+
+  it("rateFactor: aplica newRate/oldRate como factor", () => {
+    expect(
+      buildPriceExpression("retail_price", {
+        mode: "rateFactor",
+        rateFactor: { oldRate: 380, newRate: 400 },
+        rounding: "none",
+      })
+    ).toBe("GREATEST(retail_price * (400::numeric / 380::numeric), 0)");
+  });
+
+  it("rateFactor: respeta el redondeo solicitado", () => {
+    expect(
+      buildPriceExpression("wholesale_price", {
+        mode: "rateFactor",
+        rateFactor: { oldRate: 380, newRate: 400 },
+        rounding: "whole",
+      })
+    ).toBe("GREATEST(ROUND((wholesale_price * (400::numeric / 380::numeric))::numeric), 0)");
+  });
+
+  it("rateFactor: lanza error si falta rateFactor o las tasas no son finitas/positivas", () => {
+    expect(() =>
+      buildPriceExpression("retail_price", { mode: "rateFactor", rounding: "none" })
+    ).toThrow();
+    expect(() =>
+      buildPriceExpression("retail_price", {
+        mode: "rateFactor",
+        rateFactor: { oldRate: 0, newRate: 400 },
+        rounding: "none",
+      })
+    ).toThrow();
+    expect(() =>
+      buildPriceExpression("retail_price", {
+        mode: "rateFactor",
+        rateFactor: { oldRate: 380, newRate: NaN },
+        rounding: "none",
+      })
+    ).toThrow();
+  });
 });
 
 describe("bulkPriceAdjustmentSchema", () => {
@@ -231,6 +272,60 @@ describe("bulkPriceAdjustmentSchema", () => {
       reason: "a".repeat(200),
     });
     expect(result.success).toBe(true);
+  });
+
+  it("acepta mode:rateFactor sin direction/value, con rateFactor", () => {
+    const result = bulkPriceAdjustmentSchema.safeParse({
+      scope: { kind: "all" },
+      mode: "rateFactor",
+      rateFactor: { oldRate: 380, newRate: 400 },
+      target: "retail",
+      rounding: "none",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rechaza mode:rateFactor sin el objeto rateFactor", () => {
+    const result = bulkPriceAdjustmentSchema.safeParse({
+      scope: { kind: "all" },
+      mode: "rateFactor",
+      target: "retail",
+      rounding: "none",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rechaza mode:percent/fixed sin direction ni value", () => {
+    const result = bulkPriceAdjustmentSchema.safeParse({
+      scope: { kind: "all" },
+      mode: "percent",
+      target: "retail",
+      rounding: "none",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("acepta priceCurrencyId explícito (incluyendo null para moneda base)", () => {
+    expect(
+      bulkPriceAdjustmentSchema.safeParse({ ...base, value: 10, priceCurrencyId: null }).success
+    ).toBe(true);
+    expect(
+      bulkPriceAdjustmentSchema.safeParse({ ...base, value: 10, priceCurrencyId: 2 }).success
+    ).toBe(true);
+  });
+});
+
+describe("buildCurrencyCondition", () => {
+  it("priceCurrencyId null filtra por moneda base sin params", () => {
+    const result = buildCurrencyCondition(null, 2);
+    expect(result.sql).toBe("pp.price_currency_id IS NULL");
+    expect(result.params).toEqual([]);
+  });
+
+  it("priceCurrencyId numérico parametriza con el offset indicado", () => {
+    const result = buildCurrencyCondition(2, 3);
+    expect(result.sql).toBe("pp.price_currency_id = $4");
+    expect(result.params).toEqual([2]);
   });
 });
 

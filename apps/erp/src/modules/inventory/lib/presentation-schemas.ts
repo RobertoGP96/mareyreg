@@ -21,6 +21,8 @@ export const presentationCreateSchema = z.object({
     .min(0, "El precio de mayoreo no puede ser negativo")
     .nullable()
     .optional(),
+  // null = moneda base (CUP). Una sola moneda para retail y wholesale.
+  priceCurrencyId: z.number().int().positive().nullable().optional(),
   sku: nonEmptyTrimmed("El SKU"),
   barcode: nonEmptyTrimmed("El código de barras"),
   sortOrder: z.number().int().min(0).optional(),

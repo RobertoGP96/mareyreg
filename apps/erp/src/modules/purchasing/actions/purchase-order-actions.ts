@@ -26,6 +26,7 @@ function toUserMessage(error: unknown, fallback: string): string {
   if (error instanceof Error) {
     if (BUSINESS_ERRORS.has(error.message)) return error.message;
     if (error.message.startsWith("La presentación")) return error.message;
+    if (error.message.startsWith("El producto")) return error.message;
   }
   return fallback;
 }
@@ -48,6 +49,12 @@ interface ResolvedLinePresentation {
  * producto, está activa) y calcula el snapshot que se guarda en la línea:
  * el factor nunca se toma del caller, siempre se lee de la BD en el momento
  * de crear la OC (igual que resolvePresentation en stock-actions.ts).
+ *
+ * Productos catch-weight: la OC se captura siempre en una presentación con
+ * piezas (Pieza/Caja), nunca en la unidad base (kg) — el peso real se
+ * conoce hasta la recepción. quantity debe ser entera (cajas/piezas
+ * pedidas); baseQuantity aquí es solo una ESTIMACION con el factor nominal,
+ * la recepción la recalcula con el peso real capturado en báscula.
  */
 async function resolveLinePresentation(
   tx: PrismaTx,
@@ -55,7 +62,20 @@ async function resolveLinePresentation(
 ): Promise<ResolvedLinePresentation> {
   const { productId, presentationId, quantity } = params;
 
+  const product = await tx.product.findUnique({
+    where: { productId },
+    select: { isCatchWeight: true },
+  });
+  if (!product) {
+    throw new Error(`El producto ${productId} no existe`);
+  }
+
   if (presentationId == null) {
+    if (product.isCatchWeight) {
+      throw new Error(
+        `El producto es de peso variable: selecciona una presentación con piezas (no la unidad base)`
+      );
+    }
     return { presentationId: null, unitFactor: 1, baseQuantity: quantity };
   }
 
@@ -69,6 +89,19 @@ async function resolveLinePresentation(
   }
   if (!presentation.isActive) {
     throw new Error(`La presentación "${presentation.name}" está inactiva`);
+  }
+
+  if (product.isCatchWeight) {
+    if (presentation.piecesPerUnit == null) {
+      throw new Error(
+        `El producto es de peso variable: la presentación "${presentation.name}" no tiene piezas configuradas`
+      );
+    }
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw new Error(
+        `El producto es de peso variable: la cantidad debe ser un entero (cajas/piezas)`
+      );
+    }
   }
 
   const unitFactor = Number(presentation.factor);

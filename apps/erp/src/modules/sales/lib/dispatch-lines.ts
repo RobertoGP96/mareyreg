@@ -1,6 +1,12 @@
 import { applyInventoryEntry, applyInventoryExit } from "@/lib/valuation";
 import { getEffectiveLinePrices, lineKey } from "@/modules/inventory/lib/effective-price";
-import { toBaseQuantity, formatEquivalence } from "@/modules/inventory/lib/units";
+import {
+  toBaseQuantity,
+  formatEquivalence,
+  piecesFor,
+  catchWeightBaseQuantity,
+  formatCatchWeight,
+} from "@/modules/inventory/lib/units";
 import type { Prisma } from "@/generated/prisma";
 
 type PrismaTx = Prisma.TransactionClient;
@@ -19,6 +25,8 @@ export interface DispatchLineInput {
   unitPrice?: number;
   discount?: number;
   lotId?: number;
+  /** Peso real capturado en báscula (kg). Obligatorio para productos catch-weight. */
+  actualWeightKg?: number;
 }
 
 export interface DispatchLineResult {
@@ -32,6 +40,8 @@ export interface DispatchLineResult {
   lotId: number | null;
   unitFactor: number;
   baseQuantity: number;
+  /** Piezas fungibles de la línea (catch-weight). null para productos normales. */
+  pieces: number | null;
 }
 
 export interface DispatchLinesOptions {
@@ -121,6 +131,7 @@ export async function dispatchLines(
     let presentationId: number | null = null;
     let factor = 1;
     let presentationName: string | null = null;
+    let piecesPerUnit: number | null = null;
 
     if (line.presentationId != null) {
       const presentation = presentationById.get(line.presentationId);
@@ -135,47 +146,122 @@ export async function dispatchLines(
       presentationId = presentation.presentationId;
       factor = Number(presentation.factor);
       presentationName = presentation.name;
+      piecesPerUnit = presentation.piecesPerUnit ?? null;
     }
 
-    const baseQty = toBaseQuantity(line.quantity, factor);
+    if (!product.isCatchWeight && line.actualWeightKg != null) {
+      throw new Error(`${product.name} no es un producto de peso variable`);
+    }
 
     const effective = effectivePrices.get(lineKey(line.productId, line.presentationId));
     if (!effective) throw new Error(`Producto ${line.productId} no encontrado`);
 
     let unitPrice = line.unitPrice ?? 0;
+    let pieces: number | null = null;
+    let baseQty: number;
 
-    if (allowManualPrice) {
-      // Precio de catálogo server-side (fuente de verdad, por unidad de
-      // PRESENTACIÓN). El POS permite edición manual legítima del precio, así
-      // que se acepta el precio que envía el cliente, pero se registra en el
-      // audit log cuando difiere del precio de catálogo, para trazabilidad.
-      if (Math.abs(unitPrice - effective.finalPrice) > 0.0001) {
-        priceOverrides.push({
-          productId: line.productId,
-          catalogPrice: effective.finalPrice,
-          chargedPrice: unitPrice,
-        });
+    if (product.isCatchWeight) {
+      // Producto de peso variable: solo Pieza/Caja (piecesPerUnit != null) son
+      // vendibles — la presentación base (kg) no tiene conteo de piezas.
+      if (piecesPerUnit == null) {
+        throw new Error(
+          `El producto ${product.name} es de peso variable: selecciona presentación Pieza o Caja`
+        );
+      }
+      if (!Number.isInteger(line.quantity) || line.quantity < 1) {
+        throw new Error(`La cantidad de ${product.name} debe ser un número entero mayor o igual a 1`);
+      }
+      if (line.actualWeightKg == null || !(line.actualWeightKg > 0)) {
+        throw new Error(`Captura el peso real de ${product.name}`);
+      }
+
+      pieces = piecesFor(line.quantity, piecesPerUnit);
+      baseQty = catchWeightBaseQuantity(line.actualWeightKg);
+
+      if (allowManualPrice) {
+        // unitPrice se interpreta SIEMPRE por kg en catch-weight. El POS puede
+        // capturar un precio manual (por kg); se compara contra pricePerBase
+        // para el mismo registro de auditoría que las líneas normales.
+        if (effective.pricePerBase == null) {
+          throw new Error(`El producto ${product.name} no tiene precio por kg configurado`);
+        }
+        if (Math.abs(unitPrice - effective.pricePerBase) > 0.0001) {
+          priceOverrides.push({
+            productId: line.productId,
+            catalogPrice: effective.pricePerBase,
+            chargedPrice: unitPrice,
+          });
+        }
+      } else {
+        if (effective.pricePerBase == null) {
+          throw new Error(`El producto ${product.name} no tiene precio por kg configurado`);
+        }
+        unitPrice = effective.pricePerBase;
       }
     } else {
-      // Webstore: precio efectivo de catálogo forzado server-side, nunca el
-      // que envía el cliente/integración externa.
-      unitPrice = effective.finalPrice;
+      baseQty = toBaseQuantity(line.quantity, factor);
+
+      if (allowManualPrice) {
+        // Precio de catálogo server-side (fuente de verdad, por unidad de
+        // PRESENTACIÓN). El POS permite edición manual legítima del precio, así
+        // que se acepta el precio que envía el cliente, pero se registra en el
+        // audit log cuando difiere del precio de catálogo, para trazabilidad.
+        if (Math.abs(unitPrice - effective.finalPrice) > 0.0001) {
+          priceOverrides.push({
+            productId: line.productId,
+            catalogPrice: effective.finalPrice,
+            chargedPrice: unitPrice,
+          });
+        }
+      } else {
+        // Webstore: precio efectivo de catálogo forzado server-side, nunca el
+        // que envía el cliente/integración externa.
+        unitPrice = effective.finalPrice;
+      }
     }
 
     let unitCost = 0;
 
     if (!product.isService) {
-      const equivalenceNote =
-        factor !== 1 && presentationName
+      const equivalenceNote = product.isCatchWeight
+        ? ` — ${formatCatchWeight(line.quantity, presentationName ?? product.unit, pieces ?? line.quantity, line.actualWeightKg ?? 0)}`
+        : factor !== 1 && presentationName
           ? ` — ${formatEquivalence(line.quantity, factor, presentationName, product.unit)}`
           : "";
 
-      // Descontar StockLevel de forma atómica: si el producto no permite
-      // stock negativo, updateMany solo aplica si currentQuantity >= qty;
-      // si count === 0, no había stock suficiente. Si allowNegative es
-      // true, se descuenta sin condición (puede quedar en negativo). El
-      // descuento SIEMPRE ocurre en unidad base.
-      if (!product.allowNegative) {
+      // Descontar StockLevel de forma atómica. Catch-weight decrementa kg
+      // (currentQuantity) y piezas (currentPieces) en un único updateMany —
+      // ambas condiciones deben cumplirse o no se aplica ninguna (sin locks,
+      // Neon HTTP no soporta SELECT FOR UPDATE confiable). Catch-weight
+      // ignora allowNegative: el form de producto ya lo prohíbe para estos
+      // productos, así que siempre se trata como stock estricto.
+      if (product.isCatchWeight) {
+        const updated = await tx.stockLevel.updateMany({
+          where: {
+            productId: line.productId,
+            warehouseId,
+            currentQuantity: { gte: baseQty },
+            currentPieces: { gte: pieces! },
+          },
+          data: {
+            currentQuantity: { decrement: baseQty },
+            currentPieces: { decrement: pieces! },
+            lastUpdated: new Date(),
+          },
+        });
+        if (updated.count === 0) {
+          const lvl = await tx.stockLevel.findUnique({
+            where: {
+              productId_warehouseId: { productId: line.productId, warehouseId },
+            },
+          });
+          const currentKg = lvl ? Number(lvl.currentQuantity) : 0;
+          const currentPieces = lvl ? lvl.currentPieces : 0;
+          throw new Error(
+            `Stock insuficiente de ${product.name}. Disponible: ${currentKg} kg / ${currentPieces} pzas — solicitado: ${baseQty} kg / ${pieces} pzas`
+          );
+        }
+      } else if (!product.allowNegative) {
         const updated = await tx.stockLevel.updateMany({
           where: {
             productId: line.productId,
@@ -221,7 +307,7 @@ export async function dispatchLines(
 
       // Valuación: salida (metodo pre-resuelto desde el batch de arriba, evita
       // el findUnique duplicado dentro de applyInventoryExit/resolveMethod).
-      // Siempre en unidad base.
+      // Siempre en unidad base (kg reales para catch-weight).
       const exit = await applyInventoryExit(
         tx,
         {
@@ -239,6 +325,7 @@ export async function dispatchLines(
           productId: line.productId,
           warehouseId,
           quantity: baseQty,
+          pieces,
           movementType: "exit",
           unitCost,
           referenceDoc: folio,
@@ -257,7 +344,9 @@ export async function dispatchLines(
     }
 
     const discount = line.discount ?? 0;
-    const subtotal = line.quantity * unitPrice - discount;
+    const subtotal = product.isCatchWeight
+      ? baseQty * unitPrice - discount
+      : line.quantity * unitPrice - discount;
 
     lineResults.push({
       productId: line.productId,
@@ -270,6 +359,7 @@ export async function dispatchLines(
       lotId: line.lotId ?? null,
       unitFactor: factor,
       baseQuantity: baseQty,
+      pieces,
     });
   }
 
@@ -286,6 +376,7 @@ export async function dispatchLines(
       lotId: r.lotId,
       unitFactor: r.unitFactor,
       baseQuantity: r.baseQuantity,
+      pieces: r.pieces,
     })),
   });
 
@@ -299,6 +390,8 @@ export interface ReverseInvoiceLineInput {
   baseQuantity: number;
   unitCost: number;
   lotId?: number | null;
+  /** Piezas fungibles de la línea original (catch-weight). null/undefined para productos normales. */
+  pieces?: number | null;
 }
 
 export interface ReverseInvoiceStockOptions {
@@ -319,6 +412,8 @@ export interface ReverseInvoiceLineResult {
   /** Cantidad en unidad base realmente reingresada a stock/kardex. */
   baseQuantity: number;
   unitCost: number;
+  /** Piezas reingresadas a currentPieces (catch-weight). null para productos normales. */
+  pieces: number | null;
 }
 
 /**
@@ -348,11 +443,21 @@ export async function reverseInvoiceStock(
     }
 
     const baseQty = line.baseQuantity;
+    const pieces = line.pieces ?? null;
 
     await tx.stockLevel.upsert({
       where: { productId_warehouseId: { productId: line.productId, warehouseId } },
-      create: { productId: line.productId, warehouseId, currentQuantity: baseQty },
-      update: { currentQuantity: { increment: baseQty }, lastUpdated: new Date() },
+      create: {
+        productId: line.productId,
+        warehouseId,
+        currentQuantity: baseQty,
+        ...(pieces != null ? { currentPieces: pieces } : {}),
+      },
+      update: {
+        currentQuantity: { increment: baseQty },
+        ...(pieces != null ? { currentPieces: { increment: pieces } } : {}),
+        lastUpdated: new Date(),
+      },
     });
 
     await applyInventoryEntry(tx, {
@@ -369,6 +474,7 @@ export async function reverseInvoiceStock(
         productId: line.productId,
         warehouseId,
         quantity: baseQty,
+        pieces,
         movementType: "adjustment",
         unitCost: line.unitCost,
         referenceDoc: folio,
@@ -390,6 +496,7 @@ export async function reverseInvoiceStock(
       quantity: line.quantity,
       baseQuantity: baseQty,
       unitCost: line.unitCost,
+      pieces,
     });
   }
 

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma";
 import { toBaseQuantity } from "./units";
+import { getBaseCurrency, getRateToBase, roundToCurrency } from "@/lib/currency";
 
 type PrismaTx = Prisma.TransactionClient;
 type DbOrTx = PrismaTx | typeof db;
@@ -12,9 +13,37 @@ export interface AppliedDiscount {
 }
 
 export interface EffectivePriceResult {
+  /** Precio base ya convertido a moneda BASE (CUP), antes de descuentos. */
   basePrice: number;
+  /** Precio final tras descuentos, convertido a base y redondeado (roundToCurrency). */
   finalPrice: number;
   appliedDiscounts: AppliedDiscount[];
+  /** Moneda original del precio antes de convertir a base. null = ya estaba en base. */
+  priceCurrencyId?: number | null;
+  /** Tasa aplicada para llevar el precio a base. null si ya estaba en base. */
+  rateApplied?: number | null;
+}
+
+/**
+ * Cache de tasas por moneda para no repetir `getRateToBase` por cada línea
+ * cuando varias comparten la misma moneda de precio dentro de un mismo batch.
+ */
+class RateCache {
+  private readonly rates = new Map<number, number>();
+
+  constructor(
+    private readonly client: DbOrTx,
+    private readonly baseCurrencyId: number
+  ) {}
+
+  async rateFor(currencyId: number | null | undefined): Promise<number | null> {
+    if (currencyId == null || currencyId === this.baseCurrencyId) return null;
+    const cached = this.rates.get(currencyId);
+    if (cached != null) return cached;
+    const { rate } = await getRateToBase(this.client, currencyId);
+    this.rates.set(currencyId, rate);
+    return rate;
+  }
 }
 
 function discountAmount(
@@ -40,10 +69,19 @@ type DiscountLike = {
  * (producto/categoría/global), vigencia y minQty para ese producto. Regla de
  * negocio: solo se aplica UN descuento a la vez — el de mayor beneficio para
  * el cliente — para que la variante unitaria y la batch nunca diverjan.
+ *
+ * `basePrice` YA debe venir convertido a moneda base (CUP) por el caller —
+ * esta función es agnóstica de moneda. Los descuentos porcentuales/volumen
+ * funcionan igual sobre el monto en base; los descuentos "fixed" se asumen
+ * definidos en moneda base (hoy no existe un `currencyId` en `Discount`, así
+ * que no hay conversión posible para ese monto — documentado aquí para no
+ * repetir la investigación si se agrega soporte multi-moneda a descuentos).
+ * El redondeo final a la moneda base ocurre DESPUÉS del descuento.
  */
 function resolvePriceFromDiscounts(
   basePrice: number,
-  discounts: DiscountLike[]
+  discounts: DiscountLike[],
+  baseDecimalPlaces: number
 ): EffectivePriceResult {
   const appliedDiscounts: AppliedDiscount[] = [];
   let finalPrice = basePrice;
@@ -57,7 +95,11 @@ function resolvePriceFromDiscounts(
     appliedDiscounts.push({ discountId: best.discountId, name: best.name, discountAmount: amount });
   }
 
-  return { basePrice, finalPrice, appliedDiscounts };
+  return {
+    basePrice,
+    finalPrice: roundToCurrency(finalPrice, baseDecimalPlaces),
+    appliedDiscounts,
+  };
 }
 
 /**
@@ -130,13 +172,17 @@ export async function getEffectivePrices(
 
   const at = opts.at ?? new Date();
 
-  const products = await client.product.findMany({
-    where: { productId: { in: uniqueIds } },
-    select: { productId: true, salePrice: true, category: true },
-  });
+  const [base, products] = await Promise.all([
+    getBaseCurrency(client),
+    client.product.findMany({
+      where: { productId: { in: uniqueIds } },
+      select: { productId: true, salePrice: true, saleCurrencyId: true, category: true },
+    }),
+  ]);
   const productById = new Map(products.map((p) => [p.productId, p]));
+  const rateCache = new RateCache(client, base.currencyId);
 
-  const priceListItemByProductId = new Map<number, Prisma.Decimal>();
+  const priceListItemByProductId = new Map<number, { price: Prisma.Decimal; currencyId: number | null }>();
   if (opts.customerId) {
     const customer = await client.customer.findUnique({
       where: { customerId: opts.customerId },
@@ -145,10 +191,10 @@ export async function getEffectivePrices(
     if (customer?.priceListId) {
       const items = await client.priceListItem.findMany({
         where: { priceListId: customer.priceListId, productId: { in: uniqueIds } },
-        select: { productId: true, price: true },
+        select: { productId: true, price: true, currencyId: true },
       });
       for (const item of items) {
-        priceListItemByProductId.set(item.productId, item.price);
+        priceListItemByProductId.set(item.productId, { price: item.price, currencyId: item.currencyId });
       }
     }
   }
@@ -202,9 +248,16 @@ export async function getEffectivePrices(
     const product = productById.get(productId);
     if (!product) continue; // findMany no lanza para ids inexistentes; se omiten del resultado.
 
-    let basePrice = product.salePrice != null ? Number(product.salePrice) : 0;
+    let rawPrice = product.salePrice != null ? Number(product.salePrice) : 0;
+    let priceCurrencyId: number | null = product.saleCurrencyId;
     const priceListItem = priceListItemByProductId.get(productId);
-    if (priceListItem != null) basePrice = Number(priceListItem);
+    if (priceListItem != null) {
+      rawPrice = Number(priceListItem.price);
+      priceCurrencyId = priceListItem.currencyId;
+    }
+
+    const rateApplied = await rateCache.rateFor(priceCurrencyId);
+    const basePrice = rateApplied != null ? rawPrice * rateApplied : rawPrice;
 
     const applicable = [
       ...(discountsByProductId.get(productId) ?? []),
@@ -212,7 +265,11 @@ export async function getEffectivePrices(
       ...(product.category ? discountsByCategory.get(product.category) ?? [] : []),
     ];
 
-    results.set(productId, resolvePriceFromDiscounts(basePrice, applicable));
+    results.set(productId, {
+      ...resolvePriceFromDiscounts(basePrice, applicable, base.decimalPlaces),
+      priceCurrencyId,
+      rateApplied,
+    });
   }
 
   return results;
@@ -227,6 +284,14 @@ export interface EffectiveLineInput {
 export interface EffectiveLinePriceResult extends EffectivePriceResult {
   /** Unidades base por unidad vendida (1 para la base o sin presentación). */
   factor: number;
+  /**
+   * Precio final POR KG (unidad base) para productos catch-weight, resuelto
+   * SIEMPRE desde la presentación base del producto (lista de precios del
+   * cliente y descuentos evaluados igual que para la base), sin importar qué
+   * presentación (Pieza/Caja) se vendió en la línea. undefined para productos
+   * normales — el precio de la línea ya es el correcto vía basePrice/finalPrice.
+   */
+  pricePerBase?: number;
 }
 
 /** Llave del resultado de getEffectiveLinePrices para una línea. */
@@ -270,15 +335,38 @@ export async function getEffectiveLinePrices(
     )
   );
 
-  const products = await client.product.findMany({
-    where: { productId: { in: uniqueProductIds } },
-    select: { productId: true, salePrice: true, category: true },
-  });
+  const [base, products] = await Promise.all([
+    getBaseCurrency(client),
+    client.product.findMany({
+      where: { productId: { in: uniqueProductIds } },
+      select: {
+        productId: true,
+        salePrice: true,
+        saleCurrencyId: true,
+        category: true,
+        isCatchWeight: true,
+      },
+    }),
+  ]);
   const productById = new Map(products.map((p) => [p.productId, p]));
+  const rateCache = new RateCache(client, base.currencyId);
 
-  const presentations = uniquePresentationIds.length
+  // Productos catch-weight necesitan su presentación BASE para resolver
+  // pricePerBase, sin importar si la línea vendió Pieza/Caja (no-base) — se
+  // agrega aunque no venga en uniquePresentationIds para no hacer un segundo
+  // round-trip por línea.
+  const catchWeightProductIds = products.filter((p) => p.isCatchWeight).map((p) => p.productId);
+
+  const presentations = uniquePresentationIds.length || catchWeightProductIds.length
     ? await client.productPresentation.findMany({
-        where: { presentationId: { in: uniquePresentationIds } },
+        where: {
+          OR: [
+            ...(uniquePresentationIds.length ? [{ presentationId: { in: uniquePresentationIds } }] : []),
+            ...(catchWeightProductIds.length
+              ? [{ productId: { in: catchWeightProductIds }, isBase: true }]
+              : []),
+          ],
+        },
         select: {
           presentationId: true,
           productId: true,
@@ -286,15 +374,19 @@ export async function getEffectiveLinePrices(
           factor: true,
           retailPrice: true,
           wholesalePrice: true,
+          priceCurrencyId: true,
           isBase: true,
           isActive: true,
         },
       })
     : [];
   const presentationById = new Map(presentations.map((p) => [p.presentationId, p]));
+  const basePresentationByProductId = new Map(
+    presentations.filter((p) => p.isBase).map((p) => [p.productId, p])
+  );
 
   let isWholesaleCustomer = false;
-  const priceListItemByProductId = new Map<number, Prisma.Decimal>();
+  const priceListItemByProductId = new Map<number, { price: Prisma.Decimal; currencyId: number | null }>();
   if (opts.customerId) {
     const customer = await client.customer.findUnique({
       where: { customerId: opts.customerId },
@@ -304,10 +396,10 @@ export async function getEffectiveLinePrices(
     if (customer?.priceListId) {
       const items = await client.priceListItem.findMany({
         where: { priceListId: customer.priceListId, productId: { in: uniqueProductIds } },
-        select: { productId: true, price: true },
+        select: { productId: true, price: true, currencyId: true },
       });
       for (const item of items) {
-        priceListItemByProductId.set(item.productId, item.price);
+        priceListItemByProductId.set(item.productId, { price: item.price, currencyId: item.currencyId });
       }
     }
   }
@@ -358,6 +450,47 @@ export async function getEffectiveLinePrices(
     }
   }
 
+  // pricePerBase (catch-weight) depende solo del producto, no de la línea:
+  // se resuelve una vez por producto y se reutiliza en todas sus líneas.
+  const pricePerBaseByProductId = new Map<number, number>();
+
+  async function resolvePricePerBase(productId: number): Promise<number | undefined> {
+    if (pricePerBaseByProductId.has(productId)) return pricePerBaseByProductId.get(productId);
+
+    const product = productById.get(productId);
+    if (!product?.isCatchWeight) return undefined;
+
+    const basePresentation = basePresentationByProductId.get(productId);
+    let rawPrice = product.salePrice != null ? Number(product.salePrice) : 0;
+    let priceCurrencyId: number | null = product.saleCurrencyId;
+    if (basePresentation) {
+      rawPrice =
+        isWholesaleCustomer && basePresentation.wholesalePrice != null
+          ? Number(basePresentation.wholesalePrice)
+          : Number(basePresentation.retailPrice);
+      priceCurrencyId = basePresentation.priceCurrencyId;
+    }
+
+    const priceListItem = priceListItemByProductId.get(productId);
+    if (priceListItem != null) {
+      rawPrice = Number(priceListItem.price);
+      priceCurrencyId = priceListItem.currencyId;
+    }
+
+    const rateApplied = await rateCache.rateFor(priceCurrencyId);
+    const basePriceForKg = rateApplied != null ? rawPrice * rateApplied : rawPrice;
+
+    const applicable = [
+      ...(discountsByProductId.get(productId) ?? []),
+      ...globalDiscounts,
+      ...(product.category ? discountsByCategory.get(product.category) ?? [] : []),
+    ].filter((d) => d.minQty == null || Number(d.minQty) <= 1);
+
+    const resolved = resolvePriceFromDiscounts(basePriceForKg, applicable, base.decimalPlaces).finalPrice;
+    pricePerBaseByProductId.set(productId, resolved);
+    return resolved;
+  }
+
   for (const line of lines) {
     const key = lineKey(line.productId, line.presentationId);
     if (results.has(key)) continue;
@@ -367,7 +500,8 @@ export async function getEffectiveLinePrices(
 
     let factor = 1;
     let isBasePresentation = true;
-    let basePrice = product.salePrice != null ? Number(product.salePrice) : 0;
+    let rawPrice = product.salePrice != null ? Number(product.salePrice) : 0;
+    let priceCurrencyId: number | null = product.saleCurrencyId;
 
     if (line.presentationId != null) {
       const presentation = presentationById.get(line.presentationId);
@@ -381,16 +515,23 @@ export async function getEffectiveLinePrices(
       }
       factor = Number(presentation.factor);
       isBasePresentation = presentation.isBase;
-      basePrice =
+      rawPrice =
         isWholesaleCustomer && presentation.wholesalePrice != null
           ? Number(presentation.wholesalePrice)
           : Number(presentation.retailPrice);
+      priceCurrencyId = presentation.priceCurrencyId;
     }
 
     // La lista de precios del cliente gana solo sobre la presentación base;
     // las presentaciones no-base tienen su propio precio explícito.
     const priceListItem = priceListItemByProductId.get(line.productId);
-    if (isBasePresentation && priceListItem != null) basePrice = Number(priceListItem);
+    if (isBasePresentation && priceListItem != null) {
+      rawPrice = Number(priceListItem.price);
+      priceCurrencyId = priceListItem.currencyId;
+    }
+
+    const rateApplied = await rateCache.rateFor(priceCurrencyId);
+    const basePrice = rateApplied != null ? rawPrice * rateApplied : rawPrice;
 
     const baseQty = toBaseQuantity(line.quantity, factor);
     const applicable = [
@@ -399,7 +540,15 @@ export async function getEffectiveLinePrices(
       ...(product.category ? discountsByCategory.get(product.category) ?? [] : []),
     ].filter((d) => d.minQty == null || Number(d.minQty) <= baseQty);
 
-    results.set(key, { ...resolvePriceFromDiscounts(basePrice, applicable), factor });
+    const pricePerBase = await resolvePricePerBase(line.productId);
+
+    results.set(key, {
+      ...resolvePriceFromDiscounts(basePrice, applicable, base.decimalPlaces),
+      factor,
+      priceCurrencyId,
+      rateApplied,
+      ...(pricePerBase !== undefined ? { pricePerBase } : {}),
+    });
   }
 
   return results;

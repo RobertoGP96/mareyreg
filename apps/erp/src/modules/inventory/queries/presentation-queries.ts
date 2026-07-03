@@ -9,6 +9,8 @@ export interface ProductPresentationRow {
   barcode: string | null;
   retailPrice: number;
   wholesalePrice: number | null;
+  /** null = moneda base (CUP). */
+  priceCurrencyId: number | null;
   isBase: boolean;
   isActive: boolean;
   sortOrder: number;
@@ -29,6 +31,7 @@ export async function getProductPresentations(productId: number): Promise<Produc
     barcode: r.barcode,
     retailPrice: Number(r.retailPrice),
     wholesalePrice: r.wholesalePrice != null ? Number(r.wholesalePrice) : null,
+    priceCurrencyId: r.priceCurrencyId,
     isBase: r.isBase,
     isActive: r.isActive,
     sortOrder: r.sortOrder,

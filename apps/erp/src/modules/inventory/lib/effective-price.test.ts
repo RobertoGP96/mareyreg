@@ -1,10 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const { getBaseCurrency, getRateToBase } = vi.hoisted(() => ({
+  getBaseCurrency: vi.fn(),
+  getRateToBase: vi.fn(),
+}));
+
+vi.mock("@/lib/currency", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/currency")>("@/lib/currency");
+  return {
+    ...actual,
+    getBaseCurrency,
+    getRateToBase,
+  };
+});
+
 import {
   getEffectivePrice,
   getEffectivePrices,
   getEffectiveLinePrices,
   lineKey,
 } from "./effective-price";
+
+const BASE = { currencyId: 1, code: "CUP", symbol: "$", decimalPlaces: 0 };
+const USD_ID = 2;
 
 type MockDb = {
   product: { findMany: ReturnType<typeof vi.fn> };
@@ -32,17 +50,28 @@ function presentation(overrides: Partial<Record<string, unknown>> = {}) {
     factor: 24,
     retailPrice: 550,
     wholesalePrice: null,
+    priceCurrencyId: null,
     isBase: false,
     isActive: true,
     ...overrides,
   };
 }
 
-function product(overrides: Partial<{ productId: number; salePrice: number; category: string | null }> = {}) {
+function product(
+  overrides: Partial<{
+    productId: number;
+    salePrice: number;
+    saleCurrencyId: number | null;
+    category: string | null;
+    isCatchWeight: boolean;
+  }> = {}
+) {
   return {
     productId: 1,
     salePrice: 100,
+    saleCurrencyId: null,
     category: null,
+    isCatchWeight: false,
     ...overrides,
   };
 }
@@ -69,6 +98,8 @@ describe("effective-price", () => {
 
   beforeEach(() => {
     db = createMockDb();
+    getBaseCurrency.mockResolvedValue(BASE);
+    getRateToBase.mockReset();
     db.customer.findUnique.mockResolvedValue(null);
     db.priceListItem.findMany.mockResolvedValue([]);
     db.productPresentation.findMany.mockResolvedValue([]);
@@ -319,7 +350,7 @@ describe("effective-price", () => {
         presentation({ presentationId: 10 }),
       ]);
       db.customer.findUnique.mockResolvedValue({ priceListId: 7, customerType: "retail" });
-      db.priceListItem.findMany.mockResolvedValue([{ productId: 1, price: 20 }]);
+      db.priceListItem.findMany.mockResolvedValue([{ productId: 1, price: 20, currencyId: null }]);
       db.discount.findMany.mockResolvedValue([]);
 
       const results = await getEffectiveLinePrices(
@@ -370,6 +401,157 @@ describe("effective-price", () => {
       await expect(
         getEffectiveLinePrices(db as never, [{ productId: 1, presentationId: 10, quantity: 1 }])
       ).rejects.toThrow("inactiva");
+    });
+  });
+
+  describe("getEffectiveLinePrices (catch-weight)", () => {
+    it("producto catch-weight retorna pricePerBase resuelto desde la presentación base", async () => {
+      db.product.findMany.mockResolvedValue([
+        product({ salePrice: 25, isCatchWeight: true }),
+      ]);
+      db.productPresentation.findMany.mockResolvedValue([
+        presentation({ presentationId: 9, name: "kg", factor: 1, retailPrice: 80, isBase: true }),
+        presentation({ presentationId: 10, name: "Caja", factor: 5, retailPrice: 380 }),
+      ]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      const results = await getEffectiveLinePrices(db as never, [
+        { productId: 1, presentationId: 10, quantity: 1 },
+      ]);
+
+      const line = results.get(lineKey(1, 10));
+      expect(line?.pricePerBase).toBe(80);
+      // El precio de la línea (Caja) no se ve afectado por pricePerBase.
+      expect(line?.basePrice).toBe(380);
+    });
+
+    it("producto normal deja pricePerBase undefined", async () => {
+      db.product.findMany.mockResolvedValue([product({ salePrice: 25, isCatchWeight: false })]);
+      db.productPresentation.findMany.mockResolvedValue([presentation()]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      const results = await getEffectiveLinePrices(db as never, [
+        { productId: 1, presentationId: 10, quantity: 1 },
+      ]);
+
+      expect(results.get(lineKey(1, 10))?.pricePerBase).toBeUndefined();
+    });
+
+    it("pricePerBase respeta la lista de precios del cliente sobre la base", async () => {
+      db.product.findMany.mockResolvedValue([
+        product({ salePrice: 25, isCatchWeight: true }),
+      ]);
+      db.productPresentation.findMany.mockResolvedValue([
+        presentation({ presentationId: 9, name: "kg", factor: 1, retailPrice: 80, isBase: true }),
+        presentation({ presentationId: 10, name: "Caja", factor: 5, retailPrice: 380 }),
+      ]);
+      db.customer.findUnique.mockResolvedValue({ priceListId: 7, customerType: "retail" });
+      db.priceListItem.findMany.mockResolvedValue([{ productId: 1, price: 70, currencyId: null }]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      const results = await getEffectiveLinePrices(
+        db as never,
+        [{ productId: 1, presentationId: 10, quantity: 1 }],
+        { customerId: 42 }
+      );
+
+      expect(results.get(lineKey(1, 10))?.pricePerBase).toBe(70);
+    });
+  });
+
+  describe("multi-moneda", () => {
+    it("getEffectivePrices: salePrice en USD se convierte a base y se redondea", async () => {
+      getRateToBase.mockResolvedValue({ exchangeRateId: 5, rate: 400 });
+      db.product.findMany.mockResolvedValue([
+        product({ salePrice: 1.5, saleCurrencyId: USD_ID }),
+      ]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      const results = await getEffectivePrices(db as never, [1], { quantity: 1 });
+
+      const result = results.get(1);
+      expect(getRateToBase).toHaveBeenCalledWith(db, USD_ID);
+      expect(result?.basePrice).toBe(600); // 1.5 * 400
+      expect(result?.finalPrice).toBe(600); // CUP decimalPlaces=0, ya es entero
+      expect(result?.priceCurrencyId).toBe(USD_ID);
+      expect(result?.rateApplied).toBe(400);
+    });
+
+    it("getEffectivePrices: precio de lista en USD se convierte antes de descuentos", async () => {
+      getRateToBase.mockResolvedValue({ exchangeRateId: 5, rate: 400 });
+      db.product.findMany.mockResolvedValue([product({ salePrice: 100, saleCurrencyId: null })]);
+      db.customer.findUnique.mockResolvedValue({ priceListId: 7 });
+      db.priceListItem.findMany.mockResolvedValue([
+        { productId: 1, price: 2, currencyId: USD_ID },
+      ]);
+      db.discount.findMany.mockResolvedValue([discount({ type: "percent", value: 10 })]);
+
+      const results = await getEffectivePrices(db as never, [1], {
+        quantity: 1,
+        customerId: 42,
+      });
+
+      const result = results.get(1);
+      expect(result?.basePrice).toBe(800); // 2 USD * 400
+      expect(result?.finalPrice).toBe(720); // 800 - 10%
+    });
+
+    it("getEffectivePrices: sin tasa configurada, propaga GlobalRateNotConfiguredError", async () => {
+      getRateToBase.mockRejectedValue(new Error("No hay una tasa de cambio configurada"));
+      db.product.findMany.mockResolvedValue([
+        product({ salePrice: 1, saleCurrencyId: USD_ID }),
+      ]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      await expect(
+        getEffectivePrices(db as never, [1], { quantity: 1 })
+      ).rejects.toThrow("No hay una tasa de cambio configurada");
+    });
+
+    it("getEffectiveLinePrices: presentación con precio en USD se convierte y redondea a entero CUP", async () => {
+      getRateToBase.mockResolvedValue({ exchangeRateId: 5, rate: 400 });
+      db.product.findMany.mockResolvedValue([product({ salePrice: 25 })]);
+      db.productPresentation.findMany.mockResolvedValue([
+        presentation({ retailPrice: 22.995, priceCurrencyId: USD_ID }),
+      ]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      const results = await getEffectiveLinePrices(db as never, [
+        { productId: 1, presentationId: 10, quantity: 1 },
+      ]);
+
+      const line = results.get(lineKey(1, 10));
+      expect(getRateToBase).toHaveBeenCalledWith(db, USD_ID);
+      expect(line?.basePrice).toBeCloseTo(9198); // 22.995 * 400
+      expect(line?.finalPrice).toBe(9198); // redondeado a entero (CUP decimalPlaces=0)
+      expect(line?.priceCurrencyId).toBe(USD_ID);
+      expect(line?.rateApplied).toBe(400);
+    });
+
+    it("getEffectiveLinePrices: una sola llamada a getRateToBase por moneda distinta en el batch", async () => {
+      getRateToBase.mockResolvedValue({ exchangeRateId: 5, rate: 400 });
+      db.product.findMany.mockResolvedValue([
+        product({ productId: 1, salePrice: 1, saleCurrencyId: USD_ID }),
+        product({ productId: 2, salePrice: 2, saleCurrencyId: USD_ID }),
+      ]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      await getEffectiveLinePrices(db as never, [
+        { productId: 1, quantity: 1 },
+        { productId: 2, quantity: 1 },
+      ]);
+
+      expect(getRateToBase).toHaveBeenCalledTimes(1);
+    });
+
+    it("getEffectiveLinePrices: línea sin moneda explícita (null) no llama a getRateToBase", async () => {
+      db.product.findMany.mockResolvedValue([product({ salePrice: 100, saleCurrencyId: null })]);
+      db.discount.findMany.mockResolvedValue([]);
+
+      const results = await getEffectiveLinePrices(db as never, [{ productId: 1, quantity: 1 }]);
+
+      expect(getRateToBase).not.toHaveBeenCalled();
+      expect(results.get(lineKey(1, null))?.rateApplied ?? null).toBeNull();
     });
   });
 });

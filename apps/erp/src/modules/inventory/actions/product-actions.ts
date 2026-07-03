@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { assertRole, ForbiddenError } from "@/lib/auth-guard";
+import { safePriceMarginData, type PriceMarginData } from "../lib/margin";
+import { getRateToBase, GlobalRateNotConfiguredError } from "@/lib/currency";
 
 const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 
@@ -32,6 +34,8 @@ export async function createProduct(data: {
   maxStock?: number;
   costPrice?: number;
   salePrice?: number;
+  /** null/undefined = moneda base (CUP). Aplica a salePrice y a la presentación base. */
+  saleCurrencyId?: number | null;
   secondaryPrice?: number;
   valuationMethod?: "fifo" | "average";
   tracksLots?: boolean;
@@ -47,7 +51,7 @@ export async function createProduct(data: {
   supplierRef?: string;
   description?: string;
   notes?: string;
-}): Promise<ActionResult<{ productId: number }>> {
+}): Promise<ActionResult<{ productId: number } & PriceMarginData>> {
   try {
     if (data.sku) {
       const existing = await db.product.findUnique({ where: { sku: data.sku } });
@@ -65,6 +69,12 @@ export async function createProduct(data: {
 
     const userId = await requireCurrentUserId();
     const product = await db.$transaction(async (tx) => {
+      // Un precio en moneda sin tasa configurada dejaría el producto
+      // invendible (effective-price lanza al cotizar): rechazar aquí con
+      // el mensaje accionable de GlobalRateNotConfiguredError.
+      if (data.saleCurrencyId != null) {
+        await getRateToBase(tx, data.saleCurrencyId);
+      }
       const p = await tx.product.create({
         data: {
           name: data.name,
@@ -76,6 +86,7 @@ export async function createProduct(data: {
           maxStock: data.maxStock ?? null,
           costPrice: data.costPrice ?? null,
           salePrice: data.salePrice ?? null,
+          saleCurrencyId: data.saleCurrencyId ?? null,
           secondaryPrice: data.secondaryPrice ?? null,
           valuationMethod: data.valuationMethod ?? "average",
           tracksLots: data.tracksLots ?? false,
@@ -100,6 +111,7 @@ export async function createProduct(data: {
           factor: 1,
           retailPrice: data.salePrice ?? 0,
           wholesalePrice: data.secondaryPrice ?? null,
+          priceCurrencyId: data.saleCurrencyId ?? null,
           isBase: true,
           isActive: true,
           sortOrder: 0,
@@ -117,11 +129,23 @@ export async function createProduct(data: {
       return p;
     });
 
+    const margin =
+      data.salePrice != null
+        ? await safePriceMarginData(db, {
+            productId: product.productId,
+            priceAmount: data.salePrice,
+            priceCurrencyId: data.saleCurrencyId ?? null,
+          })
+        : { marginWarning: null, replacementMarginPct: null, marginPct: null };
+
     revalidatePath("/products");
-    return { success: true, data: { productId: product.productId } };
+    return { success: true, data: { productId: product.productId, ...margin } };
   } catch (error) {
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
+    }
+    if (error instanceof GlobalRateNotConfiguredError) {
+      return { success: false, error: error.message };
     }
     console.error("Error creating product:", error);
     return { success: false, error: "Error al crear el producto" };
@@ -140,6 +164,8 @@ export async function updateProduct(
     maxStock?: number;
     costPrice?: number;
     salePrice?: number;
+    /** null = moneda base (CUP); undefined = sin cambio. */
+    saleCurrencyId?: number | null;
     secondaryPrice?: number;
     valuationMethod?: "fifo" | "average";
     tracksLots?: boolean;
@@ -157,19 +183,30 @@ export async function updateProduct(
     notes?: string;
     isActive?: boolean;
   }
-): Promise<ActionResult<void>> {
+): Promise<ActionResult<PriceMarginData>> {
   try {
     const userId = await requireCurrentUserId();
-    const previousImageUrl = await db.$transaction(async (tx) => {
+    const { previousImageUrl, marginInput } = await db.$transaction(async (tx) => {
       const prev = await tx.product.findUnique({ where: { productId: id } });
 
-      // secondaryPrice deprecado: ver ProductPresentation.wholesalePrice
+      const currencyChanged =
+        data.saleCurrencyId !== undefined &&
+        (prev?.saleCurrencyId ?? null) !== (data.saleCurrencyId ?? null);
+      // secondaryPrice deprecado: ver ProductPresentation.wholesalePrice.
+      // Cambiar la moneda cambia el precio efectivo aunque el número no cambie.
       const priceChanged =
         (data.costPrice !== undefined && Number(prev?.costPrice ?? NaN) !== data.costPrice) ||
-        (data.salePrice !== undefined && Number(prev?.salePrice ?? NaN) !== data.salePrice);
+        (data.salePrice !== undefined && Number(prev?.salePrice ?? NaN) !== data.salePrice) ||
+        currencyChanged;
 
       if (priceChanged) {
         await assertRole("admin", "dispatcher");
+      }
+
+      const newSaleCurrencyId =
+        data.saleCurrencyId !== undefined ? data.saleCurrencyId ?? null : prev?.saleCurrencyId ?? null;
+      if (currencyChanged && newSaleCurrencyId != null) {
+        await getRateToBase(tx, newSaleCurrencyId);
       }
 
       const unitChanged = data.unit !== undefined && data.unit !== prev?.unit;
@@ -194,6 +231,7 @@ export async function updateProduct(
           ...(data.maxStock !== undefined && { maxStock: data.maxStock ?? null }),
           ...(data.costPrice !== undefined && { costPrice: data.costPrice ?? null }),
           ...(data.salePrice !== undefined && { salePrice: data.salePrice ?? null }),
+          ...(data.saleCurrencyId !== undefined && { saleCurrencyId: data.saleCurrencyId ?? null }),
           ...(data.valuationMethod !== undefined && { valuationMethod: data.valuationMethod }),
           ...(data.tracksLots !== undefined && { tracksLots: data.tracksLots }),
           ...(data.allowNegative !== undefined && { allowNegative: data.allowNegative }),
@@ -220,6 +258,8 @@ export async function updateProduct(
             newCostPrice: data.costPrice !== undefined ? data.costPrice : prev?.costPrice ?? null,
             oldSalePrice: prev?.salePrice ?? null,
             newSalePrice: data.salePrice !== undefined ? data.salePrice : prev?.salePrice ?? null,
+            oldCurrencyId: prev?.saleCurrencyId ?? null,
+            newCurrencyId: newSaleCurrencyId,
             changedBy: userId,
           },
         });
@@ -227,7 +267,7 @@ export async function updateProduct(
 
       const salePriceChanged =
         data.salePrice !== undefined && Number(prev?.salePrice ?? NaN) !== data.salePrice;
-      if (salePriceChanged || unitChanged) {
+      if (salePriceChanged || unitChanged || currencyChanged) {
         const base = await tx.productPresentation.findFirst({
           where: { productId: id, isBase: true },
         });
@@ -236,18 +276,21 @@ export async function updateProduct(
             where: { presentationId: base.presentationId },
             data: {
               ...(salePriceChanged && { retailPrice: data.salePrice }),
+              ...(currencyChanged && { priceCurrencyId: newSaleCurrencyId }),
               ...(unitChanged && { name: data.unit }),
             },
           });
 
-          if (salePriceChanged) {
+          if (salePriceChanged || currencyChanged) {
             await tx.presentationPriceHistory.create({
               data: {
                 presentationId: base.presentationId,
                 oldRetailPrice: base.retailPrice,
-                newRetailPrice: data.salePrice,
+                newRetailPrice: salePriceChanged ? data.salePrice : base.retailPrice,
                 oldWholesalePrice: base.wholesalePrice ?? null,
                 newWholesalePrice: base.wholesalePrice ?? null,
+                oldCurrencyId: base.priceCurrencyId,
+                newCurrencyId: newSaleCurrencyId,
                 changedBy: userId,
               },
             });
@@ -265,7 +308,24 @@ export async function updateProduct(
         newValues: data,
       });
 
-      return prev?.imageUrl ?? null;
+      const effectiveSalePrice =
+        data.salePrice !== undefined
+          ? data.salePrice
+          : prev?.salePrice != null
+            ? Number(prev.salePrice)
+            : null;
+
+      return {
+        previousImageUrl: prev?.imageUrl ?? null,
+        marginInput:
+          priceChanged && effectiveSalePrice != null
+            ? {
+                productId: id,
+                priceAmount: effectiveSalePrice,
+                priceCurrencyId: newSaleCurrencyId,
+              }
+            : null,
+      };
     });
 
     const newImageUrl = data.imageUrl !== undefined ? data.imageUrl || null : undefined;
@@ -273,14 +333,21 @@ export async function updateProduct(
       await deleteProductImageBlob(previousImageUrl);
     }
 
+    const margin = marginInput
+      ? await safePriceMarginData(db, marginInput)
+      : { marginWarning: null, replacementMarginPct: null, marginPct: null };
+
     revalidatePath("/products");
-    return { success: true, data: undefined };
+    return { success: true, data: margin };
   } catch (error) {
     if (error instanceof Error && error.message === "No autenticado") {
       return { success: false, error: "Debes iniciar sesión para realizar esta acción." };
     }
     if (error instanceof ForbiddenError) {
       return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
+    }
+    if (error instanceof GlobalRateNotConfiguredError) {
+      return { success: false, error: error.message };
     }
     if (error instanceof Error && error.message.startsWith("UNIT_COLLISION:")) {
       const unit = error.message.split(":")[1];

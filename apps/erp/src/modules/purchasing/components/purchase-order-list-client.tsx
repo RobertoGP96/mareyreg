@@ -84,6 +84,7 @@ interface PresentationOption {
   name: string;
   factor: number;
   isBase: boolean;
+  piecesPerUnit: number | null;
 }
 
 interface ProductOption {
@@ -91,6 +92,7 @@ interface ProductOption {
   name: string;
   unit: string;
   costPrice: number | null;
+  isCatchWeight: boolean;
   presentations: PresentationOption[];
 }
 
@@ -403,7 +405,9 @@ export function PurchaseOrderListClient({
                     (p) => p.presentationId === l.presentationId
                   );
                   const factor = selectedPresentation?.factor ?? 1;
-                  const costLabel = selectedPresentation && !selectedPresentation.isBase
+                  const costLabel = product?.isCatchWeight
+                    ? "Costo ($/kg)"
+                    : selectedPresentation && !selectedPresentation.isBase
                     ? `Costo por ${selectedPresentation.name}`
                     : "Costo";
 
@@ -450,8 +454,8 @@ export function PurchaseOrderListClient({
                       <div className={showPresentationPicker ? "col-span-2 space-y-1" : "col-span-2 space-y-1"}>
                         <Input
                           type="number"
-                          step="0.01"
-                          min="0.01"
+                          step={product?.isCatchWeight ? "1" : "0.01"}
+                          min={product?.isCatchWeight ? "1" : "0.01"}
                           placeholder="Cant"
                           value={l.quantity || ""}
                           onChange={(e) => updateLine(i, { quantity: Number(e.target.value) })}
@@ -472,7 +476,15 @@ export function PurchaseOrderListClient({
                           <Trash2 className="w-3 h-3" />
                         </Button>
                       </div>
-                      {showPresentationPicker && factor !== 1 && l.quantity > 0 && (
+                      {product?.isCatchWeight && (
+                        <div className="col-span-12 -mt-1">
+                          <p className="text-xs text-muted-foreground">
+                            Total estimado = cajas × peso nominal × $/kg. El peso real se captura pieza
+                            por pieza al recibir.
+                          </p>
+                        </div>
+                      )}
+                      {!product?.isCatchWeight && showPresentationPicker && factor !== 1 && l.quantity > 0 && (
                         <div className="col-span-12 -mt-1">
                           <p className="text-xs text-muted-foreground">
                             {formatEquivalence(

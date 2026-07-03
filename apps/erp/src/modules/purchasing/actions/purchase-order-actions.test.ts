@@ -8,6 +8,9 @@ const { revalidatePath, createAuditLog, requireCurrentUserId, nextFolio, tx, db 
     productPresentation: {
       findUnique: vi.fn(),
     },
+    product: {
+      findUnique: vi.fn(),
+    },
     company: {
       findUnique: vi.fn(),
     },
@@ -64,6 +67,7 @@ describe("createPurchaseOrder — snapshot de presentación en líneas", () => {
     nextFolio.mockResolvedValue("OC-0001");
     tx.purchaseOrder.create.mockResolvedValue({ poId: 1, folio: "OC-0001" });
     tx.company.findUnique.mockResolvedValue(CUP_BASE);
+    tx.product.findUnique.mockResolvedValue({ isCatchWeight: false });
   });
 
   it("sin presentación: factor 1 y baseQuantity === quantity", async () => {
@@ -182,6 +186,7 @@ describe("createPurchaseOrder — snapshot de moneda/tasa (Fase 2)", () => {
     nextFolio.mockResolvedValue("OC-0001");
     tx.purchaseOrder.create.mockResolvedValue({ poId: 1, folio: "OC-0001" });
     tx.company.findUnique.mockResolvedValue(CUP_BASE);
+    tx.product.findUnique.mockResolvedValue({ isCatchWeight: false });
   });
 
   it("sin currencyId: documento en moneda base, sin snapshot", async () => {

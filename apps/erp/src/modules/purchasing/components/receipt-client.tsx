@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, PackageCheck } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
-import { formatEquivalence } from "@/modules/inventory/lib/units";
+import { formatEquivalence, piecesFor } from "@/modules/inventory/lib/units";
 import {
   createGoodsReceipt,
   type ReceiptLineInput,
@@ -21,8 +21,8 @@ interface POLine {
   receivedQty: unknown;
   unitCost: unknown;
   unitFactor: unknown;
-  presentation: { presentationId: number; name: string } | null;
-  product: { productId: number; name: string; unit: string; tracksLots: boolean };
+  presentation: { presentationId: number; name: string; piecesPerUnit: number | null } | null;
+  product: { productId: number; name: string; unit: string; tracksLots: boolean; isCatchWeight: boolean };
 }
 
 interface Props {
@@ -51,15 +51,43 @@ export function ReceiptClient({ poId, folio, lines, pendingRate }: Props) {
       ])
     )
   );
+  // Pesos por pieza (kg) capturados en báscula, por línea de OC — solo
+  // productos catch-weight. Se arma como array plano al enviar.
+  const [pieceWeightsByLine, setPieceWeightsByLine] = useState<Record<number, string[]>>({});
 
   const update = (lineId: number, patch: Partial<ReceiptLineInput>) => {
     setRows({ ...rows, [lineId]: { ...rows[lineId], ...patch } });
   };
 
+  const updatePieceWeight = (lineId: number, index: number, value: string) => {
+    const current = pieceWeightsByLine[lineId] ?? [];
+    const next = [...current];
+    next[index] = value;
+    setPieceWeightsByLine({ ...pieceWeightsByLine, [lineId]: next });
+  };
+
   const handleSubmit = async () => {
-    const payload = Object.values(rows).filter((r) => r.quantity > 0);
+    const payload = Object.values(rows)
+      .filter((r) => r.quantity > 0)
+      .map((r) => {
+        const line = lines.find((l) => l.lineId === r.poLineId);
+        if (!line?.product.isCatchWeight) return r;
+        const weights = (pieceWeightsByLine[r.poLineId] ?? []).map(Number);
+        return { ...r, pieceWeights: weights };
+      });
     if (!payload.length) {
       toast.error("Indica al menos una cantidad a recibir");
+      return;
+    }
+    const catchWeightMissing = payload.find((r) => {
+      const line = lines.find((l) => l.lineId === r.poLineId);
+      if (!line?.product.isCatchWeight) return false;
+      const piecesPerUnit = line.presentation?.piecesPerUnit ?? 1;
+      const expected = piecesFor(r.quantity, piecesPerUnit);
+      return !r.pieceWeights || r.pieceWeights.length !== expected || r.pieceWeights.some((w) => !(w > 0));
+    });
+    if (catchWeightMissing) {
+      toast.error("Captura el peso de cada pieza (mayor a 0) para los productos de peso variable");
       return;
     }
     setIsSubmitting(true);
@@ -114,7 +142,15 @@ export function ReceiptClient({ poId, folio, lines, pendingRate }: Props) {
           const factor = Number(l.unitFactor);
           const presentationName = l.presentation?.name ?? l.product.unit;
           const currencySuffix = pendingRate ? ` (${pendingRate.code})` : "";
-          const costLabel = (factor !== 1 ? `Costo por ${presentationName}` : "Costo unit.") + currencySuffix;
+          const isCatchWeight = l.product.isCatchWeight;
+          const piecesPerUnit = l.presentation?.piecesPerUnit ?? 1;
+          const costLabel = isCatchWeight
+            ? `Costo ($/kg)${currencySuffix}`
+            : (factor !== 1 ? `Costo por ${presentationName}` : "Costo unit.") + currencySuffix;
+          const expectedPieces =
+            isCatchWeight && row.quantity > 0 ? piecesFor(row.quantity, piecesPerUnit) : 0;
+          const weights = pieceWeightsByLine[l.lineId] ?? [];
+          const totalWeightKg = weights.reduce((s, w) => s + (Number(w) || 0), 0);
           return (
             <div key={l.lineId} className="border rounded p-3 grid grid-cols-12 gap-2 items-end">
               <div className="col-span-12 sm:col-span-4">
@@ -129,7 +165,7 @@ export function ReceiptClient({ poId, folio, lines, pendingRate }: Props) {
                   type="number"
                   min="0"
                   max={pending}
-                  step="0.01"
+                  step={isCatchWeight ? "1" : "0.01"}
                   value={row.quantity || ""}
                   onChange={(e) => update(l.lineId, { quantity: Number(e.target.value) })}
                 />
@@ -163,10 +199,33 @@ export function ReceiptClient({ poId, folio, lines, pendingRate }: Props) {
                   </div>
                 </>
               )}
-              {factor !== 1 && row.quantity > 0 && (
+              {!isCatchWeight && factor !== 1 && row.quantity > 0 && (
                 <div className="col-span-12 -mt-1">
                   <p className="text-xs text-muted-foreground">
                     {formatEquivalence(row.quantity, factor, presentationName, l.product.unit)}
+                  </p>
+                </div>
+              )}
+              {isCatchWeight && expectedPieces > 0 && (
+                <div className="col-span-12 space-y-2 border-t pt-2 mt-1">
+                  <p className="text-xs font-medium">Peso por pieza (kg)</p>
+                  <div className="space-y-1.5">
+                    {Array.from({ length: expectedPieces }, (_, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Label className="text-xs w-20 shrink-0">Pieza {idx + 1}</Label>
+                        <Input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          className="h-9"
+                          value={weights[idx] ?? ""}
+                          onChange={(e) => updatePieceWeight(l.lineId, idx, e.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-sm font-mono tabular-nums">
+                    Total: {totalWeightKg.toFixed(3)} kg
                   </p>
                 </div>
               )}

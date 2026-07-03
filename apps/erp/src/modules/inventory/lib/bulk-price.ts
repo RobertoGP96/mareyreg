@@ -13,17 +13,43 @@ const scopeSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
+/**
+ * Factor de reprecio derivado de un cambio de tasa de cambio: aplica
+ * `newRate/oldRate` al precio vigente. Pensado para "la tasa subió, reprecia
+ * todo lo que está en USD" sin tener que calcular el factor a mano.
+ */
+const rateFactorSchema = z.object({
+  oldRate: z.number().finite().gt(0),
+  newRate: z.number().finite().gt(0),
+});
+
 export const bulkPriceAdjustmentSchema = z
   .object({
     scope: scopeSchema,
-    mode: z.enum(["percent", "fixed"]),
-    direction: z.enum(["increase", "decrease"]),
-    value: z.number().finite().gt(0),
+    mode: z.enum(["percent", "fixed", "rateFactor"]),
+    direction: z.enum(["increase", "decrease"]).optional(),
+    value: z.number().finite().gt(0).optional(),
+    rateFactor: rateFactorSchema.optional(),
     target: z.enum(["retail", "wholesale", "both"]),
     rounding: z.enum(["none", "cents", "fifty", "whole"]),
+    /** Ajusta solo presentaciones cuyo precio está definido en esta moneda. null = base (CUP). */
+    priceCurrencyId: z.number().int().positive().nullable().optional(),
     reason: z.string().max(200).optional(),
   })
   .superRefine((input, ctx) => {
+    if (input.mode === "rateFactor") {
+      if (!input.rateFactor) {
+        ctx.addIssue({ code: "custom", path: ["rateFactor"], message: "Faltan las tasas old/new" });
+      }
+      return;
+    }
+    if (input.direction == null) {
+      ctx.addIssue({ code: "custom", path: ["direction"], message: "La dirección es obligatoria" });
+    }
+    if (input.value == null) {
+      ctx.addIssue({ code: "custom", path: ["value"], message: "El valor es obligatorio" });
+      return;
+    }
     if (input.mode === "percent" && input.direction === "decrease" && input.value > 100) {
       ctx.addIssue({
         code: "custom",
@@ -43,11 +69,12 @@ export type BulkPriceScope = z.infer<typeof scopeSchema>;
  * columna, que en este archivo siempre proviene de un literal TS
  * ("retail_price" | "wholesale_price"), nunca de input de usuario; (b)
  * tokens fijos derivados de los enums ya validados por Zod (`mode`,
- * `direction`, `rounding`); y (c) el valor numérico `value`, verificado
- * *aquí también* con `Number.isFinite` como defensa en profundidad (no basta
- * con confiar en que el caller ya validó con Zod). Nunca interpolar aquí
- * `category` ni `reason`: esos deben viajar como parámetros bind en las
- * queries que consuman este fragmento (ver `buildScopeCondition`).
+ * `direction`, `rounding`); y (c) los valores numéricos (`value` o
+ * `rateFactor.oldRate/newRate`), verificados *aquí también* con
+ * `Number.isFinite` como defensa en profundidad (no basta con confiar en que
+ * el caller ya validó con Zod). Nunca interpolar aquí `category` ni
+ * `reason`: esos deben viajar como parámetros bind en las queries que
+ * consuman este fragmento (ver `buildScopeCondition`).
  *
  * El caller controla el prefijo/alias de `column` (p. ej. puede pasar
  * "pp.retail_price" si lo necesita calificado); esta función no lo valida
@@ -58,22 +85,30 @@ type PriceColumn = "retail_price" | "wholesale_price";
 
 export function buildPriceExpression(
   column: PriceColumn | `${string}.${PriceColumn}`,
-  input: Pick<BulkPriceAdjustmentInput, "mode" | "direction" | "value" | "rounding">
+  input: Pick<BulkPriceAdjustmentInput, "mode" | "direction" | "value" | "rounding" | "rateFactor">
 ): string {
-  if (!Number.isFinite(input.value)) {
-    throw new Error("El valor del ajuste de precio debe ser un número finito");
-  }
-
-  const value = String(input.value);
   let expr: string;
-  if (input.mode === "percent" && input.direction === "increase") {
-    expr = `${column} * (1 + ${value}/100)`;
-  } else if (input.mode === "percent" && input.direction === "decrease") {
-    expr = `${column} * (1 - ${value}/100)`;
-  } else if (input.mode === "fixed" && input.direction === "increase") {
-    expr = `${column} + ${value}`;
+
+  if (input.mode === "rateFactor") {
+    const { oldRate, newRate } = input.rateFactor ?? {};
+    if (!Number.isFinite(oldRate) || !Number.isFinite(newRate) || !oldRate || oldRate <= 0) {
+      throw new Error("El factor de tasa del ajuste de precio debe ser un número finito y positivo");
+    }
+    expr = `${column} * (${String(newRate)}::numeric / ${String(oldRate)}::numeric)`;
   } else {
-    expr = `${column} - ${value}`;
+    if (!Number.isFinite(input.value)) {
+      throw new Error("El valor del ajuste de precio debe ser un número finito");
+    }
+    const value = String(input.value);
+    if (input.mode === "percent" && input.direction === "increase") {
+      expr = `${column} * (1 + ${value}/100)`;
+    } else if (input.mode === "percent" && input.direction === "decrease") {
+      expr = `${column} * (1 - ${value}/100)`;
+    } else if (input.mode === "fixed" && input.direction === "increase") {
+      expr = `${column} + ${value}`;
+    } else {
+      expr = `${column} - ${value}`;
+    }
   }
 
   let rounded: string;
@@ -114,4 +149,23 @@ export function buildScopeCondition(scope: BulkPriceScope): { sql: string; param
   }
   const placeholders = scope.productIds.map((_, i) => `$${i + 1}`).join(", ");
   return { sql: `pp.product_id IN (${placeholders})`, params: [...scope.productIds] };
+}
+
+/**
+ * Condición adicional (compuesta con AND junto al scope) para acotar el
+ * ajuste masivo a presentaciones cuyo precio está definido en una moneda
+ * específica. `priceCurrencyId: null` filtra las que están en moneda base
+ * (CUP); `undefined` (no filtrar) no debe usarse — el caller decide si
+ * incluir esta condición según si el usuario eligió filtrar por moneda.
+ * Usa `$N` con el offset que el caller indique para poder concatenarse
+ * después del placeholder final del scope.
+ */
+export function buildCurrencyCondition(
+  priceCurrencyId: number | null,
+  paramOffset: number
+): { sql: string; params: unknown[] } {
+  if (priceCurrencyId === null) {
+    return { sql: "pp.price_currency_id IS NULL", params: [] };
+  }
+  return { sql: `pp.price_currency_id = $${paramOffset + 1}`, params: [priceCurrencyId] };
 }
