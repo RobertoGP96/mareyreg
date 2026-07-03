@@ -54,10 +54,14 @@ model Company {
   address     String?
   description String?
   timezone    String   @default("America/Mexico_City")
-  // Excepción a la regla de usar el modelo Currency: es la moneda de referencia de la empresa/tienda, no un monto transaccional; convertir a FK requiere migración de datos — ver plan Fase 4.
+  // DEPRECADO: campo legacy pre-multi-moneda. baseCurrencyId es ahora la fuente de verdad
+  // (ver ExchangeRate); este string se mantiene solo por compatibilidad hasta limpiar lecturas.
   currency    String   @default("MXN")
+  baseCurrencyId Int?     @map("base_currency_id")
   language    String   @default("es-MX")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  baseCurrency Currency? @relation(fields: [baseCurrencyId], references: [currencyId], onDelete: Restrict)
 
   @@map("company")
 }
@@ -1390,6 +1394,9 @@ model Currency {
   rulesAsBase         ExchangeRateRule[] @relation("BaseCurrency")
   rulesAsQuote        ExchangeRateRule[] @relation("QuoteCurrency")
   cashDeliveries      CashDelivery[]
+  globalRatesAsBase   ExchangeRate[]     @relation("GlobalRateBase")
+  globalRatesAsQuote  ExchangeRate[]     @relation("GlobalRateQuote")
+  companiesAsBase     Company[]
 
   @@map("currencies")
 }
@@ -1563,6 +1570,41 @@ model CashDelivery {
   @@index([status, occurredAt])
   @@index([currencyId])
   @@map("cash_deliveries")
+}
+
+// Tasa global manual por par (1 base = rate quote). Sistema independiente de
+// ExchangeRateRule (envios): esta tasa la usan inventario, compras, ventas y tienda.
+model ExchangeRate {
+  exchangeRateId  Int      @id @default(autoincrement()) @map("id")
+  baseCurrencyId  Int      @map("base_currency_id")
+  quoteCurrencyId Int      @map("quote_currency_id")
+  rate            Decimal  @db.Decimal(20, 8)
+  version         Int      @default(0)
+  updatedBy       Int?     @map("updated_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  baseCurrency  Currency @relation("GlobalRateBase", fields: [baseCurrencyId], references: [currencyId], onDelete: Restrict)
+  quoteCurrency Currency @relation("GlobalRateQuote", fields: [quoteCurrencyId], references: [currencyId], onDelete: Restrict)
+  history       ExchangeRateHistory[]
+
+  @@unique([baseCurrencyId, quoteCurrencyId])
+  @@map("exchange_rates")
+}
+
+model ExchangeRateHistory {
+  historyId      Int      @id @default(autoincrement()) @map("id")
+  exchangeRateId Int      @map("exchange_rate_id")
+  oldRate        Decimal? @map("old_rate") @db.Decimal(20, 8)
+  newRate        Decimal  @map("new_rate") @db.Decimal(20, 8)
+  changedBy      Int?     @map("changed_by")
+  changedAt      DateTime @default(now()) @map("changed_at")
+  note           String?
+
+  exchangeRate ExchangeRate @relation(fields: [exchangeRateId], references: [exchangeRateId], onDelete: Restrict)
+
+  @@index([exchangeRateId, changedAt])
+  @@map("exchange_rate_history")
 }
 
 // =============================================

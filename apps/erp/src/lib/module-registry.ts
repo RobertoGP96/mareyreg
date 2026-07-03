@@ -154,6 +154,15 @@ export const modules: AppModule[] = [
     ],
   },
   {
+    id: "currency",
+    label: "Divisas",
+    icon: CircleDollarSign,
+    enabled: true,
+    routes: [
+      { name: "Tasa de cambio", href: "/currency/tasas", icon: CircleDollarSign },
+    ],
+  },
+  {
     id: "payments",
     label: "Pagos",
     icon: CircleDollarSign,
