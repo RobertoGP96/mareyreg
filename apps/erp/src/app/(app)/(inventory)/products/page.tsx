@@ -45,6 +45,8 @@ export default async function ProductsPage() {
       isActive: p.isActive,
       description: p.description,
       notes: p.notes,
+      allowNegative: p.allowNegative,
+      isCatchWeight: p.isCatchWeight,
     };
   });
 

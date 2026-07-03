@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { ArrowLeft, Heart, ShoppingCart } from "lucide-react";
 import type {
   WebstoreProduct,
   WebstoreProductPresentation,
@@ -76,6 +77,7 @@ export function ProductDetailClient({
       qty: 1,
       imageUrl: product.imageUrl,
       stockAvailable: product.stockAvailable,
+      isCatchWeight: product.isCatchWeight,
     };
     addToCart(line, qty);
     showToast(`${product.name} añadido al carrito`);
@@ -83,31 +85,31 @@ export function ProductDetailClient({
   };
 
   return (
-    <div className="flex flex-1 flex-col bg-white">
-      <div className="relative flex h-[270px] items-center justify-center bg-photo text-xs tracking-[1px] text-photo-fg">
+    <div className="flex flex-1 flex-col bg-white md:mx-auto md:w-full md:max-w-5xl md:flex-row md:gap-8 md:bg-transparent md:px-6 md:py-8">
+      <div className="relative flex h-[270px] items-center justify-center overflow-hidden bg-photo text-xs tracking-[1px] text-photo-fg md:h-auto md:flex-1 md:self-start md:rounded-2xl">
         <ProductImage
           src={product.imageUrl}
           alt={product.name}
-          sizes="430px"
+          sizes="(min-width: 768px) 50vw, 430px"
           label="FOTO PRODUCTO"
         />
         <button
           type="button"
           onClick={goBack}
           aria-label="Volver"
-          className="absolute top-4 left-4 flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-white text-base text-navy shadow-[0_2px_8px_rgba(10,31,63,.14)]"
+          className="absolute top-4 left-4 flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-white text-base text-navy shadow-[0_2px_8px_rgba(10,31,63,.14)] transition-colors hover:bg-app md:hidden"
         >
-          ←
+          <ArrowLeft className="h-[18px] w-[18px]" />
         </button>
         <button
           type="button"
           onClick={() => toggleFav(product.sku)}
           aria-label={isFav ? "Quitar de favoritos" : "Añadir a favoritos"}
-          className={`absolute top-4 right-4 flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-white text-[15px] shadow-[0_2px_8px_rgba(10,31,63,.14)] ${
+          className={`absolute top-4 right-4 flex h-[38px] w-[38px] items-center justify-center rounded-xl bg-white shadow-[0_2px_8px_rgba(10,31,63,.14)] transition-colors hover:bg-app ${
             isFav ? "text-fav" : "text-muted-2"
           }`}
         >
-          {isFav ? "♥" : "♡"}
+          <Heart className="h-[17px] w-[17px]" fill={isFav ? "currentColor" : "none"} />
         </button>
         {pct > 0 && (
           <span className="absolute bottom-3.5 left-4 rounded-lg bg-brand px-2.5 py-[5px] text-[11px] font-semibold text-white">
@@ -116,13 +118,21 @@ export function ProductDetailClient({
         )}
       </div>
 
-      <div className="flex-1 p-5">
+      <div className="flex-1 p-5 md:max-w-md md:p-0">
+        <button
+          type="button"
+          onClick={goBack}
+          className="mb-4 hidden items-center gap-1.5 text-[13px] font-medium text-muted transition-colors hover:text-navy md:inline-flex"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Volver
+        </button>
         {product.category && (
           <div className="text-xs font-semibold tracking-[.8px] text-brand-mid uppercase">
             {product.category}
           </div>
         )}
-        <div className="mt-1.5 text-[21px] leading-[1.25] font-semibold text-navy">
+        <div className="mt-1.5 text-[21px] leading-[1.25] font-semibold text-navy md:text-[26px]">
           {product.name}
         </div>
         <div className="mt-2.5 flex items-baseline gap-2.5">
@@ -134,6 +144,11 @@ export function ProductDetailClient({
           )}
           <div className="text-[13px] text-muted">/ {unitLabel}</div>
         </div>
+        {product.isCatchWeight && (
+          <div className="mt-1 text-xs font-medium text-brand-mid">
+            Precio estimado · el total se ajusta al peso real al preparar tu pedido
+          </div>
+        )}
         <div
           className="mt-1.5 text-xs font-medium"
           style={{ color: stock.color }}
@@ -171,10 +186,10 @@ export function ProductDetailClient({
                     key={pres.sku}
                     type="button"
                     onClick={() => setSelected(pres)}
-                    className={`flex-none rounded-full border px-[15px] py-2 text-[13px] font-medium ${
+                    className={`flex-none rounded-full border px-[15px] py-2 text-[13px] font-medium transition-colors ${
                       active
                         ? "border-brand bg-brand text-white"
-                        : "border-line bg-white text-ink-soft"
+                        : "border-line bg-white text-ink-soft hover:border-brand-mid"
                     }`}
                   >
                     {pres.name} · {fmt(pres.retailPrice)}
@@ -210,7 +225,7 @@ export function ProductDetailClient({
                 <Link
                   key={r.sku}
                   href={`/producto/${encodeURIComponent(r.sku)}`}
-                  className="w-[130px] flex-none overflow-hidden rounded-[13px] bg-app"
+                  className="w-[130px] flex-none overflow-hidden rounded-[13px] bg-app transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(10,31,63,.1)]"
                 >
                   <div className="relative flex h-[76px] items-center justify-center bg-photo text-[9.5px] tracking-[.5px] text-photo-fg">
                     <ProductImage src={r.imageUrl} alt={r.name} sizes="130px" />
@@ -230,7 +245,7 @@ export function ProductDetailClient({
         )}
       </div>
 
-      <div className="sticky bottom-0 flex items-center gap-3 border-t border-line-2 bg-white px-5 pt-4 pb-6">
+      <div className="sticky bottom-0 flex items-center gap-3 border-t border-line-2 bg-white px-5 pt-4 pb-6 md:static md:mt-6 md:rounded-2xl md:border md:border-line md:shadow-[0_3px_12px_rgba(10,31,63,.05)]">
         <div className="flex-1">
           <div className="text-xs text-muted">Total</div>
           <div className="text-[19px] font-bold text-navy">
@@ -240,10 +255,11 @@ export function ProductDetailClient({
         <button
           type="button"
           onClick={handleAdd}
-          className={`rounded-[13px] px-[26px] py-3.5 text-[14.5px] font-semibold text-white ${
-            soldOut ? "bg-disabled" : "grad-cta"
+          className={`flex items-center gap-2 rounded-[13px] px-[26px] py-3.5 text-[14.5px] font-semibold text-white transition-colors ${
+            soldOut ? "bg-disabled" : "grad-cta hover:opacity-90"
           }`}
         >
+          {soldOut ? null : <ShoppingCart className="h-[17px] w-[17px]" />}
           {soldOut ? "Agotado" : "Añadir al carrito"}
         </button>
       </div>

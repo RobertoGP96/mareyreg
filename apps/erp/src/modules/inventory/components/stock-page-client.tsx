@@ -58,19 +58,22 @@ interface PresentationItem {
   name: string;
   factor: number;
   isBase: boolean;
+  piecesPerUnit: number | null;
 }
 
 interface StockLevelItem {
   productId: number;
   warehouseId: number;
   currentQuantity: number;
+  currentPieces: number;
   product: {
     name: string;
     minStock: number;
     maxStock: number | null;
     unit: string;
     costPrice: number | null;
-    largestPresentation: { name: string; factor: number } | null;
+    isCatchWeight: boolean;
+    largestPresentation: { name: string; factor: number; piecesPerUnit: number | null } | null;
   };
   warehouse: { name: string };
 }
@@ -78,12 +81,13 @@ interface StockLevelItem {
 interface MovementItem {
   movementId: number;
   quantity: number;
+  pieces: number | null;
   movementType: string;
   unitCost: number | null;
   referenceDoc: string | null;
   notes: string | null;
   createdAt: string;
-  product: { name: string; unit: string };
+  product: { name: string; unit: string; isCatchWeight: boolean };
   warehouse: { name: string };
 }
 
@@ -91,6 +95,7 @@ interface ProductItem {
   productId: number;
   name: string;
   unit: string;
+  isCatchWeight: boolean;
   presentations: PresentationItem[];
 }
 
@@ -144,6 +149,7 @@ export function StockPageClient({
   const [selectedProductId, setSelectedProductId] = useState<string>("");
   const [selectedPresentationId, setSelectedPresentationId] = useState<string>("base");
   const [quantityInput, setQuantityInput] = useState<string>("");
+  const [piecesInput, setPiecesInput] = useState<string>("");
 
   const selectedProduct = useMemo(
     () => products.find((p) => String(p.productId) === selectedProductId) ?? null,
@@ -183,6 +189,7 @@ export function StockPageClient({
     setSelectedProductId("");
     setSelectedPresentationId("base");
     setQuantityInput("");
+    setPiecesInput("");
   };
 
   const summary = useMemo(() => {
@@ -226,6 +233,9 @@ export function StockPageClient({
     const productId = Number(fd.get("productId"));
     const quantity = Number(fd.get("quantity"));
     const presentationId = activePresentation ? activePresentation.presentationId : undefined;
+    const pieces = selectedProduct?.isCatchWeight
+      ? Number(fd.get("pieces"))
+      : undefined;
 
     let result;
     if (movementType === "transfer") {
@@ -237,6 +247,7 @@ export function StockPageClient({
         warehouseIdTo,
         quantity,
         presentationId,
+        pieces,
         referenceDoc: (fd.get("referenceDoc") as string) || undefined,
         notes: (fd.get("notes") as string) || undefined,
       });
@@ -251,6 +262,7 @@ export function StockPageClient({
         adjustmentSign:
           movementType === "adjustment" ? adjustmentSign : undefined,
         unitCost: fd.get("unitCost") ? Number(fd.get("unitCost")) : undefined,
+        pieces,
         referenceDoc: (fd.get("referenceDoc") as string) || undefined,
         notes: (fd.get("notes") as string) || undefined,
       });
@@ -353,8 +365,15 @@ export function StockPageClient({
               const value = qty * cost;
               const largest = sl.product.largestPresentation;
               const presentationEquivalence =
-                largest && largest.factor > 1 && qty >= largest.factor
+                !sl.product.isCatchWeight && largest && largest.factor > 1 && qty >= largest.factor
                   ? `${Math.floor(qty / largest.factor)} ${largest.name}`
+                  : null;
+              // Catch-weight: piezas fungibles + equivalencia estimada en cajas
+              // (piezas / piecesPerUnit) cuando el producto tiene una
+              // presentación que agrupa piezas (ej. Caja de 5 pzas).
+              const piecesEquivalence =
+                sl.product.isCatchWeight && largest?.piecesPerUnit && largest.piecesPerUnit > 1
+                  ? `≈${(sl.currentPieces / largest.piecesPerUnit).toFixed(1)} ${largest.name}`
                   : null;
 
               return (
@@ -387,11 +406,18 @@ export function StockPageClient({
                         Cantidad:{" "}
                         <span className="font-mono tabular-nums font-medium text-foreground">
                           {qty} {abbr}
+                          {sl.product.isCatchWeight && ` · ${sl.currentPieces} pzas`}
                         </span>
                         {presentationEquivalence && (
                           <span className="font-mono tabular-nums text-muted-foreground">
                             {" "}
                             ({presentationEquivalence})
+                          </span>
+                        )}
+                        {piecesEquivalence && (
+                          <span className="font-mono tabular-nums text-muted-foreground">
+                            {" "}
+                            ({piecesEquivalence})
                           </span>
                         )}
                       </span>
@@ -486,6 +512,7 @@ export function StockPageClient({
                       <span>
                         <span className="font-mono tabular-nums font-medium text-foreground">
                           {m.quantity} {abbr}
+                          {m.pieces != null && ` · ${m.pieces} pzas`}
                         </span>
                       </span>
                       {m.unitCost != null && m.unitCost > 0 && (
@@ -689,7 +716,11 @@ export function StockPageClient({
                 description="Detalles cuantitativos del movimiento."
               >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Cantidad" icon={Package} required>
+                  <Field
+                    label={selectedProduct?.isCatchWeight ? "Peso (kg)" : "Cantidad"}
+                    icon={Package}
+                    required
+                  >
                     <Input
                       name="quantity"
                       type="number"
@@ -705,6 +736,25 @@ export function StockPageClient({
                       </p>
                     )}
                   </Field>
+                  {selectedProduct?.isCatchWeight && (
+                    <Field label="Piezas" icon={Package} required>
+                      <Input
+                        name="pieces"
+                        type="number"
+                        step="1"
+                        required
+                        min={movementType === "adjustment" ? "0" : "1"}
+                        value={piecesInput}
+                        onChange={(e) => setPiecesInput(e.target.value)}
+                      />
+                      {movementType === "adjustment" && (
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          Usa 0 si el ajuste es solo de peso (ej. deshidratación), sin
+                          perder piezas completas.
+                        </p>
+                      )}
+                    </Field>
+                  )}
                   {movementType === "adjustment" && (
                     <Field label="Signo del ajuste" icon={Wrench} required>
                       <Select

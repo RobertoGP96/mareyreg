@@ -42,6 +42,7 @@ export async function getInventoryDashboard() {
             costPrice: true,
             category: true,
             isActive: true,
+            isCatchWeight: true,
           },
         },
         warehouse: { select: { warehouseId: true, name: true } },
@@ -60,7 +61,7 @@ export async function getInventoryDashboard() {
       orderBy: { createdAt: "desc" },
       take: 8,
       include: {
-        product: { select: { name: true, unit: true } },
+        product: { select: { name: true, unit: true, isCatchWeight: true } },
         warehouse: { select: { name: true } },
       },
     }),
@@ -156,7 +157,8 @@ export async function getInventoryDashboard() {
     (a, b) => b.value - a.value
   );
 
-  // Top stock value products (sum across warehouses)
+  // Top stock value products (sum across warehouses). En catch-weight, pieces
+  // acumula currentPieces — es informativo, no participa en la valuación.
   const byProductMap = new Map<
     number,
     {
@@ -166,6 +168,8 @@ export async function getInventoryDashboard() {
       qty: number;
       value: number;
       category: string | null;
+      isCatchWeight: boolean;
+      pieces: number;
     }
   >();
   for (const l of stockLevels) {
@@ -177,11 +181,14 @@ export async function getInventoryDashboard() {
         qty: 0,
         value: 0,
         category: l.product.category,
+        isCatchWeight: l.product.isCatchWeight,
+        pieces: 0,
       };
     const qty = Number(l.currentQuantity);
     const cost = l.product.costPrice ? Number(l.product.costPrice) : 0;
     cur.qty += qty;
     cur.value += qty * cost;
+    cur.pieces += l.currentPieces;
     byProductMap.set(l.productId, cur);
   }
   const topByValue = Array.from(byProductMap.values())
@@ -241,6 +248,8 @@ export async function getInventoryDashboard() {
       warehouseName: m.warehouse.name,
       unit: m.product.unit,
       quantity: Number(m.quantity),
+      pieces: m.pieces,
+      isCatchWeight: m.product.isCatchWeight,
       createdAt: m.createdAt,
     })),
     byWarehouse,

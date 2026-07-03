@@ -1,5 +1,7 @@
 "use client";
 
+import { Minus, Plus } from "lucide-react";
+
 interface QtyStepperProps {
   qty: number;
   onInc: () => void;
@@ -9,6 +11,10 @@ interface QtyStepperProps {
 
 export function QtyStepper({ qty, onInc, onDec, size = "sm" }: QtyStepperProps) {
   const isLg = size === "lg";
+  const iconSize = isLg ? "h-[17px] w-[17px]" : "h-[15px] w-[15px]";
+  const btnClass = `flex items-center justify-center rounded-md text-brand-mid transition-[color,transform] hover:text-brand active:scale-90 ${
+    isLg ? "h-6 w-6" : "h-5 w-5"
+  }`;
   return (
     <div
       className={`flex items-center bg-app ${
@@ -21,9 +27,9 @@ export function QtyStepper({ qty, onInc, onDec, size = "sm" }: QtyStepperProps) 
         type="button"
         onClick={onDec}
         aria-label="Disminuir cantidad"
-        className={`font-bold text-brand-mid ${isLg ? "w-5 text-[17px]" : "text-[15px]"}`}
+        className={btnClass}
       >
-        −
+        <Minus className={iconSize} />
       </button>
       <div
         className={`text-center font-semibold text-navy ${
@@ -36,9 +42,9 @@ export function QtyStepper({ qty, onInc, onDec, size = "sm" }: QtyStepperProps) 
         type="button"
         onClick={onInc}
         aria-label="Aumentar cantidad"
-        className={`font-bold text-brand-mid ${isLg ? "w-5 text-[17px]" : "text-[15px]"}`}
+        className={btnClass}
       >
-        +
+        <Plus className={iconSize} />
       </button>
     </div>
   );

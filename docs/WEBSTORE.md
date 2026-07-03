@@ -18,6 +18,7 @@ Plan completo de diseño: `C:/Users/usuario/.claude/plans/necesito-crear-un-modu
 | 8 | `getEffectivePrice` aplicado como precio sugerido en POS (B2B: sin UI de carrito propia todavía, pendiente cuando exista) | ✅ |
 | 9 | Esta documentación | ✅ |
 | 10 | Ofertas (`WebstoreOffer` + materialización en `Discount`), badge/filtro "Ofertas" en la tienda, endpoint `POST /api/webstore/customers` y sincronización de perfil desde la tienda | ✅ |
+| 11 (catch-weight) | Venta de productos de peso variable desde la tienda: precio/factura estimados por unidad, pesaje real y facturación en el ERP (`fulfillWebstoreOrder`) | ✅ |
 | — | Hardening (rate limiting del webhook, comparación automática precio-tienda-vs-Mareyway, HMAC de payload) | ⏳ v2 |
 
 ## Decisiones clave
@@ -46,15 +47,17 @@ psql "$DATABASE_URL" -f prisma/sql/webstore-constraints.sql
 1. **Productos** (`/products`): habilitar `webstoreEnabled` por producto (default `false`), cargar precio de venta y foto, ver historial de precios (timeline de solo lectura).
 2. **Descuentos** (`/discounts`): crear reglas por producto, categoría o globales, con vigencia, cantidad mínima y si son acumulables. Aplican en todos los canales.
 3. **API keys** (`/webstore/api-keys`): generar una key para la tienda (se muestra una sola vez), revocar cuando ya no se use.
-4. **Webhook de órdenes** (`POST /api/webstore/orders`): la tienda manda `externalOrderId`, cliente, líneas (`sku`, `quantity`, `unitPrice` informativo) y pago opcional. Respuestas: `201` procesada, `200` ya procesada (idempotente), `202` requiere revisión manual, `400` payload inválido, `401` key inválida, `409` ya existe en error/revisión, `500` error interno.
+4. **Webhook de órdenes** (`POST /api/webstore/orders`): la tienda manda `externalOrderId`, cliente, líneas (`sku`, `quantity`, `unitPrice` informativo) y pago opcional. Respuestas: `201` procesada, `200` ya procesada (idempotente), `202` requiere revisión manual, `400` payload inválido, `401` key inválida, `409` ya existe en error/revisión, `500` error interno. El body de `201` ahora incluye `status: "processed" | "awaiting_weighing"` y `lines: { sku, priceIsEstimated, estimatedWeightKg? }[]` (ver sección "Peso variable" abajo).
 5. **Catálogo de lectura** (`GET /api/webstore/products`): la tienda consulta sku, nombre, categoría, precio efectivo, stock disponible, foto y oferta vigente (si aplica) de los productos habilitados. Cada producto incluye:
 
    ```ts
    offer: { name: string; type: "percent" | "fixed"; value: number; endsAt: string | null } | null
+   isCatchWeight: boolean
+   pricePerKg: number | null // solo si isCatchWeight
    ```
 
-   `offer` refleja la `WebstoreOffer` que generó el `Discount` aplicado al precio del producto (null si no tiene ninguno vigente). El `%` que muestra el badge de la tienda se calcula siempre desde `price`/`compareAtPrice` (funciona igual para ofertas `percent` y `fixed`); `offer.name` y `offer.endsAt` son solo para el mensaje descriptivo en el detalle de producto.
-6. **Bandeja de órdenes** (`/webstore/ordenes`): KPIs (recibidas hoy, requieren revisión, con error, procesadas hoy), lista filtrable por estado, detalle con payload crudo, líneas resueltas/sin resolver, movimientos de stock generados y botón "Reprocesar" (con reasignación de producto por línea cuando aplica).
+   `offer` refleja la `WebstoreOffer` que generó el `Discount` aplicado al precio del producto (null si no tiene ninguno vigente). El `%` que muestra el badge de la tienda se calcula siempre desde `price`/`compareAtPrice` (funciona igual para ofertas `percent` y `fixed`); `offer.name` y `offer.endsAt` son solo para el mensaje descriptivo en el detalle de producto. Cada presentación (`presentations[]`) agrega, solo quando `isCatchWeight`: `piecesPerUnit`, `nominalWeightKg` (factor — peso nominal, solo estimación), `estimatedPrice` (`pricePerKg × nominalWeightKg`) y `stockPieces`.
+6. **Bandeja de órdenes** (`/webstore/ordenes`): KPIs (recibidas hoy, requieren revisión, con error, procesadas hoy), lista filtrable por estado (incluye "Por pesar" para `awaiting_weighing`), detalle con payload crudo, líneas resueltas/sin resolver, movimientos de stock generados, botón "Reprocesar" (con reasignación de producto por línea cuando aplica) y, para pedidos `awaiting_weighing`, formulario de pesaje (ver abajo).
 7. **Clientes** (`POST /api/webstore/customers`): la tienda registra o actualiza un cliente en el ERP al crear/editar el perfil local (registro y "Mis datos"), sin login con contraseña. Requiere API key con scope `manage_customers`. Body:
 
    ```ts
@@ -62,6 +65,14 @@ psql "$DATABASE_URL" -f prisma/sql/webstore-constraints.sql
    ```
 
    (`name` mínimo 1 carácter, `phone` mínimo 5). Respuestas: `201 { customerId, created: true }` (cliente nuevo), `200 { customerId, created: false }` (match por teléfono/email existente, idempotente), `400 { error, details }` (payload inválido), `401`/`403` (key inválida o sin el scope), `429` (rate limit), `500 { error }`. La tienda trata esta llamada como **best-effort**: si falla por cualquier motivo, el perfil/registro local de la tienda se guarda igual (ver `syncProfile` en `apps/tienda/src/app/actions/customer-actions.ts`).
+
+## Peso variable (catch-weight) en la tienda
+
+- **Venta por unidad, precio estimado**: la tienda vende productos catch-weight por pieza/caja (presentación con `piecesPerUnit`), nunca por peso. El precio mostrado (`estimatedPrice` en el catálogo) es `pricePerKg × nominalWeightKg` — una estimación. El peso real solo se conoce al pesar en báscula.
+- **`POST /api/webstore/orders` no cambia de payload**: sigue mandando `sku` + `quantity` entera (sin campo de peso). Si el pedido contiene al menos una línea de un producto `isCatchWeight`, `processWebstoreOrder` (`src/modules/webstore/lib/process-order.ts`) crea el `SalesOrder` con montos **estimados** (factor nominal, no peso real) pero **NO crea `Invoice` ni descuenta stock** — el `WebstoreOrderLog` queda en `awaiting_weighing`. Pedidos sin líneas catch-weight siguen el flujo de siempre (factura + descuento de stock inmediatos).
+- **Pesaje y facturación** (`fulfillWebstoreOrder`, `src/modules/webstore/actions/fulfill-order-actions.ts`): quien procesa el pedido en el ERP captura el peso real (kg) de cada línea catch-weight desde `/webstore/ordenes/[id]`. La acción exige un peso `> 0` por cada línea, crea la `Invoice` real (`dispatchLines` con `actualWeightKg`, que sí descuenta stock/valuación/kardex en kg reales), corrige `SalesOrderLine`/`SalesOrder` a los montos reales y marca el log `processed`. Es idempotente: solo una llamada gana el claim atómico (`status: "awaiting_weighing" → "received"`); una segunda llamada devuelve "El pedido ya fue procesado".
+- **Sin factura estimada ni ajustes posteriores**: por decisión de producto, no se genera ninguna factura previa con montos estimados — la única `Invoice` del pedido es la que crea `fulfillWebstoreOrder` con el peso real.
+- **UI de la tienda**: precio marcado como "Precio estimado" en detalle de producto, carrito y resumen de checkout cuando el producto/línea es catch-weight; la confirmación de pedido (`/pedido-confirmado?status=awaiting_weighing`) avisa que el total puede variar ligeramente.
 
 ## Riesgos / pendientes
 
@@ -80,7 +91,8 @@ psql "$DATABASE_URL" -f prisma/sql/webstore-constraints.sql
 - Layout: [src/app/(app)/(webstore)/layout.tsx](../src/app/(app)/(webstore)/layout.tsx).
 - Helpers críticos:
   - [src/modules/inventory/lib/effective-price.ts](../src/modules/inventory/lib/effective-price.ts) — `getEffectivePrice`, única fuente de verdad del precio de venta.
-  - [src/modules/webstore/lib/process-order.ts](../src/modules/webstore/lib/process-order.ts) — `processWebstoreOrder`, transacción completa (cliente, líneas, orden, factura, inventario, pago).
+  - [src/modules/webstore/lib/process-order.ts](../src/modules/webstore/lib/process-order.ts) — `processWebstoreOrder`, transacción completa (cliente, líneas, orden, factura, inventario, pago); pedidos con líneas catch-weight quedan `awaiting_weighing` sin factura ni descuento de stock.
+  - [src/modules/webstore/actions/fulfill-order-actions.ts](../src/modules/webstore/actions/fulfill-order-actions.ts) — `fulfillWebstoreOrder`, pesaje real + facturación de pedidos `awaiting_weighing`.
   - [src/modules/webstore/lib/api-key.ts](../src/modules/webstore/lib/api-key.ts) — generación/resolución de API keys.
   - [src/modules/webstore/lib/schemas.ts](../src/modules/webstore/lib/schemas.ts) — Zod del payload del webhook.
 - Endpoints: [src/app/api/webstore/orders/route.ts](../src/app/api/webstore/orders/route.ts), [src/app/api/webstore/products/route.ts](../src/app/api/webstore/products/route.ts), [src/app/api/webstore/customers/route.ts](../src/app/api/webstore/customers/route.ts), [src/app/api/products/upload/route.ts](../src/app/api/products/upload/route.ts).

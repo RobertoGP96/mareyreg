@@ -249,6 +249,7 @@ export function InventoryDashboardClient({ data }: Props) {
                     </div>
                     <div className="text-[10px] text-muted-foreground">
                       {p.qty.toFixed(0)} {getUnitAbbreviation(p.unit)}
+                      {p.isCatchWeight && ` · ${p.pieces} pzas`}
                     </div>
                   </li>
                 );
@@ -296,6 +297,7 @@ export function InventoryDashboardClient({ data }: Props) {
                     <div className="text-right shrink-0">
                       <div className="font-mono tabular-nums text-sm font-semibold text-foreground">
                         {m.quantity.toFixed(2)} {getUnitAbbreviation(m.unit)}
+                        {m.isCatchWeight && m.pieces != null && ` · ${m.pieces} pzas`}
                       </div>
                       <div className="text-[10px] text-muted-foreground">
                         {new Date(m.createdAt).toLocaleDateString("es-ES")}

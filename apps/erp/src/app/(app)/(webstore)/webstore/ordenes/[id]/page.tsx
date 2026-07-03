@@ -41,6 +41,17 @@ export default async function WebstoreOrderDetailPage({
     ? await db.stockMovement.findMany({ where: { referenceDoc: log.invoice.folio } })
     : [];
 
+  const catchWeightLines = (log.salesOrder?.lines ?? [])
+    .filter((l) => l.product.isCatchWeight && l.pieces != null)
+    .map((l) => ({
+      orderLineId: l.lineId,
+      productName: l.product.name,
+      presentationName: l.presentation?.name ?? null,
+      pieces: l.pieces as number,
+      estimatedWeightKg: Number(l.baseQuantity),
+      pricePerKg: Number(l.unitPrice),
+    }));
+
   return (
     <div className="space-y-4">
       <OrderDetailClient
@@ -52,6 +63,7 @@ export default async function WebstoreOrderDetailPage({
           receivedAt: log.receivedAt.toISOString(),
           processedAt: log.processedAt ? log.processedAt.toISOString() : null,
           apiKeyLabel: log.apiKey.label,
+          salesOrderId: log.salesOrder?.orderId ?? null,
           salesOrderFolio: log.salesOrder?.folio ?? null,
           invoiceFolio: log.invoice?.folio ?? null,
           invoiceTotal: log.invoice ? Number(log.invoice.total) : null,
@@ -65,6 +77,7 @@ export default async function WebstoreOrderDetailPage({
           productId: m.productId,
           quantity: Number(m.quantity),
         }))}
+        catchWeightLines={catchWeightLines}
       />
     </div>
   );

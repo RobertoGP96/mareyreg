@@ -270,3 +270,110 @@ describe("createPurchaseOrder — snapshot de moneda/tasa (Fase 2)", () => {
     }
   });
 });
+
+describe("createPurchaseOrder — producto catch-weight (peso variable)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) => cb(tx));
+    requireCurrentUserId.mockResolvedValue(1);
+    nextFolio.mockResolvedValue("OC-0001");
+    tx.purchaseOrder.create.mockResolvedValue({ poId: 1, folio: "OC-0001" });
+    tx.company.findUnique.mockResolvedValue(CUP_BASE);
+    tx.product.findUnique.mockResolvedValue({ isCatchWeight: true });
+  });
+
+  it("sin presentación: error claro pidiendo presentación con piezas", async () => {
+    const result = await createPurchaseOrder({
+      supplierId: 1,
+      warehouseId: 1,
+      orderDate: "2026-01-01",
+      lines: [{ productId: 1, quantity: 2, unitCost: 8 }],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("presentación con piezas");
+    }
+  });
+
+  it("presentación sin piecesPerUnit: error claro", async () => {
+    tx.productPresentation.findUnique.mockResolvedValue({
+      presentationId: 20,
+      productId: 1,
+      name: "Caja",
+      factor: 5,
+      isActive: true,
+      piecesPerUnit: null,
+    });
+
+    const result = await createPurchaseOrder({
+      supplierId: 1,
+      warehouseId: 1,
+      orderDate: "2026-01-01",
+      lines: [{ productId: 1, quantity: 2, unitCost: 8, presentationId: 20 }],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("no tiene piezas configuradas");
+    }
+  });
+
+  it("cantidad no entera: error claro", async () => {
+    tx.productPresentation.findUnique.mockResolvedValue({
+      presentationId: 20,
+      productId: 1,
+      name: "Caja",
+      factor: 5,
+      isActive: true,
+      piecesPerUnit: 2,
+    });
+
+    const result = await createPurchaseOrder({
+      supplierId: 1,
+      warehouseId: 1,
+      orderDate: "2026-01-01",
+      lines: [{ productId: 1, quantity: 2.5, unitCost: 8, presentationId: 20 }],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("cantidad debe ser un entero");
+    }
+  });
+
+  it("presentación con piezas y cantidad entera: OK, baseQuantity estimada con factor nominal", async () => {
+    tx.productPresentation.findUnique.mockResolvedValue({
+      presentationId: 20,
+      productId: 1,
+      name: "Caja",
+      factor: 5,
+      isActive: true,
+      piecesPerUnit: 2,
+    });
+
+    const result = await createPurchaseOrder({
+      supplierId: 1,
+      warehouseId: 1,
+      orderDate: "2026-01-01",
+      lines: [{ productId: 1, quantity: 3, unitCost: 8, presentationId: 20 }],
+    });
+
+    expect(result.success).toBe(true);
+    expect(tx.purchaseOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          lines: {
+            create: [
+              expect.objectContaining({
+                presentationId: 20,
+                unitFactor: 5,
+                baseQuantity: 15,
+              }),
+            ],
+          },
+        }),
+      })
+    );
+  });
+});

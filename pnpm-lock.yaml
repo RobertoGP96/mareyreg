@@ -186,6 +186,9 @@ importers:
 
   apps/tienda:
     dependencies:
+      lucide-react:
+        specifier: ^1.8.0
+        version: 1.8.0(react@19.2.0)
       next:
         specifier: ^15.3.2
         version: 15.5.15(react-dom@19.2.0(react@19.2.0))(react@19.2.0)

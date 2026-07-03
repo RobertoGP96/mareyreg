@@ -23,6 +23,8 @@ export interface CartLine {
   qty: number;
   imageUrl: string | null;
   stockAvailable: number;
+  /** true si el producto es de peso variable: el precio mostrado es estimado, el total real se ajusta al pesar el pedido. */
+  isCatchWeight?: boolean;
 }
 
 export interface StoredProfile {
@@ -38,7 +40,7 @@ export interface StoredOrder {
   dateIso: string;
   itemsCount: number;
   total: number;
-  status: "En preparación" | "En revisión";
+  status: "En preparación" | "En revisión" | "Por pesar";
 }
 
 export interface StoreState {

@@ -127,42 +127,60 @@ export function ApiKeyListClient({ apiKeys }: { apiKeys: ApiKeyItem[] }) {
     const label = fd.get("label") as string;
     const expiresInDays = EXPIRY_OPTIONS.find((o) => o.value === expiryOption)?.days ?? null;
 
-    const result = await createWebstoreApiKey({ label, scopes: selectedScopes, expiresInDays });
-    setIsSubmitting(false);
-    if (result.success) {
-      setCreatedKey(result.data.rawKey);
-      toast.success("API key creada");
-      router.refresh();
-    } else toast.error(result.error);
+    try {
+      const result = await createWebstoreApiKey({ label, scopes: selectedScopes, expiresInDays });
+      if (result.success) {
+        setCreatedKey(result.data.rawKey);
+        toast.success("API key creada");
+        router.refresh();
+      } else toast.error(result.error);
+    } catch (error) {
+      console.error("createWebstoreApiKey:", error);
+      toast.error("Error al crear la API key");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleRevoke = async () => {
     if (!toRevoke) return;
     setIsSubmitting(true);
-    const result = await revokeWebstoreApiKey(toRevoke);
-    setIsSubmitting(false);
-    if (result.success) {
-      setToRevoke(null);
-      toast.success("API key revocada");
-      router.refresh();
-    } else toast.error(result.error);
+    try {
+      const result = await revokeWebstoreApiKey(toRevoke);
+      if (result.success) {
+        setToRevoke(null);
+        toast.success("API key revocada");
+        router.refresh();
+      } else toast.error(result.error);
+    } catch (error) {
+      console.error("revokeWebstoreApiKey:", error);
+      toast.error("Error al revocar la API key");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleRotate = async () => {
     if (!toRotate) return;
     setIsSubmitting(true);
     const scopes = toValidScopes(toRotate.scopes);
-    const result = await createWebstoreApiKey({
-      label: toRotate.label,
-      scopes: scopes.length > 0 ? scopes : [...WEBSTORE_API_KEY_SCOPES],
-      expiresInDays: null,
-    });
-    setIsSubmitting(false);
-    if (result.success) {
-      setRotatedKey(result.data.rawKey);
-      toast.success("Nueva API key creada");
-      router.refresh();
-    } else toast.error(result.error);
+    try {
+      const result = await createWebstoreApiKey({
+        label: toRotate.label,
+        scopes: scopes.length > 0 ? scopes : [...WEBSTORE_API_KEY_SCOPES],
+        expiresInDays: null,
+      });
+      if (result.success) {
+        setRotatedKey(result.data.rawKey);
+        toast.success("Nueva API key creada");
+        router.refresh();
+      } else toast.error(result.error);
+    } catch (error) {
+      console.error("createWebstoreApiKey (rotate):", error);
+      toast.error("Error al crear la API key");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const closeCreateDialog = () => {

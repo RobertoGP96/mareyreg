@@ -31,7 +31,10 @@ export type SubmitOrderInput = z.infer<typeof submitOrderSchema>;
 export type SubmitOrderResult =
   | {
       success: true;
-      data: { orderNo: string; status: "processed" | "needs_review" };
+      data: {
+        orderNo: string;
+        status: "processed" | "needs_review" | "awaiting_weighing";
+      };
     }
   | { success: false; error: string };
 
@@ -75,6 +78,15 @@ export async function submitOrder(
         data: {
           orderNo: `A-${result.salesOrderId ?? result.logId}`,
           status: "processed",
+        },
+      };
+    }
+    if (result.status === "awaiting_weighing") {
+      return {
+        success: true,
+        data: {
+          orderNo: `A-${result.salesOrderId ?? result.logId}`,
+          status: "awaiting_weighing",
         },
       };
     }

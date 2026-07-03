@@ -411,7 +411,9 @@ describe("dispatchLines", () => {
     it("presentación sin piecesPerUnit lanza error (debe elegir Pieza o Caja)", async () => {
       tx.product.findMany.mockResolvedValue([catchWeightProduct()]);
       tx.productPresentation.findMany.mockResolvedValue([]);
-      getEffectiveLinePrices.mockResolvedValue(new Map());
+      getEffectiveLinePrices.mockResolvedValue(
+        new Map([[lineKey(1, undefined), effectivePriceResult({ pricePerBase: 10 })]])
+      );
 
       await expect(
         dispatchLines(tx as never, {

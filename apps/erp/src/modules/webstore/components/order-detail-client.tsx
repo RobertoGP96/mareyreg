@@ -25,10 +25,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Receipt, RefreshCw, Loader2, AlertTriangle, CheckCircle2, Ban } from "lucide-react";
+import { Receipt, RefreshCw, Loader2, AlertTriangle, CheckCircle2, Ban, Scale } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
+import { Input } from "@/components/ui/input";
 import { reprocessOrder, cancelWebstoreOrder } from "../actions/order-actions";
+import { fulfillWebstoreOrder } from "../actions/fulfill-order-actions";
 
 const STATUS_MAP: Record<string, { status: OpsStatus; label: string }> = {
   received: { status: "pending", label: "Recibida" },
@@ -36,6 +38,7 @@ const STATUS_MAP: Record<string, { status: OpsStatus; label: string }> = {
   needs_review: { status: "delayed", label: "Requiere revisión" },
   error: { status: "cancelled", label: "Error" },
   cancelled: { status: "cancelled", label: "Cancelada" },
+  awaiting_weighing: { status: "delayed", label: "Por pesar" },
 };
 
 interface OrderLogDetail {
@@ -46,11 +49,21 @@ interface OrderLogDetail {
   receivedAt: string;
   processedAt: string | null;
   apiKeyLabel: string;
+  salesOrderId: number | null;
   salesOrderFolio: string | null;
   invoiceFolio: string | null;
   invoiceTotal: number | null;
   invoiceStatus: string | null;
   rawPayload: unknown;
+}
+
+interface CatchWeightLine {
+  orderLineId: number;
+  productName: string;
+  presentationName: string | null;
+  pieces: number;
+  estimatedWeightKg: number;
+  pricePerKg: number;
 }
 
 interface LineStatus {
@@ -71,21 +84,61 @@ export function OrderDetailClient({
   lineStatuses,
   products,
   stockMovements,
+  catchWeightLines,
 }: {
   log: OrderLogDetail;
   lineStatuses: LineStatus[];
   products: ProductOption[];
   stockMovements: Array<{ movementId: number; productId: number; quantity: number }>;
+  catchWeightLines: CatchWeightLine[];
 }) {
   const router = useRouter();
   const [isReprocessing, setIsReprocessing] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isFulfilling, setIsFulfilling] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [weights, setWeights] = useState<Record<number, string>>({});
 
   const cfg = STATUS_MAP[log.status] ?? { status: "pending" as OpsStatus, label: log.status };
   const needsAttention = log.status === "needs_review" || log.status === "error";
   const canCancel = log.status === "processed";
+  const isAwaitingWeighing = log.status === "awaiting_weighing";
+
+  const weighingTotal = catchWeightLines.reduce((sum, line) => {
+    const w = Number(weights[line.orderLineId]);
+    const weight = Number.isFinite(w) && w > 0 ? w : line.estimatedWeightKg;
+    return sum + weight * line.pricePerKg;
+  }, 0);
+
+  const handleFulfill = async () => {
+    const parsedWeights = catchWeightLines.map((line) => ({
+      orderLineId: line.orderLineId,
+      actualWeightKg: Number(weights[line.orderLineId]),
+    }));
+    const missing = parsedWeights.find((w) => !Number.isFinite(w.actualWeightKg) || w.actualWeightKg <= 0);
+    if (missing) {
+      toast.error("Captura el peso real de todas las líneas antes de facturar");
+      return;
+    }
+    if (!log.salesOrderId) return;
+
+    setIsFulfilling(true);
+    const result = await fulfillWebstoreOrder({ orderId: log.salesOrderId, weights: parsedWeights });
+    setIsFulfilling(false);
+    if (result.success) {
+      toast.success(`Pedido pesado y facturado — folio ${result.data.folio}`, {
+        description: (
+          <ToastLines>
+            <ToastDetail label="Total real" value={`$${result.data.total.toFixed(2)}`} mono />
+          </ToastLines>
+        ),
+      });
+      router.refresh();
+    } else {
+      toast.error(result.error);
+    }
+  };
 
   const handleReprocess = async () => {
     setIsReprocessing(true);
@@ -177,6 +230,67 @@ export function OrderDetailClient({
             </div>
           </div>
         </div>
+      )}
+
+      {isAwaitingWeighing && catchWeightLines.length > 0 && (
+        <FormSection
+          icon={Scale}
+          title="Pesaje de productos de peso variable"
+          description="Captura el peso real de cada línea para facturar el pedido. El precio mostrado es por kg."
+        >
+          <div className="space-y-3">
+            {catchWeightLines.map((line) => {
+              const rawWeight = weights[line.orderLineId] ?? "";
+              const parsedWeight = Number(rawWeight);
+              const lineTotal =
+                Number.isFinite(parsedWeight) && parsedWeight > 0
+                  ? parsedWeight * line.pricePerKg
+                  : null;
+              return (
+                <div key={line.orderLineId} className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <div>
+                      <span className="font-medium">{line.productName}</span>
+                      {line.presentationName && (
+                        <span className="text-muted-foreground"> · {line.presentationName}</span>
+                      )}
+                      <span className="text-muted-foreground"> · {line.pieces} pzas</span>
+                    </div>
+                    <span className="font-mono tabular-nums text-muted-foreground">
+                      ${line.pricePerKg.toFixed(2)} / kg
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Field label="Peso real (kg)" className="flex-1">
+                      <Input
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        inputMode="decimal"
+                        placeholder={line.estimatedWeightKg.toFixed(3)}
+                        value={rawWeight}
+                        onChange={(e) =>
+                          setWeights((prev) => ({ ...prev, [line.orderLineId]: e.target.value }))
+                        }
+                      />
+                    </Field>
+                    <div className="text-sm font-mono tabular-nums whitespace-nowrap pt-5">
+                      {lineTotal != null ? `$${lineTotal.toFixed(2)}` : "—"}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm font-semibold">
+              <span>Total estimado</span>
+              <span className="font-mono tabular-nums">${weighingTotal.toFixed(2)}</span>
+            </div>
+            <Button variant="brand" onClick={handleFulfill} disabled={isFulfilling} className="w-full sm:w-auto">
+              {isFulfilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scale className="h-4 w-4" />}
+              {isFulfilling ? "Facturando…" : "Pesar y facturar"}
+            </Button>
+          </div>
+        </FormSection>
       )}
 
       <FormSection icon={Receipt} title="Líneas del pedido" description="Productos solicitados y su resolución en Mareyway.">

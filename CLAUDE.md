@@ -41,13 +41,13 @@ apps/
       types/index.ts              # ActionResult<T>, re-exports de Prisma
     generated/prisma/             # cliente generado — NO editar, NO commitear (gitignored)
     .env / .env.local             # secretos del ERP (viven aquí, NO en la raíz)
-  tienda/                         # storefront público (puerto 3001) — diseño "Tienda Completa v2" (azul/gris, Space Grotesk, mobile 430px)
+  tienda/                         # storefront público (puerto 3001) — diseño "Tienda Completa v2" (azul/gris, Space Grotesk, lucide-react), mobile 430px + desktop responsive (TopNav md+, BottomNav móvil)
     src/lib/erp-client.ts         # cliente tipado hacia la API webstore del ERP
     src/lib/store.tsx             # estado cliente (carrito/favoritos/perfil/pedidos) persistido en localStorage
     src/lib/cart-totals.ts        # reglas: envío gratis ≥$100, envío $5 domicilio, cupón AZUL10 −10%
     src/app/actions/order-actions.ts  # server action → POST /api/webstore/orders (Zod, externalOrderId idempotente)
     src/app/                      # rutas: / catalogo(?ofertas=1) producto/[sku] favoritos carrito checkout pedido-confirmado perfil(/pedidos,/datos) login registro
-    .env.example                  # WEBSTORE_API_URL + WEBSTORE_API_KEY (generar key en ERP /webstore/api-keys, scopes read_catalog+create_orders)
+    .env.example                  # WEBSTORE_API_URL + WEBSTORE_API_KEY (generar key en ERP /webstore/api-keys o `pnpm dlx tsx scripts/create-webstore-key.ts` desde apps/erp; scopes read_catalog+create_orders+manage_customers)
 docs/                             # documentación cross-app (WEBSTORE.md = contrato entre apps)
 ```
 
@@ -104,6 +104,8 @@ Reglas:
 - Mensajes de error al usuario en **español**, sin tecnicismos. Loguear el error real con `console.error`.
 - No exponer `Error.message` directo al cliente.
 - Acciones que tocan dinero, balances o ledger **siempre** usan `db.$transaction` y la audit es obligatoria.
+- Archivos `"use server"` solo pueden exportar **funciones async** — un `export const`/objeto rompe el registro de actions de la página en runtime (el POST falla con "A 'use server' file can only export async functions") y la UI se queda colgada. Constantes compartidas van en `lib/` del módulo.
+- Handlers de cliente que llaman server actions: `try/catch/finally` con el `setIsSubmitting(false)` en el `finally` — si la action rechaza (500, red), el spinner no debe quedarse atascado.
 
 ## Auth y permisos
 
@@ -114,6 +116,7 @@ Reglas:
 - **Server actions que mutan** exigen `requireCurrentUserId()` (lanza "No autenticado"); operaciones sensibles añaden `await assertRole("admin", ...)` (`src/lib/auth-guard.ts`, lanza `ForbiddenError` — no usar `requireRole`, que hace redirect y es solo para layouts).
 - Stock/inventario: nunca `decrement` ciego — `updateMany` condicional (`{ gte: qty }`) + verificar `count`, o el helper compartido `dispatchLines`/`reverseInvoiceStock` de `src/modules/sales/lib/dispatch-lines.ts` (lo usan POS y webstore).
 - **Inventario multi-unidad**: stock, kardex (`StockMovement`) y valuación van SIEMPRE en **unidad base**. Las líneas de venta/compra guardan `quantity` en la unidad vendida/comprada + snapshot `unitFactor`/`baseQuantity`. El factor se resuelve SIEMPRE server-side desde `ProductPresentation` (nunca del cliente); conversión única en `src/modules/inventory/lib/units.ts` (`toBaseQuantity`). Precios menudeo/mayoreo por presentación vía `getEffectiveLinePrices` (`effective-price.ts`); `Product.secondaryPrice` está DEPRECADO. Cambios de precio escriben `PresentationPriceHistory`/`ProductPriceHistory`; ajuste masivo solo admin (`pricing-actions.ts`). `Warehouse.locationType` (`general|store|service_unit`) es el tipo operativo — el POS despacha del `store`; `warehouseType` es el tipo físico. Tras `db push` aplicar `prisma/sql/inventory-presentations.sql`, `inventory-locations.sql` y `purchasing-presentations.sql`.
+- **Peso variable (catch weight)**: productos con `Product.isCatchWeight` (quesos, etc.) tienen unidad base **kg** y contador dual `StockLevel.currentPieces`; sus presentaciones Pieza/Caja llevan `piecesPerUnit` y `factor` = peso NOMINAL (solo estimación). Discriminador de línea: `pieces IS NOT NULL` ⇒ `baseQuantity` = peso REAL capturado (`actualWeightKg` en `dispatchLines`/`createInvoice`; `pieceWeights[]` en recepción) y `unitPrice` es POR KG (`pricePerBase` de `getEffectiveLinePrices`). Decrementos SIEMPRE duales y atómicos (un solo `updateMany` con `gte` en kg y piezas); `allowNegative` prohibido; merma solo-kg = `adjustment` con `pieces = 0`. Pedidos webstore con estas líneas quedan `awaiting_weighing` (sin factura ni stock) hasta `fulfillWebstoreOrder` con pesos reales. Helpers en `units.ts` (`piecesFor`, `catchWeightBaseQuantity`, `formatCatchWeight`). Tras `db push` aplicar `prisma/sql/inventory-catch-weight.sql`.
 - **Webstore ofertas/clientes**: una oferta (`WebstoreOffer`) materializa filas `Discount` (una por producto, ligadas por `offerId`) vía `src/modules/webstore/lib/sync-offer-discounts.ts` — no editar esos discounts desde inventario ni tocar `effective-price.ts` (el pricing las aplica sin cambios; sigue rigiendo "1 descuento activo por producto"). Clientes de la tienda: `Customer.source = 'webstore'` con matching por `normalizedPhone` (índice único parcial); el registro/perfil de la tienda sincroniza vía `POST /api/webstore/customers` (scope `manage_customers`, best-effort — nunca romper el flujo local si el ERP no responde). Tras `db push` aplicar `prisma/sql/webstore-offers.sql` y `webstore-customers.sql`.
 
 ## UI (mobile-first, premium)

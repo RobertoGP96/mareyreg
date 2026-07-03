@@ -60,6 +60,8 @@ interface Props {
   productId: number | null;
   productName?: string;
   productUnit?: string;
+  /** Producto de peso variable: cambia labels y deriva precios de no-base. */
+  productIsCatchWeight?: boolean;
   currencies?: CurrencyOption[];
   baseCurrencyId?: number;
   baseCode?: string;
@@ -70,6 +72,7 @@ export function PresentationManagerDialog({
   productId,
   productName,
   productUnit,
+  productIsCatchWeight = false,
   currencies = [],
   baseCurrencyId,
   baseCode = "CUP",
@@ -83,6 +86,9 @@ export function PresentationManagerDialog({
   const [editing, setEditing] = useState<ProductPresentationRow | null>(null);
   const [toDelete, setToDelete] = useState<ProductPresentationRow | null>(null);
   const [historyPresentation, setHistoryPresentation] = useState<ProductPresentationRow | null>(null);
+  // Solo relevante para catch-weight no-base: factor nominal capturado en vivo
+  // para derivar los precios readonly mostrados (precio base × factor).
+  const [liveFactor, setLiveFactor] = useState(1);
 
   const loadPresentations = useCallback(() => {
     if (productId == null) return;
@@ -105,13 +111,20 @@ export function PresentationManagerDialog({
 
   const openEdit = (p: ProductPresentationRow) => {
     setEditing(p);
+    setLiveFactor(p.factor);
     setShowForm(true);
   };
 
   const openCreate = () => {
     setEditing(null);
+    setLiveFactor(1);
     setShowForm(true);
   };
+
+  const basePresentation = presentations.find((p) => p.isBase) ?? null;
+  const derivedRetailPrice = basePresentation ? basePresentation.retailPrice * liveFactor : 0;
+  const derivedWholesalePrice =
+    basePresentation?.wholesalePrice != null ? basePresentation.wholesalePrice * liveFactor : null;
 
   const closeForm = () => {
     setShowForm(false);
@@ -172,11 +185,19 @@ export function PresentationManagerDialog({
 
     const fd = new FormData(e.currentTarget);
     const rawCurrency = fd.get("priceCurrencyId") as string | null;
+    const isNonBaseCatchWeight = productIsCatchWeight && !(editing?.isBase ?? false);
     const data = {
       name: fd.get("name") as string,
       factor: Number(fd.get("factor")),
-      retailPrice: Number(fd.get("retailPrice")),
-      wholesalePrice: fd.get("wholesalePrice") ? Number(fd.get("wholesalePrice")) : undefined,
+      // No-base catch-weight: los precios se derivan del precio base × factor
+      // nominal (readonly en UI) — se envían igual, calculados a partir de la
+      // base vigente, para que el server-side guarde el valor mostrado.
+      retailPrice: isNonBaseCatchWeight ? derivedRetailPrice : Number(fd.get("retailPrice")),
+      wholesalePrice: isNonBaseCatchWeight
+        ? derivedWholesalePrice
+        : fd.get("wholesalePrice")
+          ? Number(fd.get("wholesalePrice"))
+          : undefined,
       priceCurrencyId: rawCurrency
         ? rawCurrency === BASE_CURRENCY_VALUE
           ? null
@@ -185,6 +206,12 @@ export function PresentationManagerDialog({
       sku: (fd.get("sku") as string) || undefined,
       barcode: (fd.get("barcode") as string) || undefined,
       reason: (fd.get("reason") as string) || undefined,
+      piecesPerUnit:
+        productIsCatchWeight && !(editing?.isBase ?? false)
+          ? fd.get("piecesPerUnit")
+            ? Number(fd.get("piecesPerUnit"))
+            : undefined
+          : undefined,
     };
 
     setIsSubmitting(true);
@@ -321,7 +348,9 @@ export function PresentationManagerDialog({
                 description={
                   editing?.isBase
                     ? "El factor de la presentación base no puede modificarse."
-                    : "Define el factor respecto a la unidad base y sus precios."
+                    : productIsCatchWeight
+                      ? "Peso variable: el precio se cobra por kg pesado; estos valores son solo un estimado."
+                      : "Define el factor respecto a la unidad base y sus precios."
                 }
               >
                 <Field label="Nombre" icon={Layers} required>
@@ -333,13 +362,15 @@ export function PresentationManagerDialog({
                   />
                 </Field>
                 <Field
-                  label="Factor"
+                  label={productIsCatchWeight ? "Peso nominal (kg)" : "Factor"}
                   icon={Hash}
                   required
                   hint={
                     editing && (editing.isBase || false)
                       ? "La presentación base siempre tiene factor 1."
-                      : "Cuántas unidades base equivale una unidad de esta presentación."
+                      : productIsCatchWeight
+                        ? "Peso estimado de referencia; el peso real se captura al vender."
+                        : "Cuántas unidades base equivale una unidad de esta presentación."
                   }
                 >
                   <Input
@@ -350,27 +381,96 @@ export function PresentationManagerDialog({
                     required
                     disabled={editing?.isBase}
                     defaultValue={editing ? String(editing.factor) : "1"}
+                    onChange={(e) => setLiveFactor(Number(e.target.value) || 0)}
                   />
                 </Field>
+                {productIsCatchWeight && !(editing?.isBase ?? false) && (
+                  <Field
+                    label="Piezas por presentación"
+                    icon={Hash}
+                    required
+                    hint="Cuántas piezas fungibles representa esta presentación (ej. Caja = 5 piezas)."
+                  >
+                    <Input
+                      name="piecesPerUnit"
+                      type="number"
+                      step="1"
+                      min="1"
+                      required
+                      defaultValue={editing?.piecesPerUnit != null ? String(editing.piecesPerUnit) : "1"}
+                    />
+                  </Field>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Field label="Precio menudeo" icon={CircleDollarSign} required>
+                  <Field
+                    label="Precio menudeo"
+                    icon={CircleDollarSign}
+                    required={!productIsCatchWeight || (editing?.isBase ?? false)}
+                    hint={
+                      productIsCatchWeight && !(editing?.isBase ?? false)
+                        ? "Estimado — se cobra por kg pesado."
+                        : undefined
+                    }
+                  >
                     <Input
                       name="retailPrice"
                       type="number"
                       step="0.01"
                       min="0"
-                      required
-                      defaultValue={editing ? String(editing.retailPrice) : undefined}
+                      required={!productIsCatchWeight || (editing?.isBase ?? false)}
+                      readOnly={productIsCatchWeight && !(editing?.isBase ?? false)}
+                      value={
+                        productIsCatchWeight && !(editing?.isBase ?? false)
+                          ? derivedRetailPrice.toFixed(2)
+                          : undefined
+                      }
+                      defaultValue={
+                        productIsCatchWeight && !(editing?.isBase ?? false)
+                          ? undefined
+                          : editing
+                            ? String(editing.retailPrice)
+                            : undefined
+                      }
+                      className={
+                        productIsCatchWeight && !(editing?.isBase ?? false)
+                          ? "bg-muted/40 text-muted-foreground"
+                          : undefined
+                      }
                       placeholder="$0.00"
                     />
                   </Field>
-                  <Field label="Precio mayoreo" icon={CircleDollarSign} hint="Opcional.">
+                  <Field
+                    label="Precio mayoreo"
+                    icon={CircleDollarSign}
+                    hint={
+                      productIsCatchWeight && !(editing?.isBase ?? false)
+                        ? "Estimado — se cobra por kg pesado."
+                        : "Opcional."
+                    }
+                  >
                     <Input
                       name="wholesalePrice"
                       type="number"
                       step="0.01"
                       min="0"
-                      defaultValue={editing?.wholesalePrice != null ? String(editing.wholesalePrice) : ""}
+                      readOnly={productIsCatchWeight && !(editing?.isBase ?? false)}
+                      value={
+                        productIsCatchWeight && !(editing?.isBase ?? false)
+                          ? (derivedWholesalePrice != null ? derivedWholesalePrice.toFixed(2) : "")
+                          : undefined
+                      }
+                      defaultValue={
+                        productIsCatchWeight && !(editing?.isBase ?? false)
+                          ? undefined
+                          : editing?.wholesalePrice != null
+                            ? String(editing.wholesalePrice)
+                            : ""
+                      }
+                      className={
+                        productIsCatchWeight && !(editing?.isBase ?? false)
+                          ? "bg-muted/40 text-muted-foreground"
+                          : undefined
+                      }
                       placeholder="—"
                     />
                   </Field>

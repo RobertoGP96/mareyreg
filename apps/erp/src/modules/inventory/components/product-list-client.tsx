@@ -31,6 +31,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -64,6 +65,7 @@ import {
   ImagePlus,
   Tag,
   Layers,
+  Scale,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatAmount } from "@/lib/format";
@@ -113,6 +115,9 @@ interface ProductItem {
   isActive: boolean;
   description: string | null;
   notes: string | null;
+  allowNegative: boolean;
+  /** Producto de peso variable (ej. queso): se vende por kg pesado. */
+  isCatchWeight: boolean;
 }
 
 const BASE_CURRENCY_VALUE = "base";
@@ -137,6 +142,7 @@ export function ProductListClient({
   const [toDelete, setToDelete] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [webstoreEnabled, setWebstoreEnabled] = useState(false);
+  const [isCatchWeight, setIsCatchWeight] = useState(false);
   const [historyProduct, setHistoryProduct] = useState<ProductItem | null>(null);
   const [history, setHistory] = useState<ProductPriceHistoryEntry[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
@@ -241,7 +247,9 @@ export function ProductListClient({
         sku: (fd.get("sku") as string) || undefined,
         barcode: (fd.get("barcode") as string) || undefined,
         category: (fd.get("category") as string) || undefined,
-        unit: fd.get("unit") as string,
+        // Peso variable fuerza kg del lado del cliente (input deshabilitado),
+        // pero se refuerza aquí por si el form llega a habilitarse de otro modo.
+        unit: isCatchWeight ? "kg" : (fd.get("unit") as string),
         minStock: fd.get("minStock") ? Number(fd.get("minStock")) : 0,
         maxStock: fd.get("maxStock") ? Number(fd.get("maxStock")) : undefined,
         costPrice: fd.get("costPrice") ? Number(fd.get("costPrice")) : undefined,
@@ -251,7 +259,9 @@ export function ProductListClient({
             ? null
             : Number(rawSaleCurrency)
           : undefined,
+        allowNegative: isCatchWeight ? false : undefined,
         webstoreEnabled,
+        isCatchWeight,
         // "" limpia la foto en el server (imageUrl || null); undefined la deja intacta.
         imageUrl: uploadedImageUrl ?? (imageRemoved ? "" : undefined),
         brand: (fd.get("brand") as string) || undefined,
@@ -298,6 +308,7 @@ export function ProductListClient({
   const openEdit = (p: ProductItem) => {
     setToEdit(p);
     setWebstoreEnabled(p.webstoreEnabled);
+    setIsCatchWeight(p.isCatchWeight);
     setImageFile(null);
     setImagePreview(p.imageUrl);
     setImageRemoved(false);
@@ -312,6 +323,7 @@ export function ProductListClient({
 
   const openCreate = () => {
     setWebstoreEnabled(false);
+    setIsCatchWeight(false);
     setImageFile(null);
     setImagePreview(null);
     setImageRemoved(false);
@@ -355,7 +367,12 @@ export function ProductListClient({
             </Select>
           </Field>
           <Field label="Unidad de medida" icon={Ruler} required>
-            <Select name="unit" defaultValue={product?.unit ?? "unidades"}>
+            <Select
+              name="unit"
+              value={isCatchWeight ? "kg" : undefined}
+              defaultValue={product?.unit ?? "unidades"}
+              disabled={isCatchWeight}
+            >
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent className="max-h-[300px]">
                 {UNIT_GROUPS.map((group) => (
@@ -372,6 +389,20 @@ export function ProductListClient({
             </Select>
           </Field>
         </div>
+        <Field
+          label="Peso variable"
+          icon={Scale}
+          hint="El producto se vende por kg pesado en báscula (ej. queso). Fuerza unidad kg y desactiva stock negativo."
+        >
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={isCatchWeight}
+              onCheckedChange={(checked) => setIsCatchWeight(checked === true)}
+              aria-label="Peso variable (se vende por kg pesado)"
+            />
+            Se vende por kg pesado
+          </label>
+        </Field>
       </FormSection>
 
       <FormSection icon={WarehouseIcon} title="Stock y costos" description="Niveles de inventario, costo y precio de venta.">
@@ -795,6 +826,7 @@ export function ProductListClient({
         productId={presentationsProduct?.productId ?? null}
         productName={presentationsProduct?.name}
         productUnit={presentationsProduct?.unit}
+        productIsCatchWeight={presentationsProduct?.isCatchWeight}
         currencies={currencies}
         baseCurrencyId={baseCurrencyId}
         baseCode={baseCode}

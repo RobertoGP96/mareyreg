@@ -32,6 +32,7 @@ const STATUS_MAP: Record<string, { status: OpsStatus; label: string }> = {
   processed: { status: "completed", label: "Procesada" },
   needs_review: { status: "delayed", label: "Requiere revisión" },
   error: { status: "cancelled", label: "Error" },
+  awaiting_weighing: { status: "delayed", label: "Por pesar" },
 };
 
 export function OrderInboxClient({
@@ -68,6 +69,7 @@ export function OrderInboxClient({
               <SelectItem value="all">Todos los estados</SelectItem>
               <SelectItem value="received">Recibidas</SelectItem>
               <SelectItem value="needs_review">Requieren revisión</SelectItem>
+              <SelectItem value="awaiting_weighing">Por pesar</SelectItem>
               <SelectItem value="error">Con error</SelectItem>
               <SelectItem value="processed">Procesadas</SelectItem>
             </SelectContent>

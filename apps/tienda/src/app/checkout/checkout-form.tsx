@@ -2,6 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  Banknote,
+  CreditCard,
+  Loader2,
+  ShoppingCart,
+  Store,
+  Truck,
+  type LucideIcon,
+} from "lucide-react";
 import { submitOrder } from "@/app/actions/order-actions";
 import { computeTotals } from "@/lib/cart-totals";
 import { fmt } from "@/lib/format";
@@ -15,27 +24,36 @@ type Payment = "efectivo" | "transferencia";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const inputClass =
-  "rounded-xl border border-line bg-white px-3.5 py-[13px] text-sm text-ink placeholder:text-muted-2";
+  "rounded-xl border border-line bg-white px-3.5 py-[13px] text-sm text-ink placeholder:text-muted-2 transition-colors focus:border-brand focus:outline-none";
 
 function OptionCard({
   title,
   subtitle,
   active,
   onSelect,
+  icon: Icon,
 }: {
   title: string;
   subtitle: string;
   active: boolean;
   onSelect: () => void;
+  icon?: LucideIcon;
 }) {
   return (
     <button
       type="button"
       onClick={onSelect}
-      className={`flex-1 rounded-[13px] border-[1.5px] px-3.5 py-3 text-left ${
-        active ? "border-brand bg-chip" : "border-line bg-white"
+      className={`flex-1 rounded-[13px] border-[1.5px] px-3.5 py-3 text-left transition-colors ${
+        active
+          ? "border-brand bg-chip"
+          : "border-line bg-white hover:border-brand-mid"
       }`}
     >
+      {Icon && (
+        <Icon
+          className={`mb-1.5 h-4 w-4 ${active ? "text-brand" : "text-muted-2"}`}
+        />
+      )}
       <div className="text-[13.5px] font-semibold text-navy">{title}</div>
       <div className="mt-0.5 text-xs text-muted">{subtitle}</div>
     </button>
@@ -71,6 +89,7 @@ export function CheckoutForm() {
     couponApplied: state.couponApplied,
     pickup: delivery === "recogida",
   });
+  const hasCatchWeightLines = lines.some((line) => line.isCatchWeight);
 
   const handleSubmit = async () => {
     if (sending) return;
@@ -128,7 +147,9 @@ export function CheckoutForm() {
         status:
           result.data.status === "processed"
             ? "En preparación"
-            : "En revisión",
+            : result.data.status === "awaiting_weighing"
+              ? "Por pesar"
+              : "En revisión",
       });
       if (state.profile) {
         setProfile({
@@ -141,7 +162,7 @@ export function CheckoutForm() {
       }
       clearCart();
       router.push(
-        `/pedido-confirmado?no=${encodeURIComponent(result.data.orderNo)}`
+        `/pedido-confirmado?no=${encodeURIComponent(result.data.orderNo)}&status=${result.data.status}`
       );
     } finally {
       setSending(false);
@@ -153,7 +174,7 @@ export function CheckoutForm() {
       <div className="flex flex-1 flex-col">
         <ScreenHeader title="Finalizar compra" backHref="/carrito" />
         <EmptyState
-          icon="🛒"
+          icon={ShoppingCart}
           title="Tu carrito está vacío"
           description="Explora el catálogo y añade productos."
           ctaLabel="Ir al catálogo"
@@ -167,7 +188,8 @@ export function CheckoutForm() {
     <div className="flex flex-1 flex-col">
       <ScreenHeader title="Finalizar compra" backHref="/carrito" />
 
-      <div className="flex flex-1 flex-col gap-[18px] px-5 py-[18px]">
+      <div className="flex flex-1 flex-col gap-[18px] px-5 py-[18px] md:mx-auto md:w-full md:max-w-5xl md:flex-row md:items-start md:gap-8 md:px-6 md:py-6">
+        <div className="flex flex-1 flex-col gap-[18px] md:gap-6">
         <div>
           <div className="mb-2.5 text-[13.5px] font-semibold text-navy">
             Datos de contacto
@@ -216,12 +238,14 @@ export function CheckoutForm() {
               subtitle="$5.00 · 24–48 h"
               active={delivery === "domicilio"}
               onSelect={() => setDelivery("domicilio")}
+              icon={Truck}
             />
             <OptionCard
               title="Recoger en tienda"
               subtitle="Gratis · hoy mismo"
               active={delivery === "recogida"}
               onSelect={() => setDelivery("recogida")}
+              icon={Store}
             />
           </div>
         </div>
@@ -236,16 +260,20 @@ export function CheckoutForm() {
               subtitle="Al recibir"
               active={payment === "efectivo"}
               onSelect={() => setPayment("efectivo")}
+              icon={Banknote}
             />
             <OptionCard
               title="Transferencia"
               subtitle="Datos por SMS"
               active={payment === "transferencia"}
               onSelect={() => setPayment("transferencia")}
+              icon={CreditCard}
             />
           </div>
         </div>
+        </div>
 
+        <div className="md:sticky md:top-6 md:w-[360px] md:flex-none">
         <div className="rounded-[15px] bg-white p-4 shadow-[0_3px_12px_rgba(10,31,63,.05)]">
           <div className="mb-2.5 text-[13.5px] font-semibold text-navy">
             Resumen · {itemsCount} artículos
@@ -273,18 +301,40 @@ export function CheckoutForm() {
               ? "Entrega estimada: 24–48 horas"
               : "Listo para recoger hoy mismo"}
           </div>
+          {hasCatchWeightLines && (
+            <div className="mt-1.5 text-xs font-medium text-brand-mid">
+              Este pedido incluye productos de peso variable: el total se
+              ajusta al peso real al preparar tu pedido.
+            </div>
+          )}
         </div>
-      </div>
 
-      <div className="border-t border-line-2 bg-white px-5 pt-3.5 pb-6">
         <button
           type="button"
           onClick={handleSubmit}
           disabled={sending}
-          className={`grad-cta w-full rounded-[13px] p-[15px] text-center text-[15px] font-semibold text-white ${
+          className={`grad-cta mt-3 hidden w-full items-center justify-center gap-2 rounded-[13px] p-[15px] text-center text-[15px] font-semibold text-white transition-colors md:flex ${
+            sending ? "opacity-60" : "hover:opacity-90"
+          }`}
+        >
+          {sending && <Loader2 className="h-4 w-4 animate-spin" />}
+          {sending
+            ? "Enviando…"
+            : `Confirmar pedido · ${fmt(totals.total)}`}
+        </button>
+        </div>
+      </div>
+
+      <div className="border-t border-line-2 bg-white px-5 pt-3.5 pb-6 md:hidden">
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={sending}
+          className={`grad-cta flex w-full items-center justify-center gap-2 rounded-[13px] p-[15px] text-center text-[15px] font-semibold text-white transition-colors ${
             sending ? "opacity-60" : ""
           }`}
         >
+          {sending && <Loader2 className="h-4 w-4 animate-spin" />}
           {sending
             ? "Enviando…"
             : `Confirmar pedido · ${fmt(totals.total)}`}

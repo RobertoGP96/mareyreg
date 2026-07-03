@@ -17,6 +17,14 @@ export interface WebstoreProductPresentation {
   wholesalePrice: number | null;
   barcode: string | null;
   isBase: boolean;
+  /** Piezas por unidad de esta presentación (catch-weight: Pieza/Caja). null en productos normales. */
+  piecesPerUnit: number | null;
+  /** Peso nominal (kg) de esta presentación, solo catch-weight. Estimación — el peso real se captura al pesar el pedido. */
+  nominalWeightKg: number | null;
+  /** Precio estimado de la presentación (pricePerKg × nominalWeightKg), solo catch-weight. */
+  estimatedPrice: number | null;
+  /** Piezas disponibles en stock, solo catch-weight. */
+  stockPieces: number | null;
 }
 
 export interface WebstoreProductOffer {
@@ -40,6 +48,10 @@ export interface WebstoreProduct {
   presentations: WebstoreProductPresentation[];
   /** Oferta vigente que generó el precio con descuento, si aplica. */
   offer: WebstoreProductOffer | null;
+  /** Producto de peso variable (ej. queso): el precio mostrado es ESTIMADO, el total real se ajusta al pesar el pedido en el ERP. */
+  isCatchWeight: boolean;
+  /** Precio efectivo por kg. Solo presente cuando isCatchWeight es true. */
+  pricePerKg: number | null;
 }
 
 export interface OrderCustomer {
@@ -74,12 +86,29 @@ export interface CreateOrderInput {
   notes?: string;
 }
 
+export interface OrderLineResult {
+  sku: string;
+  /** true si el precio de esta línea es estimado (catch-weight): el total real se ajusta al pesar el pedido. */
+  priceIsEstimated: boolean;
+  /** Peso nominal estimado (kg), solo presente en líneas catch-weight. */
+  estimatedWeightKg?: number;
+}
+
 export type CreateOrderResult =
   | {
       status: "processed";
       logId: number;
       salesOrderId?: number | null;
       invoiceId?: number | null;
+      lines?: OrderLineResult[];
+    }
+  | {
+      /** Contiene líneas catch-weight: el pedido se factura hasta que se pese en el ERP, sin descuento de stock todavía. */
+      status: "awaiting_weighing";
+      logId: number;
+      salesOrderId?: number | null;
+      invoiceId?: number | null;
+      lines?: OrderLineResult[];
     }
   | { status: "needs_review"; logId: number; unresolvedSkus?: string[] }
   | {

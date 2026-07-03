@@ -3,6 +3,7 @@ import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { StoreProvider } from "@/lib/store";
 import { BottomNav } from "@/components/bottom-nav";
+import { TopNav } from "@/components/top-nav";
 import { Toast } from "@/components/toast";
 import { STORE_NAME } from "@/lib/config";
 
@@ -25,10 +26,13 @@ export default function RootLayout({
         className={`${spaceGrotesk.className} min-h-dvh bg-page text-ink antialiased`}
       >
         <StoreProvider>
-          <div className="flex min-h-dvh justify-center">
-            <div className="relative flex min-h-dvh w-full max-w-[430px] flex-col bg-app shadow-[0_0_40px_rgba(10,31,63,.18)]">
-              {children}
-              <BottomNav />
+          <div className="flex min-h-dvh flex-col md:bg-app">
+            <TopNav />
+            <div className="flex flex-1 justify-center">
+              <div className="relative flex min-h-full w-full max-w-[430px] flex-col bg-app shadow-[0_0_40px_rgba(10,31,63,.18)] md:max-w-6xl md:bg-transparent md:px-6 md:pb-12 md:shadow-none">
+                {children}
+                <BottomNav />
+              </div>
             </div>
           </div>
           <Toast />

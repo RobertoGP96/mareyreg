@@ -11,9 +11,6 @@ import { generateRawKey, getKeyPrefix, WEBSTORE_API_KEY_SCOPES } from "../lib/ap
 
 const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 
-/** Vigencias predefinidas ofrecidas en la UI, en días. `null` = sin expiración. */
-export const WEBSTORE_API_KEY_EXPIRY_PRESETS = [30, 90, 365] as const;
-
 const createWebstoreApiKeyInputSchema = z.object({
   label: z.string().trim().min(1, "La etiqueta es requerida"),
   scopes: z

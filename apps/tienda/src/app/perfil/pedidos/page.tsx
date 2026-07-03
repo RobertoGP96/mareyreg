@@ -1,5 +1,6 @@
 "use client";
 
+import { Package } from "lucide-react";
 import { fmt } from "@/lib/format";
 import { useStore, type StoredOrder } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
@@ -31,22 +32,22 @@ export default function OrdersPage() {
 
       {orders.length === 0 ? (
         <EmptyState
-          icon="▤"
+          icon={Package}
           title="Aún no tienes pedidos"
           description="Cuando compres, podrás seguirlos aquí."
           ctaLabel="Ir al catálogo"
           ctaHref="/catalogo"
         />
       ) : (
-        <div className="flex flex-col gap-3 px-5 py-[18px]">
+        <div className="flex flex-col gap-3 px-5 py-[18px] md:mx-auto md:w-full md:max-w-2xl">
           {orders.map((order) => (
             <div
               key={order.no}
-              className="rounded-[15px] bg-white px-4 py-[15px] shadow-[0_3px_12px_rgba(10,31,63,.05)]"
+              className="rounded-[15px] bg-white px-4 py-[15px] shadow-[0_3px_12px_rgba(10,31,63,.05)] transition-colors hover:bg-app"
             >
               <div className="flex items-center gap-[13px]">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-chip text-base text-brand">
-                  ▤
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-chip text-brand">
+                  <Package className="h-[18px] w-[18px]" />
                 </div>
                 <div className="flex-1">
                   <div className="text-[13.5px] font-semibold text-navy">

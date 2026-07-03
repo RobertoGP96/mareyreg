@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
 import { createAuditLog } from "@/lib/audit";
 import { getEffectiveLinePrices, lineKey } from "@/modules/inventory/lib/effective-price";
-import { toBaseQuantity } from "@/modules/inventory/lib/units";
+import { toBaseQuantity, piecesFor } from "@/modules/inventory/lib/units";
 import { dispatchLines } from "@/modules/sales/lib/dispatch-lines";
 import { getDefaultWebstoreWarehouseId } from "./dispatch-warehouse";
 import { isSkuResolved, resolveSkusBatch } from "./resolve-skus";
@@ -28,13 +28,31 @@ export interface ProcessOrderAttribution {
   apiKeyId?: number;
 }
 
+export interface ProcessOrderLineResult {
+  sku: string;
+  /** true si el precio de esta línea es estimado (catch-weight): el total real se ajusta al pesar. */
+  priceIsEstimated: boolean;
+  /** Peso nominal estimado (kg) de la línea, solo para líneas catch-weight. */
+  estimatedWeightKg?: number;
+}
+
+export interface ProcessOrderResult {
+  salesOrderId: number;
+  /** null cuando la orden queda `awaiting_weighing`: aún no hay factura ni descuento de stock. */
+  invoiceId: number | null;
+  folio: string;
+  /** "processed" (flujo normal, factura creada) o "awaiting_weighing" (contiene líneas catch-weight, pendiente de pesaje en el ERP). */
+  status: "processed" | "awaiting_weighing";
+  lines: ProcessOrderLineResult[];
+}
+
 export async function processWebstoreOrder(
   logId: number,
   payload: WebstoreOrderPayload,
   /** Reasignación manual sku -> productId, usada al reprocesar una orden en needs_review. */
   overrides?: Record<string, number>,
   attribution?: ProcessOrderAttribution
-): Promise<{ salesOrderId: number; invoiceId: number; folio: string }> {
+): Promise<ProcessOrderResult> {
   return db.$transaction(async (tx) => {
     const company = await tx.company.findUnique({ where: { id: 1 } });
     const expectedCurrency = company?.currency ?? "USD";
@@ -80,6 +98,7 @@ export async function processWebstoreOrder(
 
     const unresolvedSkus: string[] = [];
     const resolvedLines: Array<{
+      sku: string;
       productId: number;
       quantity: number;
       presentationId?: number;
@@ -100,7 +119,7 @@ export async function processWebstoreOrder(
           }
           // La reasignación manual siempre apunta al producto base (nunca a
           // una presentación específica): factor 1, igual que antes.
-          resolvedLines.push({ productId: overrideProduct.productId, quantity: line.quantity });
+          resolvedLines.push({ sku: line.sku, productId: overrideProduct.productId, quantity: line.quantity });
           continue;
         }
       }
@@ -110,6 +129,7 @@ export async function processWebstoreOrder(
         continue;
       }
       resolvedLines.push({
+        sku: line.sku,
         productId: product.productId,
         quantity: line.quantity,
         presentationId: product.presentationId,
@@ -126,6 +146,31 @@ export async function processWebstoreOrder(
       warehouseId = defaultWarehouseId;
     }
 
+    // Producto isCatchWeight + presentación (piecesPerUnit) resueltos
+    // server-side para decidir si la orden completa se factura de inmediato o
+    // queda pendiente de pesaje. Una sola query batch, igual patrón que
+    // dispatchLines.
+    const uniqueProductIdsForLines = [...new Set(resolvedLines.map((l) => l.productId))];
+    const productsForLines = await tx.product.findMany({
+      where: { productId: { in: uniqueProductIdsForLines } },
+      select: { productId: true, isCatchWeight: true },
+    });
+    const isCatchWeightByProductId = new Map(
+      productsForLines.map((p) => [p.productId, p.isCatchWeight])
+    );
+    const uniquePresentationIdsForLines = [
+      ...new Set(resolvedLines.map((l) => l.presentationId).filter((id): id is number => id != null)),
+    ];
+    const presentationsForLines = uniquePresentationIdsForLines.length
+      ? await tx.productPresentation.findMany({
+          where: { presentationId: { in: uniquePresentationIdsForLines } },
+          select: { presentationId: true, piecesPerUnit: true },
+        })
+      : [];
+    const piecesPerUnitByPresentationId = new Map(
+      presentationsForLines.map((p) => [p.presentationId, p.piecesPerUnit])
+    );
+
     const effectivePrices = await getEffectiveLinePrices(
       tx,
       resolvedLines.map((l) => ({
@@ -137,30 +182,67 @@ export async function processWebstoreOrder(
     );
 
     const priced: Array<{
+      sku: string;
       productId: number;
       presentationId?: number;
       quantity: number;
       unitPrice: number;
       unitFactor: number;
       baseQuantity: number;
+      pieces: number | null;
+      isCatchWeight: boolean;
     }> = [];
     for (const line of resolvedLines) {
       const key = lineKey(line.productId, line.presentationId);
       const price = effectivePrices.get(key);
       if (!price) throw new Error(`Producto ${line.productId} no encontrado`);
+      const isCatchWeight = isCatchWeightByProductId.get(line.productId) ?? false;
+      const piecesPerUnit = line.presentationId != null
+        ? piecesPerUnitByPresentationId.get(line.presentationId) ?? null
+        : null;
+
+      if (isCatchWeight) {
+        // Venta por unidad (pieza/caja) con precio ESTIMADO: precio por kg ×
+        // peso nominal de la presentación (factor), nunca el peso real — ese
+        // solo se conoce al pesar en el ERP (fulfillWebstoreOrder). Requiere
+        // presentación con piecesPerUnit, igual que dispatchLines.
+        if (piecesPerUnit == null || price.pricePerBase == null) {
+          throw new NeedsReviewError([
+            `${line.sku} (producto de peso variable sin presentación Pieza/Caja configurada)`,
+          ]);
+        }
+        const nominalWeightKg = price.factor; // factor = peso nominal en kg (ver schema ProductPresentation)
+        priced.push({
+          sku: line.sku,
+          productId: line.productId,
+          presentationId: line.presentationId,
+          quantity: line.quantity,
+          unitPrice: price.pricePerBase,
+          unitFactor: price.factor,
+          baseQuantity: toBaseQuantity(line.quantity, nominalWeightKg),
+          pieces: piecesFor(line.quantity, piecesPerUnit),
+          isCatchWeight: true,
+        });
+        continue;
+      }
+
       priced.push({
+        sku: line.sku,
         productId: line.productId,
         presentationId: line.presentationId,
         quantity: line.quantity,
         unitPrice: price.finalPrice,
         unitFactor: price.factor,
         baseQuantity: toBaseQuantity(line.quantity, price.factor),
+        pieces: null,
+        isCatchWeight: false,
       });
     }
 
+    const hasCatchWeightLines = priced.some((l) => l.isCatchWeight);
+
     const subtotal = priced.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
     const orderFolio = await nextFolio(tx, DOC_TYPES.SALES_ORDER);
-    const invoiceFolio = await nextFolio(tx, DOC_TYPES.INVOICE);
 
     const order = await tx.salesOrder.create({
       data: {
@@ -188,11 +270,59 @@ export async function processWebstoreOrder(
         subtotal: l.quantity * l.unitPrice,
         // factor/baseQuantity resueltos server-side (ver getEffectiveLinePrices
         // arriba): 1 y quantity respectivamente cuando la línea no trae
-        // presentación, igual que el comportamiento anterior.
+        // presentación, igual que el comportamiento anterior. En catch-weight
+        // baseQuantity es ESTIMADA (peso nominal); se corrige en
+        // fulfillWebstoreOrder con el peso real.
         unitFactor: l.unitFactor,
         baseQuantity: l.baseQuantity,
+        pieces: l.pieces,
       })),
     });
+
+    const lineResultsMeta: ProcessOrderLineResult[] = priced.map((l) => ({
+      sku: l.sku,
+      priceIsEstimated: l.isCatchWeight,
+      ...(l.isCatchWeight ? { estimatedWeightKg: l.baseQuantity } : {}),
+    }));
+
+    if (hasCatchWeightLines) {
+      // Al menos una línea de peso variable: NO se crea factura ni se
+      // descuenta stock aquí — el pedido queda awaiting_weighing hasta que se
+      // pese en el ERP (fulfillWebstoreOrder). Precio/subtotal quedan como
+      // estimación visible para el cliente y el operador.
+      await tx.webstoreOrderLog.update({
+        where: { logId },
+        data: {
+          status: "awaiting_weighing",
+          salesOrderId: order.orderId,
+        },
+      });
+
+      await createAuditLog(tx, {
+        action: "create",
+        entityType: "WebstoreOrderLog",
+        entityId: logId,
+        module: "webstore",
+        userId: attribution?.userId ?? null,
+        newValues: {
+          externalOrderId: payload.externalOrderId,
+          salesOrderId: order.orderId,
+          folio: orderFolio,
+          status: "awaiting_weighing",
+          apiKeyId: attribution?.apiKeyId,
+        },
+      });
+
+      return {
+        salesOrderId: order.orderId,
+        invoiceId: null,
+        folio: orderFolio,
+        status: "awaiting_weighing",
+        lines: lineResultsMeta,
+      };
+    }
+
+    const invoiceFolio = await nextFolio(tx, DOC_TYPES.INVOICE);
 
     const invoice = await tx.invoice.create({
       data: {
@@ -280,6 +410,12 @@ export async function processWebstoreOrder(
       },
     });
 
-    return { salesOrderId: order.orderId, invoiceId: invoice.invoiceId, folio: orderFolio };
+    return {
+      salesOrderId: order.orderId,
+      invoiceId: invoice.invoiceId,
+      folio: orderFolio,
+      status: "processed",
+      lines: lineResultsMeta,
+    };
   });
 }

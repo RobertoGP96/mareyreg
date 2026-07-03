@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ArrowRight, ShoppingCart, Trash2 } from "lucide-react";
 import { COUPON_CODE, computeTotals, shippingMessage } from "@/lib/cart-totals";
 import { fmt } from "@/lib/format";
 import { cartLines, useStore } from "@/lib/store";
@@ -41,15 +42,16 @@ export default function CartPage() {
 
       {lines.length === 0 ? (
         <EmptyState
-          icon="🛒"
+          icon={ShoppingCart}
           title="Tu carrito está vacío"
           description="Explora el catálogo y añade productos."
           ctaLabel="Ir al catálogo"
           ctaHref="/catalogo"
         />
       ) : (
-        <>
-          <div className="flex flex-1 flex-col gap-3 px-5 py-4">
+        <div className="md:mx-auto md:w-full md:max-w-5xl md:flex-1 md:px-6 md:py-6">
+          <div className="md:flex md:items-start md:gap-8">
+          <div className="flex flex-1 flex-col gap-3 px-5 py-4 md:px-0 md:py-0">
             <div className="rounded-[14px] bg-white px-[15px] py-[13px] shadow-[0_3px_12px_rgba(10,31,63,.05)]">
               <div className="mb-2 flex justify-between text-xs">
                 <span className="font-medium text-ink-soft">
@@ -61,7 +63,7 @@ export default function CartPage() {
               </div>
               <div className="h-1.5 overflow-hidden rounded bg-photo">
                 <div
-                  className="grad-progress h-full rounded"
+                  className="grad-progress h-full rounded transition-[width]"
                   style={{ width: `${totals.shippingPct}%` }}
                 />
               </div>
@@ -88,15 +90,20 @@ export default function CartPage() {
                   <div className="mt-1 text-sm font-bold text-navy">
                     {fmt(line.unitPrice * line.qty)}
                   </div>
+                  {line.isCatchWeight && (
+                    <div className="mt-0.5 text-[11px] text-brand-mid">
+                      Precio estimado · se ajusta al peso real
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <button
                     type="button"
                     onClick={() => removeLine(line.sku)}
                     aria-label="Eliminar del carrito"
-                    className="text-xs text-muted-2"
+                    className="text-muted-2 transition-colors hover:text-danger"
                   >
-                    ✕
+                    <Trash2 className="h-4 w-4" />
                   </button>
                   <QtyStepper
                     qty={line.qty}
@@ -117,14 +124,14 @@ export default function CartPage() {
               <button
                 type="button"
                 onClick={handleCoupon}
-                className="flex items-center rounded-[10px] bg-brand px-4 py-2.5 text-[12.5px] font-semibold text-white"
+                className="flex items-center rounded-[10px] bg-brand px-4 py-2.5 text-[12.5px] font-semibold text-white transition-colors hover:bg-brand-mid"
               >
                 Aplicar
               </button>
             </div>
           </div>
 
-          <div className="rounded-t-[22px] border-t border-line-2 bg-white px-5 pt-[18px] pb-6">
+          <div className="rounded-t-[22px] border-t border-line-2 bg-white px-5 pt-[18px] pb-6 md:sticky md:top-6 md:w-[360px] md:flex-none md:rounded-[22px] md:border md:border-line-2 md:px-5 md:pt-5">
             <div className="mb-1.5 flex justify-between text-[13.5px] text-ink-soft">
               <span>Subtotal</span>
               <span>{fmt(totals.subtotal)}</span>
@@ -145,12 +152,14 @@ export default function CartPage() {
             </div>
             <Link
               href="/checkout"
-              className="grad-cta mt-4 block rounded-[13px] p-[15px] text-center text-[15px] font-semibold text-white"
+              className="grad-cta mt-4 flex items-center justify-center gap-2 rounded-[13px] p-[15px] text-center text-[15px] font-semibold text-white transition-colors hover:opacity-90"
             >
               Ir a pagar
+              <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-        </>
+          </div>
+        </div>
       )}
     </div>
   );

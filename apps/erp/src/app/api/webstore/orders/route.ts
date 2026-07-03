@@ -118,7 +118,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const result = await processWebstoreOrder(log.logId, payload, undefined, {
       apiKeyId: apiKey.apiKeyId,
     });
-    return NextResponse.json({ status: "processed", logId: log.logId, ...result }, { status: 201 });
+    return NextResponse.json({ logId: log.logId, ...result }, { status: 201 });
   } catch (error) {
     if (error instanceof NeedsReviewError) {
       await db.webstoreOrderLog.update({

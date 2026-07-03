@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { MouseEvent } from "react";
+import { Heart, Plus } from "lucide-react";
 import type { WebstoreProduct } from "@/lib/erp-client";
 import { discountPct, fmt, stockInfo } from "@/lib/format";
 import { useStore, type CartLine } from "@/lib/store";
@@ -28,9 +29,9 @@ interface ProductCardProps {
 }
 
 const IMAGE_HEIGHT: Record<CardVariant, string> = {
-  grid: "h-[110px]",
-  carousel: "h-[118px]",
-  favorite: "h-[104px]",
+  grid: "h-[110px] md:h-[170px]",
+  carousel: "h-[118px] md:h-[150px]",
+  favorite: "h-[104px] md:h-[150px]",
 };
 
 export function ProductCard({ product, variant = "grid" }: ProductCardProps) {
@@ -60,17 +61,19 @@ export function ProductCard({ product, variant = "grid" }: ProductCardProps) {
   return (
     <Link
       href={`/producto/${encodeURIComponent(product.sku)}`}
-      className={`block overflow-hidden rounded-2xl bg-white shadow-[0_3px_12px_rgba(10,31,63,.06)] ${
-        variant === "carousel" ? "w-[164px] flex-none shadow-[0_3px_12px_rgba(10,31,63,.07)]" : ""
+      className={`group block overflow-hidden rounded-2xl bg-white shadow-[0_3px_12px_rgba(10,31,63,.06)] transition-[transform,box-shadow] duration-200 hover:shadow-[0_10px_28px_rgba(10,31,63,.14)] motion-safe:hover:-translate-y-1 ${
+        variant === "carousel"
+          ? "w-[164px] flex-none shadow-[0_3px_12px_rgba(10,31,63,.07)] md:w-auto"
+          : ""
       }`}
     >
       <div
-        className={`relative flex items-center justify-center bg-photo text-[11px] tracking-[.5px] text-photo-fg ${IMAGE_HEIGHT[variant]}`}
+        className={`relative flex items-center justify-center overflow-hidden bg-photo text-[11px] tracking-[.5px] text-photo-fg ${IMAGE_HEIGHT[variant]}`}
       >
         <ProductImage
           src={product.imageUrl}
           alt={product.name}
-          sizes="(max-width: 430px) 50vw, 200px"
+          sizes="(max-width: 430px) 50vw, (max-width: 768px) 33vw, 280px"
         />
         {variant === "grid" && soldOut && (
           <span className="absolute top-2 left-2 rounded-md bg-[#6B7A94] px-2 py-[3px] text-[10px] font-semibold text-white">
@@ -86,11 +89,14 @@ export function ProductCard({ product, variant = "grid" }: ProductCardProps) {
           type="button"
           onClick={handleFav}
           aria-label={isFav ? "Quitar de favoritos" : "Añadir a favoritos"}
-          className={`absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-[9px] bg-white text-[13px] shadow-[0_2px_6px_rgba(10,31,63,.12)] ${
-            isFav ? "text-fav" : "text-muted-2"
+          className={`absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-[9px] bg-white shadow-[0_2px_6px_rgba(10,31,63,.12)] transition-[color,transform] hover:scale-110 active:scale-95 ${
+            isFav ? "text-fav" : "text-muted-2 hover:text-fav"
           }`}
         >
-          {isFav ? "♥" : "♡"}
+          <Heart
+            className="h-[15px] w-[15px]"
+            fill={isFav ? "currentColor" : "none"}
+          />
         </button>
       </div>
       <div className={variant === "carousel" ? "px-3 pt-[11px] pb-[13px]" : "px-3 pt-2.5 pb-3"}>
@@ -120,11 +126,11 @@ export function ProductCard({ product, variant = "grid" }: ProductCardProps) {
             type="button"
             onClick={handleAdd}
             aria-label="Añadir al carrito"
-            className={`flex h-7 w-7 items-center justify-center rounded-[9px] text-base text-white ${
-              soldOut ? "bg-disabled" : "bg-brand"
+            className={`flex h-7 w-7 items-center justify-center rounded-[9px] text-white transition-[background-color,transform] active:scale-95 ${
+              soldOut ? "bg-disabled" : "bg-brand hover:bg-brand-mid"
             }`}
           >
-            +
+            <Plus className="h-4 w-4" />
           </button>
         </div>
       </div>

@@ -7,7 +7,7 @@ import { useStore } from "@/lib/store";
 import { ScreenHeader } from "@/components/screen-header";
 
 const inputClass =
-  "rounded-xl border border-line bg-white p-3.5 text-sm text-ink placeholder:text-muted-2";
+  "rounded-xl border border-line bg-white p-3.5 text-sm text-ink placeholder:text-muted-2 transition-colors focus:border-brand focus:outline-none";
 
 export default function DatosPage() {
   const router = useRouter();
@@ -75,7 +75,7 @@ export default function DatosPage() {
     <div className="flex flex-1 flex-col">
       <ScreenHeader title="Mis datos" backHref="/perfil" />
 
-      <div className="flex flex-1 flex-col gap-3 px-5 py-[18px]">
+      <div className="flex flex-1 flex-col gap-3 px-5 py-[18px] md:mx-auto md:w-full md:max-w-2xl">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -110,8 +110,8 @@ export default function DatosPage() {
           type="button"
           onClick={handleSave}
           disabled={sending}
-          className={`grad-cta mt-1.5 rounded-[13px] p-[15px] text-center text-[15px] font-semibold text-white ${
-            sending ? "opacity-60" : ""
+          className={`grad-cta mt-1.5 rounded-[13px] p-[15px] text-center text-[15px] font-semibold text-white transition-colors ${
+            sending ? "opacity-60" : "hover:opacity-90"
           }`}
         >
           {sending ? "Guardando…" : "Guardar cambios"}

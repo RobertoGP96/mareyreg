@@ -17,7 +17,26 @@ export async function getOrderLogById(logId: number) {
     where: { logId },
     include: {
       apiKey: { select: { label: true } },
-      salesOrder: { select: { folio: true, orderId: true, total: true } },
+      salesOrder: {
+        select: {
+          folio: true,
+          orderId: true,
+          total: true,
+          lines: {
+            select: {
+              lineId: true,
+              productId: true,
+              quantity: true,
+              unitPrice: true,
+              subtotal: true,
+              pieces: true,
+              baseQuantity: true,
+              product: { select: { name: true, isCatchWeight: true } },
+              presentation: { select: { name: true } },
+            },
+          },
+        },
+      },
       invoice: { select: { folio: true, invoiceId: true, total: true, status: true } },
     },
   });

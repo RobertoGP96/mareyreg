@@ -1,5 +1,6 @@
 "use client";
 
+import { Heart } from "lucide-react";
 import type { WebstoreProduct } from "@/lib/erp-client";
 import { useStore } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
@@ -19,14 +20,14 @@ export function FavoritesClient({
       <ScreenHeader title="Favoritos" />
       {favorites.length === 0 ? (
         <EmptyState
-          icon="♡"
+          icon={Heart}
           title="Sin favoritos todavía"
           description="Toca el corazón de un producto para guardarlo aquí."
           ctaLabel="Explorar catálogo"
           ctaHref="/catalogo"
         />
       ) : (
-        <div className="grid grid-cols-2 gap-3.5 px-5 pt-[18px] pb-6">
+        <div className="grid grid-cols-2 gap-3.5 px-5 pt-[18px] pb-6 md:grid-cols-3 md:gap-5 md:px-6 lg:grid-cols-4">
           {favorites.map((product) => (
             <ProductCard
               key={product.sku}

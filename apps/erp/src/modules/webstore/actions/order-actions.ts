@@ -7,7 +7,7 @@ import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { assertRole, ForbiddenError } from "@/lib/auth-guard";
 import { reverseInvoiceStock } from "@/modules/sales/lib/dispatch-lines";
 import { webstoreOrderPayloadSchema } from "../lib/schemas";
-import { processWebstoreOrder, NeedsReviewError } from "../lib/process-order";
+import { processWebstoreOrder, NeedsReviewError, type ProcessOrderResult } from "../lib/process-order";
 
 const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 const AUTH_ERROR_MESSAGE = "No autenticado";
@@ -59,7 +59,7 @@ async function restoreOrderStatus(logId: number, status: "needs_review" | "error
 export async function reprocessOrder(
   logId: number,
   overrides?: Record<string, number>
-): Promise<ActionResult<{ salesOrderId: number; invoiceId: number; folio: string }>> {
+): Promise<ActionResult<ProcessOrderResult>> {
   try {
     const userId = await requireCurrentUserId();
     await assertRole("admin", "dispatcher");
