@@ -1067,9 +1067,12 @@ model SalesOrder {
   createdBy   Int?             @map("created_by")
   createdAt   DateTime         @default(now()) @map("created_at")
   updatedAt   DateTime         @default(now()) @updatedAt @map("updated_at")
+  // Moneda base al momento de crear la orden (informativo). null = moneda base (CUP).
+  currencyId  Int?             @map("currency_id")
 
   customer     Customer           @relation(fields: [customerId], references: [customerId])
   warehouse    Warehouse          @relation(fields: [warehouseId], references: [warehouseId])
+  currency     Currency?          @relation("SalesOrderCurrency", fields: [currencyId], references: [currencyId], onDelete: Restrict)
   lines        SalesOrderLine[]
   invoices     Invoice[]
   reservations StockReservation[]
@@ -1119,10 +1122,14 @@ model Invoice {
   notes      String?
   createdBy  Int?          @map("created_by")
   createdAt  DateTime      @default(now()) @map("created_at")
+  // Moneda base al momento de crear la factura (informativo — total/paid
+  // siempre quedan en CUP). null = moneda base (CUP).
+  currencyId Int?          @map("currency_id")
 
   order    SalesOrder?      @relation(fields: [orderId], references: [orderId])
   customer Customer         @relation(fields: [customerId], references: [customerId])
   session  CashSession?     @relation(fields: [sessionId], references: [sessionId])
+  currency Currency?        @relation("InvoiceCurrency", fields: [currencyId], references: [currencyId], onDelete: Restrict)
   lines    InvoiceLine[]
   payments InvoicePayment[]
   webstoreLog WebstoreOrderLog?
@@ -1162,14 +1169,22 @@ model InvoiceLine {
 model InvoicePayment {
   paymentId     Int      @id @default(autoincrement()) @map("payment_id")
   invoiceId     Int      @map("invoice_id")
+  // amount SIEMPRE en moneda base (CUP) — es lo que alimenta invoice.paid.
   amount        Decimal
   paymentMethod String   @map("payment_method")
   paidAt        DateTime @map("paid_at")
   reference     String?
   createdBy     Int?     @map("created_by")
   createdAt     DateTime @default(now()) @map("created_at")
+  // Moneda ENTREGADA por el cliente (puede diferir de la base). amountTendered
+  // es el monto en esa moneda; exchangeRate = CUP por 1 unidad de currencyId,
+  // snapshot al momento del pago. Los tres son null cuando se pagó en moneda base.
+  currencyId     Int?     @map("currency_id")
+  amountTendered Decimal? @map("amount_tendered") @db.Decimal(20, 8)
+  exchangeRate   Decimal? @map("exchange_rate") @db.Decimal(20, 8)
 
-  invoice Invoice @relation(fields: [invoiceId], references: [invoiceId], onDelete: Cascade)
+  invoice  Invoice   @relation(fields: [invoiceId], references: [invoiceId], onDelete: Cascade)
+  currency Currency? @relation("InvoicePaymentCurrency", fields: [currencyId], references: [currencyId], onDelete: Restrict)
 
   @@index([invoiceId])
   @@map("invoice_payments")
@@ -1522,6 +1537,9 @@ model Currency {
   productsSalePriced  Product[]          @relation("ProductSaleCurrency")
   presentationsPriced ProductPresentation[] @relation("PresentationPriceCurrency")
   priceListItems      PriceListItem[]    @relation("PriceListItemCurrency")
+  invoicePayments     InvoicePayment[]   @relation("InvoicePaymentCurrency")
+  invoices            Invoice[]          @relation("InvoiceCurrency")
+  salesOrders         SalesOrder[]       @relation("SalesOrderCurrency")
 
   @@map("currencies")
 }

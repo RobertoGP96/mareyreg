@@ -6,8 +6,83 @@ import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
 import { dispatchLines, reverseInvoiceStock } from "@/modules/sales/lib/dispatch-lines";
-import { GlobalRateNotConfiguredError } from "@/lib/currency";
+import { getBaseCurrency, getRateToBase, roundToCurrency, GlobalRateNotConfiguredError, type DbOrTx } from "@/lib/currency";
 import type { Prisma } from "@/generated/prisma";
+
+// Tolerancia de redondeo para comparar montos monetarios contra el total,
+// expresada en la unidad más pequeña representable de la moneda base (ej.
+// 1 CUP si decimalPlaces=0, 0.01 si decimalPlaces=2). Cubre artefactos de
+// redondeo entre pagos multi-moneda, NO pagos parciales legítimos.
+function paymentTolerance(baseDecimalPlaces: number): number {
+  return 1 / 10 ** baseDecimalPlaces;
+}
+
+interface ResolvedPayment {
+  amount: number; // Equivalente en moneda base (CUP), recortado al saldo si excede.
+  currencyId: number | null;
+  amountTendered: number | null;
+  exchangeRate: number | null;
+  paymentMethod: string;
+  reference: string | null;
+  /** Vuelto en CUP, si este pago (normalmente en efectivo) excedió el saldo restante. */
+  changeBase: number;
+}
+
+/**
+ * Resuelve una lista de pagos (posiblemente en distintas monedas) a sus
+ * equivalentes en moneda base, cacheando la tasa por moneda (una sola
+ * consulta por currencyId aunque se repita en varias líneas). Recorta el
+ * ÚLTIMO pago que exceda el saldo restante (comportamiento de "vuelto" del
+ * POS: el pago en efectivo se aplica neto, el excedente no se persiste).
+ */
+async function resolvePayments(
+  tx: DbOrTx,
+  payments: PaymentInput[],
+  remainingBalance: number
+): Promise<ResolvedPayment[]> {
+  const rateCache = new Map<number, { rate: number }>();
+  const base = await getBaseCurrency(tx);
+
+  const resolved: ResolvedPayment[] = [];
+  let remaining = remainingBalance;
+
+  for (const p of payments) {
+    const isBaseCurrency = p.currencyId == null || p.currencyId === base.currencyId;
+    let rate = 1;
+    let exchangeRate: number | null = null;
+    let currencyId: number | null = null;
+
+    if (!isBaseCurrency) {
+      const key = p.currencyId!;
+      let cached = rateCache.get(key);
+      if (!cached) {
+        const snapshot = await getRateToBase(tx, key);
+        cached = { rate: snapshot.rate };
+        rateCache.set(key, cached);
+      }
+      rate = cached.rate;
+      exchangeRate = cached.rate;
+      currencyId = key;
+    }
+
+    const amountBaseFull = roundToCurrency(p.amountTendered * rate, base.decimalPlaces);
+    const change = Math.max(0, amountBaseFull - remaining);
+    const amountBaseApplied = Math.min(amountBaseFull, Math.max(remaining, 0));
+    remaining -= amountBaseApplied;
+
+    resolved.push({
+      amount: amountBaseApplied,
+      currencyId,
+      amountTendered: isBaseCurrency ? null : p.amountTendered,
+      exchangeRate,
+      paymentMethod: p.paymentMethod,
+      reference: p.reference || null,
+      changeBase: change,
+    });
+  }
+
+  return resolved;
+}
 
 const AUTH_ERROR_MESSAGE = "No autenticado";
 const SESSION_ERROR_RESPONSE =
@@ -55,6 +130,16 @@ export interface InvoiceLineInput {
   actualWeightKg?: number;
 }
 
+/** Un pago dentro de un cobro (posiblemente multi-moneda, ej. POS). */
+export interface PaymentInput {
+  /** Moneda ENTREGADA por el cliente. Omitida o = moneda base -> sin conversión. */
+  currencyId?: number | null;
+  /** Monto en `currencyId` (o en la moneda base si se omite currencyId). */
+  amountTendered: number;
+  paymentMethod: string;
+  reference?: string;
+}
+
 export interface InvoiceInput {
   customerId: number;
   warehouseId: number;
@@ -65,7 +150,9 @@ export interface InvoiceInput {
   sessionId?: number;
   notes?: string;
   lines: InvoiceLineInput[];
-  // Si viene, registra cobro inmediato (POS)
+  /** Cobro inmediato multi-moneda (POS). Preferido sobre `immediatePayment`. */
+  immediatePayments?: PaymentInput[];
+  /** @deprecated Compat: shape anterior, un solo pago en moneda base. Usa `immediatePayments`. */
   immediatePayment?: {
     amount: number;
     paymentMethod: string;
@@ -92,15 +179,36 @@ export async function createInvoice(
         return { success: false, error: "Precios no pueden ser negativos" };
       }
     }
-    // Tolerancia minima de redondeo para comparar montos monetarios.
-    const ROUNDING_TOLERANCE = 0.01;
-    if (data.immediatePayment && data.immediatePayment.amount <= 0) {
-      return { success: false, error: "El monto del cobro inmediato debe ser mayor a 0" };
+
+    // Compat: shape anterior (`immediatePayment`) se trata como un pago único
+    // en moneda base. `immediatePayments` (nuevo, multi-moneda) tiene prioridad
+    // si ambos vinieran presentes.
+    const paymentInputs: PaymentInput[] =
+      data.immediatePayments ??
+      (data.immediatePayment
+        ? [
+            {
+              currencyId: null,
+              amountTendered: data.immediatePayment.amount,
+              paymentMethod: data.immediatePayment.paymentMethod,
+              reference: data.immediatePayment.reference,
+            },
+          ]
+        : []);
+
+    for (const p of paymentInputs) {
+      if (!Number.isFinite(p.amountTendered) || p.amountTendered <= 0) {
+        return { success: false, error: "El monto del cobro inmediato debe ser mayor a 0" };
+      }
+      if (!p.paymentMethod?.trim()) {
+        return { success: false, error: "El metodo de pago es requerido" };
+      }
     }
 
     const userId = await requireCurrentUserId();
 
     const result = await db.$transaction(async (tx) => {
+      const base = await getBaseCurrency(tx);
       const folio = await nextFolio(tx, DOC_TYPES.INVOICE);
 
       const invoice = await tx.invoice.create({
@@ -117,6 +225,7 @@ export async function createInvoice(
           status: "pending",
           notes: data.notes || null,
           createdBy: userId,
+          currencyId: null, // factura siempre en moneda base
         },
       });
 
@@ -134,21 +243,20 @@ export async function createInvoice(
       const subtotal = lines.reduce((s, l) => s + l.subtotal, 0);
       const total = subtotal;
 
-      // Validar el cobro inmediato contra el total ya calculado server-side
-      // (no el total que hubiera enviado el cliente), con tolerancia minima
-      // de redondeo, igual que registerInvoicePayment. Se valida ANTES de
-      // escribir nada de pago/totales.
-      if (data.immediatePayment && data.immediatePayment.amount > total + ROUNDING_TOLERANCE) {
+      // Resuelve cada pago a su equivalente en CUP (tasa cacheada por moneda),
+      // recortando el excedente de cualquier pago que exceda el saldo restante
+      // (vuelto — no se persiste, solo se usa para mostrarlo en la UI).
+      const resolvedPayments = await resolvePayments(tx, paymentInputs, total);
+      const paidAmount = resolvedPayments.reduce((s, p) => s + p.amount, 0);
+      const tolerance = paymentTolerance(base.decimalPlaces);
+      if (paidAmount > total + tolerance) {
         throw new Error(
           `El monto del cobro excede el total de la factura (${total.toFixed(2)})`
         );
       }
 
-      // Cobro inmediato (POS) calculado en memoria antes de escribir, para
-      // fusionar el update de totales + paid/status en una sola escritura.
-      const paidAmount = data.immediatePayment ? data.immediatePayment.amount : 0;
       const invoiceStatus: "pending" | "partial" | "paid" =
-        paidAmount <= 0 ? "pending" : paidAmount >= total ? "paid" : "partial";
+        paidAmount <= 0 ? "pending" : paidAmount >= total - tolerance ? "paid" : "partial";
 
       await tx.invoice.update({
         where: { invoiceId: invoice.invoiceId },
@@ -163,17 +271,19 @@ export async function createInvoice(
         data: { currentBalance: { increment: netBalanceChange } },
       });
 
-      if (data.immediatePayment) {
-        const p = data.immediatePayment;
-        await tx.invoicePayment.create({
-          data: {
+      if (resolvedPayments.length > 0) {
+        await tx.invoicePayment.createMany({
+          data: resolvedPayments.map((p) => ({
             invoiceId: invoice.invoiceId,
             amount: p.amount,
             paymentMethod: p.paymentMethod,
             paidAt: new Date(),
-            reference: p.reference || null,
+            reference: p.reference,
             createdBy: userId,
-          },
+            currencyId: p.currencyId,
+            amountTendered: p.amountTendered,
+            exchangeRate: p.exchangeRate,
+          })),
         });
       }
 
@@ -206,13 +316,32 @@ export async function createInvoice(
   }
 }
 
+export interface RegisterInvoicePaymentInput {
+  /** Moneda ENTREGADA por el cliente. Omitida o = moneda base -> sin conversión. */
+  currencyId?: number | null;
+  /** Monto en `currencyId` (o en la moneda base si se omite currencyId). */
+  amountTendered: number;
+  paymentMethod: string;
+  paidAt: string;
+  reference?: string;
+}
+
 export async function registerInvoicePayment(
   invoiceId: number,
-  payment: { amount: number; paymentMethod: string; paidAt: string; reference?: string }
+  payment: RegisterInvoicePaymentInput | { amount: number; paymentMethod: string; paidAt: string; reference?: string }
 ): Promise<ActionResult<void>> {
   try {
-    if (!Number.isFinite(payment.amount) || payment.amount <= 0) {
+    // Compat: shape anterior usaba `amount` (siempre moneda base).
+    const normalized: RegisterInvoicePaymentInput =
+      "amountTendered" in payment
+        ? payment
+        : { amountTendered: payment.amount, paymentMethod: payment.paymentMethod, paidAt: payment.paidAt, reference: payment.reference };
+
+    if (!Number.isFinite(normalized.amountTendered) || normalized.amountTendered <= 0) {
       return { success: false, error: "El monto debe ser mayor a 0" };
+    }
+    if (!normalized.paymentMethod?.trim()) {
+      return { success: false, error: "El metodo de pago es requerido" };
     }
 
     const userId = await requireCurrentUserId();
@@ -222,26 +351,51 @@ export async function registerInvoicePayment(
       if (!invoice) throw new Error("Factura no encontrada");
       if (invoice.status === "cancelled") throw new Error("Factura cancelada");
 
+      const base = await getBaseCurrency(tx);
       const alreadyPaid = Number(invoice.paid);
       const total = Number(invoice.total);
-      // Tolerancia minima de redondeo para comparar montos monetarios.
-      if (alreadyPaid + payment.amount > total + 0.01) {
-        throw new Error(`El monto excede el saldo pendiente (${(total - alreadyPaid).toFixed(2)})`);
+      const remaining = Math.max(total - alreadyPaid, 0);
+
+      const [resolved] = await resolvePayments(
+        tx,
+        [
+          {
+            currencyId: normalized.currencyId,
+            amountTendered: normalized.amountTendered,
+            paymentMethod: normalized.paymentMethod,
+            reference: normalized.reference,
+          },
+        ],
+        remaining
+      );
+
+      const tolerance = paymentTolerance(base.decimalPlaces);
+      // resolvePayments ya recorta el pago al saldo restante (vuelto), pero si
+      // el monto entregado no alcanza a cubrir nada (remaining ya era 0) o el
+      // resultado excede el saldo por artefactos de redondeo, se rechaza.
+      if (resolved.amount <= 0) {
+        throw new Error(`El monto excede el saldo pendiente (${remaining.toFixed(2)})`);
+      }
+      if (resolved.amount > remaining + tolerance) {
+        throw new Error(`El monto excede el saldo pendiente (${remaining.toFixed(2)})`);
       }
 
       await tx.invoicePayment.create({
         data: {
           invoiceId,
-          amount: payment.amount,
-          paymentMethod: payment.paymentMethod,
-          paidAt: new Date(payment.paidAt),
-          reference: payment.reference || null,
+          amount: resolved.amount,
+          paymentMethod: resolved.paymentMethod,
+          paidAt: new Date(normalized.paidAt),
+          reference: resolved.reference,
           createdBy: userId,
+          currencyId: resolved.currencyId,
+          amountTendered: resolved.amountTendered,
+          exchangeRate: resolved.exchangeRate,
         },
       });
 
-      const newPaid = alreadyPaid + payment.amount;
-      const newStatus: "partial" | "paid" = newPaid >= total ? "paid" : "partial";
+      const newPaid = alreadyPaid + resolved.amount;
+      const newStatus: "partial" | "paid" = newPaid >= total - tolerance ? "paid" : "partial";
       await tx.invoice.update({
         where: { invoiceId },
         data: { paid: newPaid, status: newStatus },
@@ -249,7 +403,7 @@ export async function registerInvoicePayment(
 
       await tx.customer.update({
         where: { customerId: invoice.customerId },
-        data: { currentBalance: { decrement: payment.amount } },
+        data: { currentBalance: { decrement: resolved.amount } },
       });
 
       await createAuditLog(tx, {
@@ -258,7 +412,13 @@ export async function registerInvoicePayment(
         entityId: invoiceId,
         module: "sales",
         userId,
-        newValues: payment,
+        newValues: {
+          amount: resolved.amount,
+          currencyId: resolved.currencyId,
+          amountTendered: resolved.amountTendered,
+          paymentMethod: resolved.paymentMethod,
+          paidAt: normalized.paidAt,
+        },
       });
     });
 

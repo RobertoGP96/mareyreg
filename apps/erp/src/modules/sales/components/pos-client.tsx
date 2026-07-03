@@ -19,21 +19,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { Plus, Trash2, ShoppingCart, Loader2, Search, Barcode } from "lucide-react";
+import { Plus, Trash2, ShoppingCart, Loader2, Search, Barcode, Scale } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
-import { createInvoice } from "../actions/invoice-actions";
+import { createInvoice, type PaymentInput } from "../actions/invoice-actions";
 import { getSuggestedUnitPriceAction } from "@/modules/inventory/actions/pricing-actions";
+import { piecesFor, formatCatchWeight } from "@/modules/inventory/lib/units";
+import {
+  MultiCurrencyPaymentFields,
+  type CurrencyOption as PaymentCurrencyOption,
+  type PaymentFieldValue,
+} from "./multi-currency-payment-fields";
 
 interface ProductPresentationOption {
   presentationId: number;
   name: string;
   factor: number;
+  /** Piezas fungibles por unidad (catch-weight). null en la base y en productos normales. */
+  piecesPerUnit: number | null;
   retailPrice: number;
   wholesalePrice: number | null;
   barcode: string | null;
@@ -49,6 +58,10 @@ interface ProductOption {
   unit: string;
   salePrice: number | null;
   stock: number;
+  /** Producto de peso variable: se vende por kg pesado, exige modal de pesaje. */
+  isCatchWeight: boolean;
+  /** Piezas fungibles disponibles en el almacén del POS. */
+  currentPieces: number;
   presentations: ProductPresentationOption[];
 }
 
@@ -63,6 +76,9 @@ interface Props {
   customers: CustomerOption[];
   warehouseId: number;
   warehouseName: string;
+  currencies: PaymentCurrencyOption[];
+  baseCurrencyId: number;
+  baseCurrencyCode: string;
 }
 
 interface CartLine {
@@ -77,6 +93,12 @@ interface CartLine {
   /** Stock disponible en unidad base del producto (no de la presentación). */
   stock: number;
   priceEdited: boolean;
+  /** Piezas fungibles de la línea (catch-weight). null para líneas normales. */
+  pieces: number | null;
+  /** Peso real capturado en báscula (kg). null para líneas normales. */
+  actualWeightKg: number | null;
+  /** Precio por kg (catch-weight). null para líneas normales — usan unitPrice tal cual. */
+  pricePerKg: number | null;
 }
 
 function cartLineKey(productId: number, presentationId: number | null): string {
@@ -94,11 +116,22 @@ function presentationPriceFor(
   return presentation.retailPrice;
 }
 
-/** Suma en unidad base de todas las líneas de un mismo producto en el carrito. */
+/**
+ * Suma en unidad base de todas las líneas de un mismo producto en el carrito.
+ * Para catch-weight usa el peso real capturado (actualWeightKg), no
+ * quantity × factor (que solo estima).
+ */
 function baseQtyInCart(cart: CartLine[], productId: number): number {
   return cart
     .filter((l) => l.productId === productId)
-    .reduce((sum, l) => sum + l.quantity * l.factor, 0);
+    .reduce((sum, l) => sum + (l.actualWeightKg ?? l.quantity * l.factor), 0);
+}
+
+/** Suma de piezas fungibles ya en el carrito para un producto (catch-weight). */
+function piecesInCart(cart: CartLine[], productId: number): number {
+  return cart
+    .filter((l) => l.productId === productId)
+    .reduce((sum, l) => sum + (l.pieces ?? 0), 0);
 }
 
 const PAYMENT_METHODS = [
@@ -108,19 +141,40 @@ const PAYMENT_METHODS = [
   { value: "credit", label: "Credito" },
 ];
 
-export function PosClient({ products, customers, warehouseId, warehouseName }: Props) {
+const CREDIT_METHOD = "credit";
+
+export function PosClient({
+  products,
+  customers,
+  warehouseId,
+  warehouseName,
+  currencies,
+  baseCurrencyId,
+  baseCurrencyCode,
+}: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [customerId, setCustomerId] = useState<string>(
     customers[0] ? String(customers[0].customerId) : ""
   );
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [cashReceived, setCashReceived] = useState<string>("");
+  const [isCredit, setIsCredit] = useState(false);
+  const [payments, setPayments] = useState<PaymentFieldValue[]>([
+    { currencyId: baseCurrencyId, amountTendered: "", paymentMethod: "cash", reference: "" },
+  ]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Producto con >1 presentación activa esperando que el cajero elija cuál agregar.
   const [pendingProduct, setPendingProduct] = useState<ProductOption | null>(null);
+
+  // Modal de pesaje (catch-weight): producto en curso, presentación elegida,
+  // cantidad de esa presentación y peso real capturado. `editingKey` != null
+  // cuando se reabre para editar una línea ya en el carrito.
+  const [weighingProduct, setWeighingProduct] = useState<ProductOption | null>(null);
+  const [weighingPresentationId, setWeighingPresentationId] = useState<number | null>(null);
+  const [weighingQuantity, setWeighingQuantity] = useState("1");
+  const [weighingWeight, setWeighingWeight] = useState("");
+  const [editingLineKey, setEditingLineKey] = useState<string | null>(null);
 
   const selectedCustomer = customers.find((c) => String(c.customerId) === customerId);
   const prevCustomerTypeRef = useRef<string | undefined>(selectedCustomer?.customerType);
@@ -239,6 +293,9 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
           unit: p.unit,
           stock: p.stock,
           priceEdited: false,
+          pieces: null,
+          actualWeightKg: null,
+          pricePerKg: null,
         },
       ]);
     }
@@ -250,6 +307,10 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
   };
 
   const addProduct = (p: ProductOption) => {
+    if (p.isCatchWeight) {
+      openWeighing(p);
+      return;
+    }
     const activePresentations = p.presentations;
     if (activePresentations.length > 1) {
       setPendingProduct(p);
@@ -268,14 +329,152 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
     for (const p of products) {
       const presentation = p.presentations.find((pr) => pr.barcode === code || pr.sku === code);
       if (presentation) {
-        addLine(p, presentation);
+        if (p.isCatchWeight) {
+          openWeighing(p, presentation.presentationId);
+        } else {
+          addLine(p, presentation);
+        }
         return;
       }
     }
     toast.error("Producto no encontrado");
   };
 
+  // Presentaciones vendibles de un producto catch-weight: solo Pieza/Caja
+  // (piecesPerUnit != null) — la base en kg no se ofrece, se cobra siempre
+  // por kg pesado a través de alguna de estas.
+  const sellableCatchWeightPresentations = (p: ProductOption) =>
+    p.presentations.filter((pr) => pr.piecesPerUnit != null);
+
+  const openWeighing = (p: ProductOption, presentationId?: number) => {
+    const options = sellableCatchWeightPresentations(p);
+    if (options.length === 0) {
+      toast.error(`${p.name} no tiene presentaciones vendibles (Pieza/Caja) configuradas`);
+      return;
+    }
+    const initial = presentationId != null
+      ? options.find((pr) => pr.presentationId === presentationId) ?? options[0]
+      : options[0];
+    setWeighingProduct(p);
+    setWeighingPresentationId(initial.presentationId);
+    setWeighingQuantity("1");
+    setWeighingWeight(String((initial.factor * 1).toFixed(3)));
+    setEditingLineKey(null);
+    setSearch("");
+    setPendingProduct(null);
+  };
+
+  const openWeighingForEdit = (line: CartLine) => {
+    const product = products.find((p) => p.productId === line.productId);
+    if (!product) return;
+    setWeighingProduct(product);
+    setWeighingPresentationId(line.presentationId);
+    setWeighingQuantity(String(line.quantity));
+    setWeighingWeight(line.actualWeightKg != null ? String(line.actualWeightKg) : "");
+    setEditingLineKey(cartLineKey(line.productId, line.presentationId));
+  };
+
+  const closeWeighing = () => {
+    setWeighingProduct(null);
+    setWeighingPresentationId(null);
+    setWeighingQuantity("1");
+    setWeighingWeight("");
+    setEditingLineKey(null);
+  };
+
+  const confirmWeighing = () => {
+    if (!weighingProduct) return;
+    const presentation = weighingProduct.presentations.find(
+      (pr) => pr.presentationId === weighingPresentationId
+    );
+    if (!presentation || presentation.piecesPerUnit == null) {
+      toast.error("Selecciona una presentación válida");
+      return;
+    }
+    const quantity = Math.trunc(Number(weighingQuantity));
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      toast.error("La cantidad debe ser un entero mayor o igual a 1");
+      return;
+    }
+    const actualWeightKg = Number(weighingWeight);
+    if (!Number.isFinite(actualWeightKg) || actualWeightKg <= 0) {
+      toast.error("Captura el peso real (mayor a 0)");
+      return;
+    }
+    const pieces = piecesFor(quantity, presentation.piecesPerUnit);
+
+    // Validación dual de stock: kg y piezas, excluyendo la línea que se está
+    // editando de la suma ya en carrito (para no contarla dos veces).
+    const key = cartLineKey(weighingProduct.productId, presentation.presentationId);
+    const cartWithoutEditing = editingLineKey != null
+      ? cart.filter((l) => cartLineKey(l.productId, l.presentationId) !== editingLineKey)
+      : cart;
+    const projectedKg = baseQtyInCart(cartWithoutEditing, weighingProduct.productId) + actualWeightKg;
+    const projectedPieces = piecesInCart(cartWithoutEditing, weighingProduct.productId) + pieces;
+
+    if (projectedKg > weighingProduct.stock || projectedPieces > weighingProduct.currentPieces) {
+      toast.error(
+        `Sin stock suficiente de ${weighingProduct.name}. Disponible: ${weighingProduct.stock} kg / ${weighingProduct.currentPieces} pzas — solicitado: ${projectedKg.toFixed(3)} kg / ${projectedPieces} pzas`
+      );
+      return;
+    }
+
+    // El precio por kg SIEMPRE se resuelve desde la presentación BASE del
+    // producto (kg) — nunca desde Pieza/Caja, que solo definen conteo, no
+    // precio. Coincide con getEffectiveLinePrices.pricePerBase server-side.
+    const basePresentation = weighingProduct.presentations.find((pr) => pr.isBase);
+    const resolvedPricePerKg = basePresentation
+      ? presentationPriceFor(basePresentation, selectedCustomer?.customerType)
+      : 0;
+
+    const newLine: CartLine = {
+      productId: weighingProduct.productId,
+      presentationId: presentation.presentationId,
+      presentationName: presentation.name,
+      factor: presentation.factor,
+      name: weighingProduct.name,
+      quantity,
+      unitPrice: resolvedPricePerKg,
+      unit: weighingProduct.unit,
+      stock: weighingProduct.stock,
+      priceEdited: false,
+      pieces,
+      actualWeightKg,
+      pricePerKg: resolvedPricePerKg,
+    };
+
+    if (editingLineKey != null) {
+      setCart((prev) =>
+        prev.map((l) => (cartLineKey(l.productId, l.presentationId) === editingLineKey ? newLine : l))
+      );
+    } else {
+      const existingIdx = cart.findIndex((l) => cartLineKey(l.productId, l.presentationId) === key);
+      if (existingIdx >= 0) {
+        // Ya hay una línea con la misma presentación: se combina sumando
+        // peso y piezas, en vez de crear una segunda línea idéntica.
+        setCart((prev) =>
+          prev.map((l, idx) =>
+            idx === existingIdx
+              ? {
+                  ...l,
+                  quantity: l.quantity + quantity,
+                  pieces: (l.pieces ?? 0) + pieces,
+                  actualWeightKg: (l.actualWeightKg ?? 0) + actualWeightKg,
+                }
+              : l
+          )
+        );
+      } else {
+        setCart((prev) => [...prev, newLine]);
+      }
+    }
+
+    closeWeighing();
+  };
+
   const updateQty = (productId: number, presentationId: number | null, qty: number) => {
+    // Las líneas catch-weight no editan cantidad aquí: el input queda readonly
+    // en el carrito y la edición reabre el modal de pesaje (ver renderizado).
     const clampedQty = Math.max(1, qty);
     let shouldRequestPrice = false;
     const key = cartLineKey(productId, presentationId);
@@ -329,9 +528,25 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
     setCart(cart.filter((l) => cartLineKey(l.productId, l.presentationId) !== key));
   };
 
-  const total = cart.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
-  const change =
-    paymentMethod === "cash" && cashReceived ? Math.max(0, Number(cashReceived) - total) : 0;
+  /** Importe de una línea: peso × precio/kg en catch-weight, cantidad × precio en las demás. */
+  const lineAmount = (l: CartLine) =>
+    l.actualWeightKg != null ? l.actualWeightKg * l.unitPrice : l.quantity * l.unitPrice;
+
+  const total = cart.reduce((s, l) => s + lineAmount(l), 0);
+
+  // Equivalente en CUP de cada fila de pago — mismo cálculo que el componente
+  // compartido (referencial; el server SIEMPRE recalcula con la tasa vigente).
+  const paidBase = payments.reduce((sum, row) => {
+    const amount = Number(row.amountTendered);
+    if (!Number.isFinite(amount) || amount <= 0) return sum;
+    if (row.currencyId === baseCurrencyId) return sum + amount;
+    const rate = currencies.find((c) => c.currencyId === row.currencyId)?.rateToBase;
+    return rate != null ? sum + amount * rate : sum;
+  }, 0);
+  const change = isCredit ? 0 : Math.max(0, paidBase - total);
+
+  const resetPayments = () =>
+    setPayments([{ currencyId: baseCurrencyId, amountTendered: "", paymentMethod: "cash", reference: "" }]);
 
   const handleCheckout = async () => {
     if (!cart.length) {
@@ -342,6 +557,22 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
       toast.error("Selecciona un cliente");
       return;
     }
+    const immediatePayments: PaymentInput[] | undefined = isCredit
+      ? undefined
+      : payments
+          .filter((row) => Number(row.amountTendered) > 0)
+          .map((row) => ({
+            currencyId: row.currencyId === baseCurrencyId ? null : row.currencyId,
+            amountTendered: Number(row.amountTendered),
+            paymentMethod: row.paymentMethod,
+            reference: row.reference || undefined,
+          }));
+
+    if (!isCredit && (!immediatePayments || immediatePayments.length === 0)) {
+      toast.error("Captura al menos un pago");
+      return;
+    }
+
     setIsSubmitting(true);
     const result = await createInvoice({
       customerId: Number(customerId),
@@ -353,14 +584,9 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
         presentationId: l.presentationId ?? undefined,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
+        actualWeightKg: l.actualWeightKg ?? undefined,
       })),
-      immediatePayment:
-        paymentMethod === "credit"
-          ? undefined
-          : {
-              amount: total,
-              paymentMethod,
-            },
+      immediatePayments,
     });
     setIsSubmitting(false);
     if (result.success) {
@@ -373,13 +599,14 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
               mono
             />
             {change > 0 && (
-              <ToastDetail label="Cambio" value={`$${change.toFixed(2)}`} mono />
+              <ToastDetail label="Cambio" value={`${change.toFixed(0)} ${baseCurrencyCode}`} mono />
             )}
           </ToastLines>
         ),
       });
       setCart([]);
-      setCashReceived("");
+      resetPayments();
+      setIsCredit(false);
       setIsCheckoutOpen(false);
       router.refresh();
     } else {
@@ -480,23 +707,43 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
           )}
           {cart.map((l) => {
             const key = cartLineKey(l.productId, l.presentationId);
+            const isCatchWeightLine = l.actualWeightKg != null;
             return (
               <div key={key} className="border rounded p-2 space-y-1">
                 <div className="flex justify-between items-start gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-medium line-clamp-2">{l.name}</p>
-                    {l.presentationName && (
-                      <p className="text-[11px] text-muted-foreground">{l.presentationName}</p>
+                    {isCatchWeightLine ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        {formatCatchWeight(l.quantity, l.presentationName ?? l.unit, l.pieces ?? l.quantity, l.actualWeightKg ?? 0)}
+                      </p>
+                    ) : (
+                      l.presentationName && (
+                        <p className="text-[11px] text-muted-foreground">{l.presentationName}</p>
+                      )
                     )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => removeLine(l.productId, l.presentationId)}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
+                  <div className="flex items-center gap-0.5 shrink-0">
+                    {isCatchWeightLine && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        title="Editar peso"
+                        onClick={() => openWeighingForEdit(l)}
+                      >
+                        <Scale className="w-3 h-3" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => removeLine(l.productId, l.presentationId)}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-3 gap-1">
                   <Input
@@ -504,8 +751,14 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
                     min="1"
                     step="0.01"
                     value={l.quantity}
-                    onChange={(e) => updateQty(l.productId, l.presentationId, Number(e.target.value))}
-                    className="h-8 text-sm font-mono tabular-nums"
+                    readOnly={isCatchWeightLine}
+                    onChange={
+                      isCatchWeightLine
+                        ? undefined
+                        : (e) => updateQty(l.productId, l.presentationId, Number(e.target.value))
+                    }
+                    onClick={isCatchWeightLine ? () => openWeighingForEdit(l) : undefined}
+                    className={`h-8 text-sm font-mono tabular-nums ${isCatchWeightLine ? "cursor-pointer bg-muted/40" : ""}`}
                   />
                   <Input
                     type="number"
@@ -516,9 +769,14 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
                     className="h-8 text-sm font-mono tabular-nums"
                   />
                   <div className="flex items-center justify-end text-sm font-medium font-mono tabular-nums pr-1">
-                    ${(l.quantity * l.unitPrice).toFixed(2)}
+                    ${lineAmount(l).toFixed(2)}
                   </div>
                 </div>
+                {isCatchWeightLine && (
+                  <p className="text-[10px] text-muted-foreground text-right pr-1">
+                    ${l.unitPrice.toFixed(2)}/kg
+                  </p>
+                )}
               </div>
             );
           })}
@@ -544,36 +802,38 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
         <DialogContent>
           <DialogHeader><DialogTitle>Cobrar ${total.toFixed(2)}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-2">
-              <Label>Metodo de pago</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHODS.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={!isCredit ? "default" : "outline"}
+                className="flex-1 h-11"
+                onClick={() => setIsCredit(false)}
+              >
+                Pago inmediato
+              </Button>
+              <Button
+                type="button"
+                variant={isCredit ? "default" : "outline"}
+                className="flex-1 h-11"
+                onClick={() => setIsCredit(true)}
+              >
+                Credito
+              </Button>
             </div>
-            {paymentMethod === "cash" && (
-              <div className="space-y-2">
-                <Label>Efectivo recibido</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min={total}
-                  value={cashReceived}
-                  onChange={(e) => setCashReceived(e.target.value)}
-                />
-                {cashReceived && (
-                  <p className="text-sm">Cambio: <span className="font-semibold">${change.toFixed(2)}</span></p>
-                )}
-              </div>
-            )}
-            {paymentMethod === "credit" && (
+            {isCredit ? (
               <p className="text-sm text-muted-foreground">
                 La venta se registrara como cuenta por cobrar al cliente.
               </p>
+            ) : (
+              <MultiCurrencyPaymentFields
+                currencies={currencies}
+                baseCurrencyId={baseCurrencyId}
+                baseCurrencyCode={baseCurrencyCode}
+                paymentMethods={PAYMENT_METHODS.filter((m) => m.value !== CREDIT_METHOD)}
+                total={total}
+                value={payments}
+                onChange={setPayments}
+              />
             )}
             <Button className="w-full" size="lg" onClick={handleCheckout} disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
@@ -608,6 +868,77 @@ export function PosClient({ products, customers, warehouseId, warehouseName }: P
           </div>
         </DialogContent>
       </Dialog>
+
+      <ResponsiveFormDialog
+        open={weighingProduct != null}
+        onOpenChange={(open) => !open && closeWeighing()}
+        title="Pesaje"
+        description={weighingProduct?.name}
+        showHeader
+        desktopMaxWidth="sm:max-w-md"
+      >
+        {weighingProduct && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Presentación</Label>
+              <Select
+                value={weighingPresentationId != null ? String(weighingPresentationId) : ""}
+                onValueChange={(v) => {
+                  const id = Number(v);
+                  setWeighingPresentationId(id);
+                  const pr = weighingProduct.presentations.find((p) => p.presentationId === id);
+                  if (pr) {
+                    const qty = Math.trunc(Number(weighingQuantity)) || 1;
+                    setWeighingWeight(String((pr.factor * qty).toFixed(3)));
+                  }
+                }}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {sellableCatchWeightPresentations(weighingProduct).map((pr) => (
+                    <SelectItem key={pr.presentationId} value={String(pr.presentationId)}>
+                      {pr.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Cantidad</Label>
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                value={weighingQuantity}
+                onChange={(e) => {
+                  setWeighingQuantity(e.target.value);
+                  const pr = weighingProduct.presentations.find(
+                    (p) => p.presentationId === weighingPresentationId
+                  );
+                  const qty = Math.trunc(Number(e.target.value)) || 1;
+                  if (pr) setWeighingWeight(String((pr.factor * qty).toFixed(3)));
+                }}
+                className="font-mono tabular-nums"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Peso real (kg)</Label>
+              <Input
+                type="number"
+                min="0.001"
+                step="0.001"
+                value={weighingWeight}
+                onChange={(e) => setWeighingWeight(e.target.value)}
+                className="font-mono tabular-nums"
+                autoFocus
+              />
+            </div>
+            <Button className="w-full" size="lg" onClick={confirmWeighing}>
+              Confirmar peso
+            </Button>
+          </div>
+        )}
+      </ResponsiveFormDialog>
     </div>
   );
 }

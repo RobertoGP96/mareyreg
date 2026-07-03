@@ -2,10 +2,14 @@ export const dynamic = "force-dynamic";
 
 import { getInvoices } from "@/modules/sales/queries/invoice-queries";
 import { InvoiceListClient } from "@/modules/sales/components/invoice-list-client";
+import { getPaymentCurrencyOptions } from "@/modules/sales/queries/payment-currency-queries";
 import { PageHeader } from "@/components/ui/page-header";
 
 export default async function InvoicesPage() {
-  const invoices = await getInvoices();
+  const [invoices, paymentCurrencies] = await Promise.all([
+    getInvoices(),
+    getPaymentCurrencyOptions(),
+  ]);
   return (
     <div className="space-y-4">
       <PageHeader
@@ -14,6 +18,9 @@ export default async function InvoicesPage() {
       />
       <InvoiceListClient
         invoices={invoices as Parameters<typeof InvoiceListClient>[0]["invoices"]}
+        currencies={paymentCurrencies.currencies}
+        baseCurrencyId={paymentCurrencies.baseCurrencyId}
+        baseCurrencyCode={paymentCurrencies.baseCurrencyCode}
       />
     </div>
   );

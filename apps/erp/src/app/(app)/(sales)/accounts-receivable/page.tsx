@@ -1,6 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import { getAccountsReceivable } from "@/modules/sales/queries/invoice-queries";
+import { getPaymentCurrencyOptions } from "@/modules/sales/queries/payment-currency-queries";
+import { AccountsReceivableRowActions } from "@/modules/sales/components/accounts-receivable-row-actions";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
@@ -13,7 +15,10 @@ const BUCKET_COLORS: Record<string, string> = {
 };
 
 export default async function AccountsReceivablePage() {
-  const invoices = await getAccountsReceivable();
+  const [invoices, paymentCurrencies] = await Promise.all([
+    getAccountsReceivable(),
+    getPaymentCurrencyOptions(),
+  ]);
 
   const totals = invoices.reduce(
     (acc, i) => {
@@ -58,6 +63,7 @@ export default async function AccountsReceivablePage() {
               <th className="px-3 py-2 text-right">Pagado</th>
               <th className="px-3 py-2 text-right">Pendiente</th>
               <th className="px-3 py-2">Dias</th>
+              <th className="px-3 py-2"></th>
             </tr>
           </thead>
           <tbody>
@@ -78,6 +84,19 @@ export default async function AccountsReceivablePage() {
                   <Badge className={BUCKET_COLORS[i.bucket]}>
                     {i.bucket === "current" ? "Al dia" : i.bucket}
                   </Badge>
+                </td>
+                <td className="px-3 py-2">
+                  <AccountsReceivableRowActions
+                    target={{
+                      invoiceId: i.invoiceId,
+                      folio: i.folio,
+                      customerName: i.customer.name,
+                      balance: i.balance,
+                    }}
+                    currencies={paymentCurrencies.currencies}
+                    baseCurrencyId={paymentCurrencies.baseCurrencyId}
+                    baseCurrencyCode={paymentCurrencies.baseCurrencyCode}
+                  />
                 </td>
               </tr>
             ))}

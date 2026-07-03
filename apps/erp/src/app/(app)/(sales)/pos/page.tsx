@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { PosClient } from "@/modules/sales/components/pos-client";
 import { PageHeader } from "@/components/ui/page-header";
 import { getActiveCustomersForPicker } from "@/modules/customers/queries/customer-queries";
+import { getPaymentCurrencyOptions } from "@/modules/sales/queries/payment-currency-queries";
 
 export default async function PosPage() {
   // Preferimos un almac\u00e9n tipo "store" (punto de venta f\u00edsico). Si no hay
@@ -31,7 +32,7 @@ export default async function PosPage() {
     );
   }
 
-  const [productsRaw, customers] = await Promise.all([
+  const [productsRaw, customers, paymentCurrencies] = await Promise.all([
     db.product.findMany({
       where: { isActive: true },
       select: {
@@ -42,9 +43,10 @@ export default async function PosPage() {
         unit: true,
         salePrice: true,
         isService: true,
+        isCatchWeight: true,
         stockLevels: {
           where: { warehouseId: warehouse.warehouseId },
-          select: { currentQuantity: true },
+          select: { currentQuantity: true, currentPieces: true },
         },
         presentations: {
           where: { isActive: true },
@@ -52,6 +54,7 @@ export default async function PosPage() {
             presentationId: true,
             name: true,
             factor: true,
+            piecesPerUnit: true,
             retailPrice: true,
             wholesalePrice: true,
             barcode: true,
@@ -64,6 +67,7 @@ export default async function PosPage() {
       orderBy: { name: "asc" },
     }),
     getActiveCustomersForPicker(),
+    getPaymentCurrencyOptions(),
   ]);
 
   const products = productsRaw.map((p) => ({
@@ -74,10 +78,13 @@ export default async function PosPage() {
     unit: p.unit,
     salePrice: p.salePrice != null ? Number(p.salePrice) : null,
     stock: p.isService ? 9999 : p.stockLevels[0] ? Number(p.stockLevels[0].currentQuantity) : 0,
+    isCatchWeight: p.isCatchWeight,
+    currentPieces: p.isService ? 0 : p.stockLevels[0] ? p.stockLevels[0].currentPieces : 0,
     presentations: p.presentations.map((pr) => ({
       presentationId: pr.presentationId,
       name: pr.name,
       factor: Number(pr.factor),
+      piecesPerUnit: pr.piecesPerUnit,
       retailPrice: Number(pr.retailPrice),
       wholesalePrice: pr.wholesalePrice != null ? Number(pr.wholesalePrice) : null,
       barcode: pr.barcode,
@@ -94,6 +101,9 @@ export default async function PosPage() {
         customers={customers}
         warehouseId={warehouse.warehouseId}
         warehouseName={warehouse.name}
+        currencies={paymentCurrencies.currencies}
+        baseCurrencyId={paymentCurrencies.baseCurrencyId}
+        baseCurrencyCode={paymentCurrencies.baseCurrencyCode}
       />
     </div>
   );

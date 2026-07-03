@@ -109,3 +109,19 @@ ALTER TABLE product_costs
 ALTER TABLE product_costs
   ADD CONSTRAINT chk_product_costs_last_exchange_rate_pos
   CHECK (last_exchange_rate IS NULL OR last_exchange_rate > 0);
+
+-- =============================================
+-- Fase 4 — POS y pagos multi-moneda
+-- =============================================
+
+ALTER TABLE invoice_payments
+  DROP CONSTRAINT IF EXISTS chk_invoice_payments_exchange_rate_pos;
+ALTER TABLE invoice_payments
+  ADD CONSTRAINT chk_invoice_payments_exchange_rate_pos
+  CHECK (exchange_rate IS NULL OR exchange_rate > 0);
+
+ALTER TABLE invoice_payments
+  DROP CONSTRAINT IF EXISTS chk_invoice_payments_amount_tendered_pos;
+ALTER TABLE invoice_payments
+  ADD CONSTRAINT chk_invoice_payments_amount_tendered_pos
+  CHECK (amount_tendered IS NULL OR amount_tendered > 0);

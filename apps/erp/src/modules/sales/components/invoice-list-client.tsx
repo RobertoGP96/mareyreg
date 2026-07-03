@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +10,9 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { Search, FileText } from "lucide-react";
+import { Search, FileText, HandCoins } from "lucide-react";
+import { InvoicePaymentDialog, type InvoicePayTarget } from "./invoice-payment-dialog";
+import type { CurrencyOption } from "./multi-currency-payment-fields";
 
 interface InvoiceItem {
   invoiceId: number;
@@ -26,6 +27,13 @@ interface InvoiceItem {
   _count: { lines: number; payments: number };
 }
 
+interface Props {
+  invoices: InvoiceItem[];
+  currencies?: CurrencyOption[];
+  baseCurrencyId?: number;
+  baseCurrencyCode?: string;
+}
+
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",
   partial: "bg-blue-100 text-blue-800",
@@ -33,8 +41,14 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-red-100 text-red-800",
 };
 
-export function InvoiceListClient({ invoices }: { invoices: InvoiceItem[] }) {
+export function InvoiceListClient({
+  invoices,
+  currencies = [],
+  baseCurrencyId = 0,
+  baseCurrencyCode = "CUP",
+}: Props) {
   const [search, setSearch] = useState("");
+  const [payTarget, setPayTarget] = useState<InvoicePayTarget | null>(null);
   const filtered = invoices.filter(
     (i) =>
       i.folio.toLowerCase().includes(search.toLowerCase()) ||
@@ -82,11 +96,36 @@ export function InvoiceListClient({ invoices }: { invoices: InvoiceItem[] }) {
                     {balance > 0 && <span className="text-yellow-700">Pendiente: ${balance.toFixed(2)}</span>}
                   </div>
                 </div>
+                {balance > 0 && i.status !== "cancelled" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() =>
+                      setPayTarget({
+                        invoiceId: i.invoiceId,
+                        folio: i.folio,
+                        customerName: i.customer.name,
+                        balance,
+                      })
+                    }
+                  >
+                    <HandCoins className="w-4 h-4" />
+                    Cobrar
+                  </Button>
+                )}
               </div>
             );
           })
         )}
       </div>
+      <InvoicePaymentDialog
+        payTarget={payTarget}
+        onClose={() => setPayTarget(null)}
+        currencies={currencies}
+        baseCurrencyId={baseCurrencyId}
+        baseCurrencyCode={baseCurrencyCode}
+      />
     </div>
   );
 }

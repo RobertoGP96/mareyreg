@@ -21,7 +21,10 @@ export async function getInvoice(invoiceId: number) {
     include: {
       customer: true,
       lines: { include: { product: true, lot: true, presentation: { select: { name: true } } } },
-      payments: { orderBy: { paidAt: "desc" } },
+      payments: {
+        include: { currency: { select: { code: true, symbol: true, decimalPlaces: true } } },
+        orderBy: { paidAt: "desc" },
+      },
     },
   });
 }
