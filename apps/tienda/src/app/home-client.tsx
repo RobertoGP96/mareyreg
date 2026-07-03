@@ -61,7 +61,7 @@ export function HomeClient({
             <Link
               href="/favoritos"
               aria-label="Favoritos"
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10 transition-colors hover:bg-white/20"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/0 bg-white/0 transition-colors hover:bg-white/20"
             >
               <Heart className="h-[18px] w-[18px]" />
             </Link>

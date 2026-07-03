@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Heart,
-  House,
+  Store,
   LayoutGrid,
   ShoppingCart,
   UserRound,
@@ -29,7 +29,7 @@ interface NavItem {
 }
 
 const ITEMS: NavItem[] = [
-  { href: "/", icon: House, label: "Inicio", isActive: (p) => p === "/" },
+  { href: "/", icon: Store, label: "Inicio", isActive: (p) => p === "/" },
   {
     href: "/catalogo",
     icon: LayoutGrid,
