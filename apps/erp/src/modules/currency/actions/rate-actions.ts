@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { assertRole, ForbiddenError } from "@/lib/auth-guard";
+import { Prisma } from "@/generated/prisma";
 import {
   createExchangeRateSchema,
   updateExchangeRateSchema,
@@ -39,6 +40,9 @@ export async function createExchangeRate(
     }
     const data = parsed.data;
 
+    const userId = await requireCurrentUserId();
+    await assertRole("admin");
+
     const dup = await db.exchangeRate.findUnique({
       where: {
         baseCurrencyId_quoteCurrencyId: {
@@ -50,9 +54,6 @@ export async function createExchangeRate(
     if (dup) {
       return { success: false, error: "Ya existe una tasa configurada para ese par de monedas." };
     }
-
-    const userId = await requireCurrentUserId();
-    await assertRole("admin");
 
     const created = await db.$transaction(async (tx) => {
       const rate = await tx.exchangeRate.create({
@@ -88,6 +89,9 @@ export async function createExchangeRate(
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     if (isForbiddenError(error)) return { success: false, error: FORBIDDEN_ERROR_MESSAGE };
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { success: false, error: "Ya existe una tasa configurada para ese par de monedas." };
+    }
     console.error("createExchangeRate:", error);
     return { success: false, error: "Error al crear la tasa de cambio" };
   }
@@ -166,6 +170,9 @@ export async function deleteExchangeRate(
     }
     const { exchangeRateId } = parsed.data;
 
+    const userId = await requireCurrentUserId();
+    await assertRole("admin");
+
     const historyCount = await db.exchangeRateHistory.count({ where: { exchangeRateId } });
     if (historyCount > 1) {
       return {
@@ -173,9 +180,6 @@ export async function deleteExchangeRate(
         error: "No se puede eliminar: esta tasa tiene historial de cambios. Consérvala para auditoría.",
       };
     }
-
-    const userId = await requireCurrentUserId();
-    await assertRole("admin");
 
     await db.$transaction(async (tx) => {
       const prev = await tx.exchangeRate.findUnique({ where: { exchangeRateId } });

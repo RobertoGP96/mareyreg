@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import type { Prisma } from "@/generated/prisma";
+import { Prisma } from "@/generated/prisma";
 
 type PrismaTx = Prisma.TransactionClient;
 export type DbOrTx = PrismaTx | typeof db;
@@ -76,7 +76,10 @@ export async function getRateToBase(
     },
   });
   if (inverse) {
-    return { exchangeRateId: inverse.exchangeRateId, rate: 1 / inverse.rate.toNumber() };
+    return {
+      exchangeRateId: inverse.exchangeRateId,
+      rate: new Prisma.Decimal(1).dividedBy(inverse.rate).toNumber(),
+    };
   }
 
   const fromCurrency = await client.currency.findUnique({ where: { currencyId: fromCurrencyId } });

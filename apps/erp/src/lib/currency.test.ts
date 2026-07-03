@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Prisma } from "@/generated/prisma";
 
 const { db } = vi.hoisted(() => {
   const db = {
@@ -26,7 +27,7 @@ import {
 } from "./currency";
 
 function decimalLike(value: number) {
-  return { toNumber: () => value };
+  return new Prisma.Decimal(value);
 }
 
 const CUP_BASE = {
