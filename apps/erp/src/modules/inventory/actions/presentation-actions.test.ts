@@ -112,7 +112,16 @@ describe("presentation-actions", () => {
 
       const result = await createPresentation(1, baseCreateInput());
 
-      expect(result).toEqual({ success: true, data: { presentationId: 10 } });
+      // Margen degradado a nulls: el mock de db no tiene productCost/valuación.
+      expect(result).toEqual({
+        success: true,
+        data: {
+          presentationId: 10,
+          marginWarning: null,
+          replacementMarginPct: null,
+          marginPct: null,
+        },
+      });
       expect(tx.productPresentation.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ productId: 1, isBase: false }),
@@ -172,7 +181,10 @@ describe("presentation-actions", () => {
 
       const result = await updatePresentation(5, { retailPrice: 120 });
 
-      expect(result).toEqual({ success: true, data: undefined });
+      expect(result).toEqual({
+        success: true,
+        data: { marginWarning: null, replacementMarginPct: null, marginPct: null },
+      });
       expect(tx.presentationPriceHistory.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -199,7 +211,10 @@ describe("presentation-actions", () => {
 
       const result = await updatePresentation(1, { retailPrice: 150 });
 
-      expect(result).toEqual({ success: true, data: undefined });
+      expect(result).toEqual({
+        success: true,
+        data: { marginWarning: null, replacementMarginPct: null, marginPct: null },
+      });
       expect(tx.product.update).toHaveBeenCalledWith({
         where: { productId: 1 },
         data: { salePrice: 150 },

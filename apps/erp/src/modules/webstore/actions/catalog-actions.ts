@@ -92,9 +92,12 @@ export async function updateWebstorePrice(
 ): Promise<ActionResult<void>> {
   const parsed = updatePriceSchema.safeParse({ productId, salePrice });
   if (!parsed.success) return { success: false, error: "Precio inválido" };
+  // updateProduct ahora devuelve datos de margen; este endpoint del catálogo
+  // web conserva su contrato void (la UI webstore no muestra márgenes).
   const res = await updateProduct(productId, { salePrice });
-  if (res.success) revalidatePath(CATALOG_PATH);
-  return res;
+  if (!res.success) return res;
+  revalidatePath(CATALOG_PATH);
+  return { success: true, data: undefined };
 }
 
 export async function getProductDiscountsAction(

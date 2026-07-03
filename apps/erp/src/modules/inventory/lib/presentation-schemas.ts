@@ -26,6 +26,16 @@ export const presentationCreateSchema = z.object({
   sku: nonEmptyTrimmed("El SKU"),
   barcode: nonEmptyTrimmed("El código de barras"),
   sortOrder: z.number().int().min(0).optional(),
+  // Piezas fungibles por unidad (catch-weight). null en la base y en
+  // productos normales; entero >=1 en Pieza/Caja de productos catch-weight.
+  // La validación cruzada contra Product.isCatchWeight vive en el server
+  // action (aquí no se conoce el producto).
+  piecesPerUnit: z
+    .number()
+    .int("Las piezas por unidad deben ser un entero")
+    .min(1, "Las piezas por unidad deben ser mayor o igual a 1")
+    .nullable()
+    .optional(),
 });
 
 export const presentationUpdateSchema = presentationCreateSchema.partial().extend({

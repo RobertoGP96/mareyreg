@@ -5,6 +5,8 @@ export interface ProductPresentationRow {
   productId: number;
   name: string;
   factor: number;
+  /** Piezas fungibles por unidad (catch-weight). null en la base y en productos normales. */
+  piecesPerUnit: number | null;
   sku: string | null;
   barcode: string | null;
   retailPrice: number;
@@ -27,6 +29,7 @@ export async function getProductPresentations(productId: number): Promise<Produc
     productId: r.productId,
     name: r.name,
     factor: Number(r.factor),
+    piecesPerUnit: r.piecesPerUnit ?? null,
     sku: r.sku,
     barcode: r.barcode,
     retailPrice: Number(r.retailPrice),

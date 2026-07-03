@@ -6,6 +6,7 @@ import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
 import { dispatchLines, reverseInvoiceStock } from "@/modules/sales/lib/dispatch-lines";
+import { GlobalRateNotConfiguredError } from "@/lib/currency";
 import type { Prisma } from "@/generated/prisma";
 
 const AUTH_ERROR_MESSAGE = "No autenticado";
@@ -16,6 +17,8 @@ const SESSION_ERROR_RESPONSE =
 // de mostrar al usuario tal cual). Cualquier otro error se reemplaza por un
 // mensaje generico para no filtrar detalles internos (stack, SQL, etc.).
 function toUserMessage(error: unknown, genericMessage: string): string {
+  // Precio en moneda sin tasa configurada (multi-moneda): mensaje accionable.
+  if (error instanceof GlobalRateNotConfiguredError) return error.message;
   if (error instanceof Error) {
     if (error.message === AUTH_ERROR_MESSAGE) return SESSION_ERROR_RESPONSE;
     if (

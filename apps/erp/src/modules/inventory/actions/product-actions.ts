@@ -6,8 +6,8 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { assertRole, ForbiddenError } from "@/lib/auth-guard";
-import { safePriceMarginData, type PriceMarginData } from "../lib/margin";
-import { getRateToBase, GlobalRateNotConfiguredError } from "@/lib/currency";
+import { computeMarginInfo, safePriceMarginData, type PriceMarginData } from "../lib/margin";
+import { getBaseCurrency, getRateToBase, GlobalRateNotConfiguredError } from "@/lib/currency";
 
 const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
 
@@ -46,6 +46,8 @@ export async function createProduct(data: {
   reorderPoint?: number;
   reorderQuantity?: number;
   isService?: boolean;
+  /** Producto de peso variable (ej. queso): fuerza unit="kg" y allowNegative=false. */
+  isCatchWeight?: boolean;
   brand?: string;
   supplier?: string;
   supplierRef?: string;
@@ -53,6 +55,16 @@ export async function createProduct(data: {
   notes?: string;
 }): Promise<ActionResult<{ productId: number } & PriceMarginData>> {
   try {
+    if (data.isCatchWeight && data.unit !== "kg") {
+      return { success: false, error: "Los productos de peso variable deben usar la unidad kg" };
+    }
+    if (data.isCatchWeight && data.allowNegative) {
+      return {
+        success: false,
+        error: "Los productos de peso variable no permiten stock negativo",
+      };
+    }
+
     if (data.sku) {
       const existing = await db.product.findUnique({ where: { sku: data.sku } });
       if (existing) {
@@ -97,6 +109,7 @@ export async function createProduct(data: {
           reorderPoint: data.reorderPoint ?? null,
           reorderQuantity: data.reorderQuantity ?? null,
           isService: data.isService ?? false,
+          isCatchWeight: data.isCatchWeight ?? false,
           brand: data.brand || null,
           supplier: data.supplier || null,
           supplierRef: data.supplierRef || null,
@@ -176,6 +189,8 @@ export async function updateProduct(
     reorderPoint?: number;
     reorderQuantity?: number;
     isService?: boolean;
+    /** Producto de peso variable (ej. queso): fuerza unit="kg" y allowNegative=false. */
+    isCatchWeight?: boolean;
     brand?: string;
     supplier?: string;
     supplierRef?: string;
@@ -186,8 +201,48 @@ export async function updateProduct(
 ): Promise<ActionResult<PriceMarginData>> {
   try {
     const userId = await requireCurrentUserId();
+
+    const effectiveUnit = data.unit;
+    const effectiveIsCatchWeight = data.isCatchWeight;
+    if (effectiveIsCatchWeight === true) {
+      // Si unit no viene en este update, se valida contra el valor ya
+      // guardado dentro de la transacción (ver chequeo con prev más abajo).
+      if (effectiveUnit !== undefined && effectiveUnit !== "kg") {
+        return { success: false, error: "Los productos de peso variable deben usar la unidad kg" };
+      }
+      if (data.allowNegative === true) {
+        return {
+          success: false,
+          error: "Los productos de peso variable no permiten stock negativo",
+        };
+      }
+    }
+
     const { previousImageUrl, marginInput } = await db.$transaction(async (tx) => {
       const prev = await tx.product.findUnique({ where: { productId: id } });
+
+      const willBeCatchWeight = data.isCatchWeight !== undefined ? data.isCatchWeight : prev?.isCatchWeight ?? false;
+      const willBeUnit = data.unit !== undefined ? data.unit : prev?.unit;
+      if (willBeCatchWeight && willBeUnit !== "kg") {
+        throw new Error("CATCH_WEIGHT_REQUIRES_KG");
+      }
+      const willAllowNegative =
+        data.allowNegative !== undefined ? data.allowNegative : prev?.allowNegative ?? false;
+      if (willBeCatchWeight && willAllowNegative) {
+        throw new Error("CATCH_WEIGHT_FORBIDS_NEGATIVE");
+      }
+
+      // Desactivar peso variable con movimientos que ya registraron piezas
+      // dejaría esas piezas huérfanas (sin significado en un producto
+      // normal) — se bloquea el cambio.
+      if (prev?.isCatchWeight && data.isCatchWeight === false) {
+        const pieceMovementsCount = await tx.stockMovement.count({
+          where: { productId: id, pieces: { not: null } },
+        });
+        if (pieceMovementsCount > 0) {
+          throw new Error("CATCH_WEIGHT_HAS_PIECE_MOVEMENTS");
+        }
+      }
 
       const currencyChanged =
         data.saleCurrencyId !== undefined &&
@@ -241,6 +296,7 @@ export async function updateProduct(
           ...(data.reorderPoint !== undefined && { reorderPoint: data.reorderPoint ?? null }),
           ...(data.reorderQuantity !== undefined && { reorderQuantity: data.reorderQuantity ?? null }),
           ...(data.isService !== undefined && { isService: data.isService }),
+          ...(data.isCatchWeight !== undefined && { isCatchWeight: data.isCatchWeight }),
           ...(data.brand !== undefined && { brand: data.brand || null }),
           ...(data.supplier !== undefined && { supplier: data.supplier || null }),
           ...(data.supplierRef !== undefined && { supplierRef: data.supplierRef || null }),
@@ -353,8 +409,81 @@ export async function updateProduct(
       const unit = error.message.split(":")[1];
       return { success: false, error: `Ya existe una presentación llamada '${unit}' para este producto` };
     }
+    if (error instanceof Error && error.message === "CATCH_WEIGHT_REQUIRES_KG") {
+      return { success: false, error: "Los productos de peso variable deben usar la unidad kg" };
+    }
+    if (error instanceof Error && error.message === "CATCH_WEIGHT_FORBIDS_NEGATIVE") {
+      return {
+        success: false,
+        error: "Los productos de peso variable no permiten stock negativo",
+      };
+    }
+    if (error instanceof Error && error.message === "CATCH_WEIGHT_HAS_PIECE_MOVEMENTS") {
+      return {
+        success: false,
+        error:
+          "No se puede desactivar peso variable: ya hay movimientos con piezas",
+      };
+    }
     console.error("Error updating product:", error);
     return { success: false, error: "Error al actualizar el producto" };
+  }
+}
+
+export interface ProductCostInfo {
+  /** Último costo de reposición en su moneda original (ProductCost.lastUnitCost). */
+  replacementCost: number | null;
+  replacementCostCurrencyCode: string | null;
+  /** Costo de reposición convertido a base con la tasa VIGENTE. null si falta tasa. */
+  replacementCostBase: number | null;
+  /** Costo contable promedio (valuación), siempre en base. */
+  accountingCostBase: number | null;
+  /** Margen del precio vigente vs. costo contable. */
+  marginPct: number | null;
+  /** Margen del precio vigente vs. costo de reposición. */
+  replacementMarginPct: number | null;
+  baseCode: string;
+}
+
+/** Bloque de costos/margen del producto para la UI (solo lectura). */
+export async function getProductCostInfoAction(
+  productId: number
+): Promise<ActionResult<ProductCostInfo>> {
+  try {
+    const [product, cost, base] = await Promise.all([
+      db.product.findUnique({
+        where: { productId },
+        select: { salePrice: true, saleCurrencyId: true },
+      }),
+      db.productCost.findUnique({
+        where: { productId },
+        include: { currency: { select: { code: true } } },
+      }),
+      getBaseCurrency(db),
+    ]);
+    if (!product) return { success: false, error: "El producto no existe" };
+
+    const info = await computeMarginInfo(db, {
+      productId,
+      priceAmount: product.salePrice != null ? Number(product.salePrice) : 0,
+      priceCurrencyId: product.saleCurrencyId,
+    });
+
+    return {
+      success: true,
+      data: {
+        replacementCost: cost?.lastUnitCost != null ? Number(cost.lastUnitCost) : null,
+        replacementCostCurrencyCode: cost?.currency.code ?? null,
+        replacementCostBase: info.replacementCostBase,
+        accountingCostBase: info.accountingCostBase,
+        marginPct: product.salePrice != null ? info.marginPct : null,
+        replacementMarginPct: product.salePrice != null ? info.replacementMarginPct : null,
+        baseCode: base.code,
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching product cost info:", error);
+    return { success: false, error: "Error al obtener los costos del producto" };
   }
 }
 

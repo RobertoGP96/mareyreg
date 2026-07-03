@@ -36,6 +36,13 @@ import {
   History,
 } from "lucide-react";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   createPresentation,
   updatePresentation,
   setPresentationActive,
@@ -43,16 +50,31 @@ import {
   getProductPresentationsAction,
 } from "@/modules/inventory/actions/presentation-actions";
 import type { ProductPresentationRow } from "@/modules/inventory/queries/presentation-queries";
+import type { PriceMarginData } from "@/modules/inventory/lib/margin";
+import type { CurrencyOption } from "@/modules/inventory/queries/currency-context";
 import { PresentationPriceHistoryDialog } from "./presentation-price-history-dialog";
+
+const BASE_CURRENCY_VALUE = "base";
 
 interface Props {
   productId: number | null;
   productName?: string;
   productUnit?: string;
+  currencies?: CurrencyOption[];
+  baseCurrencyId?: number;
+  baseCode?: string;
   onOpenChange: (open: boolean) => void;
 }
 
-export function PresentationManagerDialog({ productId, productName, productUnit, onOpenChange }: Props) {
+export function PresentationManagerDialog({
+  productId,
+  productName,
+  productUnit,
+  currencies = [],
+  baseCurrencyId,
+  baseCode = "CUP",
+  onOpenChange,
+}: Props) {
   const router = useRouter();
   const [presentations, setPresentations] = useState<ProductPresentationRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -122,16 +144,44 @@ export function PresentationManagerDialog({ productId, productName, productUnit,
     }
   };
 
+  const currencyCode = (currencyId: number | null) =>
+    currencyId == null
+      ? baseCode
+      : currencies.find((c) => c.currencyId === currencyId)?.code ?? `#${currencyId}`;
+
+  const selectableCurrencies = currencies.filter((c) => c.currencyId !== baseCurrencyId);
+
+  const showMarginToast = (margin: PriceMarginData) => {
+    if (margin.marginWarning === "negative") {
+      toast.warning("Precio por debajo del costo de reposición", {
+        description:
+          margin.replacementMarginPct != null
+            ? `Margen ${margin.replacementMarginPct.toFixed(1)}%`
+            : undefined,
+      });
+    } else if (margin.marginWarning === "low" && margin.replacementMarginPct != null) {
+      toast.warning(
+        `Margen bajo: ${margin.replacementMarginPct.toFixed(1)}% sobre costo de reposición`
+      );
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (productId == null) return;
 
     const fd = new FormData(e.currentTarget);
+    const rawCurrency = fd.get("priceCurrencyId") as string | null;
     const data = {
       name: fd.get("name") as string,
       factor: Number(fd.get("factor")),
       retailPrice: Number(fd.get("retailPrice")),
       wholesalePrice: fd.get("wholesalePrice") ? Number(fd.get("wholesalePrice")) : undefined,
+      priceCurrencyId: rawCurrency
+        ? rawCurrency === BASE_CURRENCY_VALUE
+          ? null
+          : Number(rawCurrency)
+        : undefined,
       sku: (fd.get("sku") as string) || undefined,
       barcode: (fd.get("barcode") as string) || undefined,
       reason: (fd.get("reason") as string) || undefined,
@@ -144,6 +194,7 @@ export function PresentationManagerDialog({ productId, productName, productUnit,
         : await createPresentation(productId, data);
       if (res.success) {
         toast.success(editing ? "Presentación actualizada" : "Presentación creada");
+        showMarginToast(res.data);
         closeForm();
         loadPresentations();
         router.refresh();
@@ -193,8 +244,16 @@ export function PresentationManagerDialog({ productId, productName, productUnit,
                       {p.barcode && <> · {p.barcode}</>}
                     </div>
                     <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 font-mono tabular-nums text-xs">
-                      <span>Menudeo: {formatAmount(p.retailPrice)}</span>
-                      {p.wholesalePrice != null && <span>Mayoreo: {formatAmount(p.wholesalePrice)}</span>}
+                      <span>
+                        Menudeo: {formatAmount(p.retailPrice)}
+                        {p.priceCurrencyId != null && ` ${currencyCode(p.priceCurrencyId)}`}
+                      </span>
+                      {p.wholesalePrice != null && (
+                        <span>
+                          Mayoreo: {formatAmount(p.wholesalePrice)}
+                          {p.priceCurrencyId != null && ` ${currencyCode(p.priceCurrencyId)}`}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 shrink-0">
@@ -293,7 +352,7 @@ export function PresentationManagerDialog({ productId, productName, productUnit,
                     defaultValue={editing ? String(editing.factor) : "1"}
                   />
                 </Field>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <Field label="Precio menudeo" icon={CircleDollarSign} required>
                     <Input
                       name="retailPrice"
@@ -314,6 +373,28 @@ export function PresentationManagerDialog({ productId, productName, productUnit,
                       defaultValue={editing?.wholesalePrice != null ? String(editing.wholesalePrice) : ""}
                       placeholder="—"
                     />
+                  </Field>
+                  <Field label="Moneda" icon={CircleDollarSign} hint="Aplica a ambos precios.">
+                    <Select
+                      name="priceCurrencyId"
+                      defaultValue={
+                        editing?.priceCurrencyId != null
+                          ? String(editing.priceCurrencyId)
+                          : BASE_CURRENCY_VALUE
+                      }
+                    >
+                      <SelectTrigger className="w-full" aria-label="Moneda del precio">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={BASE_CURRENCY_VALUE}>{baseCode}</SelectItem>
+                        {selectableCurrencies.map((c) => (
+                          <SelectItem key={c.currencyId} value={String(c.currencyId)}>
+                            {c.code}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </Field>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

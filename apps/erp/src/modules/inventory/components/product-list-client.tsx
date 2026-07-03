@@ -66,13 +66,18 @@ import {
   Layers,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
+import { formatAmount } from "@/lib/format";
 import {
   createProduct,
   updateProduct,
   deleteProduct,
   getProductPriceHistoryAction,
+  getProductCostInfoAction,
   type ProductPriceHistoryEntry,
+  type ProductCostInfo,
 } from "../actions/product-actions";
+import type { PriceMarginData } from "../lib/margin";
+import type { CurrencyOption } from "../queries/currency-context";
 import { ProductDiscountsDialog } from "@/modules/webstore/components/product-discounts-dialog";
 import { PresentationManagerDialog } from "./presentation-manager-dialog";
 import { BulkPriceDialog } from "./bulk-price-dialog";
@@ -96,6 +101,10 @@ interface ProductItem {
   maxStock: number | null;
   costPrice: number | null;
   salePrice: number | null;
+  /** null = moneda base (CUP). */
+  saleCurrencyId: number | null;
+  /** Equivalente en CUP calculado server-side cuando el precio no está en base. */
+  salePriceBase: number | null;
   webstoreEnabled: boolean;
   imageUrl: string | null;
   brand: string | null;
@@ -106,12 +115,20 @@ interface ProductItem {
   notes: string | null;
 }
 
+const BASE_CURRENCY_VALUE = "base";
+
 export function ProductListClient({
   products,
   isAdmin = false,
+  currencies = [],
+  baseCurrencyId,
+  baseCode = "CUP",
 }: {
   products: ProductItem[];
   isAdmin?: boolean;
+  currencies?: CurrencyOption[];
+  baseCurrencyId?: number;
+  baseCode?: string;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -130,7 +147,38 @@ export function ProductListClient({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageRemoved, setImageRemoved] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [costInfo, setCostInfo] = useState<ProductCostInfo | null>(null);
+  const [isCostLoading, setIsCostLoading] = useState(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  const currencyCode = (currencyId: number | null) =>
+    currencyId == null
+      ? baseCode
+      : currencies.find((c) => c.currencyId === currencyId)?.code ?? `#${currencyId}`;
+
+  const currencyDecimals = (currencyId: number | null) =>
+    currencyId == null
+      ? 0
+      : currencies.find((c) => c.currencyId === currencyId)?.decimalPlaces ?? 2;
+
+  // Monedas seleccionables: la base va primero con value especial "base"
+  // (el registro guarda null = CUP), las demás por currencyId.
+  const selectableCurrencies = currencies.filter((c) => c.currencyId !== baseCurrencyId);
+
+  const showMarginToast = (margin: PriceMarginData) => {
+    if (margin.marginWarning === "negative") {
+      toast.warning("Precio por debajo del costo de reposición", {
+        description:
+          margin.replacementMarginPct != null
+            ? `Margen ${margin.replacementMarginPct.toFixed(1)}%`
+            : undefined,
+      });
+    } else if (margin.marginWarning === "low" && margin.replacementMarginPct != null) {
+      toast.warning(
+        `Margen bajo: ${margin.replacementMarginPct.toFixed(1)}% sobre costo de reposición`
+      );
+    }
+  };
 
   const filtered = products.filter(
     (p) =>
@@ -187,6 +235,7 @@ export function ProductListClient({
       }
 
       const fd = new FormData(form);
+      const rawSaleCurrency = fd.get("saleCurrencyId") as string | null;
       const data = {
         name: fd.get("name") as string,
         sku: (fd.get("sku") as string) || undefined,
@@ -197,6 +246,11 @@ export function ProductListClient({
         maxStock: fd.get("maxStock") ? Number(fd.get("maxStock")) : undefined,
         costPrice: fd.get("costPrice") ? Number(fd.get("costPrice")) : undefined,
         salePrice: fd.get("salePrice") ? Number(fd.get("salePrice")) : undefined,
+        saleCurrencyId: rawSaleCurrency
+          ? rawSaleCurrency === BASE_CURRENCY_VALUE
+            ? null
+            : Number(rawSaleCurrency)
+          : undefined,
         webstoreEnabled,
         // "" limpia la foto en el server (imageUrl || null); undefined la deja intacta.
         imageUrl: uploadedImageUrl ?? (imageRemoved ? "" : undefined),
@@ -218,6 +272,7 @@ export function ProductListClient({
         setImagePreview(null);
         setImageRemoved(false);
         toast.success(editId ? "Producto actualizado" : "Producto creado");
+        showMarginToast(result.data);
         router.refresh();
       } else toast.error(result.error);
     } finally {
@@ -246,6 +301,13 @@ export function ProductListClient({
     setImageFile(null);
     setImagePreview(p.imageUrl);
     setImageRemoved(false);
+    setCostInfo(null);
+    setIsCostLoading(true);
+    getProductCostInfoAction(p.productId)
+      .then((res) => {
+        if (res.success) setCostInfo(res.data);
+      })
+      .finally(() => setIsCostLoading(false));
   };
 
   const openCreate = () => {
@@ -324,7 +386,34 @@ export function ProductListClient({
             <Input name="costPrice" type="number" step="0.01" defaultValue={product?.costPrice ? String(product.costPrice) : ""} placeholder="$0.00" />
           </Field>
           <Field label="Precio de venta" icon={CircleDollarSign} hint="Precio base; los descuentos activos se aplican sobre este.">
-            <Input name="salePrice" type="number" step="0.01" defaultValue={product?.salePrice ? String(product.salePrice) : ""} placeholder="$0.00" />
+            <div className="flex gap-2">
+              <Input
+                name="salePrice"
+                type="number"
+                step="0.01"
+                defaultValue={product?.salePrice ? String(product.salePrice) : ""}
+                placeholder="$0.00"
+                className="flex-1"
+              />
+              <Select
+                name="saleCurrencyId"
+                defaultValue={
+                  product?.saleCurrencyId != null ? String(product.saleCurrencyId) : BASE_CURRENCY_VALUE
+                }
+              >
+                <SelectTrigger className="w-24 shrink-0" aria-label="Moneda del precio">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={BASE_CURRENCY_VALUE}>{baseCode}</SelectItem>
+                  {selectableCurrencies.map((c) => (
+                    <SelectItem key={c.currencyId} value={String(c.currencyId)}>
+                      {c.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </Field>
         </div>
       </FormSection>
@@ -477,6 +566,20 @@ export function ProductListClient({
                         {String(p.costPrice)}
                       </span>
                     )}
+                    {p.salePrice != null && p.salePrice > 0 && (
+                      <span>
+                        Venta:{" "}
+                        <span className="font-medium font-mono tabular-nums text-foreground">
+                          {formatAmount(p.salePrice, currencyDecimals(p.saleCurrencyId))}
+                          {p.saleCurrencyId != null && ` ${currencyCode(p.saleCurrencyId)}`}
+                        </span>
+                        {p.salePriceBase != null && (
+                          <span className="text-muted-foreground">
+                            {" "}≈ {formatAmount(p.salePriceBase, 0)} {baseCode}
+                          </span>
+                        )}
+                      </span>
+                    )}
                     {p.supplier && <span>Proveedor: <span className="font-medium text-foreground">{p.supplier}</span></span>}
                   </div>
                 </div>
@@ -559,6 +662,59 @@ export function ProductListClient({
           </DialogHeader>
           <form onSubmit={(e) => handleSubmit(e, toEdit?.productId)}>
             <ProductFormFields product={toEdit} />
+            <div className="mt-6 rounded-lg border border-border bg-muted/20 p-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Costos y margen
+              </p>
+              {isCostLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Cargando costos…
+                </div>
+              ) : costInfo ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                  <span className="text-muted-foreground">
+                    Costo de reposición:{" "}
+                    <span className="font-mono tabular-nums text-foreground">
+                      {costInfo.replacementCost != null && costInfo.replacementCostCurrencyCode
+                        ? `${formatAmount(costInfo.replacementCost)} ${costInfo.replacementCostCurrencyCode}`
+                        : "—"}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    Costo {costInfo.baseCode} a tasa vigente:{" "}
+                    <span className="font-mono tabular-nums text-foreground">
+                      {costInfo.replacementCostBase != null
+                        ? formatAmount(costInfo.replacementCostBase, 0)
+                        : "—"}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    Costo contable {costInfo.baseCode} (promedio):{" "}
+                    <span className="font-mono tabular-nums text-foreground">
+                      {costInfo.accountingCostBase != null
+                        ? formatAmount(costInfo.accountingCostBase, 0)
+                        : "—"}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground">
+                    Margen del precio vigente:{" "}
+                    <span
+                      className={`font-mono tabular-nums ${
+                        costInfo.replacementMarginPct != null && costInfo.replacementMarginPct < 0
+                          ? "text-destructive"
+                          : "text-foreground"
+                      }`}
+                    >
+                      {costInfo.replacementMarginPct != null
+                        ? `${formatAmount(costInfo.replacementMarginPct, 1)}%`
+                        : "—"}
+                    </span>
+                  </span>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin datos de costo registrados.</p>
+              )}
+            </div>
             <div className="flex justify-end gap-2 pt-5 border-t border-border mt-6">
               <Button type="button" variant="outline" onClick={() => setToEdit(null)}>
                 Cancelar
@@ -639,6 +795,9 @@ export function ProductListClient({
         productId={presentationsProduct?.productId ?? null}
         productName={presentationsProduct?.name}
         productUnit={presentationsProduct?.unit}
+        currencies={currencies}
+        baseCurrencyId={baseCurrencyId}
+        baseCode={baseCode}
         onOpenChange={(open) => !open && setPresentationsProduct(null)}
       />
 

@@ -55,6 +55,19 @@ export async function createPresentation(
       return { success: false, error: "El producto no existe" };
     }
 
+    if (product.isCatchWeight && data.piecesPerUnit == null) {
+      return {
+        success: false,
+        error: "Este producto es de peso variable: indica las piezas por presentación",
+      };
+    }
+    if (!product.isCatchWeight && data.piecesPerUnit != null) {
+      return {
+        success: false,
+        error: "Las piezas por unidad solo aplican a productos de peso variable",
+      };
+    }
+
     if (data.sku) {
       const [productHit, presentationHit] = await Promise.all([
         db.product.findUnique({ where: { sku: data.sku } }),
@@ -99,6 +112,7 @@ export async function createPresentation(
           retailPrice: data.retailPrice,
           wholesalePrice: data.wholesalePrice ?? null,
           priceCurrencyId: data.priceCurrencyId ?? null,
+          piecesPerUnit: data.piecesPerUnit ?? null,
           isBase: false,
           isActive: true,
           sortOrder: data.sortOrder ?? 0,
@@ -156,6 +170,15 @@ export async function updatePresentation(
         include: { product: true },
       });
       if (!prev) throw new Error("NOT_FOUND");
+
+      if (data.piecesPerUnit !== undefined) {
+        if (prev.product.isCatchWeight && !prev.isBase && data.piecesPerUnit == null) {
+          throw new Error("PIECES_REQUIRED");
+        }
+        if ((!prev.product.isCatchWeight || prev.isBase) && data.piecesPerUnit != null) {
+          throw new Error("PIECES_NOT_ALLOWED");
+        }
+      }
 
       if (data.sku !== undefined && data.sku && data.sku !== prev.sku) {
         const [productHit, presentationHit] = await Promise.all([
@@ -223,6 +246,7 @@ export async function updatePresentation(
           ...(data.wholesalePrice !== undefined && { wholesalePrice: data.wholesalePrice ?? null }),
           ...(data.priceCurrencyId !== undefined && { priceCurrencyId: data.priceCurrencyId ?? null }),
           ...(data.sortOrder !== undefined && { sortOrder: data.sortOrder }),
+          ...(data.piecesPerUnit !== undefined && { piecesPerUnit: data.piecesPerUnit ?? null }),
         },
       });
 
@@ -309,6 +333,18 @@ export async function updatePresentation(
         success: false,
         error:
           "No se puede modificar el factor de una presentación con ventas registradas. Crea una nueva presentación en su lugar.",
+      };
+    }
+    if (error instanceof Error && error.message === "PIECES_REQUIRED") {
+      return {
+        success: false,
+        error: "Este producto es de peso variable: indica las piezas por presentación",
+      };
+    }
+    if (error instanceof Error && error.message === "PIECES_NOT_ALLOWED") {
+      return {
+        success: false,
+        error: "Las piezas por unidad solo aplican a presentaciones no-base de productos de peso variable",
       };
     }
     if (error instanceof Error && error.message.startsWith("SKU_COLLISION_PRODUCT:")) {
