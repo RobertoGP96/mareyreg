@@ -46,6 +46,11 @@ export default async function StockPage() {
     pieces: m.pieces,
     movementType: m.movementType,
     unitCost: m.unitCost != null ? Number(m.unitCost) : null,
+    origUnitCost: m.origUnitCost != null ? Number(m.origUnitCost) : null,
+    exchangeRate: m.exchangeRate != null ? Number(m.exchangeRate) : null,
+    origCurrency: m.origCurrency
+      ? { code: m.origCurrency.code, decimalPlaces: m.origCurrency.decimalPlaces }
+      : null,
     referenceDoc: m.referenceDoc,
     notes: m.notes,
     createdAt: m.createdAt.toISOString(),

@@ -16,7 +16,7 @@ export async function getProductsForStock(includeInactive = false) {
 export async function getStockMovements() {
   return db.stockMovement.findMany({
     orderBy: { createdAt: "desc" },
-    include: { product: true, warehouse: true },
+    include: { product: true, warehouse: true, origCurrency: true },
     take: 100,
   });
 }

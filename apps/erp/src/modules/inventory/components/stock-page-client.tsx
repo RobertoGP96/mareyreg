@@ -52,6 +52,7 @@ import {
 } from "../actions/stock-actions";
 import { MOVEMENT_TYPES, getUnitAbbreviation } from "@/lib/constants";
 import { formatEquivalence } from "../lib/units";
+import { formatAmount } from "@/lib/format";
 
 interface PresentationItem {
   presentationId: number;
@@ -84,6 +85,9 @@ interface MovementItem {
   pieces: number | null;
   movementType: string;
   unitCost: number | null;
+  origUnitCost: number | null;
+  exchangeRate: number | null;
+  origCurrency: { code: string; decimalPlaces: number } | null;
   referenceDoc: string | null;
   notes: string | null;
   createdAt: string;
@@ -127,6 +131,19 @@ const MOVEMENT_BG: Record<string, string> = {
 
 function getMovementLabel(type: string) {
   return MOVEMENT_TYPES.find((m) => m.value === type)?.label ?? type;
+}
+
+/**
+ * Referencia compacta de moneda original de un movimiento, ej.
+ * "190 CUP · 0.30 USD @ 635". null si el movimiento no tiene costo o ya
+ * estaba en moneda base (origCurrency null).
+ */
+function formatOrigCostReference(m: MovementItem): string | null {
+  if (m.unitCost == null || m.origCurrency == null || m.origUnitCost == null) return null;
+  const cupPart = `${formatAmount(m.unitCost, 0)} CUP`;
+  const origPart = `${formatAmount(m.origUnitCost, m.origCurrency.decimalPlaces)} ${m.origCurrency.code}`;
+  const ratePart = m.exchangeRate != null ? ` @ ${formatAmount(m.exchangeRate, 0)}` : "";
+  return `${cupPart} · ${origPart}${ratePart}`;
 }
 
 export function StockPageClient({
@@ -516,8 +533,8 @@ export function StockPageClient({
                         </span>
                       </span>
                       {m.unitCost != null && m.unitCost > 0 && (
-                        <span>
-                          Costo: ${m.unitCost.toFixed(2)}/{abbr}
+                        <span className="font-mono tabular-nums">
+                          Costo: {formatOrigCostReference(m) ?? `${formatAmount(m.unitCost, 2)} CUP`}/{abbr}
                         </span>
                       )}
                       {m.referenceDoc && (

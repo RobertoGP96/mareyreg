@@ -33,6 +33,7 @@ import {
   Inbox,
   KeyRound,
   BadgePercent,
+  Percent,
   type LucideIcon,
 } from "lucide-react";
 
@@ -92,6 +93,7 @@ export const modules: AppModule[] = [
       { name: "Almacenes", href: "/warehouses", icon: Warehouse },
       { name: "Stock", href: "/stock", icon: PackageOpen },
       { name: "Descuentos", href: "/discounts", icon: Tags },
+      { name: "Márgenes", href: "/margins", icon: Percent },
     ],
   },
   {

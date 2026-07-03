@@ -22,6 +22,7 @@ import {
   PackagePlus,
   Plus,
   PackageSearch,
+  Percent,
 } from "lucide-react";
 import { MOVEMENT_TYPES, getUnitAbbreviation } from "@/lib/constants";
 import type { InventoryDashboardData } from "../queries/inventory-dashboard-queries";
@@ -64,6 +65,9 @@ export function InventoryDashboardClient({ data }: Props) {
         badge="Últimos 30 días"
         actions={
           <>
+            <Button variant="outline" onClick={() => router.push("/margins")}>
+              <Percent className="h-4 w-4" /> Márgenes
+            </Button>
             <Button variant="outline" onClick={() => router.push("/stock")}>
               <PackageSearch className="h-4 w-4" /> Ver stock
             </Button>
