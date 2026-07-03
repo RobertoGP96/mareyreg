@@ -1,4 +1,4 @@
-export const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME ?? "EL ALMACÉN";
+export const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME ?? "SHOP";
 
 // Defaults en CUP (moneda base del ERP): envío gratis desde 63500 (~$100 USD
 // a 635 CUP/USD) y costo de envío a domicilio 3200 (~$5 USD). Configurables
