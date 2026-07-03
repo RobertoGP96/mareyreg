@@ -18,6 +18,13 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "tienda", "start"],
       "port": 3001
+    },
+    {
+      "name": "tienda-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "tienda", "exec", "next", "dev", "--turbopack"],
+      "port": 3001,
+      "autoPort": true
     }
   ]
 }

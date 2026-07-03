@@ -1,17 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
-import {
-  Heart,
-  Search,
-  ShoppingCart,
-  Store,
-  UserRound,
-} from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Heart, ShoppingCart, Store, UserRound } from "lucide-react";
 import { STORE_NAME } from "@/lib/config";
 import { cartCount, useStore } from "@/lib/store";
+import { NavSearch } from "@/components/nav-search";
 
 const LINKS = [
   { href: "/", label: "Inicio", isActive: (p: string) => p === "/" },
@@ -29,16 +23,8 @@ const LINKS = [
 
 export function TopNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const { state } = useStore();
-  const [query, setQuery] = useState("");
   const count = cartCount(state);
-
-  const submitSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const term = query.trim();
-    router.push(term ? `/catalogo?q=${encodeURIComponent(term)}` : "/catalogo");
-  };
 
   return (
     <header className="grad-header sticky top-0 z-40 hidden text-white shadow-[0_4px_18px_rgba(10,31,63,.25)] md:block">
@@ -72,19 +58,7 @@ export function TopNav() {
           })}
         </nav>
 
-        <form
-          onSubmit={submitSearch}
-          className="ml-auto flex max-w-xs flex-1 items-center gap-2.5 rounded-[13px] border border-white/15 bg-white/10 px-3.5 py-2 transition-colors focus-within:border-white/35 focus-within:bg-white/15"
-        >
-          <Search className="h-4 w-4 flex-none text-white/60" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar productos…"
-            aria-label="Buscar productos"
-            className="w-full border-none bg-transparent text-[13px] text-white placeholder:text-white/60"
-          />
-        </form>
+        <NavSearch />
 
         <div className="flex items-center gap-2">
           <Link
