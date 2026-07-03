@@ -42,7 +42,7 @@ export function HomeClient({
   const highlighted =
     featured.length > 0 ? featured.slice(0, 10) : products.slice(0, 8);
   const newest = [...products]
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
     .slice(0, 8);
 
   return (

@@ -170,10 +170,20 @@ async function erpFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function getCatalog(): Promise<CatalogResponse> {
-  return erpFetch<CatalogResponse>("/api/webstore/products", {
+  const raw = await erpFetch<CatalogResponse>("/api/webstore/products", {
     // El catálogo cambia con precios/stock; no cachear en el server de la tienda.
     cache: "no-store",
   });
+  // Tolerancia al desfase de deploy tienda/ERP (2 proyectos Vercel, nunca
+  // atómico): un ERP viejo puede mandar productos sin sku (rompe keys de
+  // React y el carrito) o sin createdAt (rompía el sort de "Recién añadidos"
+  // con TypeError en producción). Se sanea aquí, en un solo lugar.
+  return {
+    ...raw,
+    products: (raw.products ?? [])
+      .filter((p) => typeof p.sku === "string" && p.sku.length > 0)
+      .map((p) => (p.createdAt == null ? { ...p, createdAt: "" } : p)),
+  };
 }
 
 /**
