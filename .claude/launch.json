@@ -12,6 +12,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "tienda", "dev"],
       "port": 3001
+    },
+    {
+      "name": "tienda-prod",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "tienda", "start"],
+      "port": 3001
     }
   ]
 }

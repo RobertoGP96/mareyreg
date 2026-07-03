@@ -42,11 +42,16 @@ export function ProductCarousel({
     if (!el) return;
     updateArrows();
     el.addEventListener("scroll", updateArrows, { passive: true });
-    const observer = new ResizeObserver(updateArrows);
-    observer.observe(el);
+    // ResizeObserver no existe en WebViews viejos; las flechas igual se
+    // recalculan en cada scroll, así que degradar sin observer es aceptable.
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(updateArrows)
+        : null;
+    observer?.observe(el);
     return () => {
       el.removeEventListener("scroll", updateArrows);
-      observer.disconnect();
+      observer?.disconnect();
     };
   }, [updateArrows, products.length]);
 

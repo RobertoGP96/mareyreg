@@ -22,12 +22,13 @@ export function fmt(n: number, currency: WebstoreCurrency = DEFAULT_CURRENCY): s
   return `${amount} ${currency.code}`;
 }
 
+// Rango de combinantes diacríticos vía constructor: un literal /\p{Diacritic}/u
+// es SyntaxError al parsear el bundle en WebViews/Safari viejos y tumba toda la app.
+const DIACRITICS = new RegExp("[\\u0300-\\u036f]", "g");
+
 /** Normaliza para búsqueda: minúsculas y sin acentos ("azucar" encuentra "Azúcar"). */
 export function normalizeText(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "");
+  return value.toLowerCase().normalize("NFD").replace(DIACRITICS, "");
 }
 
 export function discountPct(product: WebstoreProduct): number {
