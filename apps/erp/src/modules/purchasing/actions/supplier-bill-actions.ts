@@ -6,6 +6,7 @@ import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { assertRole, ForbiddenError } from "@/lib/auth-guard";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
+import { getBaseCurrency, getRateToBase, GlobalRateNotConfiguredError } from "@/lib/currency";
 import type { Prisma } from "@/generated/prisma";
 
 const AUTH_ERROR_MESSAGE = "Debes iniciar sesion para realizar esta accion";
@@ -20,6 +21,7 @@ const BUSINESS_ERRORS = new Set([
   "Ya existe una factura para esta OC",
   "Factura no encontrada",
   "El monto debe ser mayor a 0",
+  "El monto entregado debe ser mayor a 0",
   "El pago excede el saldo pendiente de la factura",
   "No se puede cancelar una factura con pagos registrados",
   "La factura ya esta cancelada",
@@ -28,6 +30,7 @@ const BUSINESS_ERRORS = new Set([
 
 function toUserMessage(error: unknown, fallback: string): string {
   if (error instanceof ForbiddenError) return error.message;
+  if (error instanceof GlobalRateNotConfiguredError) return error.message;
   if (error instanceof Error && BUSINESS_ERRORS.has(error.message)) return error.message;
   return fallback;
 }
@@ -44,6 +47,7 @@ export interface CreateSupplierBillInput {
   dueDate?: string; // ISO
   total: number;
   notes?: string;
+  currencyId?: number; // omitido o = moneda base -> factura en CUP, sin snapshot
 }
 
 /**
@@ -63,6 +67,7 @@ export async function createSupplierBill(
 
     const bill = await db.$transaction(async (tx) => {
       let supplierId = data.supplierId;
+      let currencyId = data.currencyId;
 
       if (data.purchaseOrderId) {
         const po = await tx.purchaseOrder.findUnique({
@@ -72,9 +77,22 @@ export async function createSupplierBill(
         if (!po) throw new Error("La OC no existe");
         if (po.bills.length > 0) throw new Error("Ya existe una factura para esta OC");
         supplierId = po.supplierId;
+        // Si no se especifica moneda explicitamente, la factura hereda la de la OC.
+        if (currencyId == null) currencyId = po.currencyId ?? undefined;
       }
 
       const folio = await nextFolio(tx, DOC_TYPES.SUPPLIER_BILL);
+
+      // Snapshot de tasa al crear la factura. null moneda = base (CUP), sin snapshot.
+      const base = await getBaseCurrency(tx);
+      const isBaseCurrency = !currencyId || currencyId === base.currencyId;
+      let exchangeRate: number | null = null;
+      let totalBase: number | null = null;
+      if (!isBaseCurrency) {
+        const snapshot = await getRateToBase(tx, currencyId!);
+        exchangeRate = snapshot.rate;
+        totalBase = data.total * snapshot.rate;
+      }
 
       const created = await tx.supplierBill.create({
         data: {
@@ -86,6 +104,9 @@ export async function createSupplierBill(
           total: data.total,
           paid: 0,
           status: "open",
+          currencyId: isBaseCurrency ? null : currencyId,
+          exchangeRate,
+          totalBase,
           notes: data.notes || null,
           createdBy: userId,
         },
@@ -131,6 +152,8 @@ export interface RegisterSupplierPaymentInput {
   method: string;
   paymentDate: string; // ISO
   notes?: string;
+  currencyId?: number; // moneda ENTREGADA por el pagador; omitida = moneda de la factura
+  amountTendered?: number; // monto en currencyId; requerido si currencyId difiere de la factura
 }
 
 /**
@@ -138,6 +161,12 @@ export interface RegisterSupplierPaymentInput {
  * atomica que no exceda el saldo pendiente. Usa optimistic locking por
  * `version` (Neon serverless no soporta SELECT FOR UPDATE confiable) con
  * reintento corto ante conflicto de concurrencia.
+ *
+ * Si la moneda entregada difiere de la moneda de la factura, la conversion
+ * pasa SIEMPRE por la moneda base (nunca tasa cruzada directa): se convierte
+ * el monto entregado a base con su propia tasa, y ese equivalente se vuelve a
+ * convertir a la moneda de la factura con la tasa de esta ultima. `amount`
+ * (el campo que alimenta `paid`) siempre queda en la moneda de la factura.
  */
 export async function registerSupplierPayment(
   data: RegisterSupplierPaymentInput
@@ -162,9 +191,42 @@ export async function registerSupplierPayment(
           if (!bill) throw new Error("Factura no encontrada");
           if (bill.status === "cancelled") throw new Error("La factura ya esta cancelada");
 
+          const billCurrencyId = bill.currencyId;
+          const base = await getBaseCurrency(tx);
+          const billCurrencyIdOrBase = billCurrencyId ?? base.currencyId;
+          const tenderedDiffersFromBill =
+            data.currencyId != null && data.currencyId !== billCurrencyIdOrBase;
+
+          let amount = data.amount;
+          let paymentCurrencyId: number | null = null;
+          let amountTendered: number | null = null;
+          let paymentExchangeRate: number | null = null;
+
+          if (tenderedDiffersFromBill) {
+            if (data.amountTendered == null || data.amountTendered <= 0) {
+              throw new Error("El monto entregado debe ser mayor a 0");
+            }
+            const tenderedSnapshot = await getRateToBase(tx, data.currencyId!);
+            const billSnapshot = await getRateToBase(tx, billCurrencyIdOrBase);
+
+            const amountBase = data.amountTendered * tenderedSnapshot.rate;
+            amount = amountBase / billSnapshot.rate;
+            paymentCurrencyId = data.currencyId!;
+            amountTendered = data.amountTendered;
+            paymentExchangeRate = tenderedSnapshot.rate;
+          } else if (data.currencyId != null) {
+            // Moneda entregada === moneda de la factura: amount = amountTendered,
+            // exchangeRate se guarda solo como referencia (tasa a base).
+            const snapshot = await getRateToBase(tx, data.currencyId);
+            amount = data.amountTendered ?? data.amount;
+            paymentCurrencyId = data.currencyId;
+            amountTendered = data.amountTendered ?? data.amount;
+            paymentExchangeRate = snapshot.rate;
+          }
+
           const total = Number(bill.total);
           const currentPaid = Number(bill.paid);
-          const newPaid = currentPaid + data.amount;
+          const newPaid = currentPaid + amount;
 
           if (newPaid > total) {
             throw new Error("El pago excede el saldo pendiente de la factura");
@@ -189,11 +251,14 @@ export async function registerSupplierPayment(
           const payment = await tx.supplierPayment.create({
             data: {
               billId: data.billId,
-              amount: data.amount,
+              amount,
               method: data.method,
               paymentDate: new Date(data.paymentDate),
               notes: data.notes || null,
               createdBy: userId,
+              currencyId: paymentCurrencyId,
+              amountTendered,
+              exchangeRate: paymentExchangeRate,
             },
           });
 
@@ -205,10 +270,12 @@ export async function registerSupplierPayment(
             userId,
             newValues: {
               billId: data.billId,
-              amount: data.amount,
+              amount,
               method: data.method,
               paymentDate: data.paymentDate,
               resultingStatus: newStatus,
+              currencyId: paymentCurrencyId,
+              amountTendered,
             },
           });
 

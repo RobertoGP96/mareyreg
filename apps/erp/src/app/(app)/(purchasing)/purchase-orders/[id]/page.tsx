@@ -34,6 +34,12 @@ export default async function PurchaseOrderDetailPage({
             <span>Proveedor: {po.supplier.name}</span>
             <span>Almacen: {po.warehouse.name}</span>
             <span>Fecha: {new Date(po.orderDate).toLocaleDateString("es-ES")}</span>
+            {po.currency && (
+              <span>
+                Moneda: {po.currency.code}
+                {po.exchangeRate && ` (tasa ${Number(po.exchangeRate).toFixed(2)})`}
+              </span>
+            )}
           </div>
         </div>
         {(po.status === "sent" || po.status === "partial") && (
@@ -57,8 +63,8 @@ export default async function PurchaseOrderDetailPage({
               <div key={l.lineId} className="flex flex-wrap items-center justify-between gap-2 border rounded px-3 py-2">
                 <div>
                   <p className="font-medium">{l.product.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {String(l.quantity)} {unitLabel} x ${String(l.unitCost)} = ${(Number(l.quantity) * Number(l.unitCost)).toFixed(2)}
+                  <p className="text-sm text-muted-foreground font-mono tabular-nums">
+                    {String(l.quantity)} {unitLabel} x {String(l.unitCost)} {po.currency?.code ?? "CUP"} = {(Number(l.quantity) * Number(l.unitCost)).toFixed(2)} {po.currency?.code ?? "CUP"}
                     {Number(l.unitFactor) !== 1 && (
                       <span> ({(Number(l.quantity) * Number(l.unitFactor)).toString()} {l.product.unit})</span>
                     )}
@@ -72,8 +78,15 @@ export default async function PurchaseOrderDetailPage({
               </div>
             );
           })}
-          <div className="flex justify-end text-sm mt-2">
-            <span>Total: <span className="font-semibold text-base">${String(po.total)}</span></span>
+          <div className="flex flex-col items-end gap-0.5 text-sm mt-2">
+            <span className="font-mono tabular-nums">
+              Total: <span className="font-semibold text-base">{String(po.total)} {po.currency?.code ?? "CUP"}</span>
+            </span>
+            {po.totalBase != null && po.currency && (
+              <span className="text-xs text-muted-foreground font-mono tabular-nums">
+                ≈ {String(po.totalBase)} CUP
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -92,6 +105,7 @@ export default async function PurchaseOrderDetailPage({
                 <p className="font-medium">{r.folio}</p>
                 <span className="text-sm text-muted-foreground">
                   {new Date(r.receivedAt).toLocaleString("es-ES")}
+                  {r.currency && ` · ${r.currency.code} (tasa ${Number(r.exchangeRate).toFixed(2)})`}
                 </span>
               </div>
               <div className="mt-1 text-sm text-muted-foreground">

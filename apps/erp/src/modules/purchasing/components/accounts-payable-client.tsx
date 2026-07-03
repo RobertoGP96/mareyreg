@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
-import { ToastDetail, ToastLines, ToastNote } from "@/components/ui/toast-content";
+import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -50,7 +50,6 @@ import {
   CalendarDays,
   Building2,
   Hash,
-  CreditCard,
   FileStack,
   ListFilter,
   Loader2,
@@ -58,8 +57,9 @@ import {
   HandCoins,
   FileSpreadsheet,
 } from "lucide-react";
-import { createSupplierBill, registerSupplierPayment, cancelSupplierBill } from "../actions/supplier-bill-actions";
+import { createSupplierBill, cancelSupplierBill } from "../actions/supplier-bill-actions";
 import type { SupplierBillListItem } from "../queries/supplier-bill-queries";
+import { SupplierPaymentDialog } from "./supplier-payment-dialog";
 
 interface SupplierOption {
   supplierId: number;
@@ -84,11 +84,20 @@ interface Summary {
   overdueCount: number;
 }
 
+interface CurrencyOption {
+  currencyId: number;
+  code: string;
+  rateToBase: number | null;
+}
+
 interface Props {
   bills: SupplierBillListItem[];
   suppliers: SupplierOption[];
   receivablePOs: ReceivedPoOption[];
   summary: Summary;
+  currencies: CurrencyOption[];
+  baseCurrencyId: number;
+  baseCurrencyCode: string;
 }
 
 const ALL = "__all__";
@@ -112,7 +121,15 @@ function statusToPill(status: SupplierBillListItem["status"], isOverdue: boolean
   return <StatusPill status="pending" label="Abierta" />;
 }
 
-export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary }: Props) {
+export function AccountsPayableClient({
+  bills,
+  suppliers,
+  receivablePOs,
+  summary,
+  currencies,
+  baseCurrencyId,
+  baseCurrencyCode,
+}: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(ALL);
@@ -122,6 +139,10 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
   const [payTarget, setPayTarget] = useState<SupplierBillListItem | null>(null);
   const [cancelTarget, setCancelTarget] = useState<SupplierBillListItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [billCurrencyId, setBillCurrencyId] = useState<string>(String(baseCurrencyId));
+
+  const billCurrency = currencies.find((c) => c.currencyId === Number(billCurrencyId));
+  const isBillCurrencyBase = Number(billCurrencyId) === baseCurrencyId;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -153,6 +174,7 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
       dueDate: (fd.get("dueDate") as string) || undefined,
       total,
       notes: (fd.get("notes") as string) || undefined,
+      currencyId: billCurrencyId ? Number(billCurrencyId) : undefined,
     });
     setIsSubmitting(false);
     if (result.success) {
@@ -160,7 +182,7 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
       toast.success(`Factura ${result.data.folio} creada`, {
         description: (
           <ToastLines>
-            <ToastDetail label="Total" value={`$${money(total)}`} mono />
+            <ToastDetail label="Total" value={`${money(total)} ${billCurrency?.code ?? baseCurrencyCode}`} mono />
           </ToastLines>
         ),
       });
@@ -201,35 +223,7 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
     } else toast.error(result.error);
   };
 
-  const handlePay = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!payTarget) return;
-    setIsSubmitting(true);
-    const fd = new FormData(e.currentTarget);
-    const amount = Number(fd.get("amount"));
-    const method = fd.get("method") as string;
-    const result = await registerSupplierPayment({
-      billId: payTarget.billId,
-      amount,
-      method,
-      paymentDate: fd.get("paymentDate") as string,
-      notes: (fd.get("notes") as string) || undefined,
-    });
-    setIsSubmitting(false);
-    if (result.success) {
-      setPayTarget(null);
-      const methodLabel = PAYMENT_METHODS.find((m) => m.value === method)?.label ?? method;
-      toast.success("Pago registrado", {
-        description: (
-          <ToastLines>
-            <ToastDetail label={`Factura ${payTarget.folio}`} value={`$${money(amount)}`} mono />
-            <ToastNote>{methodLabel}</ToastNote>
-          </ToastLines>
-        ),
-      });
-      router.refresh();
-    } else toast.error(result.error);
-  };
+  const openPayDialog = (b: SupplierBillListItem) => setPayTarget(b);
 
   const handleCancel = async () => {
     if (!cancelTarget) return;
@@ -283,7 +277,11 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
       key: "total",
       header: "Total",
       align: "right",
-      cell: (b) => <span className="font-mono tabular-nums text-sm">${money(b.total)}</span>,
+      cell: (b) => (
+        <span className="font-mono tabular-nums text-sm">
+          {money(b.total)} {b.currencyCode ?? baseCurrencyCode}
+        </span>
+      ),
     },
     {
       key: "balance",
@@ -291,7 +289,7 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
       align: "right",
       cell: (b) => (
         <span className="font-mono tabular-nums font-semibold text-[var(--ops-warning)]">
-          ${money(b.balance)}
+          {money(b.balance)} {b.currencyCode ?? baseCurrencyCode}
         </span>
       ),
     },
@@ -314,7 +312,7 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
               className="size-8 text-muted-foreground hover:text-[var(--ops-success)]"
               onClick={(ev) => {
                 ev.stopPropagation();
-                setPayTarget(b);
+                openPayDialog(b);
               }}
               aria-label="Registrar pago"
             >
@@ -384,7 +382,7 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
             }
             value={
               <span className="font-mono tabular-nums font-semibold text-[var(--ops-warning)]">
-                ${money(b.balance)}
+                {money(b.balance)} {b.currencyCode ?? baseCurrencyCode}
               </span>
             }
             actions={
@@ -394,7 +392,7 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
                     variant="ghost"
                     size="icon"
                     className="size-9 text-muted-foreground hover:text-[var(--ops-success)]"
-                    onClick={() => setPayTarget(b)}
+                    onClick={() => openPayDialog(b)}
                     aria-label="Registrar pago"
                   >
                     <HandCoins className="h-4 w-4" />
@@ -417,7 +415,7 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
               <>
                 {statusToPill(b.status, b.isOverdue)}
                 <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
-                  Total ${money(b.total)}
+                  Total {money(b.total)} {b.currencyCode ?? baseCurrencyCode}
                 </span>
                 {b.dueDate && (
                   <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
@@ -589,9 +587,30 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
               <Input name="dueDate" type="date" />
             </Field>
           </div>
-          <Field label="Total" icon={Hash} required>
-            <Input name="total" type="number" step="0.01" min="0.01" required placeholder="0.00" />
-          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Field label="Total" icon={Hash} required>
+              <Input name="total" type="number" step="0.01" min="0.01" required placeholder="0.00" />
+            </Field>
+            <Field label="Moneda">
+              <Select value={billCurrencyId} onValueChange={setBillCurrencyId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Moneda" />
+                </SelectTrigger>
+                <SelectContent>
+                  {currencies.map((c) => (
+                    <SelectItem key={c.currencyId} value={String(c.currencyId)}>
+                      {c.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          {!isBillCurrencyBase && billCurrency?.rateToBase == null && (
+            <p className="text-xs text-destructive">
+              No hay tasa de cambio configurada para {billCurrency?.code}.
+            </p>
+          )}
           <Field label="Notas">
             <Textarea name="notes" placeholder="Observaciones de la factura…" />
           </Field>
@@ -668,71 +687,13 @@ export function AccountsPayableClient({ bills, suppliers, receivablePOs, summary
         </form>
       </ResponsiveFormDialog>
 
-      {/* Registrar pago */}
-      <ResponsiveFormDialog
-        open={!!payTarget}
-        onOpenChange={(open) => !open && setPayTarget(null)}
-        a11yTitle="Registrar pago"
-        description="Registra un pago a proveedor contra esta factura."
-        desktopMaxWidth="sm:max-w-lg"
-      >
-        {payTarget && (
-          <>
-            <FormDialogHeader
-              icon={HandCoins}
-              title={`Pago · ${payTarget.folio}`}
-              description={`${payTarget.supplierName} — saldo pendiente $${money(payTarget.balance)}`}
-            />
-            <form onSubmit={handlePay} className="space-y-5 mt-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Monto" icon={Hash} required>
-                  <Input
-                    name="amount"
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    max={payTarget.balance}
-                    required
-                    defaultValue={payTarget.balance.toFixed(2)}
-                  />
-                </Field>
-                <Field label="Fecha de pago" icon={CalendarDays} required>
-                  <Input
-                    name="paymentDate"
-                    type="date"
-                    required
-                    defaultValue={new Date().toISOString().split("T")[0]}
-                  />
-                </Field>
-              </div>
-              <Field label="Metodo de pago" icon={CreditCard} required>
-                <Select name="method" defaultValue="transfer">
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleccionar..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_METHODS.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Notas">
-                <Textarea name="notes" placeholder="Referencia, numero de transferencia…" />
-              </Field>
-              <div className="flex justify-end gap-2 pt-4 border-t border-border">
-                <Button type="button" variant="outline" onClick={() => setPayTarget(null)}>
-                  Cancelar
-                </Button>
-                <Button type="submit" variant="brand" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {isSubmitting ? "Registrando…" : "Registrar pago"}
-                </Button>
-              </div>
-            </form>
-          </>
-        )}
-      </ResponsiveFormDialog>
+      <SupplierPaymentDialog
+        payTarget={payTarget}
+        onClose={() => setPayTarget(null)}
+        currencies={currencies}
+        baseCurrencyId={baseCurrencyId}
+        baseCurrencyCode={baseCurrencyCode}
+      />
 
       <AlertDialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
         <AlertDialogContent>

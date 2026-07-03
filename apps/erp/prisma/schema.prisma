@@ -37,6 +37,7 @@ model User {
   cashDeliveriesCreated    CashDelivery[] @relation("CashDeliveryCreatedBy")
   cashDeliveriesConfirmed  CashDelivery[] @relation("CashDeliveryConfirmedBy")
   webstoreApiKeys          WebstoreApiKey[]
+  webstoreOffers           WebstoreOffer[]
   productPriceChanges      ProductPriceHistory[]
   presentationPriceChanges PresentationPriceHistory[]
   discountHistory          DiscountHistory[]
@@ -508,6 +509,7 @@ model Product {
   priceHistory       ProductPriceHistory[]
   discountHistory    DiscountHistory[]
   presentations      ProductPresentation[]
+  cost               ProductCost?
 
   @@index([category])
   @@index([isActive])
@@ -586,17 +588,23 @@ model StockMovement {
   warehouseId     Int          @map("warehouse_id")
   quantity        Decimal
   movementType    MovementType @map("movement_type")
+  // unitCost SIEMPRE en CUP (moneda base). Si el movimiento se originó en otra
+  // moneda, origCurrencyId/origUnitCost/exchangeRate guardan el snapshot original.
   unitCost        Decimal?     @map("unit_cost")
+  origCurrencyId  Int?         @map("orig_currency_id")
+  origUnitCost    Decimal?     @map("orig_unit_cost") @db.Decimal(20, 8)
+  exchangeRate    Decimal?     @map("exchange_rate") @db.Decimal(20, 8)
   referenceTripId Int?         @map("reference_trip_id")
   referenceDoc    String?      @map("reference_doc")
   notes           String?
   createdAt       DateTime     @default(now()) @map("created_at")
   createdBy       Int?         @map("created_by")
 
-  product   Product   @relation(fields: [productId], references: [productId])
-  warehouse Warehouse @relation(fields: [warehouseId], references: [warehouseId])
-  trip      Trip?     @relation(fields: [referenceTripId], references: [tripId])
-  user      User?     @relation(fields: [createdBy], references: [userId])
+  product      Product   @relation(fields: [productId], references: [productId])
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [warehouseId])
+  trip         Trip?     @relation(fields: [referenceTripId], references: [tripId])
+  user         User?     @relation(fields: [createdBy], references: [userId])
+  origCurrency Currency? @relation("StockMovementOrigCurrency", fields: [origCurrencyId], references: [currencyId], onDelete: Restrict)
 
   @@index([productId])
   @@index([warehouseId])
@@ -638,17 +646,40 @@ model InventoryLayer {
   warehouseId  Int      @map("warehouse_id")
   lotId        Int?     @map("lot_id")
   enteredAt    DateTime @default(now()) @map("entered_at")
+  // unitCost SIEMPRE en CUP (moneda base). Snapshot original en origCurrencyId/origUnitCost/exchangeRate.
   unitCost     Decimal  @map("unit_cost")
+  origCurrencyId Int?     @map("orig_currency_id")
+  origUnitCost   Decimal? @map("orig_unit_cost") @db.Decimal(20, 8)
+  exchangeRate   Decimal? @map("exchange_rate") @db.Decimal(20, 8)
   quantityOpen Decimal  @map("quantity_open")
   sourceType   String?  @map("source_type")
   sourceId     Int?     @map("source_id")
 
-  product   Product   @relation(fields: [productId], references: [productId])
-  warehouse Warehouse @relation(fields: [warehouseId], references: [warehouseId])
-  lot       Lot?      @relation(fields: [lotId], references: [lotId])
+  product      Product   @relation(fields: [productId], references: [productId])
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [warehouseId])
+  lot          Lot?      @relation(fields: [lotId], references: [lotId])
+  origCurrency Currency? @relation("InventoryLayerOrigCurrency", fields: [origCurrencyId], references: [currencyId], onDelete: Restrict)
 
   @@index([productId, warehouseId, enteredAt])
   @@map("inventory_layers")
+}
+
+// Último costo de compra por unidad base (costo de reposición), alimentado
+// automáticamente al recibir mercancía. El costo contable vive en la valuación.
+model ProductCost {
+  productId        Int       @id @map("product_id")
+  currencyId       Int       @map("currency_id")
+  lastUnitCost     Decimal?  @map("last_unit_cost") @db.Decimal(20, 8)
+  lastUnitCostBase Decimal?  @map("last_unit_cost_base") @db.Decimal(20, 8)
+  lastExchangeRate Decimal?  @map("last_exchange_rate") @db.Decimal(20, 8)
+  lastReceiptId    Int?      @map("last_receipt_id")
+  lastReceivedAt   DateTime? @map("last_received_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  product  Product  @relation(fields: [productId], references: [productId], onDelete: Restrict)
+  currency Currency @relation("ProductCostCurrency", fields: [currencyId], references: [currencyId], onDelete: Restrict)
+
+  @@map("product_costs")
 }
 
 // =============================================
@@ -683,22 +714,34 @@ enum CustomerType {
   wholesale
 }
 
+// Origen del cliente: internal = creado desde el ERP; webstore = registrado o
+// creado por pedidos de la tienda en línea (matching por teléfono normalizado).
+enum CustomerSource {
+  internal
+  webstore
+}
+
 model Customer {
-  customerId     Int          @id @default(autoincrement()) @map("customer_id")
-  name           String
-  taxId          String?      @map("tax_id")
-  email          String?
-  phone          String?
-  address        String?
-  customerType   CustomerType @default(retail) @map("customer_type")
-  creditLimit    Decimal?     @map("credit_limit")
-  currentBalance Decimal      @default(0) @map("current_balance")
-  paymentTerms   Int?         @map("payment_terms")
-  priceListId    Int?         @map("price_list_id")
-  isActive       Boolean      @default(true) @map("is_active")
-  notes          String?
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at")
+  customerId      Int            @id @default(autoincrement()) @map("customer_id")
+  name            String
+  taxId           String?        @map("tax_id")
+  email           String?
+  phone           String?
+  address         String?
+  customerType    CustomerType   @default(retail) @map("customer_type")
+  creditLimit     Decimal?       @map("credit_limit")
+  currentBalance  Decimal        @default(0) @map("current_balance")
+  paymentTerms    Int?           @map("payment_terms")
+  priceListId     Int?           @map("price_list_id")
+  source          CustomerSource @default(internal)
+  // Solo dígitos del phone; clave de matching para clientes webstore (índice único
+  // parcial en webstore-customers.sql). Se recalcula en cada escritura de phone.
+  normalizedPhone String?        @map("normalized_phone")
+  version         Int            @default(0)
+  isActive        Boolean        @default(true) @map("is_active")
+  notes           String?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @default(now()) @updatedAt @map("updated_at")
 
   priceList   PriceList?   @relation(fields: [priceListId], references: [priceListId])
   quotes      Quote[]
@@ -708,6 +751,7 @@ model Customer {
 
   @@index([isActive])
   @@index([customerType])
+  @@index([source])
   @@map("customers")
 }
 
@@ -733,6 +777,12 @@ model PurchaseOrder {
   expectedDate DateTime?           @map("expected_date")
   subtotal     Decimal             @default(0)
   total        Decimal             @default(0)
+  // Moneda del documento. null = moneda base (CUP), igual que registros pre-existentes.
+  currencyId    Int?     @map("currency_id")
+  // CUP por 1 unidad de currencyId, snapshot al crear la OC. Inmutable.
+  exchangeRate  Decimal? @map("exchange_rate") @db.Decimal(20, 8)
+  subtotalBase  Decimal? @map("subtotal_base") @db.Decimal(20, 8)
+  totalBase     Decimal? @map("total_base") @db.Decimal(20, 8)
   notes        String?
   createdBy    Int?                @map("created_by")
   createdAt    DateTime            @default(now()) @map("created_at")
@@ -740,6 +790,7 @@ model PurchaseOrder {
 
   supplier  Supplier            @relation(fields: [supplierId], references: [supplierId])
   warehouse Warehouse           @relation(fields: [warehouseId], references: [warehouseId])
+  currency  Currency?           @relation("PurchaseOrderCurrency", fields: [currencyId], references: [currencyId], onDelete: Restrict)
   lines     PurchaseOrderLine[]
   receipts  GoodsReceipt[]
   bills     SupplierBill[]
@@ -776,9 +827,14 @@ model GoodsReceipt {
   receivedAt DateTime @default(now()) @map("received_at")
   notes      String?
   createdBy  Int?     @map("created_by")
+  // Moneda heredada de la OC. Snapshot de la tasa AL RECIBIR (puede diferir de
+  // la tasa capturada en la OC); es la tasa que valúa esta recepción.
+  currencyId   Int?     @map("currency_id")
+  exchangeRate Decimal? @map("exchange_rate") @db.Decimal(20, 8)
 
-  po    PurchaseOrder      @relation(fields: [poId], references: [poId])
-  lines GoodsReceiptLine[]
+  po       PurchaseOrder      @relation(fields: [poId], references: [poId])
+  currency Currency?          @relation("GoodsReceiptCurrency", fields: [currencyId], references: [currencyId], onDelete: Restrict)
+  lines    GoodsReceiptLine[]
 
   @@index([poId])
   @@map("goods_receipts")
@@ -790,7 +846,8 @@ model GoodsReceiptLine {
   poLineId  Int     @map("po_line_id")
   quantity  Decimal // Cantidad en la unidad recibida (presentación)
   lotId     Int?    @map("lot_id")
-  unitCost  Decimal @map("unit_cost") // Costo por unidad recibida (presentación)
+  unitCost  Decimal @map("unit_cost") // Costo por unidad recibida (presentación), en moneda del documento
+  unitCostBase Decimal? @map("unit_cost_base") @db.Decimal(20, 8) // unitCost × exchangeRate, en CUP, por unidad recibida
   presentationId Int?    @map("presentation_id")
   unitFactor     Decimal @default(1) @map("unit_factor")
   baseQuantity   Decimal @default(0) @map("base_quantity") // quantity × unitFactor, en unidad base
@@ -822,6 +879,11 @@ model SupplierBill {
   paid            Decimal            @default(0) @db.Decimal(20, 8)
   status          SupplierBillStatus @default(open)
   version         Int                @default(0)
+  // total/paid quedan en la moneda del documento (currencyId). totalBase es el
+  // equivalente en CUP al momento de crear la factura (snapshot, inmutable).
+  currencyId   Int?     @map("currency_id")
+  exchangeRate Decimal? @map("exchange_rate") @db.Decimal(20, 8)
+  totalBase    Decimal? @map("total_base") @db.Decimal(20, 8)
   notes           String?
   createdBy       Int?               @map("created_by")
   createdAt       DateTime           @default(now()) @map("created_at")
@@ -829,6 +891,7 @@ model SupplierBill {
 
   supplier      Supplier          @relation(fields: [supplierId], references: [supplierId], onDelete: Restrict)
   purchaseOrder PurchaseOrder?    @relation(fields: [purchaseOrderId], references: [poId], onDelete: Restrict)
+  currency      Currency?         @relation("SupplierBillCurrency", fields: [currencyId], references: [currencyId], onDelete: Restrict)
   payments      SupplierPayment[]
 
   @@index([supplierId])
@@ -840,14 +903,22 @@ model SupplierBill {
 model SupplierPayment {
   paymentId   Int      @id @default(autoincrement()) @map("payment_id")
   billId      Int      @map("bill_id")
+  // amount SIEMPRE en la moneda de la factura (bill.currencyId / paid).
   amount      Decimal  @db.Decimal(20, 8)
   method      String
   paymentDate DateTime @map("payment_date")
   notes       String?
   createdBy   Int?     @map("created_by")
   createdAt   DateTime @default(now()) @map("created_at")
+  // Moneda ENTREGADA por el pagador (puede diferir de la moneda de la factura).
+  // amountTendered es el monto en esa moneda; exchangeRate = CUP por 1 unidad
+  // de currencyId, snapshot al momento del pago.
+  currencyId     Int?     @map("currency_id")
+  amountTendered Decimal? @map("amount_tendered") @db.Decimal(20, 8)
+  exchangeRate   Decimal? @map("exchange_rate") @db.Decimal(20, 8)
 
-  bill SupplierBill @relation(fields: [billId], references: [billId], onDelete: Restrict)
+  bill     SupplierBill @relation(fields: [billId], references: [billId], onDelete: Restrict)
+  currency Currency?    @relation("SupplierPaymentCurrency", fields: [currencyId], references: [currencyId], onDelete: Restrict)
 
   @@index([billId])
   @@map("supplier_payments")
@@ -1180,17 +1251,20 @@ model Discount {
   productId  Int?         @map("product_id")
   category   String?
   customerId Int?         @map("customer_id")
+  offerId    Int?         @map("offer_id")
   isActive   Boolean      @default(true) @map("is_active")
   createdAt  DateTime     @default(now()) @map("created_at")
   version    Int           @default(0)
 
-  product  Product?  @relation(fields: [productId], references: [productId])
-  customer Customer? @relation(fields: [customerId], references: [customerId])
+  product  Product?       @relation(fields: [productId], references: [productId])
+  customer Customer?      @relation(fields: [customerId], references: [customerId])
+  offer    WebstoreOffer? @relation(fields: [offerId], references: [offerId], onDelete: Restrict)
   history  DiscountHistory[]
 
   @@index([productId])
   @@index([category])
   @@index([isActive])
+  @@index([offerId])
   @@map("discounts")
 }
 
@@ -1397,6 +1471,13 @@ model Currency {
   globalRatesAsBase   ExchangeRate[]     @relation("GlobalRateBase")
   globalRatesAsQuote  ExchangeRate[]     @relation("GlobalRateQuote")
   companiesAsBase     Company[]
+  purchaseOrders      PurchaseOrder[]    @relation("PurchaseOrderCurrency")
+  goodsReceipts       GoodsReceipt[]     @relation("GoodsReceiptCurrency")
+  supplierBills       SupplierBill[]     @relation("SupplierBillCurrency")
+  supplierPayments    SupplierPayment[]  @relation("SupplierPaymentCurrency")
+  stockMovements      StockMovement[]    @relation("StockMovementOrigCurrency")
+  inventoryLayers     InventoryLayer[]   @relation("InventoryLayerOrigCurrency")
+  productCosts        ProductCost[]      @relation("ProductCostCurrency")
 
   @@map("currencies")
 }
@@ -1637,6 +1718,30 @@ model WebstoreApiKey {
 
   @@index([isActive])
   @@map("webstore_api_keys")
+}
+
+// Oferta de la tienda: agrupa varios productos bajo un mismo descuento y vigencia.
+// Al guardar se materializan filas Discount (una por producto, ligadas por offerId)
+// para que el pipeline de precios (effective-price.ts) y el POS funcionen sin cambios.
+model WebstoreOffer {
+  offerId     Int          @id @default(autoincrement()) @map("offer_id")
+  name        String
+  description String?
+  type        DiscountType // solo percent | fixed (validado por Zod + CHECK en webstore-offers.sql)
+  value       Decimal      @db.Decimal(20, 8)
+  startsAt    DateTime?    @map("starts_at")
+  endsAt      DateTime?    @map("ends_at")
+  isActive    Boolean      @default(true) @map("is_active")
+  version     Int          @default(0)
+  createdBy   Int?         @map("created_by")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at")
+
+  creator   User?      @relation(fields: [createdBy], references: [userId], onDelete: SetNull)
+  discounts Discount[]
+
+  @@index([isActive])
+  @@map("webstore_offers")
 }
 
 model WebstoreOrderLog {

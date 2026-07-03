@@ -33,6 +33,21 @@ const { revalidatePath, createAuditLog, requireCurrentUserId, applyInventoryEntr
       stockLevel: {
         upsert: vi.fn(),
       },
+      productCost: {
+        upsert: vi.fn(),
+      },
+      product: {
+        update: vi.fn(),
+      },
+      company: {
+        findUnique: vi.fn(),
+      },
+      exchangeRate: {
+        findUnique: vi.fn(),
+      },
+      currency: {
+        findUnique: vi.fn(),
+      },
       auditLog: {
         create: vi.fn(),
       },
@@ -64,6 +79,16 @@ vi.mock("@/lib/valuation", () => ({ applyInventoryEntry }));
 
 import { createGoodsReceipt } from "./goods-receipt-actions";
 
+const CUP_BASE = {
+  id: 1,
+  baseCurrencyId: 1,
+  baseCurrency: { currencyId: 1, code: "CUP", symbol: "$", decimalPlaces: 0 },
+};
+
+function decimalLike(value: number) {
+  return { toNumber: () => value };
+}
+
 function poLine(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     lineId: 1,
@@ -88,6 +113,7 @@ function purchaseOrder(overrides: Partial<Record<string, unknown>> = {}) {
     supplierId: 1,
     warehouseId: 1,
     status: "sent",
+    currencyId: null,
     lines: [poLine()],
     supplier: { supplierId: 1, name: "Proveedor SA" },
     ...overrides,
@@ -103,7 +129,7 @@ describe("createGoodsReceipt — conversion a unidad base con presentacion", () 
     applyInventoryEntry.mockResolvedValue(undefined);
 
     tx.purchaseOrder.findUnique.mockResolvedValue(purchaseOrder());
-    tx.goodsReceipt.create.mockResolvedValue({ receiptId: 1, folio: "REC-0001" });
+    tx.goodsReceipt.create.mockResolvedValue({ receiptId: 1, folio: "REC-0001", receivedAt: new Date("2026-01-01") });
     tx.purchaseOrderLine.updateMany.mockResolvedValue({ count: 1 });
     tx.purchaseOrderLine.findMany.mockResolvedValue([
       poLine({ receivedQty: 2 }),
@@ -112,6 +138,9 @@ describe("createGoodsReceipt — conversion a unidad base con presentacion", () 
     tx.stockMovement.create.mockResolvedValue({ movementId: 1 });
     tx.stockLevel.upsert.mockResolvedValue({});
     tx.purchaseOrder.update.mockResolvedValue({});
+    tx.productCost.upsert.mockResolvedValue({});
+    tx.product.update.mockResolvedValue({});
+    tx.company.findUnique.mockResolvedValue(CUP_BASE);
   });
 
   it("recibir 2 cajas de 24 a $240/caja crea entrada de 48 en base con unitCost 10", async () => {
@@ -314,5 +343,151 @@ describe("createGoodsReceipt — conversion a unidad base con presentacion", () 
         expect(result.error).toBe("La cantidad excede lo pendiente por recibir");
       }
     });
+  });
+});
+
+describe("createGoodsReceipt — costos duales USD/CUP (Fase 2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.$transaction.mockImplementation(async (cb: (tx: unknown) => unknown) => cb(tx));
+    requireCurrentUserId.mockResolvedValue(1);
+    nextFolio.mockResolvedValue("REC-0001");
+    applyInventoryEntry.mockResolvedValue(undefined);
+
+    tx.goodsReceipt.create.mockResolvedValue({ receiptId: 1, folio: "REC-0001", receivedAt: new Date("2026-01-01") });
+    tx.purchaseOrderLine.updateMany.mockResolvedValue({ count: 1 });
+    tx.purchaseOrderLine.findMany.mockResolvedValue([poLine({ receivedQty: 2 })]);
+    tx.goodsReceiptLine.create.mockResolvedValue({ lineId: 1 });
+    tx.stockMovement.create.mockResolvedValue({ movementId: 1 });
+    tx.stockLevel.upsert.mockResolvedValue({});
+    tx.purchaseOrder.update.mockResolvedValue({});
+    tx.productCost.upsert.mockResolvedValue({});
+    tx.product.update.mockResolvedValue({});
+    tx.company.findUnique.mockResolvedValue(CUP_BASE);
+  });
+
+  it("recepcion en moneda base (currencyId null) no setea el trio origCurrencyId/origUnitCost/exchangeRate", async () => {
+    tx.purchaseOrder.findUnique.mockResolvedValue(purchaseOrder({ currencyId: null }));
+
+    await createGoodsReceipt({
+      poId: 1,
+      lines: [{ poLineId: 1, quantity: 2, unitCost: 240 }],
+    });
+
+    expect(applyInventoryEntry).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        unitCost: 10,
+        origCurrencyId: undefined,
+        origUnitCost: undefined,
+        exchangeRate: undefined,
+      })
+    );
+    expect(tx.stockMovement.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          unitCost: 10,
+          origCurrencyId: null,
+          origUnitCost: null,
+          exchangeRate: null,
+        }),
+      })
+    );
+    expect(tx.goodsReceiptLine.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ unitCostBase: null }) })
+    );
+    expect(tx.exchangeRate.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("recepcion de OC en USD: crea capa/movimiento con unitCost en CUP y trio original correcto", async () => {
+    tx.purchaseOrder.findUnique.mockResolvedValue(purchaseOrder({ currencyId: 2 }));
+    tx.exchangeRate.findUnique.mockResolvedValueOnce({ exchangeRateId: 5, rate: decimalLike(380) });
+
+    await createGoodsReceipt({
+      poId: 1,
+      lines: [{ poLineId: 1, quantity: 2, unitCost: 240 }],
+    });
+
+    // unitCostPerBase = 240/24 = 10 USD; unitCostBasePerBaseUnit = 10*380 = 3800 CUP
+    expect(applyInventoryEntry).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        qty: 48,
+        unitCost: 3800,
+        origCurrencyId: 2,
+        origUnitCost: 10,
+        exchangeRate: 380,
+      })
+    );
+    expect(tx.stockMovement.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          unitCost: 3800,
+          origCurrencyId: 2,
+          origUnitCost: 10,
+          exchangeRate: 380,
+        }),
+      })
+    );
+    expect(tx.goodsReceiptLine.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ unitCost: 240, unitCostBase: 240 * 380 }),
+      })
+    );
+    expect(tx.goodsReceipt.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ currencyId: 2, exchangeRate: 380 }) })
+    );
+  });
+
+  it("upsert de ProductCost y espejo Product.costPrice tras recibir en USD", async () => {
+    tx.purchaseOrder.findUnique.mockResolvedValue(purchaseOrder({ currencyId: 2 }));
+    tx.exchangeRate.findUnique.mockResolvedValueOnce({ exchangeRateId: 5, rate: decimalLike(380) });
+
+    await createGoodsReceipt({
+      poId: 1,
+      lines: [{ poLineId: 1, quantity: 2, unitCost: 240 }],
+    });
+
+    expect(tx.productCost.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { productId: 1 },
+        create: expect.objectContaining({
+          productId: 1,
+          currencyId: 2,
+          lastUnitCost: 10,
+          lastUnitCostBase: 3800,
+          lastExchangeRate: 380,
+          lastReceiptId: 1,
+        }),
+        update: expect.objectContaining({
+          currencyId: 2,
+          lastUnitCost: 10,
+          lastUnitCostBase: 3800,
+          lastExchangeRate: 380,
+          lastReceiptId: 1,
+        }),
+      })
+    );
+    expect(tx.product.update).toHaveBeenCalledWith({
+      where: { productId: 1 },
+      data: { costPrice: 3800 },
+    });
+  });
+
+  it("sin tasa configurada: error claro en español y no crea la recepcion", async () => {
+    tx.purchaseOrder.findUnique.mockResolvedValue(purchaseOrder({ currencyId: 2 }));
+    tx.exchangeRate.findUnique.mockResolvedValue(null);
+    tx.currency.findUnique.mockResolvedValue({ currencyId: 2, code: "USD" });
+
+    const result = await createGoodsReceipt({
+      poId: 1,
+      lines: [{ poLineId: 1, quantity: 2, unitCost: 240 }],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("No hay una tasa de cambio configurada entre USD y CUP");
+    }
+    expect(tx.goodsReceiptLine.create).not.toHaveBeenCalled();
   });
 });

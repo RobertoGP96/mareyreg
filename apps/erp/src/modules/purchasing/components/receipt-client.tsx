@@ -29,9 +29,10 @@ interface Props {
   poId: number;
   folio: string;
   lines: POLine[];
+  pendingRate: { code: string; rate: number } | null;
 }
 
-export function ReceiptClient({ poId, folio, lines }: Props) {
+export function ReceiptClient({ poId, folio, lines, pendingRate }: Props) {
   const router = useRouter();
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,6 +94,17 @@ export function ReceiptClient({ poId, folio, lines }: Props) {
         <p className="text-muted-foreground mt-1">
           Indica las cantidades recibidas y los datos de lote si aplica
         </p>
+        {pendingRate && (
+          Number.isNaN(pendingRate.rate) ? (
+            <p className="text-sm text-destructive mt-2">
+              No hay tasa de cambio configurada para {pendingRate.code}. Configúrala en Divisas → Tasa de cambio.
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-2 font-mono tabular-nums">
+              Se valuará a la tasa vigente: 1 {pendingRate.code} = {pendingRate.rate.toFixed(2)} CUP
+            </p>
+          )
+        )}
       </div>
 
       <div className="bg-card border rounded-lg p-4 space-y-3">
@@ -101,7 +113,8 @@ export function ReceiptClient({ poId, folio, lines }: Props) {
           const row = rows[l.lineId];
           const factor = Number(l.unitFactor);
           const presentationName = l.presentation?.name ?? l.product.unit;
-          const costLabel = factor !== 1 ? `Costo por ${presentationName}` : "Costo unit.";
+          const currencySuffix = pendingRate ? ` (${pendingRate.code})` : "";
+          const costLabel = (factor !== 1 ? `Costo por ${presentationName}` : "Costo unit.") + currencySuffix;
           return (
             <div key={l.lineId} className="border rounded p-3 grid grid-cols-12 gap-2 items-end">
               <div className="col-span-12 sm:col-span-4">

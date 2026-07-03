@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,8 +61,10 @@ interface POItem {
   orderDate: Date;
   expectedDate: Date | null;
   total: unknown;
+  totalBase: unknown;
   supplier: { name: string; taxId: string | null };
   warehouse: { name: string };
+  currency: { code: string; symbol: string; decimalPlaces: number } | null;
   _count: { lines: number; receipts: number };
 }
 
@@ -92,11 +94,21 @@ interface ProductOption {
   presentations: PresentationOption[];
 }
 
+interface CurrencyOption {
+  currencyId: number;
+  code: string;
+  symbol: string;
+  rateToBase: number | null;
+}
+
 interface Props {
   orders: POItem[];
   suppliers: SupplierOption[];
   warehouses: WarehouseOption[];
   products: ProductOption[];
+  currencies: CurrencyOption[];
+  baseCurrencyId: number;
+  baseCurrencyCode: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -115,18 +127,36 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Cancelada",
 };
 
-export function PurchaseOrderListClient({ orders, suppliers, warehouses, products }: Props) {
+export function PurchaseOrderListClient({
+  orders,
+  suppliers,
+  warehouses,
+  products,
+  currencies,
+  baseCurrencyId,
+  baseCurrencyCode,
+}: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Preseleccion: USD si existe entre las monedas activas, si no la base.
+  const defaultCurrencyId = useMemo(() => {
+    const usd = currencies.find((c) => c.code === "USD");
+    return usd ? usd.currencyId : baseCurrencyId;
+  }, [currencies, baseCurrencyId]);
+
   const [supplierId, setSupplierId] = useState<string>("");
   const [warehouseId, setWarehouseId] = useState<string>("");
+  const [currencyId, setCurrencyId] = useState<string>(String(defaultCurrencyId));
   const [orderDate, setOrderDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [expectedDate, setExpectedDate] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [lines, setLines] = useState<POLineInput[]>([]);
+
+  const selectedCurrency = currencies.find((c) => c.currencyId === Number(currencyId));
+  const isBaseCurrencySelected = Number(currencyId) === baseCurrencyId;
 
   const filtered = orders.filter(
     (o) =>
@@ -140,10 +170,13 @@ export function PurchaseOrderListClient({ orders, suppliers, warehouses, product
     setLines(lines.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
 
   const total = lines.reduce((s, l) => s + l.quantity * l.unitCost, 0);
+  const totalBaseEquivalent =
+    !isBaseCurrencySelected && selectedCurrency?.rateToBase ? total * selectedCurrency.rateToBase : null;
 
   const resetForm = () => {
     setSupplierId("");
     setWarehouseId("");
+    setCurrencyId(String(defaultCurrencyId));
     setOrderDate(new Date().toISOString().slice(0, 10));
     setExpectedDate("");
     setNotes("");
@@ -167,6 +200,7 @@ export function PurchaseOrderListClient({ orders, suppliers, warehouses, product
     const result = await createPurchaseOrder({
       supplierId: Number(supplierId),
       warehouseId: Number(warehouseId),
+      currencyId: currencyId ? Number(currencyId) : undefined,
       orderDate,
       expectedDate: expectedDate || undefined,
       notes: notes || undefined,
@@ -181,7 +215,7 @@ export function PurchaseOrderListClient({ orders, suppliers, warehouses, product
           <ToastLines>
             <ToastDetail
               label={`${lines.length} ${lines.length === 1 ? "linea" : "lineas"}`}
-              value={`$${total.toFixed(2)}`}
+              value={`${total.toFixed(2)} ${selectedCurrency?.code ?? baseCurrencyCode}`}
               mono
             />
           </ToastLines>
@@ -254,7 +288,12 @@ export function PurchaseOrderListClient({ orders, suppliers, warehouses, product
                   <span>Fecha: {new Date(o.orderDate).toLocaleDateString("es-ES")}</span>
                   <span>Lineas: {o._count.lines}</span>
                   <span>Recepciones: {o._count.receipts}</span>
-                  <span className="font-medium text-foreground">Total: ${String(o.total)}</span>
+                  <span className="font-medium text-foreground font-mono tabular-nums">
+                    Total: {String(o.total)} {o.currency?.code ?? baseCurrencyCode}
+                    {o.totalBase != null && o.currency && (
+                      <span className="text-muted-foreground font-normal"> (≈ {String(o.totalBase)} {baseCurrencyCode})</span>
+                    )}
+                  </span>
                 </div>
               </div>
               <DropdownMenu>
@@ -331,6 +370,18 @@ export function PurchaseOrderListClient({ orders, suppliers, warehouses, product
                 <Label>Fecha esperada</Label>
                 <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Moneda</Label>
+              <Select value={currencyId} onValueChange={setCurrencyId}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                <SelectContent>
+                  {currencies.map((c) => (
+                    <SelectItem key={c.currencyId} value={String(c.currencyId)}>{c.code}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -438,8 +489,20 @@ export function PurchaseOrderListClient({ orders, suppliers, warehouses, product
                 })}
               </div>
               {lines.length > 0 && (
-                <div className="mt-3 flex justify-end text-sm">
-                  <span>Total: <span className="font-semibold">${total.toFixed(2)}</span></span>
+                <div className="mt-3 flex flex-col items-end gap-0.5 text-sm">
+                  <span className="font-mono tabular-nums">
+                    Total: <span className="font-semibold">{total.toFixed(2)} {selectedCurrency?.code ?? baseCurrencyCode}</span>
+                  </span>
+                  {totalBaseEquivalent != null && (
+                    <span className="text-xs text-muted-foreground font-mono tabular-nums">
+                      ≈ {totalBaseEquivalent.toFixed(2)} {baseCurrencyCode} · tasa {selectedCurrency!.rateToBase!.toFixed(2)}
+                    </span>
+                  )}
+                  {!isBaseCurrencySelected && selectedCurrency?.rateToBase == null && (
+                    <span className="text-xs text-destructive">
+                      No hay tasa de cambio configurada para {selectedCurrency?.code}.
+                    </span>
+                  )}
                 </div>
               )}
             </div>

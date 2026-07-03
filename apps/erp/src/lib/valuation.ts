@@ -6,10 +6,16 @@ export interface EntryInput {
   productId: number;
   warehouseId: number;
   qty: number;
-  unitCost: number;
+  unitCost: number; // Siempre en CUP (moneda base)
   lotId?: number | null;
   sourceType?: string;
   sourceId?: number;
+  // Snapshot de la moneda original de compra (si difiere de la base). Se
+  // persiste tal cual en la capa FIFO; no participa en el cálculo FIFO/promedio,
+  // que siempre opera sobre unitCost (CUP).
+  origCurrencyId?: number;
+  origUnitCost?: number;
+  exchangeRate?: number;
 }
 
 export interface ExitInput {
@@ -83,6 +89,9 @@ export async function applyInventoryEntry(
         warehouseId: input.warehouseId,
         lotId: input.lotId ?? null,
         unitCost: input.unitCost,
+        origCurrencyId: input.origCurrencyId ?? null,
+        origUnitCost: input.origUnitCost ?? null,
+        exchangeRate: input.exchangeRate ?? null,
         quantityOpen: input.qty,
         sourceType: input.sourceType ?? null,
         sourceId: input.sourceId ?? null,

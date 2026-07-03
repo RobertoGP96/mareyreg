@@ -6,6 +6,7 @@ import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
 import { toBaseQuantity } from "@/modules/inventory/lib/units";
+import { getBaseCurrency, getRateToBase, GlobalRateNotConfiguredError } from "@/lib/currency";
 import type { Prisma } from "@/generated/prisma";
 
 type PrismaTx = Prisma.TransactionClient;
@@ -21,6 +22,7 @@ const BUSINESS_ERRORS = new Set([
 ]);
 
 function toUserMessage(error: unknown, fallback: string): string {
+  if (error instanceof GlobalRateNotConfiguredError) return error.message;
   if (error instanceof Error) {
     if (BUSINESS_ERRORS.has(error.message)) return error.message;
     if (error.message.startsWith("La presentación")) return error.message;
@@ -82,6 +84,7 @@ export interface POInput {
   expectedDate?: string;
   notes?: string;
   lines: POLineInput[];
+  currencyId?: number; // omitido o = moneda base -> documento en CUP, sin snapshot
 }
 
 function calcTotals(lines: POLineInput[]) {
@@ -106,6 +109,23 @@ export async function createPurchaseOrder(
 
     const po = await db.$transaction(async (tx) => {
       const folio = await nextFolio(tx, DOC_TYPES.PURCHASE_ORDER);
+
+      // Moneda del documento: si se omite o coincide con la base, el
+      // documento queda en CUP y los campos *Base quedan null (convención
+      // "null moneda = base" ya usada en Fase 1).
+      const base = await getBaseCurrency(tx);
+      const isBaseCurrency = !data.currencyId || data.currencyId === base.currencyId;
+      let currencyId: number | null = null;
+      let exchangeRate: number | null = null;
+      let subtotalBase: number | null = null;
+      let totalBase: number | null = null;
+      if (!isBaseCurrency) {
+        const snapshot = await getRateToBase(tx, data.currencyId!);
+        currencyId = data.currencyId!;
+        exchangeRate = snapshot.rate;
+        subtotalBase = subtotal * snapshot.rate;
+        totalBase = total * snapshot.rate;
+      }
 
       const resolvedLines = await Promise.all(
         data.lines.map(async (l) => {
@@ -135,6 +155,10 @@ export async function createPurchaseOrder(
           expectedDate: data.expectedDate ? new Date(data.expectedDate) : null,
           subtotal,
           total,
+          currencyId,
+          exchangeRate,
+          subtotalBase,
+          totalBase,
           notes: data.notes || null,
           createdBy: userId,
           lines: {

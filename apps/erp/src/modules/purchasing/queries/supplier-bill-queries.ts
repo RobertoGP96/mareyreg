@@ -19,6 +19,8 @@ export interface SupplierBillListItem {
   balance: number;
   status: SupplierBillStatus;
   isOverdue: boolean;
+  currencyCode: string | null;
+  totalBase: number | null;
 }
 
 export async function getSupplierBills(filter?: {
@@ -33,6 +35,7 @@ export async function getSupplierBills(filter?: {
     include: {
       supplier: { select: { name: true } },
       purchaseOrder: { select: { folio: true } },
+      currency: { select: { code: true } },
     },
     orderBy: [{ status: "asc" }, { dueDate: "asc" }, { issueDate: "desc" }],
   });
@@ -63,6 +66,8 @@ export async function getSupplierBills(filter?: {
       balance,
       status: b.status,
       isOverdue,
+      currencyCode: b.currency?.code ?? null,
+      totalBase: b.totalBase != null ? toNumber(b.totalBase) : null,
     };
   });
 }
@@ -76,6 +81,8 @@ export interface SupplierBillDetail extends SupplierBillListItem {
     method: string;
     paymentDate: string;
     notes: string | null;
+    currencyCode: string | null;
+    amountTendered: number | null;
   }[];
 }
 
@@ -85,7 +92,8 @@ export async function getSupplierBill(billId: number): Promise<SupplierBillDetai
     include: {
       supplier: { select: { name: true } },
       purchaseOrder: { select: { folio: true } },
-      payments: { orderBy: { paymentDate: "desc" } },
+      currency: { select: { code: true } },
+      payments: { orderBy: { paymentDate: "desc" }, include: { currency: { select: { code: true } } } },
     },
   });
   if (!b) return null;
@@ -114,6 +122,8 @@ export async function getSupplierBill(billId: number): Promise<SupplierBillDetai
     balance,
     status: b.status,
     isOverdue,
+    currencyCode: b.currency?.code ?? null,
+    totalBase: b.totalBase != null ? toNumber(b.totalBase) : null,
     notes: b.notes,
     createdAt: b.createdAt.toISOString(),
     payments: b.payments.map((p) => ({
@@ -122,6 +132,8 @@ export async function getSupplierBill(billId: number): Promise<SupplierBillDetai
       method: p.method,
       paymentDate: p.paymentDate.toISOString(),
       notes: p.notes,
+      currencyCode: p.currency?.code ?? null,
+      amountTendered: p.amountTendered != null ? toNumber(p.amountTendered) : null,
     })),
   };
 }

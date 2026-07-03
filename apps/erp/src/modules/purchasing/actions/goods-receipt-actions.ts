@@ -7,6 +7,7 @@ import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { nextFolio, DOC_TYPES } from "@/lib/folio";
 import { applyInventoryEntry } from "@/lib/valuation";
 import { toBaseQuantity, formatEquivalence } from "@/modules/inventory/lib/units";
+import { getBaseCurrency, getRateToBase, GlobalRateNotConfiguredError } from "@/lib/currency";
 
 function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
@@ -18,6 +19,7 @@ const BUSINESS_ERRORS = new Set([
 ]);
 
 function toUserMessage(error: unknown, fallback: string): string {
+  if (error instanceof GlobalRateNotConfiguredError) return error.message;
   if (error instanceof Error) {
     if (BUSINESS_ERRORS.has(error.message)) return error.message;
     if (error.message.includes("requiere lote")) return error.message;
@@ -91,12 +93,24 @@ export async function createGoodsReceipt(
 
       const folio = await nextFolio(tx, DOC_TYPES.GOODS_RECEIPT);
 
+      // Moneda de la recepcion = moneda de la OC (heredada, no editable por
+      // linea). Snapshot de tasa AL RECIBIR: la tasa pudo cambiar desde que se
+      // creo la OC, y es la que valua esta recepcion (no la de la OC).
+      const isBaseCurrency = po.currencyId == null;
+      let receiptExchangeRate: number | null = null;
+      if (!isBaseCurrency) {
+        const snapshot = await getRateToBase(tx, po.currencyId!);
+        receiptExchangeRate = snapshot.rate;
+      }
+
       const created = await tx.goodsReceipt.create({
         data: {
           folio,
           poId: data.poId,
           notes: data.notes || null,
           createdBy: userId,
+          currencyId: po.currencyId,
+          exchangeRate: receiptExchangeRate,
         },
       });
 
@@ -131,7 +145,12 @@ export async function createGoodsReceipt(
         const baseQuantity = toBaseQuantity(rl.quantity, unitFactor);
         // Costo por unidad base: si el costo capturado es por presentacion
         // (ej. $240 la caja de 24), se divide por el factor ($10 la unidad base).
+        // Esto queda en la moneda del documento (unitCostPerBase); el costo
+        // que valua inventario SIEMPRE es en CUP (unitCostBasePerBaseUnit).
         const unitCostPerBase = unitCost / unitFactor;
+        const unitCostBasePerBaseUnit = isBaseCurrency
+          ? unitCostPerBase
+          : unitCostPerBase * receiptExchangeRate!;
         const equivalenceNote =
           unitFactor !== 1
             ? ` — ${formatEquivalence(rl.quantity, unitFactor, poLine.presentation?.name ?? "presentación", poLine.product.unit)}`
@@ -185,14 +204,16 @@ export async function createGoodsReceipt(
         }
 
         // Crear linea de recepcion. quantity/unitCost quedan en la unidad
-        // recibida (presentacion); presentationId/unitFactor/baseQuantity son
-        // el snapshot de conversion a unidad base.
+        // recibida (presentacion), en la moneda del documento;
+        // presentationId/unitFactor/baseQuantity son el snapshot de conversion
+        // a unidad base. unitCostBase es el equivalente en CUP por unidad recibida.
         await tx.goodsReceiptLine.create({
           data: {
             receiptId: created.receiptId,
             poLineId: rl.poLineId,
             quantity: rl.quantity,
             unitCost,
+            unitCostBase: isBaseCurrency ? null : unitCost * receiptExchangeRate!,
             lotId,
             presentationId,
             unitFactor,
@@ -200,26 +221,35 @@ export async function createGoodsReceipt(
           },
         });
 
-        // Valuacion: entrada. SIEMPRE en unidad base con costo por unidad base.
+        // Valuacion: entrada. SIEMPRE en unidad base con costo por unidad base
+        // en CUP; si el documento esta en otra moneda, se persiste el trio
+        // original (moneda, costo original, tasa) junto al costo en CUP.
         await applyInventoryEntry(tx, {
           productId: poLine.productId,
           warehouseId: po.warehouseId,
           qty: baseQuantity,
-          unitCost: unitCostPerBase,
+          unitCost: unitCostBasePerBaseUnit,
           lotId,
           sourceType: "purchase",
           sourceId: created.receiptId,
+          origCurrencyId: isBaseCurrency ? undefined : po.currencyId!,
+          origUnitCost: isBaseCurrency ? undefined : unitCostPerBase,
+          exchangeRate: isBaseCurrency ? undefined : receiptExchangeRate!,
         });
 
         // StockMovement: cantidad en unidad base, con nota de equivalencia
-        // cuando la presentacion no es la base (factor !== 1).
+        // cuando la presentacion no es la base (factor !== 1). unitCost SIEMPRE
+        // en CUP; el trio original se persiste solo si el documento no es la base.
         await tx.stockMovement.create({
           data: {
             productId: poLine.productId,
             warehouseId: po.warehouseId,
             quantity: baseQuantity,
             movementType: "entry",
-            unitCost: unitCostPerBase,
+            unitCost: unitCostBasePerBaseUnit,
+            origCurrencyId: isBaseCurrency ? null : po.currencyId,
+            origUnitCost: isBaseCurrency ? null : unitCostPerBase,
+            exchangeRate: isBaseCurrency ? null : receiptExchangeRate,
             referenceDoc: folio,
             notes: `Recepcion OC ${po.folio}${equivalenceNote}`,
             createdBy: userId,
@@ -243,6 +273,35 @@ export async function createGoodsReceipt(
             currentQuantity: { increment: baseQuantity },
             lastUpdated: new Date(),
           },
+        });
+
+        // Costo de reposicion: ultimo costo de compra por producto, siempre
+        // en moneda del documento + equivalente CUP. Espejo de solo lectura
+        // en Product.costPrice, alimentado unicamente por compras.
+        const productCurrencyId = po.currencyId ?? (await getBaseCurrency(tx)).currencyId;
+        await tx.productCost.upsert({
+          where: { productId: poLine.productId },
+          create: {
+            productId: poLine.productId,
+            currencyId: productCurrencyId,
+            lastUnitCost: unitCostPerBase,
+            lastUnitCostBase: unitCostBasePerBaseUnit,
+            lastExchangeRate: isBaseCurrency ? null : receiptExchangeRate,
+            lastReceiptId: created.receiptId,
+            lastReceivedAt: created.receivedAt,
+          },
+          update: {
+            currencyId: productCurrencyId,
+            lastUnitCost: unitCostPerBase,
+            lastUnitCostBase: unitCostBasePerBaseUnit,
+            lastExchangeRate: isBaseCurrency ? null : receiptExchangeRate,
+            lastReceiptId: created.receiptId,
+            lastReceivedAt: created.receivedAt,
+          },
+        });
+        await tx.product.update({
+          where: { productId: poLine.productId },
+          data: { costPrice: unitCostBasePerBaseUnit },
         });
       }
 

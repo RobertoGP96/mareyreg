@@ -6,6 +6,7 @@ export async function getPurchaseOrders(filter?: { status?: string }) {
     include: {
       supplier: { select: { name: true, taxId: true } },
       warehouse: { select: { name: true } },
+      currency: { select: { code: true, symbol: true, decimalPlaces: true } },
       _count: { select: { lines: true, receipts: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -18,9 +19,11 @@ export async function getPurchaseOrder(poId: number) {
     include: {
       supplier: true,
       warehouse: true,
+      currency: true,
       lines: { include: { product: true, presentation: true } },
       receipts: {
         include: {
+          currency: { select: { code: true, symbol: true } },
           lines: {
             include: { lot: true, presentation: true, poLine: { include: { product: true } } },
           },
