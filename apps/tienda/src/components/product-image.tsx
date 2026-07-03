@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
 
 interface ProductImageProps {
   src: string | null;
@@ -16,7 +19,9 @@ export function ProductImage({
   label = "FOTO",
   priority = false,
 }: ProductImageProps) {
-  if (src) {
+  const [failed, setFailed] = useState(false);
+
+  if (src && !failed) {
     return (
       <Image
         src={src}
@@ -25,6 +30,7 @@ export function ProductImage({
         sizes={sizes}
         priority={priority}
         className="object-cover"
+        onError={() => setFailed(true)}
       />
     );
   }

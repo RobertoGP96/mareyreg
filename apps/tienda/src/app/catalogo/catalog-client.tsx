@@ -1,11 +1,28 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, Search, SearchX, X } from "lucide-react";
+import {
+  Check,
+  Search,
+  SearchX,
+  SlidersHorizontal,
+  Star,
+  X,
+} from "lucide-react";
 import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
-import { discountPct, normalizeText } from "@/lib/format";
+import { discountPct, fmt, normalizeText } from "@/lib/format";
 import { useSyncCurrency } from "@/lib/store";
 import { ProductCard } from "@/components/product-card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Slider } from "@/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type SortKey = "rel" | "asc" | "desc" | "discount" | "name";
 
@@ -19,6 +36,7 @@ const SORTS: { key: SortKey; label: string }[] = [
 
 const TODO = "Todo";
 const OFERTAS = "Ofertas";
+const DESTACADOS = "Destacados";
 
 interface CatalogClientProps {
   products: WebstoreProduct[];
@@ -27,6 +45,7 @@ interface CatalogClientProps {
   initialQuery: string;
   autoFocus: boolean;
   initialOfertas: boolean;
+  initialDestacados: boolean;
 }
 
 export function CatalogClient({
@@ -36,6 +55,7 @@ export function CatalogClient({
   initialQuery,
   autoFocus,
   initialOfertas,
+  initialDestacados,
 }: CatalogClientProps) {
   useSyncCurrency(currency);
   const categories = useMemo(
@@ -48,24 +68,28 @@ export function CatalogClient({
         )
       )
         // Reservados como chips especiales: una categoría real con ese nombre
-        // duplicaría keys y chocaría con el filtro de ofertas.
-        .filter((c) => c !== TODO && c !== OFERTAS)
+        // duplicaría keys y chocaría con los filtros de ofertas/destacados.
+        .filter((c) => c !== TODO && c !== OFERTAS && c !== DESTACADOS)
         .sort((a, b) => a.localeCompare(b, "es")),
     [products]
   );
 
   const [category, setCategory] = useState(() => {
     if (initialOfertas) return OFERTAS;
+    if (initialDestacados) return DESTACADOS;
     return categories.includes(initialCategory) ? initialCategory : TODO;
   });
   const [query, setQuery] = useState(initialQuery);
   const [sort, setSort] = useState<SortKey>("rel");
   const [inStockOnly, setInStockOnly] = useState(false);
+  const [showPrice, setShowPrice] = useState(false);
+  const [priceRange, setPriceRange] = useState<[number, number] | null>(null);
 
   // Mantiene la URL compartible/navegable sin re-render del server component.
   useEffect(() => {
     const params = new URLSearchParams();
     if (category === OFERTAS) params.set("ofertas", "1");
+    else if (category === DESTACADOS) params.set("destacados", "1");
     else if (category !== TODO) params.set("cat", category);
     const term = query.trim();
     if (term) params.set("q", term);
@@ -82,6 +106,29 @@ export function CatalogClient({
     return map;
   }, [products]);
 
+  // null cuando todos los productos cuestan lo mismo: no hay nada que filtrar.
+  const priceBounds = useMemo<[number, number] | null>(() => {
+    if (products.length === 0) return null;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const p of products) {
+      if (p.price < min) min = p.price;
+      if (p.price > max) max = p.price;
+    }
+    min = Math.floor(min);
+    max = Math.ceil(max);
+    return min < max ? [min, max] : null;
+  }, [products]);
+
+  const priceStep = priceBounds
+    ? Math.max(1, Math.round((priceBounds[1] - priceBounds[0]) / 100))
+    : 1;
+  const range: [number, number] = priceRange ?? priceBounds ?? [0, 0];
+  const priceActive =
+    priceBounds != null &&
+    priceRange != null &&
+    (priceRange[0] > priceBounds[0] || priceRange[1] < priceBounds[1]);
+
   const deferredQuery = useDeferredValue(query);
 
   const filtered = useMemo(() => {
@@ -89,10 +136,19 @@ export function CatalogClient({
     const base = products.filter((p) => {
       if (category === OFERTAS) {
         if (p.compareAtPrice == null) return false;
+      } else if (category === DESTACADOS) {
+        if (!p.featured) return false;
       } else if (category !== TODO && p.category !== category) {
         return false;
       }
       if (inStockOnly && p.stockAvailable <= 0) return false;
+      if (
+        priceActive &&
+        priceRange != null &&
+        (p.price < priceRange[0] || p.price > priceRange[1])
+      ) {
+        return false;
+      }
       if (term && !(searchIndex.get(p.sku) ?? "").includes(term)) return false;
       return true;
     });
@@ -108,16 +164,30 @@ export function CatalogClient({
       default:
         return base;
     }
-  }, [products, searchIndex, category, deferredQuery, sort, inStockOnly]);
+  }, [
+    products,
+    searchIndex,
+    category,
+    deferredQuery,
+    sort,
+    inStockOnly,
+    priceActive,
+    priceRange,
+  ]);
 
   const hasActiveFilters =
-    category !== TODO || query.trim() !== "" || inStockOnly || sort !== "rel";
+    category !== TODO ||
+    query.trim() !== "" ||
+    inStockOnly ||
+    sort !== "rel" ||
+    priceActive;
 
   const clearFilters = () => {
     setCategory(TODO);
     setQuery("");
     setSort("rel");
     setInStockOnly(false);
+    setPriceRange(null);
   };
 
   return (
@@ -128,12 +198,12 @@ export function CatalogClient({
         </div>
         <div className="flex items-center gap-2.5 rounded-[13px] border border-white/15 bg-white/10 px-3.5 py-[11px] transition-colors focus-within:border-white/35 focus-within:bg-white/15 md:max-w-xl">
           <Search className="h-4 w-4 flex-none text-white/60" />
-          <input
+          <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar productos…"
             autoFocus={autoFocus}
-            className="flex-1 border-none bg-transparent text-sm text-white placeholder:text-white/60"
+            className="h-auto flex-1 rounded-none border-none bg-transparent p-0 text-sm text-white placeholder:text-white/60 focus-visible:border-transparent focus-visible:ring-0"
           />
           {query.length > 0 && (
             <button
@@ -149,19 +219,22 @@ export function CatalogClient({
       </div>
 
       <div className="anim-fade-up no-scrollbar flex gap-2 overflow-x-auto px-5 pt-3.5 pb-2 [animation-delay:60ms] max-md:sticky max-md:top-0 max-md:z-20 max-md:bg-app/95 max-md:backdrop-blur md:flex-wrap md:overflow-visible md:px-0 md:pt-5">
-        {[TODO, OFERTAS, ...categories].map((name) => {
+        {[TODO, DESTACADOS, OFERTAS, ...categories].map((name) => {
           const active = category === name;
           return (
             <button
               key={name}
               type="button"
               onClick={() => setCategory(name)}
-              className={`flex-none rounded-full border px-[15px] py-2 text-[13px] font-medium transition-colors ${
+              className={`inline-flex flex-none items-center gap-1 rounded-full border px-[15px] py-2 text-[13px] font-medium transition-colors ${
                 active
                   ? "border-brand bg-brand text-white"
                   : "border-line bg-white text-ink-soft hover:border-brand-soft hover:text-brand"
               }`}
             >
+              {name === DESTACADOS && (
+                <Star className="h-3 w-3" fill="currentColor" />
+              )}
               {name}
             </button>
           );
@@ -170,40 +243,84 @@ export function CatalogClient({
 
       <div className="anim-fade-up flex items-center justify-between gap-2 px-5 pt-2 pb-1 [animation-delay:100ms] md:px-0">
         <div aria-live="polite" className="flex-none text-[12.5px] text-muted">
-          {filtered.length}{" "}
-          {filtered.length === 1 ? "producto" : "productos"}
+          {filtered.length} {filtered.length === 1 ? "producto" : "productos"}
         </div>
         <div className="flex min-w-0 items-center gap-1.5">
-          <button
-            type="button"
+          <Button
+            size="sm"
+            variant={inStockOnly ? "chip" : "ghost"}
             onClick={() => setInStockOnly((v) => !v)}
             aria-pressed={inStockOnly}
-            className={`flex flex-none items-center gap-1 rounded-lg px-[11px] py-1.5 text-[11.5px] font-medium transition-colors ${
-              inStockOnly
-                ? "bg-chip text-brand"
-                : "bg-transparent text-muted hover:text-brand"
-            }`}
           >
             {inStockOnly && <Check className="h-3 w-3" />}
-            Disponibles
-          </button>
-          <div className="relative min-w-0">
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as SortKey)}
-              aria-label="Ordenar productos"
-              className="w-full max-w-[170px] appearance-none truncate rounded-lg bg-chip py-1.5 pr-7 pl-[11px] text-[11.5px] font-medium text-brand"
+            En stock
+          </Button>
+          {priceBounds && (
+            <Button
+              size="sm"
+              variant={showPrice || priceActive ? "chip" : "ghost"}
+              onClick={() => setShowPrice((v) => !v)}
+              aria-expanded={showPrice}
+              aria-label="Filtro de precio"
             >
+              <SlidersHorizontal className="h-3 w-3" />
+              Precio
+            </Button>
+          )}
+          <Select
+            value={sort}
+            onValueChange={(v) => setSort(v as SortKey)}
+          >
+            <SelectTrigger
+              aria-label="Ordenar productos"
+              className="min-w-0 max-w-[150px] [&>span]:truncate"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
               {SORTS.map((s) => (
-                <option key={s.key} value={s.key}>
+                <SelectItem key={s.key} value={s.key}>
                   {s.label}
-                </option>
+                </SelectItem>
               ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute top-1/2 right-2 h-3.5 w-3.5 -translate-y-1/2 text-brand" />
-          </div>
+            </SelectContent>
+          </Select>
         </div>
       </div>
+
+      {showPrice && priceBounds && (
+        <div className="anim-fade-up mx-5 mt-1.5 rounded-2xl bg-white p-4 shadow-[0_3px_12px_rgba(10,31,63,.06)] md:mx-0 md:max-w-md">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[12.5px] font-semibold text-navy">Precio</div>
+            <div className="font-mono text-[12px] font-medium tabular-nums text-brand">
+              {fmt(range[0], currency)} – {fmt(range[1], currency)}
+            </div>
+          </div>
+          <Slider
+            min={priceBounds[0]}
+            max={priceBounds[1]}
+            step={priceStep}
+            value={range}
+            onValueChange={(v) => setPriceRange([v[0], v[1]])}
+            aria-label="Rango de precio"
+            className="mt-3.5"
+          />
+          <div className="mt-2 flex items-center justify-between">
+            <div className="text-[11px] text-muted">
+              {fmt(priceBounds[0], currency)} a {fmt(priceBounds[1], currency)}
+            </div>
+            {priceActive && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setPriceRange(null)}
+              >
+                Restablecer
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {filtered.length === 0 ? (
         <div className="anim-fade-up flex flex-1 flex-col items-center justify-center gap-3 px-5 py-14 text-center">
@@ -219,13 +336,9 @@ export function CatalogClient({
               : "Aún no hay productos disponibles."}
           </div>
           {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="mt-1 rounded-xl bg-brand px-[22px] py-[11px] text-[13.5px] font-semibold text-white transition-colors hover:bg-brand-mid"
-            >
+            <Button onClick={clearFilters} className="mt-1">
               Limpiar filtros
-            </button>
+            </Button>
           )}
         </div>
       ) : (

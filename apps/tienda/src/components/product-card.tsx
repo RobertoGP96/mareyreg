@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import type { MouseEvent } from "react";
-import { Heart, Plus } from "lucide-react";
+import { Heart, Plus, Star } from "lucide-react";
 import type { WebstoreProduct } from "@/lib/erp-client";
 import { discountPct, fmt, stockInfo } from "@/lib/format";
 import { useStore, type CartLine } from "@/lib/store";
 import { ProductImage } from "@/components/product-image";
+import { Badge } from "@/components/ui/badge";
 
 export function baseCartLine(product: WebstoreProduct): CartLine {
   return {
@@ -72,7 +73,7 @@ export function ProductCard({
         variant === "carousel"
           ? "w-[164px] flex-none snap-start shadow-[0_3px_12px_rgba(10,31,63,.07)] md:w-[210px]"
           : ""
-      }`}
+      } ${product.featured ? "ring-1 ring-brand-soft/60" : ""}`}
     >
       <div
         className={`relative flex flex-none items-center justify-center overflow-hidden bg-photo text-[11px] tracking-[.5px] text-photo-fg ${IMAGE_HEIGHT[variant]}`}
@@ -83,16 +84,16 @@ export function ProductCard({
           sizes="(max-width: 430px) 50vw, (max-width: 768px) 33vw, 280px"
           priority={priority}
         />
-        {soldOut && (
-          <span className="absolute top-2 left-2 rounded-md bg-[#6B7A94] px-2 py-[3px] text-[10px] font-semibold text-white">
-            AGOTADO
-          </span>
-        )}
-        {!soldOut && pct > 0 && (
-          <span className="absolute top-2 left-2 rounded-md bg-brand px-2 py-[3px] text-[10px] font-semibold text-white">
-            −{pct}%
-          </span>
-        )}
+        <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
+          {product.featured && (
+            <Badge variant="featured">
+              <Star className="h-2.5 w-2.5" fill="currentColor" />
+              DESTACADO
+            </Badge>
+          )}
+          {soldOut && <Badge variant="soldout">AGOTADO</Badge>}
+          {!soldOut && pct > 0 && <Badge variant="discount">−{pct}%</Badge>}
+        </div>
         <button
           type="button"
           onClick={handleFav}

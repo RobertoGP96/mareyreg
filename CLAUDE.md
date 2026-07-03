@@ -42,11 +42,12 @@ apps/
     generated/prisma/             # cliente generado — NO editar, NO commitear (gitignored)
     .env / .env.local             # secretos del ERP (viven aquí, NO en la raíz)
   tienda/                         # storefront público (puerto 3001) — diseño "Tienda Completa v2" (azul/gris, Space Grotesk, lucide-react), mobile 430px + desktop responsive (TopNav md+, BottomNav móvil)
+    src/components/ui/            # primitives shadcn-style propias de la tienda (input, select, slider, button, badge) tematizadas con sus tokens; cn() en src/lib/utils.ts — NO importar los ui/ del ERP
     src/lib/erp-client.ts         # cliente tipado hacia la API webstore del ERP
     src/lib/store.tsx             # estado cliente (carrito/favoritos/perfil/pedidos) persistido en localStorage
     src/lib/cart-totals.ts        # reglas: envío gratis ≥$100, envío $5 domicilio, cupón AZUL10 −10%
     src/app/actions/order-actions.ts  # server action → POST /api/webstore/orders (Zod, externalOrderId idempotente)
-    src/app/                      # rutas: / catalogo(?ofertas=1) producto/[sku] favoritos carrito checkout pedido-confirmado perfil(/pedidos,/datos) login registro
+    src/app/                      # rutas: / catalogo(?ofertas=1|?destacados=1|?cat=|?q=) producto/[sku] favoritos carrito checkout pedido-confirmado perfil(/pedidos,/datos) login registro
     .env.example                  # WEBSTORE_API_URL + WEBSTORE_API_KEY (generar key en ERP /webstore/api-keys o `pnpm dlx tsx scripts/create-webstore-key.ts` desde apps/erp; scopes read_catalog+create_orders+manage_customers)
 docs/                             # documentación cross-app (WEBSTORE.md = contrato entre apps)
 ```

@@ -142,7 +142,7 @@ export function HomeClient({
       <ProductCarousel
         title="Destacados"
         products={highlighted}
-        viewAllHref="/catalogo"
+        viewAllHref="/catalogo?destacados=1"
         eagerImages
         className="anim-fade-up pt-[22px] [animation-delay:180ms] md:pt-8"
       />

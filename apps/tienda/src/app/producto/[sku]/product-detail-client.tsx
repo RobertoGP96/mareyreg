@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Heart, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Heart, ShoppingCart, Star } from "lucide-react";
 import type {
   WebstoreCurrency,
   WebstoreProduct,
@@ -13,6 +13,7 @@ import { discountPct, fmt, stockInfo } from "@/lib/format";
 import { useStore, useSyncCurrency, type CartLine } from "@/lib/store";
 import { ProductImage } from "@/components/product-image";
 import { QtyStepper } from "@/components/qty-stepper";
+import { Badge } from "@/components/ui/badge";
 
 interface ProductDetailClientProps {
   product: WebstoreProduct;
@@ -90,12 +91,14 @@ export function ProductDetailClient({
 
   return (
     <div className="flex flex-1 flex-col bg-white md:mx-auto md:w-full md:max-w-5xl md:flex-row md:gap-8 md:bg-transparent md:px-6 md:py-8">
-      <div className="relative flex h-[270px] items-center justify-center overflow-hidden bg-photo text-xs tracking-[1px] text-photo-fg md:h-auto md:flex-1 md:self-start md:rounded-2xl">
+      {/* md: aspect fijo — con h-auto el contenedor colapsaba a 0 y next/image fill fallaba */}
+      <div className="relative flex h-[270px] items-center justify-center overflow-hidden bg-photo text-xs tracking-[1px] text-photo-fg md:aspect-[4/3] md:h-auto md:flex-1 md:self-start md:rounded-2xl">
         <ProductImage
           src={product.imageUrl}
           alt={product.name}
           sizes="(min-width: 768px) 50vw, 430px"
           label="FOTO PRODUCTO"
+          priority
         />
         <button
           type="button"
@@ -115,11 +118,19 @@ export function ProductDetailClient({
         >
           <Heart className="h-[17px] w-[17px]" fill={isFav ? "currentColor" : "none"} />
         </button>
-        {pct > 0 && (
-          <span className="absolute bottom-3.5 left-4 rounded-lg bg-brand px-2.5 py-[5px] text-[11px] font-semibold text-white">
-            −{pct}%
-          </span>
-        )}
+        <div className="absolute bottom-3.5 left-4 flex items-center gap-1.5">
+          {product.featured && (
+            <Badge variant="featured" className="px-2.5 py-[5px] text-[11px]">
+              <Star className="h-3 w-3" fill="currentColor" />
+              DESTACADO
+            </Badge>
+          )}
+          {pct > 0 && (
+            <Badge variant="discount" className="px-2.5 py-[5px] text-[11px]">
+              −{pct}%
+            </Badge>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 p-5 md:max-w-md md:p-0">
@@ -249,7 +260,7 @@ export function ProductDetailClient({
         )}
       </div>
 
-      <div className="sticky bottom-0 flex items-center gap-3 border-t border-line-2 bg-white px-5 pt-4 pb-6 md:static md:mt-6 md:rounded-2xl md:border md:border-line md:shadow-[0_3px_12px_rgba(10,31,63,.05)]">
+      <div className="sticky bottom-0 flex items-center gap-3 border-t border-line-2 bg-white px-5 pt-4 pb-6 md:static md:mt-6 md:self-start md:rounded-2xl md:border md:border-line md:p-5 md:shadow-[0_3px_12px_rgba(10,31,63,.05)]">
         <div className="flex-1">
           <div className="text-xs text-muted">Total</div>
           <div className="text-[19px] font-bold text-navy">

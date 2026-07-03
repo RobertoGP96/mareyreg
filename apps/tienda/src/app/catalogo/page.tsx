@@ -30,6 +30,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
       initialQuery={firstValue(params.q)}
       autoFocus={firstValue(params.focus) === "1"}
       initialOfertas={firstValue(params.ofertas) === "1"}
+      initialDestacados={firstValue(params.destacados) === "1"}
     />
   );
 }
