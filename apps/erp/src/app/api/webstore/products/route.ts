@@ -90,8 +90,38 @@ export async function GET(request: Request): Promise<NextResponse> {
     { quantity: 1 }
   );
 
+  const appliedDiscountIds = Array.from(
+    new Set(
+      Array.from(prices.values()).flatMap((p) => p.appliedDiscounts.map((d) => d.discountId))
+    )
+  );
+  const discountsWithOffer = appliedDiscountIds.length
+    ? await db.discount.findMany({
+        where: { discountId: { in: appliedDiscountIds }, offerId: { not: null } },
+        select: {
+          discountId: true,
+          offer: { select: { name: true, type: true, value: true, endsAt: true } },
+        },
+      })
+    : [];
+  const offerByDiscountId = new Map(
+    discountsWithOffer
+      .filter((d) => d.offer != null)
+      .map((d) => [
+        d.discountId,
+        {
+          name: d.offer!.name,
+          type: d.offer!.type as "percent" | "fixed",
+          value: Number(d.offer!.value),
+          endsAt: d.offer!.endsAt ? d.offer!.endsAt.toISOString() : null,
+        },
+      ])
+  );
+
   const catalog = products.map((p) => {
     const price = prices.get(p.productId) ?? { basePrice: 0, finalPrice: 0, appliedDiscounts: [] };
+    const appliedDiscountId = price.appliedDiscounts[0]?.discountId;
+    const offer = appliedDiscountId != null ? offerByDiscountId.get(appliedDiscountId) ?? null : null;
     // Mismo almacén que usa processWebstoreOrder para despachar (ver
     // getDefaultWebstoreWarehouseId): así el stock mostrado nunca diverge
     // del stock realmente disponible para el despacho de esta orden.
@@ -106,6 +136,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       featured: p.webstoreFeatured,
       stockAvailable,
       imageUrl: p.imageUrl,
+      offer,
       presentations: p.presentations
         .filter((pr): pr is typeof pr & { sku: string } => pr.sku != null)
         .map((pr) => ({

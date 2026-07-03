@@ -12,11 +12,14 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: "desc", label: "Precio ↓" },
 ];
 
+const OFERTAS = "Ofertas";
+
 interface CatalogClientProps {
   products: WebstoreProduct[];
   initialCategory: string;
   initialQuery: string;
   autoFocus: boolean;
+  initialOfertas: boolean;
 }
 
 export function CatalogClient({
@@ -24,6 +27,7 @@ export function CatalogClient({
   initialCategory,
   initialQuery,
   autoFocus,
+  initialOfertas,
 }: CatalogClientProps) {
   const categories = useMemo(
     () =>
@@ -37,16 +41,21 @@ export function CatalogClient({
     [products]
   );
 
-  const [category, setCategory] = useState(
-    categories.includes(initialCategory) ? initialCategory : "Todo"
-  );
+  const [category, setCategory] = useState(() => {
+    if (initialOfertas) return OFERTAS;
+    return categories.includes(initialCategory) ? initialCategory : "Todo";
+  });
   const [query, setQuery] = useState(initialQuery);
   const [sort, setSort] = useState<SortKey>("rel");
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     const base = products
-      .filter((p) => category === "Todo" || p.category === category)
+      .filter((p) => {
+        if (category === "Todo") return true;
+        if (category === OFERTAS) return p.compareAtPrice != null;
+        return p.category === category;
+      })
       .filter((p) => !term || p.name.toLowerCase().includes(term));
     if (sort === "asc") return [...base].sort((a, b) => a.price - b.price);
     if (sort === "desc") return [...base].sort((a, b) => b.price - a.price);
@@ -70,7 +79,7 @@ export function CatalogClient({
       </div>
 
       <div className="flex gap-2 overflow-x-auto px-5 pt-3.5 pb-1">
-        {["Todo", ...categories].map((name) => {
+        {["Todo", OFERTAS, ...categories].map((name) => {
           const active = category === name;
           return (
             <button

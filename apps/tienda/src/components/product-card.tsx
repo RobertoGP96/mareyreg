@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { MouseEvent } from "react";
 import type { WebstoreProduct } from "@/lib/erp-client";
-import { fmt, stockInfo } from "@/lib/format";
+import { discountPct, fmt, stockInfo } from "@/lib/format";
 import { useStore, type CartLine } from "@/lib/store";
 import { ProductImage } from "@/components/product-image";
 
@@ -38,6 +38,7 @@ export function ProductCard({ product, variant = "grid" }: ProductCardProps) {
   const isFav = state.favs.includes(product.sku);
   const soldOut = product.stockAvailable <= 0;
   const stock = stockInfo(product.stockAvailable);
+  const pct = discountPct(product);
 
   const handleFav = (e: MouseEvent) => {
     e.preventDefault();
@@ -76,9 +77,9 @@ export function ProductCard({ product, variant = "grid" }: ProductCardProps) {
             AGOTADO
           </span>
         )}
-        {variant === "grid" && !soldOut && product.compareAtPrice != null && (
+        {variant === "grid" && !soldOut && pct > 0 && (
           <span className="absolute top-2 left-2 rounded-md bg-brand px-2 py-[3px] text-[10px] font-semibold text-white">
-            OFERTA
+            −{pct}%
           </span>
         )}
         <button

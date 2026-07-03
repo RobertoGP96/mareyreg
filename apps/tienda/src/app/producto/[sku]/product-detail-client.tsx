@@ -7,7 +7,7 @@ import type {
   WebstoreProduct,
   WebstoreProductPresentation,
 } from "@/lib/erp-client";
-import { fmt, stockInfo } from "@/lib/format";
+import { discountPct, fmt, stockInfo } from "@/lib/format";
 import { useStore, type CartLine } from "@/lib/store";
 import { ProductImage } from "@/components/product-image";
 import { QtyStepper } from "@/components/qty-stepper";
@@ -40,11 +40,21 @@ export function ProductDetailClient({
   const isFav = state.favs.includes(product.sku);
   const soldOut = product.stockAvailable <= 0;
   const stock = stockInfo(product.stockAvailable);
+  const pct = discountPct(product);
 
   const isBaseSelected = selected == null || selected.isBase;
   const unitPrice = selected ? selected.retailPrice : product.price;
   const unitLabel = isBaseSelected ? "unidad" : selected.name.toLowerCase();
   const showCompare = isBaseSelected && product.compareAtPrice != null;
+
+  const offerEndsAtLabel =
+    product.offer?.endsAt != null
+      ? new Date(product.offer.endsAt).toLocaleDateString("es-MX", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : null;
 
   const goBack = () => {
     if (window.history.length > 1) router.back();
@@ -99,9 +109,9 @@ export function ProductDetailClient({
         >
           {isFav ? "♥" : "♡"}
         </button>
-        {product.compareAtPrice != null && (
+        {pct > 0 && (
           <span className="absolute bottom-3.5 left-4 rounded-lg bg-brand px-2.5 py-[5px] text-[11px] font-semibold text-white">
-            OFERTA
+            −{pct}%
           </span>
         )}
       </div>
@@ -130,6 +140,18 @@ export function ProductDetailClient({
         >
           {stock.label}
         </div>
+        {product.offer && (
+          <div className="mt-2.5 rounded-xl bg-chip px-3.5 py-2.5">
+            <div className="text-[13px] font-semibold text-brand">
+              {product.offer.name}
+            </div>
+            {offerEndsAtLabel && (
+              <div className="mt-0.5 text-[11.5px] text-brand-mid">
+                Termina el {offerEndsAtLabel}
+              </div>
+            )}
+          </div>
+        )}
         {product.description && (
           <div className="mt-3 text-sm leading-[1.55] text-ink-soft">
             {product.description}

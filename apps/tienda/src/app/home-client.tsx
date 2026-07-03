@@ -4,15 +4,9 @@ import Link from "next/link";
 import type { WebstoreProduct } from "@/lib/erp-client";
 import { STORE_NAME } from "@/lib/config";
 import { categoryIcon } from "@/lib/category-icons";
+import { discountPct } from "@/lib/format";
 import { cartCount, useStore } from "@/lib/store";
 import { ProductCard } from "@/components/product-card";
-
-function discountPct(product: WebstoreProduct): number {
-  if (product.compareAtPrice == null || product.compareAtPrice <= 0) return 0;
-  return Math.round(
-    ((product.compareAtPrice - product.price) / product.compareAtPrice) * 100
-  );
-}
 
 function bestOffer(products: WebstoreProduct[]): WebstoreProduct | null {
   const offers = products.filter((p) => discountPct(p) > 0);
@@ -111,7 +105,7 @@ export function HomeClient({ products }: { products: WebstoreProduct[] }) {
 
       {offer && (
         <Link
-          href={`/producto/${encodeURIComponent(offer.sku)}`}
+          href="/catalogo?ofertas=1"
           className="grad-offer relative mx-5 mt-5 block overflow-hidden rounded-[18px] p-5 text-white"
         >
           <div className="absolute -top-[30px] -right-[30px] h-[130px] w-[130px] rounded-full bg-white/8" />

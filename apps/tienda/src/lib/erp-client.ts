@@ -2,8 +2,9 @@ import "server-only";
 
 // Cliente hacia la API de webstore del ERP (apps/erp). Contrato documentado
 // en docs/WEBSTORE.md; los tipos reflejan los endpoints reales:
-// - GET  /api/webstore/products  (src/app/api/webstore/products/route.ts)
-// - POST /api/webstore/orders    (src/app/api/webstore/orders/route.ts)
+// - GET  /api/webstore/products   (src/app/api/webstore/products/route.ts)
+// - POST /api/webstore/orders     (src/app/api/webstore/orders/route.ts)
+// - POST /api/webstore/customers  (src/app/api/webstore/customers/route.ts)
 
 const BASE_URL = process.env.WEBSTORE_API_URL;
 const API_KEY = process.env.WEBSTORE_API_KEY;
@@ -18,6 +19,13 @@ export interface WebstoreProductPresentation {
   isBase: boolean;
 }
 
+export interface WebstoreProductOffer {
+  name: string;
+  type: "percent" | "fixed";
+  value: number;
+  endsAt: string | null;
+}
+
 export interface WebstoreProduct {
   sku: string;
   name: string;
@@ -30,6 +38,8 @@ export interface WebstoreProduct {
   imageUrl: string | null;
   /** Presentaciones activas del producto (ej. caja, paquete). Vacío si no tiene. */
   presentations: WebstoreProductPresentation[];
+  /** Oferta vigente que generó el precio con descuento, si aplica. */
+  offer: WebstoreProductOffer | null;
 }
 
 export interface OrderCustomer {
@@ -132,6 +142,32 @@ export async function createOrder(
   input: CreateOrderInput
 ): Promise<CreateOrderResult> {
   return erpFetch<CreateOrderResult>("/api/webstore/orders", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export interface UpsertCustomerInput {
+  name: string;
+  phone: string;
+  email?: string;
+  address?: string;
+}
+
+export interface UpsertCustomerResult {
+  customerId: number;
+  created: boolean;
+}
+
+/**
+ * Crea o actualiza un cliente en el ERP (match por teléfono/email). Requiere
+ * API key con scope "manage_customers". Respuestas: 201 creado, 200 ya
+ * existía (idempotente). 400/401/403/429/500 se lanzan como ErpApiError.
+ */
+export async function upsertCustomer(
+  input: UpsertCustomerInput
+): Promise<UpsertCustomerResult> {
+  return erpFetch<UpsertCustomerResult>("/api/webstore/customers", {
     method: "POST",
     body: JSON.stringify(input),
   });

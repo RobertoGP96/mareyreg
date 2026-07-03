@@ -32,6 +32,7 @@ import {
   Store,
   Inbox,
   KeyRound,
+  BadgePercent,
   type LucideIcon,
 } from "lucide-react";
 
@@ -177,7 +178,9 @@ export const modules: AppModule[] = [
     badge: "Nuevo",
     routes: [
       { name: "Catálogo", href: "/webstore/catalogo", icon: Tags },
+      { name: "Ofertas", href: "/webstore/ofertas", icon: BadgePercent },
       { name: "Órdenes", href: "/webstore/ordenes", icon: Inbox },
+      { name: "Clientes", href: "/webstore/clientes", icon: Users },
       { name: "API keys", href: "/webstore/api-keys", icon: KeyRound },
     ],
   },

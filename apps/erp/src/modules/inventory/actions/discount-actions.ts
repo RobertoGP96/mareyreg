@@ -5,12 +5,10 @@ import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { assertRole, ForbiddenError } from "@/lib/auth-guard";
-import type { Prisma } from "@/generated/prisma";
 import { getDiscountHistory, type DiscountHistoryRow } from "../queries/discount-queries";
+import { writeDiscountHistory } from "../lib/discount-history";
 
 const FORBIDDEN_ERROR_MESSAGE = "No tienes permisos para realizar esta acción";
-
-type PrismaTx = Prisma.TransactionClient;
 
 function revalidateDiscountSurfaces(): void {
   revalidatePath("/discounts");
@@ -43,29 +41,6 @@ function validate(data: DiscountInput): string | null {
     return "Un descuento aplica a un producto o a una categoría, no a ambos";
   }
   return null;
-}
-
-async function writeDiscountHistory(
-  tx: PrismaTx,
-  input: {
-    discountId?: number | null;
-    productId?: number | null;
-    action: "created" | "updated" | "activated" | "deactivated" | "deleted";
-    oldValues?: unknown;
-    newValues?: unknown;
-    changedBy: number;
-  }
-): Promise<void> {
-  await tx.discountHistory.create({
-    data: {
-      discountId: input.discountId ?? null,
-      productId: input.productId ?? null,
-      action: input.action,
-      oldValues: input.oldValues != null ? (JSON.parse(JSON.stringify(input.oldValues)) as Prisma.InputJsonValue) : undefined,
-      newValues: input.newValues != null ? (JSON.parse(JSON.stringify(input.newValues)) as Prisma.InputJsonValue) : undefined,
-      changedBy: input.changedBy,
-    },
-  });
 }
 
 export async function createDiscount(
