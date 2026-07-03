@@ -2,22 +2,26 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 type Props = {
+  leading?: React.ReactNode;
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   meta?: React.ReactNode;
   value?: React.ReactNode;
   actions?: React.ReactNode;
+  footer?: React.ReactNode;
   onClick?: () => void;
   selected?: boolean;
   className?: string;
 };
 
 export function MobileListCard({
+  leading,
   title,
   subtitle,
   meta,
   value,
   actions,
+  footer,
   onClick,
   selected,
   className,
@@ -64,6 +68,7 @@ export function MobileListCard({
       )}
     >
       <div className="flex items-start justify-between gap-3">
+        {leading && <div className="shrink-0">{leading}</div>}
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-sm text-foreground leading-tight truncate">
             {title}
@@ -89,6 +94,14 @@ export function MobileListCard({
       </div>
       {meta && (
         <div className="flex flex-wrap items-center gap-1.5 pt-1">{meta}</div>
+      )}
+      {footer && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="mt-1 border-t border-border pt-2"
+        >
+          {footer}
+        </div>
       )}
     </div>
   );

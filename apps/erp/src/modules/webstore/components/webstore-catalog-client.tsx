@@ -205,6 +205,31 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
       <span className="font-mono tabular-nums">{formatAmount(row.finalPrice)}</span>
     );
 
+  const renderThumbnail = (row: CatalogRow, size: "sm" | "lg" = "sm") => {
+    const box = size === "lg" ? "h-14 w-14 rounded-lg" : "h-10 w-10 rounded-md";
+    return row.imageUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={row.imageUrl}
+        alt={row.name}
+        className={cn(
+          box,
+          "object-cover shrink-0 border border-border",
+          !row.webstoreEnabled && "grayscale opacity-60"
+        )}
+      />
+    ) : (
+      <div
+        className={cn(
+          box,
+          "flex items-center justify-center bg-muted shrink-0 border border-border"
+        )}
+      >
+        <PackageSearch className="h-4 w-4 text-muted-foreground" />
+      </div>
+    );
+  };
+
   const renderActions = (row: CatalogRow) => (
     <div className="flex items-center gap-1">
       <Button
@@ -246,18 +271,7 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
       header: "Producto",
       cell: (row) => (
         <div className="flex items-center gap-3 min-w-0">
-          {row.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={row.imageUrl}
-              alt={row.name}
-              className="h-10 w-10 rounded-md object-cover shrink-0 border border-border"
-            />
-          ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted shrink-0 border border-border">
-              <PackageSearch className="h-4 w-4 text-muted-foreground" />
-            </div>
-          )}
+          {renderThumbnail(row)}
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="font-medium text-foreground truncate">{row.name}</span>
@@ -354,18 +368,25 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
   const mobileCard = (row: CatalogRow) => (
     <MobileListCard
       key={row.productId}
-      title={row.name}
+      leading={renderThumbnail(row, "lg")}
+      title={
+        <span className={cn(!row.webstoreEnabled && "text-muted-foreground")}>
+          {row.name}
+        </span>
+      }
       subtitle={row.sku ?? undefined}
       value={
         row.onSale ? (
           <div className="flex flex-col items-end leading-tight">
-            <span className="text-[10px] text-muted-foreground line-through">
+            <span className="font-mono tabular-nums text-[10px] font-normal text-muted-foreground line-through">
               {formatAmount(row.basePrice)}
             </span>
-            <span className="text-[var(--success)]">{formatAmount(row.finalPrice)}</span>
+            <span className="font-mono tabular-nums text-[var(--success)]">
+              {formatAmount(row.finalPrice)}
+            </span>
           </div>
         ) : (
-          formatAmount(row.finalPrice)
+          <span className="font-mono tabular-nums">{formatAmount(row.finalPrice)}</span>
         )
       }
       meta={
@@ -375,48 +396,59 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
             label={row.webstoreEnabled ? "En tienda" : "Oculto"}
             size="sm"
           />
+          {row.onSale && <Badge variant="success">Oferta</Badge>}
           {row.webstoreFeatured && <Badge variant="brand">Destacado</Badge>}
           {row.presentationCount > 0 && (
             <Badge variant="outline" className="text-[10px]">
               {row.presentationCount} present.
             </Badge>
           )}
-          <span className="text-xs text-muted-foreground">Stock: {row.stockAvailable}</span>
+          <span className="ml-auto font-mono tabular-nums text-xs text-muted-foreground">
+            Stock: {row.stockAvailable}
+          </span>
         </>
       }
-      actions={
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2" title="Disponible en tienda">
-            <Store
-              aria-hidden
-              className={cn(
-                "h-3.5 w-3.5",
-                row.webstoreEnabled ? "text-[var(--brand)]" : "text-muted-foreground"
-              )}
-            />
-            <Switch
-              checked={row.webstoreEnabled}
-              disabled={pendingToggleId === row.productId}
-              onCheckedChange={(next) => onToggleEnabled(row, next)}
-              aria-label="Disponible en tienda"
-            />
-          </div>
-          <div className="flex items-center gap-2" title="Producto destacado">
-            <Star
-              aria-hidden
-              className={cn(
-                "h-3.5 w-3.5",
-                row.webstoreFeatured
-                  ? "fill-[var(--warning)] text-[var(--warning)]"
-                  : "text-muted-foreground"
-              )}
-            />
-            <Switch
-              checked={row.webstoreFeatured}
-              disabled={pendingToggleId === row.productId}
-              onCheckedChange={(next) => onToggleFeatured(row, next)}
-              aria-label="Producto destacado"
-            />
+      footer={
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <label
+              className="flex items-center gap-1.5 rounded-lg bg-muted/50 px-2 py-1.5"
+              title="Disponible en tienda"
+            >
+              <Store
+                aria-hidden
+                className={cn(
+                  "h-3.5 w-3.5",
+                  row.webstoreEnabled ? "text-[var(--brand)]" : "text-muted-foreground"
+                )}
+              />
+              <Switch
+                checked={row.webstoreEnabled}
+                disabled={pendingToggleId === row.productId}
+                onCheckedChange={(next) => onToggleEnabled(row, next)}
+                aria-label="Disponible en tienda"
+              />
+            </label>
+            <label
+              className="flex items-center gap-1.5 rounded-lg bg-muted/50 px-2 py-1.5"
+              title="Producto destacado"
+            >
+              <Star
+                aria-hidden
+                className={cn(
+                  "h-3.5 w-3.5",
+                  row.webstoreFeatured
+                    ? "fill-[var(--warning)] text-[var(--warning)]"
+                    : "text-muted-foreground"
+                )}
+              />
+              <Switch
+                checked={row.webstoreFeatured}
+                disabled={pendingToggleId === row.productId}
+                onCheckedChange={(next) => onToggleFeatured(row, next)}
+                aria-label="Producto destacado"
+              />
+            </label>
           </div>
           {renderActions(row)}
         </div>
