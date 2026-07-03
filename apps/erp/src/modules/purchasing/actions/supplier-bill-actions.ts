@@ -175,6 +175,13 @@ export async function registerSupplierPayment(
     if (data.amount <= 0) {
       return { success: false, error: "El monto debe ser mayor a 0" };
     }
+    // amount se recalcula server-side a partir de amountTendered cuando la
+    // moneda entregada difiere de la moneda de la factura (ver mas abajo,
+    // dentro de la tx) — validamos amountTendered tambien aqui, temprano,
+    // para no llegar a abrir la tx con un monto entregado invalido.
+    if (data.amountTendered != null && data.amountTendered <= 0) {
+      return { success: false, error: "El monto entregado debe ser mayor a 0" };
+    }
     if (!data.method.trim()) {
       return { success: false, error: "El metodo de pago es requerido" };
     }

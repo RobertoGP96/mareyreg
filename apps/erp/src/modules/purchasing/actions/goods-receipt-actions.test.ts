@@ -490,6 +490,50 @@ describe("createGoodsReceipt — costos duales USD/CUP (Fase 2)", () => {
     }
     expect(tx.goodsReceiptLine.create).not.toHaveBeenCalled();
   });
+
+  it("recepcion con dos lineas del mismo producto: ProductCost/costPrice reflejan la ULTIMA linea procesada (determinismo)", async () => {
+    // Dos lineas de OC distintas (lineId 1 y 2) para el mismo productId,
+    // cada una con un costo distinto — simula recibir el mismo producto en
+    // dos presentaciones/costos dentro de una sola recepcion.
+    tx.purchaseOrder.findUnique.mockResolvedValue(
+      purchaseOrder({
+        currencyId: null,
+        lines: [
+          poLine({ lineId: 1, unitCost: 240 }),
+          poLine({ lineId: 2, unitCost: 480 }),
+        ],
+      })
+    );
+    tx.purchaseOrderLine.findMany.mockResolvedValue([
+      poLine({ lineId: 1, unitCost: 240, receivedQty: 2 }),
+      poLine({ lineId: 2, unitCost: 480, receivedQty: 1 }),
+    ]);
+
+    const result = await createGoodsReceipt({
+      poId: 1,
+      lines: [
+        { poLineId: 1, quantity: 2, unitCost: 240 },
+        { poLineId: 2, quantity: 1, unitCost: 480 },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+
+    // Linea 1: 240/24 = 10 CUP por unidad base. Linea 2: 480/24 = 20 CUP.
+    // La ULTIMA linea procesada (poLineId 2) es la que debe quedar reflejada
+    // en el espejo Product.costPrice y en el upsert final de ProductCost,
+    // sin importar el orden de llegada de las promesas.
+    expect(tx.product.update).toHaveBeenLastCalledWith({
+      where: { productId: 1 },
+      data: { costPrice: 20 },
+    });
+    expect(tx.productCost.upsert).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { productId: 1 },
+        update: expect.objectContaining({ lastUnitCost: 20, lastUnitCostBase: 20 }),
+      })
+    );
+  });
 });
 
 describe("createGoodsReceipt — catch-weight (peso variable)", () => {
