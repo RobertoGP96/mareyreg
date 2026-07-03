@@ -15,13 +15,19 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowRightLeft, CircleDollarSign, MoreHorizontal, Plus, RefreshCcw, Settings2, Trash2 } from "lucide-react";
+import { ArrowRightLeft, CircleDollarSign, MoreHorizontal, Plus, RefreshCcw, Settings2, Trash2, X } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { formatAmount } from "@/lib/format";
 import { createExchangeRate, updateExchangeRate, deleteExchangeRate } from "../actions/rate-actions";
 import { RateForm, type RateFormPayload } from "./rate-form";
 import { RateHistoryList } from "./rate-history-list";
 import type { ExchangeRateRow, ExchangeRateHistoryRow, CurrencyOption } from "../lib/types";
+
+interface RateChangeNotice {
+  oldRate: number;
+  newRate: number;
+  quoteDecimalPlaces: number;
+}
 
 interface RateManagerClientProps {
   rates: ExchangeRateRow[];
@@ -46,6 +52,7 @@ export function RateManagerClient({ rates, historyByRateId, currencies }: RateMa
   const [toDelete, setToDelete] = useState<ExchangeRateRow | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [selectedRateId, setSelectedRateId] = useState<number | null>(rates[0]?.exchangeRateId ?? null);
+  const [rateChangeNotice, setRateChangeNotice] = useState<RateChangeNotice | null>(null);
 
   const selectedRate = useMemo(
     () => rates.find((r) => r.exchangeRateId === selectedRateId) ?? rates[0] ?? null,
@@ -59,6 +66,10 @@ export function RateManagerClient({ rates, historyByRateId, currencies }: RateMa
   };
 
   const handleSubmit = async (payload: RateFormPayload) => {
+    // Capturado ANTES de cerrar el diálogo: closeDialog() limpia `toEdit`, y
+    // es la única referencia que tenemos a la tasa vigente antes del cambio.
+    const previousRate = toEdit;
+
     const result =
       payload.mode === "create"
         ? await createExchangeRate({
@@ -76,11 +87,25 @@ export function RateManagerClient({ rates, historyByRateId, currencies }: RateMa
 
     if (result.success) {
       toast.success(payload.mode === "create" ? "Tasa creada" : "Tasa actualizada");
+      // Solo mostramos el aviso de reprecio en updates: una tasa recién creada
+      // no tiene precios ya calculados con la tasa anterior que revisar.
+      if (payload.mode === "update" && previousRate) {
+        setRateChangeNotice({
+          oldRate: previousRate.rate,
+          newRate: payload.rate,
+          quoteDecimalPlaces: previousRate.quoteDecimalPlaces,
+        });
+      }
       closeDialog();
       router.refresh();
       return { success: true };
     }
     return { success: false, error: result.error };
+  };
+
+  const handleReviewPrices = () => {
+    if (!rateChangeNotice) return;
+    router.push(`/products?reprecio=${rateChangeNotice.oldRate}:${rateChangeNotice.newRate}`);
   };
 
   const handleDelete = async () => {
@@ -149,6 +174,41 @@ export function RateManagerClient({ rates, historyByRateId, currencies }: RateMa
           </Button>
         }
       />
+
+      {rateChangeNotice && (
+        <div className="rounded-xl border border-[var(--brand)]/30 bg-[var(--brand)]/5 p-4 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2.5">
+              <RefreshCcw className="h-4 w-4 shrink-0 mt-0.5 text-[var(--brand)]" />
+              <p className="text-sm text-foreground">
+                La tasa cambió de{" "}
+                <span className="font-mono tabular-nums font-medium">
+                  {formatAmount(rateChangeNotice.oldRate, rateChangeNotice.quoteDecimalPlaces)}
+                </span>{" "}
+                a{" "}
+                <span className="font-mono tabular-nums font-medium">
+                  {formatAmount(rateChangeNotice.newRate, rateChangeNotice.quoteDecimalPlaces)}
+                </span>
+                . Los precios definidos en USD se actualizan solos; los precios en CUP pueden requerir ajuste.
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7 shrink-0"
+              onClick={() => setRateChangeNotice(null)}
+              aria-label="Descartar aviso"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="brand" size="sm" onClick={handleReviewPrices}>
+              Revisar precios en CUP
+            </Button>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-3 md:grid-cols-2">
         {rates.map((r) => {

@@ -6,6 +6,7 @@ import type { ActionResult } from "@/types";
 import { getEffectivePrice } from "../lib/effective-price";
 import { LOW_MARGIN_THRESHOLD_PCT, type MarginWarning } from "../lib/margin";
 import { getBaseCurrency, getRateToBase, GlobalRateNotConfiguredError } from "@/lib/currency";
+import { getProductCurrencyContext, type ProductCurrencyContext } from "../queries/currency-context";
 import {
   bulkPriceAdjustmentSchema,
   buildPriceExpression,
@@ -65,6 +66,22 @@ export async function getSuggestedUnitPriceAction(
   } catch (error) {
     console.error("Error getting suggested unit price:", error);
     return { success: false, error: toUserMessage(error, "Error al calcular el precio") };
+  }
+}
+
+/**
+ * Opciones de moneda para el filtro "moneda del precio" del ajuste masivo.
+ * Wrapper delgado sobre `getProductCurrencyContext` (server-only) para que
+ * `bulk-price-dialog.tsx` — un client component que no recibe estas opciones
+ * como prop desde su caller actual — pueda pedirlas directamente.
+ */
+export async function getPriceCurrencyOptionsAction(): Promise<ActionResult<ProductCurrencyContext>> {
+  try {
+    const ctx = await getProductCurrencyContext();
+    return { success: true, data: ctx };
+  } catch (error) {
+    console.error("getPriceCurrencyOptionsAction:", error);
+    return { success: false, error: "No se pudieron cargar las monedas" };
   }
 }
 

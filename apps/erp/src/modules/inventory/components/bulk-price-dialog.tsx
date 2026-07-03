@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "@/lib/toast";
 import { formatAmount } from "@/lib/format";
 import { ResponsiveFormDialog } from "@/components/ui/responsive-form-dialog";
@@ -33,14 +33,18 @@ import { PRODUCT_CATEGORIES } from "@/lib/constants";
 import {
   previewBulkPriceAdjustment,
   applyBulkPriceAdjustment,
+  getPriceCurrencyOptionsAction,
   type BulkPriceAdjustmentPreviewRow,
 } from "@/modules/inventory/actions/pricing-actions";
+import type { CurrencyOption } from "@/modules/inventory/queries/currency-context";
 
 type ScopeKind = "all" | "category";
-type Mode = "percent" | "fixed";
+type Mode = "percent" | "fixed" | "rateFactor";
 type Direction = "increase" | "decrease";
 type Target = "retail" | "wholesale" | "both";
 type Rounding = "none" | "cents" | "fifty" | "whole";
+/** Filtro de moneda del precio: "all" no filtra, "base" = moneda base (CUP), o el currencyId como string. */
+type CurrencyFilter = "all" | "base" | string;
 
 interface Props {
   open: boolean;
@@ -60,22 +64,69 @@ const ROUNDING_LABELS: Record<Rounding, string> = {
   whole: "Entero",
 };
 
+/** Parsea `?reprecio=oldRate:newRate` (ver rate-manager-client.tsx). Ambos valores deben ser números finitos > 0. */
+function parseReprecioParam(raw: string | null): { oldRate: number; newRate: number } | null {
+  if (!raw) return null;
+  const [oldStr, newStr] = raw.split(":");
+  const oldRate = Number(oldStr);
+  const newRate = Number(newStr);
+  if (!Number.isFinite(oldRate) || !Number.isFinite(newRate) || oldRate <= 0 || newRate <= 0) return null;
+  return { oldRate, newRate };
+}
+
 export function BulkPriceDialog({ open, onOpenChange }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const reprecio = useMemo(() => parseReprecioParam(searchParams.get("reprecio")), [searchParams]);
+
   const [step, setStep] = useState<"config" | "preview">("config");
   const [scopeKind, setScopeKind] = useState<ScopeKind>("all");
   const [category, setCategory] = useState<string>("");
-  const [mode, setMode] = useState<Mode>("percent");
+  const [mode, setMode] = useState<Mode>(reprecio ? "rateFactor" : "percent");
   const [direction, setDirection] = useState<Direction>("increase");
   const [value, setValue] = useState<string>("");
+  const [rateFactorOld, setRateFactorOld] = useState<string>(reprecio ? String(reprecio.oldRate) : "");
+  const [rateFactorNew, setRateFactorNew] = useState<string>(reprecio ? String(reprecio.newRate) : "");
   const [target, setTarget] = useState<Target>("retail");
   const [rounding, setRounding] = useState<Rounding>("cents");
   const [reason, setReason] = useState<string>("");
+  const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>(reprecio ? "base" : "all");
 
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
   const [previewRows, setPreviewRows] = useState<BulkPriceAdjustmentPreviewRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [currencyOptions, setCurrencyOptions] = useState<CurrencyOption[]>([]);
+  const [baseCurrencyId, setBaseCurrencyId] = useState<number | null>(null);
+
+  // Al abrir, carga las monedas activas para el filtro "moneda del precio".
+  // No bloquea el resto del formulario si falla — el filtro simplemente no
+  // se aplica y el ajuste corre sobre todo el catálogo (comportamiento previo).
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    getPriceCurrencyOptionsAction().then((res) => {
+      if (cancelled) return;
+      if (res.success) {
+        setCurrencyOptions(res.data.options);
+        setBaseCurrencyId(res.data.baseCurrencyId);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  // Si el diálogo se abre con `?reprecio=` ya presente, prefill inmediato
+  // (cubre el caso donde `open` llega true en el primer render, p. ej. si el
+  // caller decide abrirlo leyendo el mismo query param).
+  useEffect(() => {
+    if (!open || !reprecio) return;
+    setMode("rateFactor");
+    setRateFactorOld(String(reprecio.oldRate));
+    setRateFactorNew(String(reprecio.newRate));
+    setCurrencyFilter("base");
+  }, [open, reprecio]);
 
   const resetState = () => {
     setStep("config");
@@ -84,17 +135,31 @@ export function BulkPriceDialog({ open, onOpenChange }: Props) {
     setMode("percent");
     setDirection("increase");
     setValue("");
+    setRateFactorOld("");
+    setRateFactorNew("");
     setTarget("retail");
     setRounding("cents");
     setReason("");
+    setCurrencyFilter("all");
     setPreviewRows([]);
     setTotalCount(0);
   };
 
   const handleOpenChange = (next: boolean) => {
-    if (!next) resetState();
+    if (!next) {
+      resetState();
+      // Limpia el query param de deep-link al cerrar para que reabrir el
+      // diálogo manualmente no vuelva a prefillar el modo rateFactor.
+      if (reprecio) router.replace("/products");
+    }
     onOpenChange(next);
   };
+
+  const priceCurrencyId = useMemo((): number | null | undefined => {
+    if (currencyFilter === "all") return undefined;
+    if (currencyFilter === "base") return null;
+    return Number(currencyFilter);
+  }, [currencyFilter]);
 
   const buildInput = () => ({
     scope:
@@ -102,16 +167,30 @@ export function BulkPriceDialog({ open, onOpenChange }: Props) {
         ? ({ kind: "all" } as const)
         : ({ kind: "category" as const, category }),
     mode,
-    direction,
-    value: Number(value),
+    direction: mode === "rateFactor" ? undefined : direction,
+    value: mode === "rateFactor" ? undefined : Number(value),
+    rateFactor:
+      mode === "rateFactor" ? { oldRate: Number(rateFactorOld), newRate: Number(rateFactorNew) } : undefined,
     target,
     rounding,
+    priceCurrencyId,
     reason: reason.trim() || undefined,
   });
 
   const validationError = useMemo(() => {
     if (scopeKind === "category" && !category) {
       return "Selecciona una categoría";
+    }
+    if (mode === "rateFactor") {
+      const oldRate = Number(rateFactorOld);
+      const newRate = Number(rateFactorNew);
+      if (!rateFactorOld || !Number.isFinite(oldRate) || oldRate <= 0) {
+        return "Ingresa la tasa anterior";
+      }
+      if (!rateFactorNew || !Number.isFinite(newRate) || newRate <= 0) {
+        return "Ingresa la tasa nueva";
+      }
+      return null;
     }
     const numeric = Number(value);
     if (!value || !Number.isFinite(numeric) || numeric <= 0) {
@@ -121,7 +200,7 @@ export function BulkPriceDialog({ open, onOpenChange }: Props) {
       return "No se puede disminuir un precio en más del 100%";
     }
     return null;
-  }, [scopeKind, category, value, mode, direction]);
+  }, [scopeKind, category, mode, value, direction, rateFactorOld, rateFactorNew]);
 
   const handlePreview = async () => {
     if (validationError) {
@@ -223,6 +302,13 @@ export function BulkPriceDialog({ open, onOpenChange }: Props) {
           </FormSection>
 
           <FormSection icon={Percent} title="Ajuste" description="Modo, dirección y magnitud del cambio.">
+            {reprecio && mode === "rateFactor" && (
+              <p className="flex items-start gap-1.5 text-xs text-muted-foreground rounded-lg bg-muted/40 p-2.5">
+                <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                Prellenado desde el cambio de tasa reciente en Divisas.
+              </p>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Modo" required>
                 <Select value={mode} onValueChange={(v) => setMode(v as Mode)}>
@@ -230,44 +316,74 @@ export function BulkPriceDialog({ open, onOpenChange }: Props) {
                   <SelectContent>
                     <SelectItem value="percent">Porcentaje</SelectItem>
                     <SelectItem value="fixed">Monto fijo</SelectItem>
+                    <SelectItem value="rateFactor">Factor por cambio de tasa</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Valor" required hint={mode === "percent" ? "Porcentaje (0-100)" : "Monto en la moneda base"}>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={value}
-                  onChange={(e) => setValue(e.target.value)}
-                  placeholder={mode === "percent" ? "Ej. 10" : "Ej. 5.00"}
-                  className="font-mono tabular-nums"
-                />
-              </Field>
+              {mode !== "rateFactor" && (
+                <Field label="Valor" required hint={mode === "percent" ? "Porcentaje (0-100)" : "Monto en la moneda base"}>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    placeholder={mode === "percent" ? "Ej. 10" : "Ej. 5.00"}
+                    className="font-mono tabular-nums"
+                  />
+                </Field>
+              )}
             </div>
 
-            <RadioGroup
-              value={direction}
-              onValueChange={(v) => setDirection(v as Direction)}
-              className="grid-cols-1 sm:grid-cols-2 gap-3"
-            >
-              <Label
-                htmlFor="dir-increase"
-                className="flex items-center gap-2 rounded-lg border border-border p-3 cursor-pointer has-[[data-state=checked]]:border-[var(--success)]/50 has-[[data-state=checked]]:bg-[var(--success)]/5"
+            {mode === "rateFactor" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Field label="Tasa anterior" required>
+                  <Input
+                    type="number"
+                    step="0.00000001"
+                    min="0"
+                    value={rateFactorOld}
+                    onChange={(e) => setRateFactorOld(e.target.value)}
+                    placeholder="Ej. 24"
+                    className="font-mono tabular-nums"
+                  />
+                </Field>
+                <Field label="Tasa nueva" required>
+                  <Input
+                    type="number"
+                    step="0.00000001"
+                    min="0"
+                    value={rateFactorNew}
+                    onChange={(e) => setRateFactorNew(e.target.value)}
+                    placeholder="Ej. 26"
+                    className="font-mono tabular-nums"
+                  />
+                </Field>
+              </div>
+            ) : (
+              <RadioGroup
+                value={direction}
+                onValueChange={(v) => setDirection(v as Direction)}
+                className="grid-cols-1 sm:grid-cols-2 gap-3"
               >
-                <RadioGroupItem value="increase" id="dir-increase" />
-                <ArrowUpCircle className="h-4 w-4 text-[var(--success)]" />
-                Subir precio
-              </Label>
-              <Label
-                htmlFor="dir-decrease"
-                className="flex items-center gap-2 rounded-lg border border-border p-3 cursor-pointer has-[[data-state=checked]]:border-destructive/50 has-[[data-state=checked]]:bg-destructive/5"
-              >
-                <RadioGroupItem value="decrease" id="dir-decrease" />
-                <ArrowDownCircle className="h-4 w-4 text-destructive" />
-                Bajar precio
-              </Label>
-            </RadioGroup>
+                <Label
+                  htmlFor="dir-increase"
+                  className="flex items-center gap-2 rounded-lg border border-border p-3 cursor-pointer has-[[data-state=checked]]:border-[var(--success)]/50 has-[[data-state=checked]]:bg-[var(--success)]/5"
+                >
+                  <RadioGroupItem value="increase" id="dir-increase" />
+                  <ArrowUpCircle className="h-4 w-4 text-[var(--success)]" />
+                  Subir precio
+                </Label>
+                <Label
+                  htmlFor="dir-decrease"
+                  className="flex items-center gap-2 rounded-lg border border-border p-3 cursor-pointer has-[[data-state=checked]]:border-destructive/50 has-[[data-state=checked]]:bg-destructive/5"
+                >
+                  <RadioGroupItem value="decrease" id="dir-decrease" />
+                  <ArrowDownCircle className="h-4 w-4 text-destructive" />
+                  Bajar precio
+                </Label>
+              </RadioGroup>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="Objetivo" icon={CircleDollarSign} required>
@@ -291,6 +407,26 @@ export function BulkPriceDialog({ open, onOpenChange }: Props) {
                 </Select>
               </Field>
             </div>
+
+            <Field
+              label="Moneda del precio"
+              hint="Limita el ajuste a presentaciones cuyo precio está definido en esta moneda."
+            >
+              <Select value={currencyFilter} onValueChange={(v) => setCurrencyFilter(v)}>
+                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las monedas</SelectItem>
+                  {currencyOptions.map((c) => (
+                    <SelectItem
+                      key={c.currencyId}
+                      value={c.currencyId === baseCurrencyId ? "base" : String(c.currencyId)}
+                    >
+                      {c.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
 
             <Field label="Motivo" hint="Opcional. Se guarda en el historial de precios.">
               <Input

@@ -113,3 +113,12 @@ psql "$DATABASE_URL" -c "SELECT created_at, action, entity_type, entity_id FROM 
 - DB role hardening (revocar UPDATE/DELETE sobre operations al rol app).
 - Tests de concurrencia automatizados (PR 7).
 - E2E con Playwright para flujos críticos.
+
+## Dos sistemas de tasas
+
+El repo tiene **dos** modelos de tasa de cambio independientes, cada uno para su dominio:
+
+- **`ExchangeRateRule`** (este módulo): tasas por rangos de monto y opcionalmente por cuenta (`Account.exchangeRateRuleId`), usadas en transferencias inter-moneda de remesas. Direccional (aplica a la cuenta *outgoing*), configurada en `/envios/monedas`.
+- **`ExchangeRate`** (global, módulo `currency`): una tasa única por par de monedas, usada por inventario, compras, ventas y la tienda para convertir precios y pagos a la moneda base (CUP). Configurada en `/currency/tasas`.
+
+No comparten tablas ni lógica de resolución. Si una operación es de envíos/remesas usa `ExchangeRateRule`; si es de catálogo, POS o pagos comerciales usa `ExchangeRate`.
