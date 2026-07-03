@@ -66,6 +66,11 @@ async function resolvePayments(
     }
 
     const amountBaseFull = roundToCurrency(p.amountTendered * rate, base.decimalPlaces);
+    // `amountTendered` conserva SIEMPRE lo físicamente entregado por el
+    // cliente; `amount` (amountBaseApplied) es lo aplicado al saldo en CUP.
+    // La diferencia es el vuelto entregado en efectivo y no se persiste
+    // (igual que en una caja física) — por eso amountTendered × exchangeRate
+    // puede exceder `amount` legítimamente.
     const change = Math.max(0, amountBaseFull - remaining);
     const amountBaseApplied = Math.min(amountBaseFull, Math.max(remaining, 0));
     remaining -= amountBaseApplied;
@@ -168,7 +173,7 @@ export interface PriceOverride {
 
 export async function createInvoice(
   data: InvoiceInput
-): Promise<ActionResult<{ invoiceId: number; folio: string }>> {
+): Promise<ActionResult<{ invoiceId: number; folio: string; changeBase: number }>> {
   try {
     if (!data.lines.length) return { success: false, error: "Agrega al menos una linea" };
     for (const l of data.lines) {
@@ -202,6 +207,9 @@ export async function createInvoice(
       }
       if (!p.paymentMethod?.trim()) {
         return { success: false, error: "El metodo de pago es requerido" };
+      }
+      if (p.currencyId != null && !(Number.isInteger(p.currencyId) && p.currencyId > 0)) {
+        return { success: false, error: "Moneda inválida en el pago." };
       }
     }
 
@@ -256,7 +264,7 @@ export async function createInvoice(
       }
 
       const invoiceStatus: "pending" | "partial" | "paid" =
-        paidAmount <= 0 ? "pending" : paidAmount >= total - tolerance ? "paid" : "partial";
+        paidAmount <= 0 ? "pending" : paidAmount >= total ? "paid" : "partial";
 
       await tx.invoice.update({
         where: { invoiceId: invoice.invoiceId },
@@ -302,13 +310,21 @@ export async function createInvoice(
         },
       });
 
-      return { invoice, folio };
+      const changeBase = roundToCurrency(
+        resolvedPayments.reduce((s, p) => s + p.changeBase, 0),
+        base.decimalPlaces
+      );
+
+      return { invoice, folio, changeBase };
     });
 
     revalidatePath("/invoices");
     revalidatePath("/pos");
     revalidatePath("/stock");
-    return { success: true, data: { invoiceId: result.invoice.invoiceId, folio: result.folio } };
+    return {
+      success: true,
+      data: { invoiceId: result.invoice.invoiceId, folio: result.folio, changeBase: result.changeBase },
+    };
   } catch (error) {
     console.error("Error creating invoice:", error);
     const msg = toUserMessage(error, "Error al crear la factura");
@@ -329,7 +345,7 @@ export interface RegisterInvoicePaymentInput {
 export async function registerInvoicePayment(
   invoiceId: number,
   payment: RegisterInvoicePaymentInput | { amount: number; paymentMethod: string; paidAt: string; reference?: string }
-): Promise<ActionResult<void>> {
+): Promise<ActionResult<{ changeBase: number }>> {
   try {
     // Compat: shape anterior usaba `amount` (siempre moneda base).
     const normalized: RegisterInvoicePaymentInput =
@@ -343,10 +359,16 @@ export async function registerInvoicePayment(
     if (!normalized.paymentMethod?.trim()) {
       return { success: false, error: "El metodo de pago es requerido" };
     }
+    if (
+      normalized.currencyId != null &&
+      !(Number.isInteger(normalized.currencyId) && normalized.currencyId > 0)
+    ) {
+      return { success: false, error: "Moneda inválida en el pago." };
+    }
 
     const userId = await requireCurrentUserId();
 
-    await db.$transaction(async (tx) => {
+    const changeBase = await db.$transaction(async (tx) => {
       const invoice = await tx.invoice.findUnique({ where: { invoiceId } });
       if (!invoice) throw new Error("Factura no encontrada");
       if (invoice.status === "cancelled") throw new Error("Factura cancelada");
@@ -395,7 +417,7 @@ export async function registerInvoicePayment(
       });
 
       const newPaid = alreadyPaid + resolved.amount;
-      const newStatus: "partial" | "paid" = newPaid >= total - tolerance ? "paid" : "partial";
+      const newStatus: "partial" | "paid" = newPaid >= total ? "paid" : "partial";
       await tx.invoice.update({
         where: { invoiceId },
         data: { paid: newPaid, status: newStatus },
@@ -420,11 +442,13 @@ export async function registerInvoicePayment(
           paidAt: normalized.paidAt,
         },
       });
+
+      return roundToCurrency(resolved.changeBase, base.decimalPlaces);
     });
 
     revalidatePath("/invoices");
     revalidatePath("/accounts-receivable");
-    return { success: true, data: undefined };
+    return { success: true, data: { changeBase } };
   } catch (error) {
     console.error("Error registering payment:", error);
     const msg = toUserMessage(error, "Error al registrar el pago");

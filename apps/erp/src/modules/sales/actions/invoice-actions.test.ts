@@ -212,10 +212,10 @@ describe("createInvoice — pagos multi-moneda (Fase 4)", () => {
     }
   });
 
-  it("tolerancia de redondeo (1 CUP, moneda base sin decimales): paga con 1 CUP de diferencia y queda 'paid'", async () => {
-    // total 5000; el pago resuelve a 4999 (1 CUP por debajo) por artefactos
-    // de redondeo en la conversion — la tolerancia de 1 CUP (base decimalPlaces=0)
-    // debe considerarlo saldado, no "partial".
+  it("pagar 1 CUP menos del total (4999 de 5000) NO debe quedar 'paid': el estado 'paid' exige cubrir el total exacto, sin tolerancia", async () => {
+    // La tolerancia de redondeo solo aplica al check de exceso (pagos que
+    // sobrepasan el total por artefactos de conversion), nunca para condonar
+    // saldo pendiente legitimo.
     stubDispatch(5000);
     const result = await createInvoice({
       ...baseInput,
@@ -224,8 +224,46 @@ describe("createInvoice — pagos multi-moneda (Fase 4)", () => {
 
     expect(result.success).toBe(true);
     expect(tx.invoice.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ paid: 4999, status: "paid" }) })
+      expect.objectContaining({ data: expect.objectContaining({ paid: 4999, status: "partial" }) })
     );
+  });
+
+  it("pagar exactamente el total (5000 de 5000) queda 'paid'", async () => {
+    stubDispatch(5000);
+    const result = await createInvoice({
+      ...baseInput,
+      immediatePayments: [{ currencyId: null, amountTendered: 5000, paymentMethod: "cash" }],
+    });
+
+    expect(result.success).toBe(true);
+    expect(tx.invoice.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ paid: 5000, status: "paid" }) })
+    );
+  });
+
+  it("currencyId invalido (0 o no entero) en immediatePayments: error de validacion, no abre transaccion", async () => {
+    const result = await createInvoice({
+      ...baseInput,
+      immediatePayments: [{ currencyId: 0, amountTendered: 100, paymentMethod: "cash" }],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe("Moneda inválida en el pago.");
+    }
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("createInvoice retorna changeBase en data cuando el pago excede el total (vuelto)", async () => {
+    const result = await createInvoice({
+      ...baseInput,
+      immediatePayments: [{ currencyId: null, amountTendered: 6000, paymentMethod: "cash" }],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.changeBase).toBe(1000);
+    }
   });
 });
 
@@ -318,6 +356,72 @@ describe("registerInvoicePayment — pagos multi-moneda (Fase 4)", () => {
     expect(tx.invoicePayment.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ amount: 100 }) })
     );
+    expect(tx.invoice.update).toHaveBeenCalledWith({
+      where: { invoiceId: 1 },
+      data: { paid: 5000, status: "paid" },
+    });
+    if (result.success) {
+      expect(result.data.changeBase).toBe(100);
+    }
+  });
+
+  it("pagar 1 CUP menos del saldo pendiente NO debe quedar 'paid' (sin tolerancia para condonar saldo)", async () => {
+    tx.invoice.findUnique.mockResolvedValue({
+      invoiceId: 1,
+      customerId: 1,
+      status: "pending",
+      total: 5000,
+      paid: 0,
+    });
+
+    const result = await registerInvoicePayment(1, {
+      amount: 4999,
+      paymentMethod: "cash",
+      paidAt: "2026-01-01",
+    });
+
+    expect(result.success).toBe(true);
+    expect(tx.invoice.update).toHaveBeenCalledWith({
+      where: { invoiceId: 1 },
+      data: { paid: 4999, status: "partial" },
+    });
+  });
+
+  it("pagar exactamente el saldo pendiente (5000 de 5000) queda 'paid'", async () => {
+    tx.invoice.findUnique.mockResolvedValue({
+      invoiceId: 1,
+      customerId: 1,
+      status: "pending",
+      total: 5000,
+      paid: 0,
+    });
+
+    const result = await registerInvoicePayment(1, {
+      amount: 5000,
+      paymentMethod: "cash",
+      paidAt: "2026-01-01",
+    });
+
+    expect(result.success).toBe(true);
+    expect(tx.invoice.update).toHaveBeenCalledWith({
+      where: { invoiceId: 1 },
+      data: { paid: 5000, status: "paid" },
+    });
+  });
+
+  it("currencyId invalido (negativo) en registerInvoicePayment: error de validacion, no abre transaccion", async () => {
+    const result = await registerInvoicePayment(1, {
+      currencyId: -1,
+      amountTendered: 100,
+      paymentMethod: "cash",
+      paidAt: "2026-01-01",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe("Moneda inválida en el pago.");
+    }
+    expect(db.$transaction).not.toHaveBeenCalled();
   });
 
   it("factura cancelada: error en español", async () => {

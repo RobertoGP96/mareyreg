@@ -104,6 +104,13 @@ export function InvoicePaymentDialog({ payTarget, onClose, currencies, baseCurre
               mono
             />
             <ToastDetail label="Metodo" value={methodLabel} />
+            {result.data.changeBase > 0 && (
+              <ToastDetail
+                label="Cambio"
+                value={`${money(result.data.changeBase)} ${baseCurrencyCode}`}
+                mono
+              />
+            )}
           </ToastLines>
         ),
       });

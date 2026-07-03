@@ -15,6 +15,12 @@ INSERT INTO currencies (code, name, symbol, decimal_places, active, created_at, 
 VALUES ('USD', 'Dólar estadounidense', '$', 2, true, now(), now())
 ON CONFLICT (code) DO NOTHING;
 
+-- Si CUP ya existía (módulo envios) puede traer otros decimales; el negocio
+-- maneja pesos enteros, así que se fuerza 0 aunque el INSERT no haya aplicado.
+UPDATE currencies
+   SET decimal_places = 0, updated_at = now()
+ WHERE code = 'CUP' AND decimal_places <> 0;
+
 -- 2. La empresa (singleton id=1) opera en CUP y esa es ahora la moneda base de referencia.
 UPDATE company
    SET currency = 'CUP',

@@ -590,6 +590,10 @@ export function PosClient({
     });
     setIsSubmitting(false);
     if (result.success) {
+      // El vuelto oficial lo calcula el server (resolvePayments, con la tasa
+      // vigente en la tx); `change` local es solo el estimado mientras se
+      // captura el pago, antes de tener `result.data.changeBase`.
+      const changeToShow = result.data.changeBase > 0 ? result.data.changeBase : change;
       toast.success(`Factura ${result.data.folio} emitida`, {
         description: (
           <ToastLines>
@@ -598,8 +602,8 @@ export function PosClient({
               value={`$${total.toFixed(2)}`}
               mono
             />
-            {change > 0 && (
-              <ToastDetail label="Cambio" value={`${change.toFixed(0)} ${baseCurrencyCode}`} mono />
+            {changeToShow > 0 && (
+              <ToastDetail label="Cambio" value={`${changeToShow.toFixed(0)} ${baseCurrencyCode}`} mono />
             )}
           </ToastLines>
         ),
