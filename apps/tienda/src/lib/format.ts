@@ -21,6 +21,14 @@ export function fmt(n: number, currency: WebstoreCurrency = DEFAULT_CURRENCY): s
   return `${amount} ${currency.code}`;
 }
 
+/** Normaliza para búsqueda: minúsculas y sin acentos ("azucar" encuentra "Azúcar"). */
+export function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
+}
+
 export function discountPct(product: WebstoreProduct): number {
   if (product.compareAtPrice == null || product.compareAtPrice <= 0) return 0;
   return Math.round(

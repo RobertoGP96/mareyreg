@@ -64,7 +64,10 @@ export async function GET(request: Request): Promise<NextResponse> {
   const warehouseId = await getDefaultWebstoreWarehouseId(db);
 
   const products = await db.product.findMany({
-    where: { webstoreEnabled: true, isActive: true },
+    // sku no-null: el contrato de la tienda tipa sku como string (es la key de
+    // React y el identificador de las líneas de orden) — un producto sin SKU
+    // no puede venderse en línea y duplicaría keys en el catálogo.
+    where: { webstoreEnabled: true, isActive: true, sku: { not: null } },
     include: {
       stockLevels: warehouseId
         ? { where: { warehouseId }, select: { currentQuantity: true, currentPieces: true } }
@@ -154,6 +157,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       featured: p.webstoreFeatured,
       stockAvailable,
       imageUrl: p.imageUrl,
+      createdAt: p.createdAt.toISOString(),
       offer,
       isCatchWeight: p.isCatchWeight,
       pricePerKg,

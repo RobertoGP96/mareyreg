@@ -65,7 +65,10 @@ psql "$DATABASE_URL" -f prisma/sql/webstore-constraints.sql
    offer: { name: string; type: "percent" | "fixed"; value: number; endsAt: string | null } | null
    isCatchWeight: boolean
    pricePerKg: number | null // solo si isCatchWeight
+   createdAt: string // ISO 8601, fecha de alta del producto — alimenta "Recién añadidos" en la tienda
    ```
+
+   El catálogo **solo incluye productos con `sku` no nulo**: el `sku` es el identificador de producto en todo el contrato (keys del catálogo, líneas de orden), así que un producto sin SKU no se publica aunque tenga `webstoreEnabled=true`.
 
    `offer` refleja la `WebstoreOffer` que generó el `Discount` aplicado al precio del producto (null si no tiene ninguno vigente). El `%` que muestra el badge de la tienda se calcula siempre desde `price`/`compareAtPrice` (funciona igual para ofertas `percent` y `fixed`); `offer.name` y `offer.endsAt` son solo para el mensaje descriptivo en el detalle de producto. Cada presentación (`presentations[]`) agrega, solo quando `isCatchWeight`: `piecesPerUnit`, `nominalWeightKg` (factor — peso nominal, solo estimación), `estimatedPrice` (`pricePerKg × nominalWeightKg`) y `stockPieces`.
 6. **Bandeja de órdenes** (`/webstore/ordenes`): KPIs (recibidas hoy, requieren revisión, con error, procesadas hoy), lista filtrable por estado (incluye "Por pesar" para `awaiting_weighing`), detalle con payload crudo, líneas resueltas/sin resolver, movimientos de stock generados, botón "Reprocesar" (con reasignación de producto por línea cuando aplica) y, para pedidos `awaiting_weighing`, formulario de pesaje (ver abajo).

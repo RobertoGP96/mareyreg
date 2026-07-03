@@ -26,6 +26,8 @@ type CardVariant = "grid" | "carousel" | "favorite";
 interface ProductCardProps {
   product: WebstoreProduct;
   variant?: CardVariant;
+  /** true solo para cards above-the-fold: precarga la imagen (LCP). */
+  priority?: boolean;
 }
 
 const IMAGE_HEIGHT: Record<CardVariant, string> = {
@@ -34,7 +36,11 @@ const IMAGE_HEIGHT: Record<CardVariant, string> = {
   favorite: "h-[104px] md:h-[150px]",
 };
 
-export function ProductCard({ product, variant = "grid" }: ProductCardProps) {
+export function ProductCard({
+  product,
+  variant = "grid",
+  priority = false,
+}: ProductCardProps) {
   const { state, toggleFav, addToCart, showToast } = useStore();
   const currency = state.currency;
   const isFav = state.favs.includes(product.sku);
@@ -62,26 +68,27 @@ export function ProductCard({ product, variant = "grid" }: ProductCardProps) {
   return (
     <Link
       href={`/producto/${encodeURIComponent(product.sku)}`}
-      className={`group block overflow-hidden rounded-2xl bg-white shadow-[0_3px_12px_rgba(10,31,63,.06)] transition-[transform,box-shadow] duration-200 hover:shadow-[0_10px_28px_rgba(10,31,63,.14)] motion-safe:hover:-translate-y-1 ${
+      className={`group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-[0_3px_12px_rgba(10,31,63,.06)] transition-[transform,box-shadow] duration-200 hover:shadow-[0_10px_28px_rgba(10,31,63,.14)] motion-safe:hover:-translate-y-1 ${
         variant === "carousel"
-          ? "w-[164px] flex-none shadow-[0_3px_12px_rgba(10,31,63,.07)] md:w-auto"
+          ? "w-[164px] flex-none snap-start shadow-[0_3px_12px_rgba(10,31,63,.07)] md:w-[210px]"
           : ""
       }`}
     >
       <div
-        className={`relative flex items-center justify-center overflow-hidden bg-photo text-[11px] tracking-[.5px] text-photo-fg ${IMAGE_HEIGHT[variant]}`}
+        className={`relative flex flex-none items-center justify-center overflow-hidden bg-photo text-[11px] tracking-[.5px] text-photo-fg ${IMAGE_HEIGHT[variant]}`}
       >
         <ProductImage
           src={product.imageUrl}
           alt={product.name}
           sizes="(max-width: 430px) 50vw, (max-width: 768px) 33vw, 280px"
+          priority={priority}
         />
-        {variant === "grid" && soldOut && (
+        {soldOut && (
           <span className="absolute top-2 left-2 rounded-md bg-[#6B7A94] px-2 py-[3px] text-[10px] font-semibold text-white">
             AGOTADO
           </span>
         )}
-        {variant === "grid" && !soldOut && pct > 0 && (
+        {!soldOut && pct > 0 && (
           <span className="absolute top-2 left-2 rounded-md bg-brand px-2 py-[3px] text-[10px] font-semibold text-white">
             −{pct}%
           </span>
@@ -100,8 +107,12 @@ export function ProductCard({ product, variant = "grid" }: ProductCardProps) {
           />
         </button>
       </div>
-      <div className={variant === "carousel" ? "px-3 pt-[11px] pb-[13px]" : "px-3 pt-2.5 pb-3"}>
-        <div className="mt-[3px] min-h-[34px] text-[13px] leading-[1.3] font-medium text-ink">
+      <div
+        className={`flex flex-1 flex-col ${
+          variant === "carousel" ? "px-3 pt-[11px] pb-[13px]" : "px-3 pt-2.5 pb-3"
+        }`}
+      >
+        <div className="mt-[3px] line-clamp-2 min-h-[34px] text-[13px] leading-[1.3] font-medium text-ink">
           {product.name}
         </div>
         {variant === "grid" && (
@@ -112,7 +123,7 @@ export function ProductCard({ product, variant = "grid" }: ProductCardProps) {
             {stock.label}
           </div>
         )}
-        <div className="mt-[7px] flex items-center justify-between">
+        <div className="mt-auto flex items-end justify-between pt-[7px]">
           <div>
             <div className="text-[15px] font-bold text-navy">
               {fmt(product.price, currency)}

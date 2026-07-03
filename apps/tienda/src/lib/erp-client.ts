@@ -44,6 +44,8 @@ export interface WebstoreProduct {
   featured: boolean;
   stockAvailable: number;
   imageUrl: string | null;
+  /** Fecha de alta del producto en el ERP (ISO 8601). Alimenta la sección "Recién añadidos". */
+  createdAt: string;
   /** Presentaciones activas del producto (ej. caja, paquete). Vacío si no tiene. */
   presentations: WebstoreProductPresentation[];
   /** Oferta vigente que generó el precio con descuento, si aplica. */

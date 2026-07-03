@@ -8,7 +8,7 @@ import { categoryIcon } from "@/lib/category-icons";
 import { discountPct, fmt } from "@/lib/format";
 import { cartCount, useStore, useSyncCurrency } from "@/lib/store";
 import { FREE_SHIPPING_TARGET } from "@/lib/cart-totals";
-import { ProductCard } from "@/components/product-card";
+import { ProductCarousel } from "@/components/product-carousel";
 
 function bestOffer(products: WebstoreProduct[]): WebstoreProduct | null {
   const offers = products.filter((p) => discountPct(p) > 0);
@@ -39,7 +39,11 @@ export function HomeClient({
 
   const offer = bestOffer(products);
   const featured = products.filter((p) => p.featured);
-  const highlighted = featured.length > 0 ? featured : products.slice(0, 4);
+  const highlighted =
+    featured.length > 0 ? featured.slice(0, 10) : products.slice(0, 8);
+  const newest = [...products]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 8);
 
   return (
     <div className="flex flex-1 flex-col">
@@ -135,22 +139,20 @@ export function HomeClient({
         </Link>
       )}
 
-      <div className="anim-fade-up flex items-baseline justify-between px-5 pt-[22px] pb-2 [animation-delay:180ms] md:px-10 md:pt-8">
-        <div className="text-base font-semibold text-navy md:text-lg">
-          Destacados
-        </div>
-        <Link
-          href="/catalogo"
-          className="text-[13px] font-medium text-brand-mid transition-colors hover:text-brand"
-        >
-          Ver todo →
-        </Link>
-      </div>
-      <div className="anim-fade-up flex gap-3.5 overflow-x-auto px-5 pt-1.5 pb-5 [animation-delay:220ms] md:grid md:grid-cols-4 md:gap-5 md:overflow-visible md:px-10">
-        {highlighted.map((product) => (
-          <ProductCard key={product.sku} product={product} variant="carousel" />
-        ))}
-      </div>
+      <ProductCarousel
+        title="Destacados"
+        products={highlighted}
+        viewAllHref="/catalogo"
+        eagerImages
+        className="anim-fade-up pt-[22px] [animation-delay:180ms] md:pt-8"
+      />
+
+      <ProductCarousel
+        title="Recién añadidos"
+        products={newest}
+        viewAllHref="/catalogo"
+        className="anim-fade-up [animation-delay:220ms]"
+      />
 
       <div className="anim-fade-up mx-5 mb-[22px] grid grid-cols-2 gap-3 [animation-delay:260ms] md:mx-10 md:mb-8 md:gap-5">
         <div className="flex flex-col gap-2 rounded-2xl bg-white p-3.5 shadow-[0_3px_12px_rgba(10,31,63,.06)] md:flex-row md:items-center md:gap-4 md:p-6">
