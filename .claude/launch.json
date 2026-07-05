@@ -5,7 +5,8 @@
       "name": "erp",
       "runtimeExecutable": "corepack",
       "runtimeArgs": ["pnpm", "--filter", "erp", "dev"],
-      "port": 3000
+      "port": 3000,
+      "autoPort": true
     },
     {
       "name": "tienda",
