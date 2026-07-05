@@ -92,7 +92,7 @@ psql "$DATABASE_URL" -f prisma/sql/webstore-constraints.sql
 
 - **Sin HMAC de payload**: v1 solo valida Bearer API key + TLS + idempotencia. Si la tienda queda expuesta públicamente sin control de quién le pega al webhook, considerar firma HMAC en v2.
 - **Sin comparación automática de precio**: el `unitPrice` que manda la tienda se guarda en `rawPayload` pero no se compara contra el precio efectivo de Mareyway para detectar catálogos desincronizados — hoy solo sirve para diagnóstico manual.
-- **Almacén por defecto**: si el payload no manda `warehouseId`, se usa el primer almacén activo por `warehouseId` ascendente. Si hay más de un almacén relevante para e-commerce, esto debería volverse configurable.
+- ~~**Almacén por defecto**~~ (resuelto): el almacén de la tienda se configura en `/webstore/configuracion` (`Company.webstoreWarehouseId`). `getDefaultWebstoreWarehouseId` usa el configurado; si no hay o quedó inactivo, cae al primer almacén activo por `warehouseId` ascendente (comportamiento previo). El payload puede seguir mandando `warehouseId` explícito y tiene prioridad.
 - **B2B sin UI de carrito propia**: `getEffectivePrice` está integrado en POS (precio sugerido, editable). B2B no tiene todavía una UI de creación de factura con líneas — cuando se construya, debe llamar `getEffectivePrice`/`getSuggestedUnitPriceAction` igual que POS.
 - **Recalculo de precio por cantidad en POS**: el precio sugerido solo se calcula al agregar el producto al carrito; si el cajero cambia la cantidad después, no se recalcula automáticamente (relevante para descuentos por volumen). Mejora v2.
 

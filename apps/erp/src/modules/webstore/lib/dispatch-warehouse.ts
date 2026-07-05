@@ -10,8 +10,21 @@ type DbOrTx = PrismaTx | typeof db;
  * (products/route.ts) y el despacho real (process-order.ts) deben usar
  * siempre este mismo criterio — de lo contrario el stock mostrado al cliente
  * puede no coincidir con el almacén del que en realidad se descuenta.
+ *
+ * Prioridad: el almacén configurado en Company.webstoreWarehouseId
+ * (/webstore/configuracion); si no hay configurado o quedó inactivo, cae al
+ * primer almacén activo por id (comportamiento previo) para no bloquear la
+ * tienda.
  */
 export async function getDefaultWebstoreWarehouseId(client: DbOrTx): Promise<number | null> {
+  const company = await client.company.findUnique({
+    where: { id: 1 },
+    select: { webstoreWarehouse: { select: { warehouseId: true, isActive: true } } },
+  });
+  if (company?.webstoreWarehouse?.isActive) {
+    return company.webstoreWarehouse.warehouseId;
+  }
+
   const defaultWarehouse = await client.warehouse.findFirst({
     where: { isActive: true },
     orderBy: { warehouseId: "asc" },

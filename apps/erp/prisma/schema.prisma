@@ -59,10 +59,14 @@ model Company {
   // (ver ExchangeRate); este string se mantiene solo por compatibilidad hasta limpiar lecturas.
   currency    String   @default("MXN")
   baseCurrencyId Int?     @map("base_currency_id")
+  // Almacén cuyo stock expone y despacha la tienda en línea; null = fallback
+  // al primer almacén activo (ver getDefaultWebstoreWarehouseId).
+  webstoreWarehouseId Int? @map("webstore_warehouse_id")
   language    String   @default("es-MX")
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
 
   baseCurrency Currency? @relation(fields: [baseCurrencyId], references: [currencyId], onDelete: Restrict)
+  webstoreWarehouse Warehouse? @relation(fields: [webstoreWarehouseId], references: [warehouseId], onDelete: Restrict)
 
   @@map("company")
 }
@@ -590,6 +594,7 @@ model Warehouse {
   reservations      StockReservation[]
   cashRegisters     CashRegister[]
   stockCounts       StockCount[]
+  companiesAsWebstore Company[]
 
   @@map("warehouses")
 }

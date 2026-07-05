@@ -184,6 +184,7 @@ export const modules: AppModule[] = [
       { name: "Órdenes", href: "/webstore/ordenes", icon: Inbox },
       { name: "Clientes", href: "/webstore/clientes", icon: Users },
       { name: "API keys", href: "/webstore/api-keys", icon: KeyRound },
+      { name: "Configuración", href: "/webstore/configuracion", icon: Settings2 },
     ],
   },
 ];
