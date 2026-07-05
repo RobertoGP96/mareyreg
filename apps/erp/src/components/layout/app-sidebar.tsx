@@ -22,19 +22,27 @@ import {
 } from "@/components/ui/sidebar";
 import Image from "next/image";
 import { ChevronRight, LayoutDashboard, Settings2 } from "lucide-react";
-import { getEnabledModules } from "@/lib/module-registry";
+import { getEnabledModules, type AppModule, type ModuleRoute } from "@/lib/module-registry";
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const allModules = getEnabledModules();
+  const enabledModules = getEnabledModules();
 
-  const modules = allModules.filter((module) => {
+  const isAllowed = (module: AppModule) => {
     if (session?.user?.role === "admin") return true;
     return session?.user?.modules?.includes(module.id) ?? false;
-  });
+  };
 
-  const allHrefs = modules.flatMap((m) => m.routes.map((r) => r.href));
+  const visibleModules = enabledModules.filter(isAllowed);
+  const childrenOf = (parentId: string) =>
+    visibleModules.filter((m) => m.parentId === parentId);
+  // El padre se muestra aunque no tenga permiso propio si algún hijo sí lo tiene
+  const topModules = enabledModules.filter(
+    (m) => !m.parentId && (isAllowed(m) || childrenOf(m.id).length > 0)
+  );
+
+  const allHrefs = visibleModules.flatMap((m) => m.routes.map((r) => r.href));
 
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
@@ -43,16 +51,47 @@ export function AppSidebar() {
     return pathname.startsWith(href + "/");
   };
 
-  const findActiveModuleId = () =>
-    modules.find((m) => m.routes.some((r) => isActive(r.href)))?.id ?? null;
+  const findActiveIds = () => {
+    const active = visibleModules.find((m) => m.routes.some((r) => isActive(r.href)));
+    if (!active) return { moduleId: null, submoduleId: null };
+    if (active.parentId) return { moduleId: active.parentId, submoduleId: active.id };
+    return { moduleId: active.id, submoduleId: null };
+  };
 
-  const [openModuleId, setOpenModuleId] = useState<string | null>(findActiveModuleId);
+  const [openModuleId, setOpenModuleId] = useState<string | null>(
+    () => findActiveIds().moduleId
+  );
+  const [openSubmoduleId, setOpenSubmoduleId] = useState<string | null>(
+    () => findActiveIds().submoduleId
+  );
 
   useEffect(() => {
-    const activeId = findActiveModuleId();
-    if (activeId) setOpenModuleId(activeId);
+    const { moduleId, submoduleId } = findActiveIds();
+    if (moduleId) setOpenModuleId(moduleId);
+    if (submoduleId) setOpenSubmoduleId(submoduleId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
+
+  const renderRoute = (route: ModuleRoute) => {
+    const active = isActive(route.href);
+    return (
+      <SidebarMenuSubItem key={route.href}>
+        <SidebarMenuSubButton
+          asChild
+          isActive={active}
+          className="relative data-[active=true]:bg-gradient-to-r data-[active=true]:from-sidebar-accent data-[active=true]:to-sidebar-accent/40 data-[active=true]:text-white data-[active=true]:shadow-sm"
+        >
+          <Link href={route.href}>
+            {active && (
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-r-full bg-[var(--brand)]" />
+            )}
+            <route.icon />
+            <span>{route.name}</span>
+          </Link>
+        </SidebarMenuSubButton>
+      </SidebarMenuSubItem>
+    );
+  };
 
   return (
     <Sidebar collapsible="icon" variant="sidebar" className="border-r-0">
@@ -114,9 +153,13 @@ export function AppSidebar() {
         <SidebarGroup className="py-1">
           <SidebarGroupContent>
             <SidebarMenu>
-              {modules.map((module) => {
+              {topModules.map((module) => {
+                const submodules = childrenOf(module.id);
+                const ownRoutes = isAllowed(module) ? module.routes : [];
                 const isOpen = openModuleId === module.id;
-                const hasActiveChild = module.routes.some((r) => isActive(r.href));
+                const hasActiveChild =
+                  ownRoutes.some((r) => isActive(r.href)) ||
+                  submodules.some((s) => s.routes.some((r) => isActive(r.href)));
                 return (
                   <Collapsible.Root
                     key={module.id}
@@ -146,24 +189,45 @@ export function AppSidebar() {
                       </Collapsible.Trigger>
                       <Collapsible.Content className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
                         <SidebarMenuSub>
-                          {module.routes.map((route) => {
-                            const active = isActive(route.href);
+                          {ownRoutes.map(renderRoute)}
+                          {submodules.map((submodule) => {
+                            const subOpen = openSubmoduleId === submodule.id;
+                            const subActive = submodule.routes.some((r) =>
+                              isActive(r.href)
+                            );
                             return (
-                              <SidebarMenuSubItem key={route.href}>
-                                <SidebarMenuSubButton
-                                  asChild
-                                  isActive={active}
-                                  className="relative data-[active=true]:bg-gradient-to-r data-[active=true]:from-sidebar-accent data-[active=true]:to-sidebar-accent/40 data-[active=true]:text-white data-[active=true]:shadow-sm"
-                                >
-                                  <Link href={route.href}>
-                                    {active && (
-                                      <span className="absolute left-0 top-1/2 -translate-y-1/2 h-4 w-[2px] rounded-r-full bg-[var(--brand)]" />
-                                    )}
-                                    <route.icon />
-                                    <span>{route.name}</span>
-                                  </Link>
-                                </SidebarMenuSubButton>
-                              </SidebarMenuSubItem>
+                              <Collapsible.Root
+                                key={submodule.id}
+                                asChild
+                                open={subOpen}
+                                onOpenChange={(v) =>
+                                  setOpenSubmoduleId(v ? submodule.id : null)
+                                }
+                              >
+                                <SidebarMenuSubItem>
+                                  <Collapsible.Trigger asChild>
+                                    <SidebarMenuSubButton
+                                      asChild
+                                      isActive={subActive && !subOpen}
+                                      className="relative w-full data-[active=true]:bg-gradient-to-r data-[active=true]:from-sidebar-accent data-[active=true]:to-sidebar-accent/40 data-[active=true]:text-white data-[active=true]:shadow-sm"
+                                    >
+                                      <button type="button">
+                                        <submodule.icon />
+                                        <span>{submodule.label}</span>
+                                        <ChevronRight
+                                          className="ml-auto size-4 text-sidebar-foreground/50 transition-transform duration-200 data-[state=open]:rotate-90"
+                                          data-state={subOpen ? "open" : "closed"}
+                                        />
+                                      </button>
+                                    </SidebarMenuSubButton>
+                                  </Collapsible.Trigger>
+                                  <Collapsible.Content className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                                    <SidebarMenuSub>
+                                      {submodule.routes.map(renderRoute)}
+                                    </SidebarMenuSub>
+                                  </Collapsible.Content>
+                                </SidebarMenuSubItem>
+                              </Collapsible.Root>
                             );
                           })}
                         </SidebarMenuSub>

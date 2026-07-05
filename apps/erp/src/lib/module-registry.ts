@@ -50,6 +50,8 @@ export interface AppModule {
   routes: ModuleRoute[];
   enabled: boolean;
   badge?: string;
+  /** Si se define, el sidebar renderiza este módulo anidado dentro del padre (el permiso sigue siendo propio) */
+  parentId?: string;
 }
 
 export const modules: AppModule[] = [
@@ -111,6 +113,7 @@ export const modules: AppModule[] = [
     label: "Compras",
     icon: ShoppingCart,
     enabled: true,
+    parentId: "inventory",
     routes: [
       { name: "Ordenes de compra", href: "/purchase-orders", icon: FileText },
       { name: "Cuentas por pagar", href: "/accounts-payable", icon: HandCoins },
@@ -121,6 +124,7 @@ export const modules: AppModule[] = [
     label: "Ventas",
     icon: ShoppingBag,
     enabled: true,
+    parentId: "inventory",
     routes: [
       { name: "POS", href: "/pos", icon: CreditCard },
       { name: "Facturas", href: "/invoices", icon: Receipt },
@@ -132,6 +136,7 @@ export const modules: AppModule[] = [
     label: "Reportes",
     icon: BarChart3,
     enabled: true,
+    parentId: "inventory",
     routes: [
       { name: "Dashboard", href: "/reports/dashboard", icon: LayoutDashboard },
       { name: "Kardex", href: "/reports/kardex", icon: LineChart },
