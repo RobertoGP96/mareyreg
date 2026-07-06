@@ -25,7 +25,8 @@ type MockTx = {
   };
   stockMovement: { create: ReturnType<typeof vi.fn> };
   lotStock: { update: ReturnType<typeof vi.fn> };
-  invoiceLine: { createMany: ReturnType<typeof vi.fn> };
+  invoiceLine: { create: ReturnType<typeof vi.fn> };
+  productPiece: { findMany: ReturnType<typeof vi.fn>; updateMany: ReturnType<typeof vi.fn> };
 };
 
 function createMockTx(): MockTx {
@@ -39,7 +40,8 @@ function createMockTx(): MockTx {
     },
     stockMovement: { create: vi.fn() },
     lotStock: { update: vi.fn() },
-    invoiceLine: { createMany: vi.fn() },
+    invoiceLine: { create: vi.fn() },
+    productPiece: { findMany: vi.fn(), updateMany: vi.fn() },
   };
 }
 
@@ -83,7 +85,9 @@ describe("dispatchLines", () => {
     vi.clearAllMocks();
     tx = createMockTx();
     tx.stockMovement.create.mockResolvedValue({ movementId: 1 });
-    tx.invoiceLine.createMany.mockResolvedValue({ count: 1 });
+    tx.invoiceLine.create.mockResolvedValue({ lineId: 100 });
+    tx.productPiece.findMany.mockResolvedValue([]);
+    tx.productPiece.updateMany.mockResolvedValue({ count: 1 });
     applyInventoryExit.mockResolvedValue({ avgCostUsed: 5 });
   });
 
@@ -131,7 +135,7 @@ describe("dispatchLines", () => {
       });
     });
 
-    it("invoiceLine.createMany recibe presentationId/unitFactor/baseQuantity", async () => {
+    it("invoiceLine.create recibe presentationId/unitFactor/baseQuantity", async () => {
       tx.product.findMany.mockResolvedValue([product()]);
       tx.productPresentation.findMany.mockResolvedValue([presentation({ factor: 24 })]);
       tx.stockLevel.updateMany.mockResolvedValue({ count: 1 });
@@ -148,14 +152,12 @@ describe("dispatchLines", () => {
         allowManualPrice: true,
       });
 
-      expect(tx.invoiceLine.createMany).toHaveBeenCalledWith({
-        data: [
-          expect.objectContaining({
-            presentationId: 10,
-            unitFactor: 24,
-            baseQuantity: 48,
-          }),
-        ],
+      expect(tx.invoiceLine.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          presentationId: 10,
+          unitFactor: 24,
+          baseQuantity: 48,
+        }),
       });
     });
   });
@@ -446,6 +448,229 @@ describe("dispatchLines", () => {
       ).rejects.toThrow(
         "Stock insuficiente de Queso. Disponible: 20 kg / 3 pzas — solicitado: 17.35 kg / 5 pzas"
       );
+    });
+
+    describe("venta por piezas registradas (pieceIds)", () => {
+      function piece(overrides: Partial<Record<string, unknown>> = {}) {
+        return {
+          pieceId: 501,
+          productId: 1,
+          warehouseId: 1,
+          status: "available",
+          pieceCount: 5,
+          weightKg: 17.35,
+          label: null,
+          salesOrderLineId: null,
+          ...overrides,
+        };
+      }
+
+      it("deriva peso y piezas de los registros y reclama cada pieza con invoiceLineId", async () => {
+        tx.product.findMany.mockResolvedValue([catchWeightProduct()]);
+        tx.productPresentation.findMany.mockResolvedValue([catchWeightPresentation()]);
+        tx.stockLevel.updateMany.mockResolvedValue({ count: 1 });
+        tx.productPiece.findMany.mockResolvedValue([
+          piece({ pieceId: 501, weightKg: 17.35 }),
+          piece({ pieceId: 502, weightKg: 18.05 }),
+        ]);
+        getEffectiveLinePrices.mockResolvedValue(
+          new Map([[lineKey(1, 20), effectivePriceResult({ pricePerBase: 10 })]])
+        );
+
+        const result = await dispatchLines(tx as never, {
+          invoiceId: 1,
+          folio: "F-0001",
+          warehouseId: 1,
+          customerId: 1,
+          lines: [
+            { productId: 1, presentationId: 20, quantity: 2, unitPrice: 10, pieceIds: [501, 502] },
+          ],
+          allowManualPrice: true,
+        });
+
+        // 2 cajas × 5 pzas, peso real = suma de los pesos registrados
+        expect(result.lineResults[0]).toMatchObject({
+          quantity: 2,
+          pieces: 10,
+          baseQuantity: 35.4,
+          subtotal: 354,
+        });
+        expect(tx.stockLevel.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              currentQuantity: { gte: 35.4 },
+              currentPieces: { gte: 10 },
+            }),
+          })
+        );
+        expect(tx.productPiece.updateMany).toHaveBeenCalledTimes(2);
+        expect(tx.productPiece.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ pieceId: 501, weightKg: 17.35 }),
+            data: expect.objectContaining({ status: "sold", invoiceLineId: 100 }),
+          })
+        );
+      });
+
+      it("reclamo fallido (count 0) aborta la venta", async () => {
+        tx.product.findMany.mockResolvedValue([catchWeightProduct()]);
+        tx.productPresentation.findMany.mockResolvedValue([catchWeightPresentation()]);
+        tx.stockLevel.updateMany.mockResolvedValue({ count: 1 });
+        tx.productPiece.findMany.mockResolvedValue([piece()]);
+        tx.productPiece.updateMany.mockResolvedValue({ count: 0 });
+        getEffectiveLinePrices.mockResolvedValue(
+          new Map([[lineKey(1, 20), effectivePriceResult({ pricePerBase: 10 })]])
+        );
+
+        await expect(
+          dispatchLines(tx as never, {
+            invoiceId: 1,
+            folio: "F-0001",
+            warehouseId: 1,
+            lines: [{ productId: 1, presentationId: 20, quantity: 1, unitPrice: 10, pieceIds: [501] }],
+            allowManualPrice: true,
+          })
+        ).rejects.toThrow("ya no está disponible");
+      });
+
+      it("pieza vendida (status sold) lanza error antes de tocar stock", async () => {
+        tx.product.findMany.mockResolvedValue([catchWeightProduct()]);
+        tx.productPresentation.findMany.mockResolvedValue([catchWeightPresentation()]);
+        tx.productPiece.findMany.mockResolvedValue([piece({ status: "sold" })]);
+        getEffectiveLinePrices.mockResolvedValue(
+          new Map([[lineKey(1, 20), effectivePriceResult({ pricePerBase: 10 })]])
+        );
+
+        await expect(
+          dispatchLines(tx as never, {
+            invoiceId: 1,
+            folio: "F-0001",
+            warehouseId: 1,
+            lines: [{ productId: 1, presentationId: 20, quantity: 1, unitPrice: 10, pieceIds: [501] }],
+            allowManualPrice: true,
+          })
+        ).rejects.toThrow("ya no está disponible");
+        expect(tx.stockLevel.updateMany).not.toHaveBeenCalled();
+      });
+
+      it("pieza reservada por la propia línea de pedido webstore sí se acepta", async () => {
+        tx.product.findMany.mockResolvedValue([catchWeightProduct()]);
+        tx.productPresentation.findMany.mockResolvedValue([catchWeightPresentation()]);
+        tx.stockLevel.updateMany.mockResolvedValue({ count: 1 });
+        tx.productPiece.findMany.mockResolvedValue([
+          piece({ status: "reserved", salesOrderLineId: 77 }),
+        ]);
+        getEffectiveLinePrices.mockResolvedValue(
+          new Map([[lineKey(1, 20), effectivePriceResult({ pricePerBase: 10 })]])
+        );
+
+        const result = await dispatchLines(tx as never, {
+          invoiceId: 1,
+          folio: "F-0001",
+          warehouseId: 1,
+          lines: [
+            {
+              productId: 1,
+              presentationId: 20,
+              quantity: 1,
+              unitPrice: 10,
+              pieceIds: [501],
+              salesOrderLineId: 77,
+            },
+          ],
+          allowManualPrice: true,
+        });
+
+        expect(result.lineResults[0]).toMatchObject({ pieces: 5, baseQuantity: 17.35 });
+        expect(tx.productPiece.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              OR: expect.arrayContaining([
+                { status: "available" },
+                { status: "reserved", salesOrderLineId: 77 },
+              ]),
+            }),
+          })
+        );
+      });
+
+      it("pieza de otro almacén lanza error", async () => {
+        tx.product.findMany.mockResolvedValue([catchWeightProduct()]);
+        tx.productPresentation.findMany.mockResolvedValue([catchWeightPresentation()]);
+        tx.productPiece.findMany.mockResolvedValue([piece({ warehouseId: 9 })]);
+        getEffectiveLinePrices.mockResolvedValue(
+          new Map([[lineKey(1, 20), effectivePriceResult({ pricePerBase: 10 })]])
+        );
+
+        await expect(
+          dispatchLines(tx as never, {
+            invoiceId: 1,
+            folio: "F-0001",
+            warehouseId: 1,
+            lines: [{ productId: 1, presentationId: 20, quantity: 1, unitPrice: 10, pieceIds: [501] }],
+            allowManualPrice: true,
+          })
+        ).rejects.toThrow("no corresponde al producto o almacén");
+      });
+
+      it("pieceCount distinto a piecesPerUnit de la presentación lanza error", async () => {
+        tx.product.findMany.mockResolvedValue([catchWeightProduct()]);
+        tx.productPresentation.findMany.mockResolvedValue([catchWeightPresentation()]);
+        tx.productPiece.findMany.mockResolvedValue([piece({ pieceCount: 1 })]);
+        getEffectiveLinePrices.mockResolvedValue(
+          new Map([[lineKey(1, 20), effectivePriceResult({ pricePerBase: 10 })]])
+        );
+
+        await expect(
+          dispatchLines(tx as never, {
+            invoiceId: 1,
+            folio: "F-0001",
+            warehouseId: 1,
+            lines: [{ productId: 1, presentationId: 20, quantity: 1, unitPrice: 10, pieceIds: [501] }],
+            allowManualPrice: true,
+          })
+        ).rejects.toThrow("no corresponde a la presentación");
+      });
+
+      it("piezas repetidas entre líneas lanza error", async () => {
+        tx.product.findMany.mockResolvedValue([catchWeightProduct()]);
+        tx.productPresentation.findMany.mockResolvedValue([catchWeightPresentation()]);
+        getEffectiveLinePrices.mockResolvedValue(
+          new Map([[lineKey(1, 20), effectivePriceResult({ pricePerBase: 10 })]])
+        );
+
+        await expect(
+          dispatchLines(tx as never, {
+            invoiceId: 1,
+            folio: "F-0001",
+            warehouseId: 1,
+            lines: [
+              { productId: 1, presentationId: 20, quantity: 1, unitPrice: 10, pieceIds: [501] },
+              { productId: 1, presentationId: 20, quantity: 1, unitPrice: 10, pieceIds: [501] },
+            ],
+            allowManualPrice: true,
+          })
+        ).rejects.toThrow("Hay piezas repetidas en la venta");
+      });
+
+      it("quantity distinto de pieceIds.length lanza error", async () => {
+        tx.product.findMany.mockResolvedValue([catchWeightProduct()]);
+        tx.productPresentation.findMany.mockResolvedValue([catchWeightPresentation()]);
+        tx.productPiece.findMany.mockResolvedValue([piece()]);
+        getEffectiveLinePrices.mockResolvedValue(
+          new Map([[lineKey(1, 20), effectivePriceResult({ pricePerBase: 10 })]])
+        );
+
+        await expect(
+          dispatchLines(tx as never, {
+            invoiceId: 1,
+            folio: "F-0001",
+            warehouseId: 1,
+            lines: [{ productId: 1, presentationId: 20, quantity: 2, unitPrice: 10, pieceIds: [501] }],
+            allowManualPrice: true,
+          })
+        ).rejects.toThrow("no coincide con las piezas seleccionadas");
+      });
     });
 
     it("stock: piezas suficientes pero kg insuficientes muestra mensaje dual", async () => {

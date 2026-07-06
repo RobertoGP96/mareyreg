@@ -116,7 +116,11 @@ function toUserMessage(error: unknown, genericMessage: string): string {
       error.message.startsWith("El producto ") ||
       error.message.startsWith("La cantidad de ") ||
       error.message.startsWith("Captura el peso real de ") ||
-      error.message.endsWith("no es un producto de peso variable")
+      error.message.endsWith("no es un producto de peso variable") ||
+      // Validaciones de venta por piezas registradas (ProductPiece).
+      error.message.startsWith("La pieza ") ||
+      error.message.startsWith("El peso capturado de ") ||
+      error.message === "Hay piezas repetidas en la venta"
     ) {
       return error.message;
     }
@@ -133,6 +137,12 @@ export interface InvoiceLineInput {
   lotId?: number;
   /** Peso real capturado en báscula (kg). Solo productos catch-weight. */
   actualWeightKg?: number;
+  /**
+   * Piezas registradas seleccionadas (catch-weight). quantity debe ser
+   * pieceIds.length; el peso real se deriva server-side de los pesos
+   * registrados — ver dispatch-lines.ts.
+   */
+  pieceIds?: number[];
 }
 
 /** Un pago dentro de un cobro (posiblemente multi-moneda, ej. POS). */
@@ -508,6 +518,23 @@ export async function cancelInvoice(invoiceId: number): Promise<ActionResult<voi
         }),
         userId,
         movementNotesPrefix: "Cancelacion factura",
+      });
+
+      // Liberar las piezas registradas consumidas por esta factura: vuelven a
+      // estar disponibles en su almacén (reverseInvoiceStock ya reingresó los
+      // kg y piezas agregados en la misma tx).
+      await tx.productPiece.updateMany({
+        where: {
+          invoiceLineId: { in: invoice.lines.map((l) => l.lineId) },
+          status: "sold",
+        },
+        data: {
+          status: "available",
+          invoiceLineId: null,
+          salesOrderLineId: null,
+          soldAt: null,
+          reservedAt: null,
+        },
       });
 
       // Revertir saldo del cliente

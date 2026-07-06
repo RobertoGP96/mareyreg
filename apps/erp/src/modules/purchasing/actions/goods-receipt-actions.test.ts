@@ -27,6 +27,9 @@ const { revalidatePath, createAuditLog, requireCurrentUserId, applyInventoryEntr
       goodsReceiptLine: {
         create: vi.fn(),
       },
+      productPiece: {
+        createMany: vi.fn(),
+      },
       stockMovement: {
         create: vi.fn(),
       },
@@ -632,6 +635,74 @@ describe("createGoodsReceipt — catch-weight (peso variable)", () => {
         data: expect.objectContaining({ quantity: totalWeight, pieces: 4, unitCost: 8 }),
       })
     );
+
+    // Registro individual de pesajes: una ProductPiece disponible por peso
+    // capturado (modo "piece" default: pieceCount 1 por pieza suelta).
+    expect(tx.productPiece.createMany).toHaveBeenCalledWith({
+      data: [4.2, 3.8, 4.5, 4.15].map((w) =>
+        expect.objectContaining({
+          productId: 1,
+          warehouseId: 1,
+          weightKg: w,
+          pieceCount: 1,
+          receiptLineId: 1,
+        })
+      ),
+    });
+  });
+
+  it("modo unit (caja pesada completa): quantity pesos y pieceCount = piecesPerUnit", async () => {
+    const result = await createGoodsReceipt({
+      poId: 1,
+      lines: [
+        {
+          poLineId: 1,
+          quantity: 2,
+          unitCost: 8,
+          weighingMode: "unit",
+          pieceWeights: [8.4, 8.15],
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+
+    const totalWeight = 8.4 + 8.15;
+    // La línea sigue registrando el total de piezas fungibles (2 cajas × 2 pzas)
+    expect(tx.goodsReceiptLine.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        quantity: 2,
+        pieces: 4,
+        baseQuantity: totalWeight,
+      }),
+    });
+    // Pero cada pesaje es la caja completa: 2 registros con pieceCount 2
+    expect(tx.productPiece.createMany).toHaveBeenCalledWith({
+      data: [8.4, 8.15].map((w) =>
+        expect.objectContaining({ weightKg: w, pieceCount: 2 })
+      ),
+    });
+  });
+
+  it("modo unit con pesos de menos retorna error claro", async () => {
+    const result = await createGoodsReceipt({
+      poId: 1,
+      lines: [
+        {
+          poLineId: 1,
+          quantity: 2,
+          unitCost: 8,
+          weighingMode: "unit",
+          pieceWeights: [8.4],
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("Se esperaban 2 pesos");
+    }
+    expect(tx.productPiece.createMany).not.toHaveBeenCalled();
   });
 
   it("pieceWeights.length distinto al esperado retorna error claro", async () => {

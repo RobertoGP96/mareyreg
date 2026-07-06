@@ -25,8 +25,25 @@ export interface DispatchLineInput {
   unitPrice?: number;
   discount?: number;
   lotId?: number;
-  /** Peso real capturado en báscula (kg). Obligatorio para productos catch-weight. */
+  /**
+   * Peso real capturado en báscula (kg). Obligatorio para productos
+   * catch-weight sin pieceIds; con pieceIds es opcional y solo se usa para
+   * verificar contra la suma de pesos registrados.
+   */
   actualWeightKg?: number;
+  /**
+   * Piezas registradas (ProductPiece) que se lleva el cliente. Si se indica,
+   * quantity debe ser pieceIds.length y el peso real se deriva SIEMPRE de los
+   * pesos registrados server-side. Cada pieza debe estar disponible (o
+   * reservada por salesOrderLineId) en el almacén de despacho.
+   */
+  pieceIds?: number[];
+  /**
+   * Línea de pedido webstore que reservó las piezas (claim previo
+   * available→reserved en process-order). Permite consumir piezas en estado
+   * reserved sin poder robar reservas de otros pedidos.
+   */
+  salesOrderLineId?: number;
 }
 
 export interface DispatchLineResult {
@@ -124,6 +141,20 @@ export async function dispatchLines(
     { customerId }
   );
 
+  // Batch: piezas registradas referenciadas por las líneas. Se leen para
+  // validar y derivar pesos; el reclamo definitivo (available/reserved → sold)
+  // es un updateMany condicional por pieza al crear cada InvoiceLine.
+  const allPieceIds = lines.flatMap((l) => l.pieceIds ?? []);
+  if (new Set(allPieceIds).size !== allPieceIds.length) {
+    throw new Error("Hay piezas repetidas en la venta");
+  }
+  const referencedPieces = allPieceIds.length
+    ? await tx.productPiece.findMany({ where: { pieceId: { in: allPieceIds } } })
+    : [];
+  const piecesById = new Map(referencedPieces.map((p) => [p.pieceId, p]));
+  // Piezas a reclamar por índice de línea, resueltas dentro del loop.
+  const pieceClaimsByLine = new Map<number, { pieceId: number; weightKg: Prisma.Decimal; label: string | null }[]>();
+
   for (const line of lines) {
     const product = productById.get(line.productId);
     if (!product) throw new Error(`Producto ${line.productId} no existe`);
@@ -160,6 +191,10 @@ export async function dispatchLines(
     let pieces: number | null = null;
     let baseQty: number;
 
+    if (line.pieceIds?.length && !product.isCatchWeight) {
+      throw new Error(`${product.name} no es un producto de peso variable`);
+    }
+
     if (product.isCatchWeight) {
       // Producto de peso variable: solo Pieza/Caja (piecesPerUnit != null) son
       // vendibles — la presentación base (kg) no tiene conteo de piezas.
@@ -171,12 +206,63 @@ export async function dispatchLines(
       if (!Number.isInteger(line.quantity) || line.quantity < 1) {
         throw new Error(`La cantidad de ${product.name} debe ser un número entero mayor o igual a 1`);
       }
-      if (line.actualWeightKg == null || !(line.actualWeightKg > 0)) {
-        throw new Error(`Captura el peso real de ${product.name}`);
-      }
 
-      pieces = piecesFor(line.quantity, piecesPerUnit);
-      baseQty = catchWeightBaseQuantity(line.actualWeightKg);
+      if (line.pieceIds?.length) {
+        // Venta por piezas registradas: el peso real sale SIEMPRE de los pesos
+        // registrados server-side, nunca del cliente. Cada pieza debe ser del
+        // producto, estar en el almacén de despacho, corresponder a la
+        // presentación vendida (pieceCount === piecesPerUnit) y estar
+        // disponible (o reservada por la propia línea de pedido webstore).
+        if (line.pieceIds.length !== line.quantity) {
+          throw new Error(
+            `La cantidad de ${product.name} no coincide con las piezas seleccionadas`
+          );
+        }
+        const selected = line.pieceIds.map((id) => {
+          const piece = piecesById.get(id);
+          if (!piece || piece.productId !== line.productId || piece.warehouseId !== warehouseId) {
+            throw new Error(
+              `La pieza ${piece?.label ?? id} no corresponde al producto o almacén de la venta`
+            );
+          }
+          if (piece.pieceCount !== piecesPerUnit) {
+            throw new Error(
+              `La pieza ${piece.label ?? id} no corresponde a la presentación ${presentationName ?? ""} de ${product.name}`
+            );
+          }
+          const reservedByThisLine =
+            piece.status === "reserved" &&
+            line.salesOrderLineId != null &&
+            piece.salesOrderLineId === line.salesOrderLineId;
+          if (piece.status !== "available" && !reservedByThisLine) {
+            throw new Error(
+              `La pieza ${piece.label ?? id} ya no está disponible. Vuelve a seleccionar las piezas.`
+            );
+          }
+          return piece;
+        });
+
+        pieces = selected.reduce((s, p) => s + p.pieceCount, 0);
+        const totalWeightKg = selected.reduce((s, p) => s + Number(p.weightKg), 0);
+        baseQty = catchWeightBaseQuantity(totalWeightKg);
+        if (line.actualWeightKg != null && Math.abs(line.actualWeightKg - baseQty) > 0.001) {
+          throw new Error(
+            `El peso capturado de ${product.name} no coincide con las piezas seleccionadas`
+          );
+        }
+        pieceClaimsByLine.set(lineResults.length, selected.map((p) => ({
+          pieceId: p.pieceId,
+          weightKg: p.weightKg,
+          label: p.label,
+        })));
+      } else {
+        // Fallback de peso manual (stock sin piezas registradas).
+        if (line.actualWeightKg == null || !(line.actualWeightKg > 0)) {
+          throw new Error(`Captura el peso real de ${product.name}`);
+        }
+        pieces = piecesFor(line.quantity, piecesPerUnit);
+        baseQty = catchWeightBaseQuantity(line.actualWeightKg);
+      }
 
       if (allowManualPrice) {
         // unitPrice se interpreta SIEMPRE por kg en catch-weight. El POS puede
@@ -224,7 +310,7 @@ export async function dispatchLines(
 
     if (!product.isService) {
       const equivalenceNote = product.isCatchWeight
-        ? ` — ${formatCatchWeight(line.quantity, presentationName ?? product.unit, pieces ?? line.quantity, line.actualWeightKg ?? 0)}`
+        ? ` — ${formatCatchWeight(line.quantity, presentationName ?? product.unit, pieces ?? line.quantity, baseQty)}`
         : factor !== 1 && presentationName
           ? ` — ${formatEquivalence(line.quantity, factor, presentationName, product.unit)}`
           : "";
@@ -363,22 +449,57 @@ export async function dispatchLines(
     });
   }
 
-  await tx.invoiceLine.createMany({
-    data: lineResults.map((r) => ({
-      invoiceId,
-      productId: r.productId,
-      presentationId: r.presentationId,
-      quantity: r.quantity,
-      unitPrice: r.unitPrice,
-      discount: r.discount,
-      unitCost: r.unitCost,
-      subtotal: r.subtotal,
-      lotId: r.lotId,
-      unitFactor: r.unitFactor,
-      baseQuantity: r.baseQuantity,
-      pieces: r.pieces,
-    })),
-  });
+  // Create por línea (no createMany): las líneas con piezas registradas
+  // necesitan su lineId para reclamarlas. El reclamo condiciona estado Y peso
+  // leído — un re-pesaje concurrente entre lectura y reclamo también invalida
+  // la venta (count 0 ⇒ rollback completo de factura, stock y valuación).
+  for (let i = 0; i < lineResults.length; i++) {
+    const r = lineResults[i];
+    const createdLine = await tx.invoiceLine.create({
+      data: {
+        invoiceId,
+        productId: r.productId,
+        presentationId: r.presentationId,
+        quantity: r.quantity,
+        unitPrice: r.unitPrice,
+        discount: r.discount,
+        unitCost: r.unitCost,
+        subtotal: r.subtotal,
+        lotId: r.lotId,
+        unitFactor: r.unitFactor,
+        baseQuantity: r.baseQuantity,
+        pieces: r.pieces,
+      },
+    });
+
+    const claims = pieceClaimsByLine.get(i);
+    if (!claims?.length) continue;
+    const salesOrderLineId = lines[i].salesOrderLineId ?? null;
+    for (const claim of claims) {
+      const claimed = await tx.productPiece.updateMany({
+        where: {
+          pieceId: claim.pieceId,
+          weightKg: claim.weightKg,
+          OR: [
+            { status: "available" },
+            ...(salesOrderLineId != null
+              ? [{ status: "reserved" as const, salesOrderLineId }]
+              : []),
+          ],
+        },
+        data: {
+          status: "sold",
+          invoiceLineId: createdLine.lineId,
+          soldAt: new Date(),
+        },
+      });
+      if (claimed.count !== 1) {
+        throw new Error(
+          `La pieza ${claim.label ?? claim.pieceId} ya no está disponible. Vuelve a seleccionar las piezas.`
+        );
+      }
+    }
+  }
 
   return { lineResults, priceOverrides };
 }
