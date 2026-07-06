@@ -91,18 +91,30 @@ export default async function InvoiceDetailPage({
           <h2 className="font-medium">Lineas</h2>
         </div>
         <div className="p-4 grid gap-2">
-          {invoice.lines.map((l) => (
-            <div key={l.lineId} className="flex justify-between items-start gap-2 text-sm border-b last:border-0 pb-2 last:pb-0">
-              <div className="min-w-0">
-                <p className="font-medium">{l.product.name}</p>
-                {l.presentation && <p className="text-xs text-muted-foreground">{l.presentation.name}</p>}
+          {invoice.lines.map((l) => {
+            // Línea catch-weight (pieces != null): el precio es por kg y
+            // baseQuantity es el peso real — se muestra solo en kg, sin el
+            // desglose por presentación/piezas.
+            const isCatchWeightLine = l.pieces != null;
+            return (
+              <div key={l.lineId} className="flex justify-between items-start gap-2 text-sm border-b last:border-0 pb-2 last:pb-0">
+                <div className="min-w-0">
+                  <p className="font-medium">{l.product.name}</p>
+                  {!isCatchWeightLine && l.presentation && (
+                    <p className="text-xs text-muted-foreground">{l.presentation.name}</p>
+                  )}
+                </div>
+                <div className="text-right font-mono tabular-nums shrink-0">
+                  <p>
+                    {isCatchWeightLine
+                      ? `${Number(Number(l.baseQuantity).toFixed(3))} kg × ${Number(l.unitPrice).toFixed(2)}/kg`
+                      : `${String(l.quantity)} × ${Number(l.unitPrice).toFixed(2)}`}
+                  </p>
+                  <p className="font-medium">{Number(l.subtotal).toFixed(2)}</p>
+                </div>
               </div>
-              <div className="text-right font-mono tabular-nums shrink-0">
-                <p>{String(l.quantity)} × {Number(l.unitPrice).toFixed(2)}</p>
-                <p className="font-medium">{Number(l.subtotal).toFixed(2)}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

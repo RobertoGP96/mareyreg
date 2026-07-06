@@ -79,3 +79,14 @@ export function formatCatchWeight(
   const piecesLabel = pieces === quantity ? "" : ` (${pieces} pzas)`;
   return `${quantity} ${presentationName}${piecesLabel} · ${weight} kg`;
 }
+
+/**
+ * Display de VENTA de una línea catch-weight (carrito, ticket, factura): solo
+ * el peso real y el precio por kg — "17.35 kg × $180.00/kg". El desglose por
+ * presentación/piezas queda para inventario (formatCatchWeight), no para el
+ * cliente.
+ */
+export function formatWeightPrice(actualWeightKg: number, pricePerKg: number): string {
+  const weight = Number(actualWeightKg.toFixed(3));
+  return `${weight} kg × $${pricePerKg.toFixed(2)}/kg`;
+}

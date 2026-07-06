@@ -30,7 +30,11 @@ import { toast } from "@/lib/toast";
 import { ToastDetail, ToastLines } from "@/components/ui/toast-content";
 import { createInvoice, type PaymentInput } from "../actions/invoice-actions";
 import { getSuggestedUnitPriceAction } from "@/modules/inventory/actions/pricing-actions";
-import { piecesFor, formatCatchWeight } from "@/modules/inventory/lib/units";
+import {
+  getAvailablePiecesAction,
+  type AvailablePiece,
+} from "@/modules/inventory/actions/piece-actions";
+import { piecesFor, formatWeightPrice } from "@/modules/inventory/lib/units";
 import {
   MultiCurrencyPaymentFields,
   type CurrencyOption as PaymentCurrencyOption,
@@ -99,6 +103,12 @@ interface CartLine {
   actualWeightKg: number | null;
   /** Precio por kg (catch-weight). null para líneas normales — usan unitPrice tal cual. */
   pricePerKg: number | null;
+  /**
+   * Piezas registradas seleccionadas (catch-weight con registro de pesajes).
+   * null en líneas normales o con peso manual; el server deriva el peso real
+   * de estos registros al facturar.
+   */
+  pieceIds: number[] | null;
 }
 
 function cartLineKey(productId: number, presentationId: number | null): string {
@@ -175,6 +185,13 @@ export function PosClient({
   const [weighingQuantity, setWeighingQuantity] = useState("1");
   const [weighingWeight, setWeighingWeight] = useState("");
   const [editingLineKey, setEditingLineKey] = useState<string | null>(null);
+  // Selección de piezas registradas: modo "pieces" (default cuando hay
+  // registros) elige piezas con su peso ya capturado; "manual" es el fallback
+  // para stock sin registro (se teclea el peso de la báscula).
+  const [weighingMode, setWeighingMode] = useState<"pieces" | "manual">("manual");
+  const [availablePieces, setAvailablePieces] = useState<AvailablePiece[]>([]);
+  const [piecesLoading, setPiecesLoading] = useState(false);
+  const [selectedPieceIds, setSelectedPieceIds] = useState<number[]>([]);
 
   const selectedCustomer = customers.find((c) => String(c.customerId) === customerId);
   const prevCustomerTypeRef = useRef<string | undefined>(selectedCustomer?.customerType);
@@ -296,6 +313,7 @@ export function PosClient({
           pieces: null,
           actualWeightKg: null,
           pricePerKg: null,
+          pieceIds: null,
         },
       ]);
     }
@@ -346,6 +364,20 @@ export function PosClient({
   const sellableCatchWeightPresentations = (p: ProductOption) =>
     p.presentations.filter((pr) => pr.piecesPerUnit != null);
 
+  // Carga on-demand las piezas registradas disponibles del producto en el
+  // almacén del POS (no viajan en los props de la página).
+  const loadAvailablePieces = async (productId: number): Promise<AvailablePiece[]> => {
+    setPiecesLoading(true);
+    try {
+      const result = await getAvailablePiecesAction(productId, warehouseId);
+      return result.success ? result.data.pieces : [];
+    } catch {
+      return [];
+    } finally {
+      setPiecesLoading(false);
+    }
+  };
+
   const openWeighing = (p: ProductOption, presentationId?: number) => {
     const options = sellableCatchWeightPresentations(p);
     if (options.length === 0) {
@@ -360,8 +392,15 @@ export function PosClient({
     setWeighingQuantity("1");
     setWeighingWeight(String((initial.factor * 1).toFixed(3)));
     setEditingLineKey(null);
+    setWeighingMode("manual");
+    setAvailablePieces([]);
+    setSelectedPieceIds([]);
     setSearch("");
     setPendingProduct(null);
+    void loadAvailablePieces(p.productId).then((pieces) => {
+      setAvailablePieces(pieces);
+      if (pieces.length > 0) setWeighingMode("pieces");
+    });
   };
 
   const openWeighingForEdit = (line: CartLine) => {
@@ -372,6 +411,12 @@ export function PosClient({
     setWeighingQuantity(String(line.quantity));
     setWeighingWeight(line.actualWeightKg != null ? String(line.actualWeightKg) : "");
     setEditingLineKey(cartLineKey(line.productId, line.presentationId));
+    setWeighingMode(line.pieceIds != null ? "pieces" : "manual");
+    setAvailablePieces([]);
+    setSelectedPieceIds(line.pieceIds ?? []);
+    void loadAvailablePieces(line.productId).then((pieces) => {
+      setAvailablePieces(pieces);
+    });
   };
 
   const closeWeighing = () => {
@@ -380,6 +425,49 @@ export function PosClient({
     setWeighingQuantity("1");
     setWeighingWeight("");
     setEditingLineKey(null);
+    setWeighingMode("manual");
+    setAvailablePieces([]);
+    setSelectedPieceIds([]);
+  };
+
+  /** Piezas ya reclamadas por otras líneas del carrito (no seleccionables). */
+  const pieceIdsInOtherLines = useMemo(() => {
+    const ids = new Set<number>();
+    for (const l of cart) {
+      if (editingLineKey != null && cartLineKey(l.productId, l.presentationId) === editingLineKey) {
+        continue;
+      }
+      for (const id of l.pieceIds ?? []) ids.add(id);
+    }
+    return ids;
+  }, [cart, editingLineKey]);
+
+  const weighingPresentation = weighingProduct?.presentations.find(
+    (pr) => pr.presentationId === weighingPresentationId
+  ) ?? null;
+
+  // Solo piezas que corresponden a la presentación elegida: una pieza suelta
+  // (pieceCount 1) se vende como Pieza, una caja pesada completa
+  // (pieceCount = piecesPerUnit) como Caja.
+  const selectablePieces = useMemo(() => {
+    if (weighingPresentation?.piecesPerUnit == null) return [];
+    return availablePieces.filter(
+      (pc) =>
+        pc.pieceCount === weighingPresentation.piecesPerUnit &&
+        !pieceIdsInOtherLines.has(pc.pieceId)
+    );
+  }, [availablePieces, weighingPresentation, pieceIdsInOtherLines]);
+
+  const selectedPieces = useMemo(
+    () => selectablePieces.filter((pc) => selectedPieceIds.includes(pc.pieceId)),
+    [selectablePieces, selectedPieceIds]
+  );
+  const selectedWeightKg = selectedPieces.reduce((s, pc) => s + pc.weightKg, 0);
+
+  const togglePiece = (pieceId: number) => {
+    setSelectedPieceIds((prev) =>
+      prev.includes(pieceId) ? prev.filter((id) => id !== pieceId) : [...prev, pieceId]
+    );
   };
 
   const confirmWeighing = () => {
@@ -391,17 +479,35 @@ export function PosClient({
       toast.error("Selecciona una presentación válida");
       return;
     }
-    const quantity = Math.trunc(Number(weighingQuantity));
-    if (!Number.isInteger(quantity) || quantity < 1) {
-      toast.error("La cantidad debe ser un entero mayor o igual a 1");
-      return;
+
+    let quantity: number;
+    let actualWeightKg: number;
+    let pieces: number;
+    let pieceIds: number[] | null;
+
+    if (weighingMode === "pieces") {
+      if (!selectedPieces.length) {
+        toast.error("Selecciona al menos una pieza");
+        return;
+      }
+      quantity = selectedPieces.length;
+      actualWeightKg = selectedWeightKg;
+      pieces = selectedPieces.reduce((s, pc) => s + pc.pieceCount, 0);
+      pieceIds = selectedPieces.map((pc) => pc.pieceId);
+    } else {
+      quantity = Math.trunc(Number(weighingQuantity));
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        toast.error("La cantidad debe ser un entero mayor o igual a 1");
+        return;
+      }
+      actualWeightKg = Number(weighingWeight);
+      if (!Number.isFinite(actualWeightKg) || actualWeightKg <= 0) {
+        toast.error("Captura el peso real (mayor a 0)");
+        return;
+      }
+      pieces = piecesFor(quantity, presentation.piecesPerUnit);
+      pieceIds = null;
     }
-    const actualWeightKg = Number(weighingWeight);
-    if (!Number.isFinite(actualWeightKg) || actualWeightKg <= 0) {
-      toast.error("Captura el peso real (mayor a 0)");
-      return;
-    }
-    const pieces = piecesFor(quantity, presentation.piecesPerUnit);
 
     // Validación dual de stock: kg y piezas, excluyendo la línea que se está
     // editando de la suma ya en carrito (para no contarla dos veces).
@@ -441,6 +547,7 @@ export function PosClient({
       pieces,
       actualWeightKg,
       pricePerKg: resolvedPricePerKg,
+      pieceIds,
     };
 
     if (editingLineKey != null) {
@@ -450,6 +557,16 @@ export function PosClient({
     } else {
       const existingIdx = cart.findIndex((l) => cartLineKey(l.productId, l.presentationId) === key);
       if (existingIdx >= 0) {
+        // Una línea no puede mezclar piezas registradas con peso manual (el
+        // server exige quantity === pieceIds.length): se pide editar la
+        // existente en lugar de fusionar tipos distintos de pesaje.
+        const existing = cart[existingIdx];
+        if ((existing.pieceIds == null) !== (pieceIds == null)) {
+          toast.error(
+            `Ya hay una línea de ${weighingProduct.name} con otro tipo de pesaje. Edítala desde el carrito.`
+          );
+          return;
+        }
         // Ya hay una línea con la misma presentación: se combina sumando
         // peso y piezas, en vez de crear una segunda línea idéntica.
         setCart((prev) =>
@@ -460,6 +577,8 @@ export function PosClient({
                   quantity: l.quantity + quantity,
                   pieces: (l.pieces ?? 0) + pieces,
                   actualWeightKg: (l.actualWeightKg ?? 0) + actualWeightKg,
+                  pieceIds:
+                    pieceIds != null ? [...(l.pieceIds ?? []), ...pieceIds] : l.pieceIds,
                 }
               : l
           )
@@ -585,6 +704,7 @@ export function PosClient({
         quantity: l.quantity,
         unitPrice: l.unitPrice,
         actualWeightKg: l.actualWeightKg ?? undefined,
+        pieceIds: l.pieceIds ?? undefined,
       })),
       immediatePayments,
     });
@@ -718,8 +838,8 @@ export function PosClient({
                   <div className="min-w-0">
                     <p className="text-sm font-medium line-clamp-2">{l.name}</p>
                     {isCatchWeightLine ? (
-                      <p className="text-[11px] text-muted-foreground">
-                        {formatCatchWeight(l.quantity, l.presentationName ?? l.unit, l.pieces ?? l.quantity, l.actualWeightKg ?? 0)}
+                      <p className="text-[11px] text-muted-foreground font-mono tabular-nums">
+                        {formatWeightPrice(l.actualWeightKg ?? 0, l.unitPrice)}
                       </p>
                     ) : (
                       l.presentationName && (
@@ -776,11 +896,6 @@ export function PosClient({
                     ${lineAmount(l).toFixed(2)}
                   </div>
                 </div>
-                {isCatchWeightLine && (
-                  <p className="text-[10px] text-muted-foreground text-right pr-1">
-                    ${l.unitPrice.toFixed(2)}/kg
-                  </p>
-                )}
               </div>
             );
           })}
@@ -876,7 +991,7 @@ export function PosClient({
       <ResponsiveFormDialog
         open={weighingProduct != null}
         onOpenChange={(open) => !open && closeWeighing()}
-        title="Pesaje"
+        title={weighingMode === "pieces" ? "Seleccionar piezas" : "Pesaje"}
         description={weighingProduct?.name}
         showHeader
         desktopMaxWidth="sm:max-w-md"
@@ -890,6 +1005,7 @@ export function PosClient({
                 onValueChange={(v) => {
                   const id = Number(v);
                   setWeighingPresentationId(id);
+                  setSelectedPieceIds([]);
                   const pr = weighingProduct.presentations.find((p) => p.presentationId === id);
                   if (pr) {
                     const qty = Math.trunc(Number(weighingQuantity)) || 1;
@@ -907,38 +1023,107 @@ export function PosClient({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Cantidad</Label>
-              <Input
-                type="number"
-                min="1"
-                step="1"
-                value={weighingQuantity}
-                onChange={(e) => {
-                  setWeighingQuantity(e.target.value);
-                  const pr = weighingProduct.presentations.find(
-                    (p) => p.presentationId === weighingPresentationId
-                  );
-                  const qty = Math.trunc(Number(e.target.value)) || 1;
-                  if (pr) setWeighingWeight(String((pr.factor * qty).toFixed(3)));
-                }}
-                className="font-mono tabular-nums"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Peso real (kg)</Label>
-              <Input
-                type="number"
-                min="0.001"
-                step="0.001"
-                value={weighingWeight}
-                onChange={(e) => setWeighingWeight(e.target.value)}
-                className="font-mono tabular-nums"
-                autoFocus
-              />
-            </div>
+
+            {availablePieces.length > 0 && (
+              <div className="flex rounded-md border overflow-hidden">
+                <button
+                  type="button"
+                  className={`flex-1 h-10 text-sm ${weighingMode === "pieces" ? "bg-secondary font-medium" : "text-muted-foreground"}`}
+                  onClick={() => setWeighingMode("pieces")}
+                >
+                  Elegir piezas
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 h-10 text-sm border-l ${weighingMode === "manual" ? "bg-secondary font-medium" : "text-muted-foreground"}`}
+                  onClick={() => setWeighingMode("manual")}
+                >
+                  Peso manual
+                </button>
+              </div>
+            )}
+
+            {weighingMode === "pieces" ? (
+              piecesLoading ? (
+                <div className="flex justify-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                    {selectablePieces.map((pc) => {
+                      const isSelected = selectedPieceIds.includes(pc.pieceId);
+                      return (
+                        <button
+                          key={pc.pieceId}
+                          type="button"
+                          onClick={() => togglePiece(pc.pieceId)}
+                          className={`w-full min-h-11 border rounded-lg px-3 py-2 text-left flex items-center justify-between gap-2 ${
+                            isSelected
+                              ? "border-primary bg-primary/5 font-medium"
+                              : "hover:bg-accent"
+                          }`}
+                        >
+                          <span className="font-mono tabular-nums text-sm">
+                            {pc.weightKg.toFixed(3)} kg
+                          </span>
+                          <span className="text-xs text-muted-foreground truncate">
+                            {pc.label ?? `#${pc.pieceId}`}
+                          </span>
+                        </button>
+                      );
+                    })}
+                    {selectablePieces.length === 0 && (
+                      <p className="text-sm text-muted-foreground py-2">
+                        Sin piezas registradas para esta presentación. Usa peso manual.
+                      </p>
+                    )}
+                  </div>
+                  {selectedPieces.length > 0 && (
+                    <p className="text-sm font-mono tabular-nums text-right">
+                      {selectedPieces.length} pza{selectedPieces.length === 1 ? "" : "s"} ·{" "}
+                      {selectedWeightKg.toFixed(3)} kg
+                    </p>
+                  )}
+                </>
+              )
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>Cantidad</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={weighingQuantity}
+                    onChange={(e) => {
+                      setWeighingQuantity(e.target.value);
+                      const pr = weighingProduct.presentations.find(
+                        (p) => p.presentationId === weighingPresentationId
+                      );
+                      const qty = Math.trunc(Number(e.target.value)) || 1;
+                      if (pr) setWeighingWeight(String((pr.factor * qty).toFixed(3)));
+                    }}
+                    className="font-mono tabular-nums"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Peso real (kg)</Label>
+                  <Input
+                    type="number"
+                    min="0.001"
+                    step="0.001"
+                    value={weighingWeight}
+                    onChange={(e) => setWeighingWeight(e.target.value)}
+                    className="font-mono tabular-nums"
+                    autoFocus
+                  />
+                </div>
+              </>
+            )}
+
             <Button className="w-full" size="lg" onClick={confirmWeighing}>
-              Confirmar peso
+              {weighingMode === "pieces" ? "Agregar piezas" : "Confirmar peso"}
             </Button>
           </div>
         )}
