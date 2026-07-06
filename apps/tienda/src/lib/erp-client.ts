@@ -34,6 +34,17 @@ export interface WebstoreProductOffer {
   endsAt: string | null;
 }
 
+/** Pesaje individual disponible de un producto catch-weight (registro ProductPiece del ERP). */
+export interface WebstoreProductPiece {
+  pieceId: number;
+  /** Peso real registrado en báscula (kg). */
+  weightKg: number;
+  /** Piezas fungibles que representa: 1 = pieza suelta, N = caja pesada completa. Casa con presentations[].piecesPerUnit. */
+  pieceCount: number;
+  /** Precio de la pieza YA redondeado por el ERP (pricePerKg × weightKg). null si el producto no tiene precio por kg. */
+  price: number | null;
+}
+
 export interface WebstoreProduct {
   sku: string;
   name: string;
@@ -54,6 +65,12 @@ export interface WebstoreProduct {
   isCatchWeight: boolean;
   /** Precio efectivo por kg. Solo presente cuando isCatchWeight es true. */
   pricePerKg: number | null;
+  /**
+   * Pesajes disponibles para elegir (solo catch-weight): el cliente escoge la
+   * pieza exacta y el pedido se factura con su peso real, sin paso de pesaje.
+   * null en productos normales; [] si no hay piezas registradas (flujo estimado).
+   */
+  pieces: WebstoreProductPiece[] | null;
 }
 
 /** Moneda base del ERP (getBaseCurrency). Todos los montos del catálogo ya vienen convertidos a esta moneda — la tienda nunca convierte ni conoce tasas de cambio. */
@@ -81,6 +98,8 @@ export interface OrderLine {
   quantity: number;
   /** Informativo: el ERP recalcula el precio real con getEffectivePrice. */
   unitPrice: number;
+  /** Pesajes elegidos por el cliente (catch-weight). length debe ser quantity. */
+  pieceIds?: number[];
 }
 
 export interface OrderPayment {
@@ -102,10 +121,12 @@ export interface CreateOrderInput {
 
 export interface OrderLineResult {
   sku: string;
-  /** true si el precio de esta línea es estimado (catch-weight): el total real se ajusta al pesar el pedido. */
+  /** true si el precio de esta línea es estimado (catch-weight sin piezas): el total real se ajusta al pesar el pedido. */
   priceIsEstimated: boolean;
-  /** Peso nominal estimado (kg), solo presente en líneas catch-weight. */
+  /** Peso nominal estimado (kg), solo presente en líneas catch-weight estimadas. */
   estimatedWeightKg?: number;
+  /** Eco de las piezas asignadas (líneas con pieceIds): el peso ya es real. */
+  pieces?: Array<{ pieceId: number; weightKg: number }>;
 }
 
 export type CreateOrderResult =
@@ -125,6 +146,13 @@ export type CreateOrderResult =
       lines?: OrderLineResult[];
     }
   | { status: "needs_review"; logId: number; unresolvedSkus?: string[] }
+  | {
+      /** Alguna pieza elegida ya se vendió/reservó: quitar esas piezas del carrito y pedir re-elección. */
+      status: "pieces_unavailable";
+      logId: number;
+      unavailable: Array<{ sku: string; pieceIds: number[] }>;
+      error?: string;
+    }
   | {
       status: "error" | "received";
       logId: number;
@@ -182,7 +210,14 @@ export async function getCatalog(): Promise<CatalogResponse> {
     ...raw,
     products: (raw.products ?? [])
       .filter((p) => typeof p.sku === "string" && p.sku.length > 0)
-      .map((p) => (p.createdAt == null ? { ...p, createdAt: "" } : p)),
+      .map((p) => {
+        const withCreatedAt = p.createdAt == null ? { ...p, createdAt: "" } : p;
+        // ERP viejo sin registro de pesajes: pieces ausente se sanea a [] en
+        // catch-weight (flujo estimado) y null en productos normales.
+        return withCreatedAt.pieces === undefined
+          ? { ...withCreatedAt, pieces: withCreatedAt.isCatchWeight ? [] : null }
+          : withCreatedAt;
+      }),
   };
 }
 
@@ -194,10 +229,26 @@ export async function getCatalog(): Promise<CatalogResponse> {
 export async function createOrder(
   input: CreateOrderInput
 ): Promise<CreateOrderResult> {
-  return erpFetch<CreateOrderResult>("/api/webstore/orders", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  try {
+    return await erpFetch<CreateOrderResult>("/api/webstore/orders", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  } catch (error) {
+    // 409 pieces_unavailable es un resultado de negocio esperado (pieza
+    // vendida entre carrito y checkout), no un error de infraestructura: se
+    // devuelve tipado para que el checkout limpie el carrito y pida re-elegir.
+    if (
+      error instanceof ErpApiError &&
+      error.status === 409 &&
+      typeof error.body === "object" &&
+      error.body !== null &&
+      (error.body as Record<string, unknown>).status === "pieces_unavailable"
+    ) {
+      return error.body as CreateOrderResult;
+    }
+    throw error;
+  }
 }
 
 export interface UpsertCustomerInput {

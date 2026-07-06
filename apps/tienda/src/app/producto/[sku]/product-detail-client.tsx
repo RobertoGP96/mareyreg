@@ -43,6 +43,7 @@ export function ProductDetailClient({
   const [selected, setSelected] =
     useState<WebstoreProductPresentation | null>(presentations[0] ?? null);
   const [qty, setQty] = useState(1);
+  const [selectedPieceIds, setSelectedPieceIds] = useState<number[]>([]);
 
   const isFav = state.favs.includes(product.sku);
   const soldOut = product.stockAvailable <= 0;
@@ -53,6 +54,34 @@ export function ProductDetailClient({
   const unitPrice = selected ? selected.retailPrice : product.price;
   const unitLabel = isBaseSelected ? "unidad" : selected.name.toLowerCase();
   const showCompare = isBaseSelected && product.compareAtPrice != null;
+
+  // Pesajes disponibles que corresponden a la presentación elegida
+  // (pieceCount casa con piecesPerUnit) y con precio ya calculado por el ERP.
+  // Si hay piezas, el cliente elige la exacta y paga su peso real.
+  const matchingPieces = useMemo(() => {
+    if (!product.isCatchWeight || !product.pieces?.length) return [];
+    const piecesPerUnit = selected?.piecesPerUnit ?? null;
+    if (piecesPerUnit == null) return [];
+    return product.pieces.filter(
+      (p) => p.pieceCount === piecesPerUnit && p.price != null
+    );
+  }, [product, selected]);
+  const usePieceSelection = matchingPieces.length > 0;
+  const selectedPieces = matchingPieces.filter((p) =>
+    selectedPieceIds.includes(p.pieceId)
+  );
+  const piecesTotal = selectedPieces.reduce((s, p) => s + (p.price ?? 0), 0);
+
+  const togglePiece = (pieceId: number) => {
+    setSelectedPieceIds((prev) =>
+      prev.includes(pieceId)
+        ? prev.filter((id) => id !== pieceId)
+        : [...prev, pieceId]
+    );
+  };
+
+  const displayTotal = usePieceSelection ? piecesTotal : unitPrice * qty;
+  const addDisabled = soldOut || (usePieceSelection && selectedPieces.length === 0);
 
   const offerEndsAtLabel =
     product.offer?.endsAt != null
@@ -73,6 +102,10 @@ export function ProductDetailClient({
       showToast("Producto agotado");
       return;
     }
+    if (usePieceSelection && selectedPieces.length === 0) {
+      showToast("Elige al menos una pieza");
+      return;
+    }
     const line: CartLine = {
       sku: selected?.sku ?? product.sku,
       productSku: product.sku,
@@ -84,8 +117,18 @@ export function ProductDetailClient({
       imageUrl: product.imageUrl,
       stockAvailable: product.stockAvailable,
       isCatchWeight: product.isCatchWeight,
+      ...(product.pricePerKg != null ? { pricePerKg: product.pricePerKg } : {}),
+      ...(usePieceSelection
+        ? {
+            pieces: selectedPieces.map((p) => ({
+              pieceId: p.pieceId,
+              weightKg: p.weightKg,
+              price: p.price ?? 0,
+            })),
+          }
+        : {}),
     };
-    addToCart(line, qty);
+    addToCart(line, usePieceSelection ? selectedPieces.length : qty);
     showToast(`${product.name} añadido al carrito`);
     router.push("/carrito");
   };
@@ -160,9 +203,14 @@ export function ProductDetailClient({
           )}
           <div className="text-[13px] text-muted">/ {unitLabel}</div>
         </div>
-        {product.isCatchWeight && (
+        {product.isCatchWeight && !usePieceSelection && (
           <div className="mt-1 text-xs font-medium text-brand-mid">
             Precio estimado · el total se ajusta al peso real al preparar tu pedido
+          </div>
+        )}
+        {usePieceSelection && (
+          <div className="mt-1 text-xs font-medium text-brand-mid">
+            Elige tu pieza exacta · pagas por su peso real
           </div>
         )}
         <div
@@ -201,7 +249,10 @@ export function ProductDetailClient({
                   <button
                     key={pres.sku}
                     type="button"
-                    onClick={() => setSelected(pres)}
+                    onClick={() => {
+                      setSelected(pres);
+                      setSelectedPieceIds([]);
+                    }}
                     className={`flex-none rounded-full border px-[15px] py-2 text-[13px] font-medium transition-colors ${
                       active
                         ? "border-brand bg-brand text-white"
@@ -221,16 +272,48 @@ export function ProductDetailClient({
           </div>
         )}
 
+        {usePieceSelection && (
+          <div className="mt-5">
+            <div className="mb-2.5 text-[13.5px] font-semibold text-navy">
+              Piezas disponibles
+            </div>
+            <div className="flex flex-wrap gap-2 pb-1">
+              {matchingPieces.map((p) => {
+                const active = selectedPieceIds.includes(p.pieceId);
+                return (
+                  <button
+                    key={p.pieceId}
+                    type="button"
+                    onClick={() => togglePiece(p.pieceId)}
+                    className={`flex-none rounded-full border px-[15px] py-2 text-[13px] font-medium transition-colors ${
+                      active
+                        ? "border-brand bg-brand text-white"
+                        : "border-line bg-white text-ink-soft hover:border-brand-mid"
+                    }`}
+                  >
+                    {p.weightKg.toFixed(2)} kg · {fmt(p.price ?? 0, currency)}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-1.5 text-xs text-muted">
+              Selecciona una o varias piezas; cada una se cobra por su peso real.
+            </div>
+          </div>
+        )}
+
         {/* En md+ la cantidad vive en el panel de compra de la derecha */}
-        <div className="mt-5 flex items-center gap-4 md:hidden">
-          <div className="text-[13.5px] font-semibold text-navy">Cantidad</div>
-          <QtyStepper
-            qty={qty}
-            onInc={() => setQty((q) => q + 1)}
-            onDec={() => setQty((q) => Math.max(1, q - 1))}
-            size="lg"
-          />
-        </div>
+        {!usePieceSelection && (
+          <div className="mt-5 flex items-center gap-4 md:hidden">
+            <div className="text-[13.5px] font-semibold text-navy">Cantidad</div>
+            <QtyStepper
+              qty={qty}
+              onInc={() => setQty((q) => q + 1)}
+              onDec={() => setQty((q) => Math.max(1, q - 1))}
+              size="lg"
+            />
+          </div>
+        )}
 
         {related.length > 0 && (
           <>
@@ -264,20 +347,25 @@ export function ProductDetailClient({
 
       <div className="sticky bottom-0 flex items-center gap-3 border-t border-line-2 bg-white px-5 pt-4 pb-6 md:hidden">
         <div className="flex-1">
-          <div className="text-xs text-muted">Total</div>
+          <div className="text-xs text-muted">
+            Total
+            {usePieceSelection && selectedPieces.length > 0 && (
+              <span> · {selectedPieces.length} pza{selectedPieces.length === 1 ? "" : "s"}</span>
+            )}
+          </div>
           <div className="text-[19px] font-bold text-navy">
-            {fmt(unitPrice * qty, currency)}
+            {fmt(displayTotal, currency)}
           </div>
         </div>
         <button
           type="button"
           onClick={handleAdd}
           className={`flex items-center gap-2 rounded-[13px] px-[26px] py-3.5 text-[14.5px] font-semibold text-white transition-colors ${
-            soldOut ? "bg-disabled" : "grad-cta hover:opacity-90"
+            addDisabled ? "bg-disabled" : "grad-cta hover:opacity-90"
           }`}
         >
           {soldOut ? null : <ShoppingCart className="h-[17px] w-[17px]" />}
-          {soldOut ? "Agotado" : "Añadir al carrito"}
+          {soldOut ? "Agotado" : usePieceSelection ? "Añadir piezas" : "Añadir al carrito"}
         </button>
       </div>
 
@@ -303,29 +391,38 @@ export function ProductDetailClient({
           {stock.label}
         </div>
 
-        <div className="mt-4 flex items-center justify-between border-t border-line-2 pt-4">
-          <div className="text-[13.5px] font-semibold text-navy">Cantidad</div>
-          <QtyStepper
-            qty={qty}
-            onInc={() => setQty((q) => q + 1)}
-            onDec={() => setQty((q) => Math.max(1, q - 1))}
-          />
-        </div>
+        {!usePieceSelection && (
+          <div className="mt-4 flex items-center justify-between border-t border-line-2 pt-4">
+            <div className="text-[13.5px] font-semibold text-navy">Cantidad</div>
+            <QtyStepper
+              qty={qty}
+              onInc={() => setQty((q) => q + 1)}
+              onDec={() => setQty((q) => Math.max(1, q - 1))}
+            />
+          </div>
+        )}
 
         <div className="mt-4 flex items-baseline justify-between border-t border-line-2 pt-4">
           <div className="text-[13px] text-muted">
             Total{" "}
             <span className="text-muted-2">
-              ({qty} × {fmt(unitPrice, currency)})
+              {usePieceSelection
+                ? `(${selectedPieces.length} pza${selectedPieces.length === 1 ? "" : "s"})`
+                : `(${qty} × ${fmt(unitPrice, currency)})`}
             </span>
           </div>
           <div className="font-mono text-[19px] font-bold tabular-nums text-navy">
-            {fmt(unitPrice * qty, currency)}
+            {fmt(displayTotal, currency)}
           </div>
         </div>
-        {product.isCatchWeight && (
+        {product.isCatchWeight && !usePieceSelection && (
           <div className="mt-1 text-[11.5px] text-brand-mid">
             El total se ajusta al peso real al preparar tu pedido
+          </div>
+        )}
+        {usePieceSelection && (
+          <div className="mt-1 text-[11.5px] text-brand-mid">
+            Precio real por pieza — sin ajustes al preparar tu pedido
           </div>
         )}
 
@@ -333,11 +430,11 @@ export function ProductDetailClient({
           type="button"
           onClick={handleAdd}
           className={`mt-4 flex w-full items-center justify-center gap-2 rounded-[13px] px-[26px] py-3.5 text-[14.5px] font-semibold text-white transition-colors ${
-            soldOut ? "bg-disabled" : "grad-cta hover:opacity-90"
+            addDisabled ? "bg-disabled" : "grad-cta hover:opacity-90"
           }`}
         >
           {soldOut ? null : <ShoppingCart className="h-[17px] w-[17px]" />}
-          {soldOut ? "Agotado" : "Añadir al carrito"}
+          {soldOut ? "Agotado" : usePieceSelection ? "Añadir piezas" : "Añadir al carrito"}
         </button>
 
         <div className="mt-3.5 flex items-center gap-2 text-[11.5px] text-muted">

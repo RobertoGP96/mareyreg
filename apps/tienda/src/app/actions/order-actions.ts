@@ -13,11 +13,19 @@ const submitOrderSchema = z.object({
   }),
   lines: z
     .array(
-      z.object({
-        sku: z.string().min(1),
-        quantity: z.number().int().positive(),
-        unitPrice: z.number().nonnegative(),
-      })
+      z
+        .object({
+          sku: z.string().min(1),
+          quantity: z.number().int().positive(),
+          unitPrice: z.number().nonnegative(),
+          // Pesajes elegidos por el cliente (catch-weight). Revalidados aquí
+          // porque vienen de localStorage.
+          pieceIds: z.array(z.number().int().positive()).min(1).optional(),
+        })
+        .refine((l) => !l.pieceIds || l.pieceIds.length === l.quantity, {
+          message: "pieceIds debe tener exactamente quantity elementos",
+          path: ["pieceIds"],
+        })
     )
     .min(1),
   delivery: z.enum(["domicilio", "recogida"]),
@@ -38,7 +46,12 @@ export type SubmitOrderResult =
         status: "processed" | "needs_review" | "awaiting_weighing";
       };
     }
-  | { success: false; error: string };
+  | {
+      success: false;
+      error: string;
+      /** Piezas que ya no están disponibles: el checkout las quita del carrito y pide re-elegir. */
+      unavailablePieceIds?: number[];
+    };
 
 const GENERIC_ERROR = "No pudimos procesar tu pedido. Intenta de nuevo.";
 
@@ -100,6 +113,14 @@ export async function submitOrder(
       return {
         success: true,
         data: { orderNo: `R-${result.logId}`, status: "needs_review" },
+      };
+    }
+    if (result.status === "pieces_unavailable") {
+      return {
+        success: false,
+        error:
+          "Algunas piezas que elegiste ya se vendieron. Revisa tu carrito y vuelve a elegir.",
+        unavailablePieceIds: result.unavailable.flatMap((u) => u.pieceIds),
       };
     }
     console.error("submitOrder ERP respondió:", result);

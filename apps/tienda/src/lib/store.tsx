@@ -27,6 +27,15 @@ export interface CartLine {
   stockAvailable: number;
   /** true si el producto es de peso variable: el precio mostrado es estimado, el total real se ajusta al pesar el pedido. */
   isCatchWeight?: boolean;
+  /** Precio por kg (catch-weight), informativo para el display. */
+  pricePerKg?: number;
+  /**
+   * Pesajes elegidos por el cliente (catch-weight con registro de piezas):
+   * el precio de la línea es la suma de `price` de cada pieza (ya redondeado
+   * por el ERP) y qty === pieces.length. Ausente en líneas normales o de
+   * peso estimado.
+   */
+  pieces?: Array<{ pieceId: number; weightKg: number; price: number }>;
 }
 
 export interface StoredProfile {
@@ -68,6 +77,8 @@ type Action =
   | { type: "incQty"; sku: string }
   | { type: "decQty"; sku: string }
   | { type: "removeLine"; sku: string }
+  | { type: "removePiece"; sku: string; pieceId: number }
+  | { type: "removePieces"; pieceIds: number[] }
   | { type: "clearCart" }
   | { type: "toggleFav"; productSku: string }
   | { type: "setProfile"; profile: StoredProfile }
@@ -94,14 +105,32 @@ function reducer(state: StoreState, action: Action): StoreState {
       return { ...state, ...action.payload, hydrated: true };
     case "addToCart": {
       const existing = state.cart[action.line.sku];
-      const next: CartLine = existing
-        ? { ...existing, qty: existing.qty + action.qty }
-        : { ...action.line, qty: action.qty };
+      let next: CartLine;
+      if (action.line.pieces) {
+        // Línea por piezas: merge sin duplicar pieceIds; qty SIEMPRE es el
+        // número de piezas. Si la línea existente era de peso estimado, la
+        // versión con piezas la reemplaza (no se mezclan tipos de pesaje).
+        const existingPieces = existing?.pieces ?? [];
+        const seen = new Set(existingPieces.map((p) => p.pieceId));
+        const merged = [
+          ...existingPieces,
+          ...action.line.pieces.filter((p) => !seen.has(p.pieceId)),
+        ];
+        next = { ...action.line, pieces: merged, qty: merged.length };
+      } else if (existing?.pieces) {
+        // Versión estimada sobre línea con piezas: reemplaza (el catálogo ya
+        // no ofrece piezas para este producto).
+        next = { ...action.line, qty: action.qty };
+      } else if (existing) {
+        next = { ...existing, qty: existing.qty + action.qty };
+      } else {
+        next = { ...action.line, qty: action.qty };
+      }
       return { ...state, cart: { ...state.cart, [action.line.sku]: next } };
     }
     case "incQty": {
       const line = state.cart[action.sku];
-      if (!line) return state;
+      if (!line || line.pieces) return state;
       return {
         ...state,
         cart: { ...state.cart, [action.sku]: { ...line, qty: line.qty + 1 } },
@@ -109,7 +138,7 @@ function reducer(state: StoreState, action: Action): StoreState {
     }
     case "decQty": {
       const line = state.cart[action.sku];
-      if (!line) return state;
+      if (!line || line.pieces) return state;
       if (line.qty <= 1) {
         const { [action.sku]: _removed, ...rest } = state.cart;
         return { ...state, cart: rest };
@@ -122,6 +151,34 @@ function reducer(state: StoreState, action: Action): StoreState {
     case "removeLine": {
       const { [action.sku]: _removed, ...rest } = state.cart;
       return { ...state, cart: rest };
+    }
+    case "removePiece": {
+      const line = state.cart[action.sku];
+      if (!line?.pieces) return state;
+      const pieces = line.pieces.filter((p) => p.pieceId !== action.pieceId);
+      if (!pieces.length) {
+        const { [action.sku]: _removed, ...rest } = state.cart;
+        return { ...state, cart: rest };
+      }
+      return {
+        ...state,
+        cart: { ...state.cart, [action.sku]: { ...line, pieces, qty: pieces.length } },
+      };
+    }
+    case "removePieces": {
+      // Limpieza post-409 pieces_unavailable: quita las piezas perdidas de
+      // cualquier línea; una línea que queda sin piezas se elimina.
+      const ids = new Set(action.pieceIds);
+      const cart: Record<string, CartLine> = {};
+      for (const [sku, line] of Object.entries(state.cart)) {
+        if (!line.pieces) {
+          cart[sku] = line;
+          continue;
+        }
+        const pieces = line.pieces.filter((p) => !ids.has(p.pieceId));
+        if (pieces.length) cart[sku] = { ...line, pieces, qty: pieces.length };
+      }
+      return { ...state, cart };
     }
     case "clearCart":
       return { ...state, cart: {}, couponApplied: false };
@@ -193,6 +250,8 @@ export interface StoreApi {
   incQty: (sku: string) => void;
   decQty: (sku: string) => void;
   removeLine: (sku: string) => void;
+  removePiece: (sku: string, pieceId: number) => void;
+  removePieces: (pieceIds: number[]) => void;
   clearCart: () => void;
   toggleFav: (productSku: string) => void;
   setProfile: (profile: StoredProfile) => void;
@@ -254,6 +313,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       incQty: (sku) => dispatch({ type: "incQty", sku }),
       decQty: (sku) => dispatch({ type: "decQty", sku }),
       removeLine: (sku) => dispatch({ type: "removeLine", sku }),
+      removePiece: (sku, pieceId) => dispatch({ type: "removePiece", sku, pieceId }),
+      removePieces: (pieceIds) => dispatch({ type: "removePieces", pieceIds }),
       clearCart: () => dispatch({ type: "clearCart" }),
       toggleFav: (productSku) => dispatch({ type: "toggleFav", productSku }),
       setProfile: (profile) => dispatch({ type: "setProfile", profile }),

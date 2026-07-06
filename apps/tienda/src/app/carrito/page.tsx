@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, ShoppingCart, Trash2 } from "lucide-react";
-import { COUPON_CODE, computeTotals, shippingMessage } from "@/lib/cart-totals";
+import { COUPON_CODE, computeTotals, lineTotal, shippingMessage } from "@/lib/cart-totals";
 import { fmt } from "@/lib/format";
 import { cartLines, useStore } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
@@ -12,7 +12,7 @@ import { QtyStepper } from "@/components/qty-stepper";
 import { ScreenHeader } from "@/components/screen-header";
 
 export default function CartPage() {
-  const { state, incQty, decQty, removeLine, applyCoupon, showToast } =
+  const { state, incQty, decQty, removeLine, removePiece, applyCoupon, showToast } =
     useStore();
   const [couponInput, setCouponInput] = useState("");
 
@@ -89,12 +89,30 @@ export default function CartPage() {
                       : line.name}
                   </div>
                   <div className="mt-1 text-sm font-bold text-navy">
-                    {fmt(line.unitPrice * line.qty, currency)}
+                    {fmt(lineTotal(line), currency)}
                   </div>
-                  {line.isCatchWeight && (
-                    <div className="mt-0.5 text-[11px] text-brand-mid">
-                      Precio estimado · se ajusta al peso real
+                  {line.pieces?.length ? (
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {line.pieces.map((p) => (
+                        <button
+                          key={p.pieceId}
+                          type="button"
+                          onClick={() => removePiece(line.sku, p.pieceId)}
+                          aria-label={`Quitar pieza de ${p.weightKg.toFixed(2)} kg`}
+                          title="Quitar esta pieza"
+                          className="inline-flex items-center gap-1 rounded-full border border-line bg-app px-2 py-0.5 text-[10.5px] font-medium text-ink-soft transition-colors hover:border-danger hover:text-danger"
+                        >
+                          {p.weightKg.toFixed(2)} kg · {fmt(p.price, currency)}
+                          <span aria-hidden>×</span>
+                        </button>
+                      ))}
                     </div>
+                  ) : (
+                    line.isCatchWeight && (
+                      <div className="mt-0.5 text-[11px] text-brand-mid">
+                        Precio estimado · se ajusta al peso real
+                      </div>
+                    )
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -106,11 +124,13 @@ export default function CartPage() {
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
-                  <QtyStepper
-                    qty={line.qty}
-                    onInc={() => incQty(line.sku)}
-                    onDec={() => decQty(line.sku)}
-                  />
+                  {!line.pieces?.length && (
+                    <QtyStepper
+                      qty={line.qty}
+                      onInc={() => incQty(line.sku)}
+                      onDec={() => decQty(line.sku)}
+                    />
+                  )}
                 </div>
               </div>
             ))}

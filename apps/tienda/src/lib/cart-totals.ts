@@ -16,14 +16,24 @@ export interface CartTotals {
   shippingPct: number;
 }
 
+/**
+ * Importe de una línea: para líneas con piezas elegidas es la suma de los
+ * precios por pieza que YA redondeó el ERP (nunca se recalcula pricePerKg ×
+ * peso aquí — coherencia de redondeo centavo a centavo con la factura);
+ * para el resto, unitPrice × qty.
+ */
+export function lineTotal(line: CartLine): number {
+  if (line.pieces?.length) {
+    return line.pieces.reduce((sum, p) => sum + (p.price ?? 0), 0);
+  }
+  return line.unitPrice * line.qty;
+}
+
 export function computeTotals(
   lines: readonly CartLine[],
   options: { couponApplied: boolean; pickup: boolean }
 ): CartTotals {
-  const subtotal = lines.reduce(
-    (sum, line) => sum + line.unitPrice * line.qty,
-    0
-  );
+  const subtotal = lines.reduce((sum, line) => sum + lineTotal(line), 0);
   const discount = options.couponApplied ? subtotal * COUPON_RATE : 0;
   const freeShipping = subtotal >= FREE_SHIPPING_TARGET;
   const shipping = options.pickup || freeShipping ? 0 : SHIPPING_COST;

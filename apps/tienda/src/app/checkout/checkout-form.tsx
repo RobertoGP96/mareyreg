@@ -62,7 +62,7 @@ function OptionCard({
 
 export function CheckoutForm() {
   const router = useRouter();
-  const { state, addOrder, clearCart, setProfile, showToast } = useStore();
+  const { state, addOrder, clearCart, setProfile, removePieces, showToast } = useStore();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -90,7 +90,11 @@ export function CheckoutForm() {
     pickup: delivery === "recogida",
   });
   const currency = state.currency;
-  const hasCatchWeightLines = lines.some((line) => line.isCatchWeight);
+  // Solo las líneas catch-weight SIN piezas elegidas tienen precio estimado:
+  // con piezas el peso ya es real y el total no se ajusta.
+  const hasEstimatedLines = lines.some(
+    (line) => line.isCatchWeight && !line.pieces?.length
+  );
 
   const handleSubmit = async () => {
     if (sending) return;
@@ -128,6 +132,9 @@ export function CheckoutForm() {
           sku: line.sku,
           quantity: line.qty,
           unitPrice: line.unitPrice,
+          ...(line.pieces?.length
+            ? { pieceIds: line.pieces.map((p) => p.pieceId) }
+            : {}),
         })),
         delivery,
         payment,
@@ -137,6 +144,14 @@ export function CheckoutForm() {
       });
 
       if (!result.success) {
+        if (result.unavailablePieceIds?.length) {
+          // Alguna pieza se vendió entre el carrito y el checkout: se quitan
+          // del carrito (el resto se conserva) y se pide re-elegir.
+          removePieces(result.unavailablePieceIds);
+          showToast(result.error);
+          router.push("/carrito");
+          return;
+        }
         showToast(result.error);
         return;
       }
@@ -303,7 +318,7 @@ export function CheckoutForm() {
               ? "Entrega estimada: 24–48 horas"
               : "Listo para recoger hoy mismo"}
           </div>
-          {hasCatchWeightLines && (
+          {hasEstimatedLines && (
             <div className="mt-1.5 text-xs font-medium text-brand-mid">
               Este pedido incluye productos de peso variable: el total se
               ajusta al peso real al preparar tu pedido.
