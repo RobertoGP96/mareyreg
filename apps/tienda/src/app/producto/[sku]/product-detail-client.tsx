@@ -51,8 +51,19 @@ export function ProductDetailClient({
   const pct = discountPct(product);
 
   const isBaseSelected = selected == null || selected.isBase;
-  const unitPrice = selected ? selected.retailPrice : product.price;
+  // Catch-weight: el cobro real siempre es por kg, así que el precio de la
+  // presentación que se usa como referencia es el ESTIMADO (precio/kg × peso
+  // nominal), nunca el retailPrice de la presentación.
+  const unitPrice = selected
+    ? product.isCatchWeight && selected.estimatedPrice != null
+      ? selected.estimatedPrice
+      : selected.retailPrice
+    : product.price;
   const unitLabel = isBaseSelected ? "unidad" : selected.name.toLowerCase();
+  // Precio principal mostrado: por kg en productos de peso variable.
+  const showPerKg = product.isCatchWeight && product.pricePerKg != null;
+  const headlinePrice = showPerKg ? product.pricePerKg! : unitPrice;
+  const headlineUnit = showPerKg ? "kg" : unitLabel;
   const showCompare = isBaseSelected && product.compareAtPrice != null;
 
   // Pesajes disponibles que corresponden a la presentación elegida
@@ -195,13 +206,13 @@ export function ProductDetailClient({
           {product.name}
         </div>
         <div className="mt-2.5 flex items-baseline gap-2.5">
-          <div className="text-2xl font-bold text-navy">{fmt(unitPrice, currency)}</div>
+          <div className="text-2xl font-bold text-navy">{fmt(headlinePrice, currency)}</div>
           {showCompare && product.compareAtPrice != null && (
             <div className="text-[15px] text-muted-2 line-through">
               {fmt(product.compareAtPrice, currency)}
             </div>
           )}
-          <div className="text-[13px] text-muted">/ {unitLabel}</div>
+          <div className="text-[13px] text-muted">/ {headlineUnit}</div>
         </div>
         {product.isCatchWeight && !usePieceSelection && (
           <div className="mt-1 text-xs font-medium text-brand-mid">
@@ -259,7 +270,9 @@ export function ProductDetailClient({
                         : "border-line bg-white text-ink-soft hover:border-brand-mid"
                     }`}
                   >
-                    {pres.name} · {fmt(pres.retailPrice, currency)}
+                    {product.isCatchWeight && pres.estimatedPrice != null
+                      ? `${pres.name} · ≈${fmt(pres.estimatedPrice, currency)}`
+                      : `${pres.name} · ${fmt(pres.retailPrice, currency)}`}
                   </button>
                 );
               })}
@@ -375,9 +388,9 @@ export function ProductDetailClient({
       >
         <div className="flex items-baseline gap-2">
           <div className="text-[22px] font-bold text-navy">
-            {fmt(unitPrice, currency)}
+            {fmt(headlinePrice, currency)}
           </div>
-          <div className="text-[12.5px] text-muted">/ {unitLabel}</div>
+          <div className="text-[12.5px] text-muted">/ {headlineUnit}</div>
         </div>
         {showCompare && product.compareAtPrice != null && (
           <div className="mt-0.5 text-[13px] text-muted-2 line-through">

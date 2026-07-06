@@ -128,6 +128,9 @@ export function ProductCard({
           <div>
             <div className="text-[15px] font-bold text-navy">
               {fmt(product.price, currency)}
+              {product.isCatchWeight && (
+                <span className="text-[11px] font-medium text-muted"> / kg</span>
+              )}
             </div>
             {variant === "grid" && product.compareAtPrice != null && (
               <div className="text-[11px] text-muted-2 line-through">
