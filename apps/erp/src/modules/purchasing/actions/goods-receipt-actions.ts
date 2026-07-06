@@ -50,10 +50,17 @@ export interface ReceiptLineInput {
   lotCode?: string;        // para productos con tracksLots
   expirationDate?: string;
   manufactureDate?: string;
-  // Peso real (kg) de cada pieza recibida, en orden — solo para productos
-  // catch-weight con presentación de piezas. length debe ser exactamente
-  // piecesFor(quantity, piecesPerUnit); cada valor > 0.
+  // Peso real (kg) de cada pesaje recibido, en orden — solo para productos
+  // catch-weight con presentación de piezas. En modo "piece" length debe ser
+  // piecesFor(quantity, piecesPerUnit); en modo "unit" debe ser quantity.
+  // Cada valor > 0.
   pieceWeights?: number[];
+  // "piece" (default): se pesa cada pieza suelta. "unit": cada unidad de la
+  // presentación se pesa completa (caja con pesaje por caja, caso lomos) sin
+  // desglosar sus piezas.
+  weighingMode?: "piece" | "unit";
+  // Etiqueta física opcional por pesaje, alineada con pieceWeights.
+  pieceLabels?: (string | null)[];
 }
 
 export interface ReceiptInput {
@@ -186,15 +193,21 @@ export async function createGoodsReceipt(
         let pieces: number | null = null;
         let pieceWeights: number[] | null = null;
         let baseQuantity: number;
+        // Piezas fungibles que representa cada pesaje: 1 en modo "piece"
+        // (pieza suelta), piecesPerUnit en modo "unit" (caja pesada completa).
+        let pieceCountEach = 1;
 
         if (isCatchWeight) {
           pieces = piecesFor(rl.quantity, piecesPerUnit!);
+          const weighingMode = rl.weighingMode ?? "piece";
+          const expectedWeights = weighingMode === "unit" ? rl.quantity : pieces;
+          pieceCountEach = weighingMode === "unit" ? piecesPerUnit! : 1;
           if (!rl.pieceWeights) {
             throw new Error(`Captura el peso de cada pieza para ${poLine.product.name}`);
           }
-          if (rl.pieceWeights.length !== pieces) {
+          if (rl.pieceWeights.length !== expectedWeights) {
             throw new Error(
-              `Se esperaban ${pieces} pesos para ${poLine.product.name}, se recibieron ${rl.pieceWeights.length}`
+              `Se esperaban ${expectedWeights} pesos para ${poLine.product.name}, se recibieron ${rl.pieceWeights.length}`
             );
           }
           if (rl.pieceWeights.some((w) => !Number.isFinite(w) || w <= 0)) {
@@ -274,7 +287,7 @@ export async function createGoodsReceipt(
         // recibida (presentacion), en la moneda del documento;
         // presentationId/unitFactor/baseQuantity son el snapshot de conversion
         // a unidad base. unitCostBase es el equivalente en CUP por unidad recibida.
-        await tx.goodsReceiptLine.create({
+        const receiptLine = await tx.goodsReceiptLine.create({
           data: {
             receiptId: created.receiptId,
             poLineId: rl.poLineId,
@@ -289,6 +302,24 @@ export async function createGoodsReceipt(
             pieceWeights: pieceWeights ?? undefined,
           },
         });
+
+        // Registro individual de pesajes: cada peso capturado se da de alta
+        // como ProductPiece disponible. pieceWeights (JSON de la línea) queda
+        // como snapshot de auditoría; el registro vivo es ProductPiece.
+        if (isCatchWeight && pieceWeights) {
+          await tx.productPiece.createMany({
+            data: pieceWeights.map((w, i) => ({
+              productId: poLine.productId,
+              warehouseId: po.warehouseId,
+              presentationId,
+              weightKg: catchWeightBaseQuantity(w),
+              pieceCount: pieceCountEach,
+              label: rl.pieceLabels?.[i]?.trim() || null,
+              receiptLineId: receiptLine.lineId,
+              registeredBy: userId,
+            })),
+          });
+        }
 
         // Valuacion: entrada. SIEMPRE en unidad base con costo por unidad base
         // en CUP; si el documento esta en otra moneda, se persiste el trio

@@ -54,6 +54,11 @@ export function ReceiptClient({ poId, folio, lines, pendingRate }: Props) {
   // Pesos por pieza (kg) capturados en báscula, por línea de OC — solo
   // productos catch-weight. Se arma como array plano al enviar.
   const [pieceWeightsByLine, setPieceWeightsByLine] = useState<Record<number, string[]>>({});
+  // Modo de pesaje por línea: "piece" = un peso por pieza suelta (default),
+  // "unit" = cada caja/presentación se pesa completa (caso lomos por caja).
+  const [weighingModeByLine, setWeighingModeByLine] = useState<Record<number, "piece" | "unit">>({});
+  // Etiqueta física opcional por pesaje, alineada con pieceWeightsByLine.
+  const [pieceLabelsByLine, setPieceLabelsByLine] = useState<Record<number, string[]>>({});
 
   const update = (lineId: number, patch: Partial<ReceiptLineInput>) => {
     setRows({ ...rows, [lineId]: { ...rows[lineId], ...patch } });
@@ -66,14 +71,36 @@ export function ReceiptClient({ poId, folio, lines, pendingRate }: Props) {
     setPieceWeightsByLine({ ...pieceWeightsByLine, [lineId]: next });
   };
 
+  const updatePieceLabel = (lineId: number, index: number, value: string) => {
+    const current = pieceLabelsByLine[lineId] ?? [];
+    const next = [...current];
+    next[index] = value;
+    setPieceLabelsByLine({ ...pieceLabelsByLine, [lineId]: next });
+  };
+
+  const expectedWeightsFor = (lineId: number, quantity: number, piecesPerUnit: number) => {
+    const mode = weighingModeByLine[lineId] ?? "piece";
+    return mode === "unit" ? quantity : piecesFor(quantity, piecesPerUnit);
+  };
+
   const handleSubmit = async () => {
     const payload = Object.values(rows)
       .filter((r) => r.quantity > 0)
       .map((r) => {
         const line = lines.find((l) => l.lineId === r.poLineId);
         if (!line?.product.isCatchWeight) return r;
-        const weights = (pieceWeightsByLine[r.poLineId] ?? []).map(Number);
-        return { ...r, pieceWeights: weights };
+        const piecesPerUnit = line.presentation?.piecesPerUnit ?? 1;
+        // Recorta al conteo esperado: si se capturaron pesos en un modo y se
+        // cambió al otro, los sobrantes no deben viajar al servidor.
+        const expected = expectedWeightsFor(r.poLineId, r.quantity, piecesPerUnit);
+        const weights = (pieceWeightsByLine[r.poLineId] ?? []).slice(0, expected).map(Number);
+        const labels = pieceLabelsByLine[r.poLineId] ?? [];
+        return {
+          ...r,
+          pieceWeights: weights,
+          weighingMode: weighingModeByLine[r.poLineId] ?? "piece",
+          pieceLabels: weights.map((_, i) => labels[i]?.trim() || null),
+        };
       });
     if (!payload.length) {
       toast.error("Indica al menos una cantidad a recibir");
@@ -83,7 +110,7 @@ export function ReceiptClient({ poId, folio, lines, pendingRate }: Props) {
       const line = lines.find((l) => l.lineId === r.poLineId);
       if (!line?.product.isCatchWeight) return false;
       const piecesPerUnit = line.presentation?.piecesPerUnit ?? 1;
-      const expected = piecesFor(r.quantity, piecesPerUnit);
+      const expected = expectedWeightsFor(r.poLineId, r.quantity, piecesPerUnit);
       return !r.pieceWeights || r.pieceWeights.length !== expected || r.pieceWeights.some((w) => !(w > 0));
     });
     if (catchWeightMissing) {
@@ -147,10 +174,17 @@ export function ReceiptClient({ poId, folio, lines, pendingRate }: Props) {
           const costLabel = isCatchWeight
             ? `Costo ($/kg)${currencySuffix}`
             : (factor !== 1 ? `Costo por ${presentationName}` : "Costo unit.") + currencySuffix;
-          const expectedPieces =
-            isCatchWeight && row.quantity > 0 ? piecesFor(row.quantity, piecesPerUnit) : 0;
+          const weighingMode = weighingModeByLine[l.lineId] ?? "piece";
+          const expectedWeights =
+            isCatchWeight && row.quantity > 0
+              ? expectedWeightsFor(l.lineId, row.quantity, piecesPerUnit)
+              : 0;
           const weights = pieceWeightsByLine[l.lineId] ?? [];
-          const totalWeightKg = weights.reduce((s, w) => s + (Number(w) || 0), 0);
+          const labels = pieceLabelsByLine[l.lineId] ?? [];
+          const totalWeightKg = weights
+            .slice(0, expectedWeights)
+            .reduce((s, w) => s + (Number(w) || 0), 0);
+          const weightRowLabel = weighingMode === "unit" ? presentationName : "Pieza";
           return (
             <div key={l.lineId} className="border rounded p-3 grid grid-cols-12 gap-2 items-end">
               <div className="col-span-12 sm:col-span-4">
@@ -206,13 +240,43 @@ export function ReceiptClient({ poId, folio, lines, pendingRate }: Props) {
                   </p>
                 </div>
               )}
-              {isCatchWeight && expectedPieces > 0 && (
+              {isCatchWeight && expectedWeights > 0 && (
                 <div className="col-span-12 space-y-2 border-t pt-2 mt-1">
-                  <p className="text-xs font-medium">Peso por pieza (kg)</p>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-xs font-medium">
+                      {weighingMode === "unit"
+                        ? `Peso por ${presentationName} (kg)`
+                        : "Peso por pieza (kg)"}
+                    </p>
+                    {piecesPerUnit > 1 && (
+                      <div className="flex rounded-md border overflow-hidden">
+                        <button
+                          type="button"
+                          className={`px-3 h-9 text-xs ${weighingMode === "piece" ? "bg-secondary font-medium" : "text-muted-foreground"}`}
+                          onClick={() =>
+                            setWeighingModeByLine({ ...weighingModeByLine, [l.lineId]: "piece" })
+                          }
+                        >
+                          Por pieza
+                        </button>
+                        <button
+                          type="button"
+                          className={`px-3 h-9 text-xs border-l ${weighingMode === "unit" ? "bg-secondary font-medium" : "text-muted-foreground"}`}
+                          onClick={() =>
+                            setWeighingModeByLine({ ...weighingModeByLine, [l.lineId]: "unit" })
+                          }
+                        >
+                          Por {presentationName}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <div className="space-y-1.5">
-                    {Array.from({ length: expectedPieces }, (_, idx) => (
+                    {Array.from({ length: expectedWeights }, (_, idx) => (
                       <div key={idx} className="flex items-center gap-2">
-                        <Label className="text-xs w-20 shrink-0">Pieza {idx + 1}</Label>
+                        <Label className="text-xs w-20 shrink-0">
+                          {weightRowLabel} {idx + 1}
+                        </Label>
                         <Input
                           type="number"
                           step="0.001"
@@ -220,6 +284,12 @@ export function ReceiptClient({ poId, folio, lines, pendingRate }: Props) {
                           className="h-9"
                           value={weights[idx] ?? ""}
                           onChange={(e) => updatePieceWeight(l.lineId, idx, e.target.value)}
+                        />
+                        <Input
+                          className="h-9 w-24 shrink-0"
+                          placeholder="Etiqueta"
+                          value={labels[idx] ?? ""}
+                          onChange={(e) => updatePieceLabel(l.lineId, idx, e.target.value)}
                         />
                       </div>
                     ))}
