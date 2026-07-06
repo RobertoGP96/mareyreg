@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -44,12 +45,14 @@ import {
   Loader2,
   FileText,
   StickyNote,
+  Scale,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import {
   createStockMovement,
   createStockTransfer,
 } from "../actions/stock-actions";
+import { PieceListDialog } from "./piece-list-dialog";
 import { MOVEMENT_TYPES, getUnitAbbreviation } from "@/lib/constants";
 import { formatEquivalence } from "../lib/units";
 import { formatAmount } from "@/lib/format";
@@ -167,6 +170,10 @@ export function StockPageClient({
   const [selectedPresentationId, setSelectedPresentationId] = useState<string>("base");
   const [quantityInput, setQuantityInput] = useState<string>("");
   const [piecesInput, setPiecesInput] = useState<string>("");
+  const [pieceDialog, setPieceDialog] = useState<{
+    productId: number;
+    productName: string;
+  } | null>(null);
 
   const selectedProduct = useMemo(
     () => products.find((p) => String(p.productId) === selectedProductId) ?? null,
@@ -303,10 +310,18 @@ export function StockPageClient({
         description="Niveles de stock por producto y almacén con histórico de movimientos."
         badge={`${stockLevels.length} niveles`}
         actions={
-          <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
-            <Plus className="h-4 w-4" />
-            Nuevo movimiento
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/stock/pesajes">
+                <Scale className="h-4 w-4" />
+                Pesajes
+              </Link>
+            </Button>
+            <Button variant="brand" onClick={() => setIsCreateOpen(true)}>
+              <Plus className="h-4 w-4" />
+              Nuevo movimiento
+            </Button>
+          </div>
         }
       />
 
@@ -460,6 +475,23 @@ export function StockPageClient({
                       )}
                     </div>
                   </div>
+                  {sl.product.isCatchWeight && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() =>
+                        setPieceDialog({
+                          productId: sl.productId,
+                          productName: sl.product.name,
+                        })
+                      }
+                    >
+                      <Scale className="h-3.5 w-3.5" />
+                      Pesajes
+                    </Button>
+                  )}
                   {value > 0 && (
                     <div className="text-right shrink-0">
                       <div className="text-[10.5px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -767,7 +799,9 @@ export function StockPageClient({
                       {movementType === "adjustment" && (
                         <p className="mt-1.5 text-xs text-muted-foreground">
                           Usa 0 si el ajuste es solo de peso (ej. deshidratación), sin
-                          perder piezas completas.
+                          perder piezas completas. Si la merma es de una pieza
+                          registrada, usa Re-pesar en el diálogo de Pesajes para
+                          mantener el cuadre.
                         </p>
                       )}
                     </Field>
@@ -847,6 +881,16 @@ export function StockPageClient({
           </form>
         </DialogContent>
       </Dialog>
+
+      <PieceListDialog
+        productId={pieceDialog?.productId ?? null}
+        productName={pieceDialog?.productName ?? ""}
+        warehouses={warehouses}
+        open={pieceDialog != null}
+        onOpenChange={(o) => {
+          if (!o) setPieceDialog(null);
+        }}
+      />
     </div>
   );
 }

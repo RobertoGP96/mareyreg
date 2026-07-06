@@ -14,6 +14,12 @@ import {
   applyStockLevelDelta,
   upsertStockLevel,
 } from "@/modules/inventory/lib/stock-level";
+import {
+  getPiecesForProduct,
+  getPieceReconciliation,
+  type ProductPieceRow,
+  type PieceReconciliationRow,
+} from "@/modules/inventory/queries/piece-queries";
 
 const AUTH_ERROR_MESSAGE = "No autenticado";
 const SESSION_ERROR_RESPONSE =
@@ -544,6 +550,30 @@ export interface AvailablePiece {
   label: string | null;
   version: number;
   registeredAt: string;
+}
+
+export async function getProductPiecesAction(
+  productId: number
+): Promise<ActionResult<{ pieces: ProductPieceRow[] }>> {
+  try {
+    const pieces = await getPiecesForProduct(productId);
+    return { success: true, data: { pieces } };
+  } catch (error) {
+    console.error("getProductPiecesAction:", error);
+    return { success: false, error: "Error al cargar los pesajes del producto" };
+  }
+}
+
+export async function getPieceReconciliationAction(
+  productId: number
+): Promise<ActionResult<{ rows: PieceReconciliationRow[] }>> {
+  try {
+    const rows = await getPieceReconciliation(productId);
+    return { success: true, data: { rows } };
+  } catch (error) {
+    console.error("getPieceReconciliationAction:", error);
+    return { success: false, error: "Error al cargar el cuadre de pesajes" };
+  }
 }
 
 export async function getAvailablePiecesAction(
