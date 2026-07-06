@@ -519,6 +519,7 @@ model Product {
   discountHistory    DiscountHistory[]
   presentations      ProductPresentation[]
   cost               ProductCost?
+  productPieces      ProductPiece[]
 
   @@index([category])
   @@index([isActive])
@@ -559,6 +560,7 @@ model ProductPresentation {
   purchaseOrderLines PurchaseOrderLine[]
   goodsReceiptLines  GoodsReceiptLine[]
   priceHistory       PresentationPriceHistory[]
+  productPieces      ProductPiece[]
 
   @@unique([productId, name])
   @@index([productId, isActive])
@@ -595,6 +597,7 @@ model Warehouse {
   cashRegisters     CashRegister[]
   stockCounts       StockCount[]
   companiesAsWebstore Company[]
+  productPieces     ProductPiece[]
 
   @@map("warehouses")
 }
@@ -646,6 +649,55 @@ model StockLevel {
 
   @@id([productId, warehouseId])
   @@map("stock_levels")
+}
+
+enum PieceStatus {
+  available
+  reserved
+  sold
+  disposed
+}
+
+// Pieza física pesada individualmente (queso, caja de lomo pesada por caja) de
+// un producto catch-weight. weightKg es el peso REAL de báscula. pieceCount es
+// cuántas piezas fungibles de StockLevel.currentPieces representa: 1 si se pesó
+// la pieza suelta, piecesPerUnit si se pesó la caja completa. Las piezas son un
+// subconjunto descriptivo del stock: StockLevel sigue siendo la fuente de los
+// agregados y toda operación por pieza muta ambos en la misma transacción.
+// CHECKs e índice parcial en prisma/sql/inventory-pieces.sql.
+model ProductPiece {
+  pieceId          Int         @id @default(autoincrement()) @map("piece_id")
+  productId        Int         @map("product_id")
+  warehouseId      Int         @map("warehouse_id")
+  presentationId   Int?        @map("presentation_id")
+  weightKg         Decimal     @map("weight_kg") @db.Decimal(20, 8)
+  pieceCount       Int         @default(1) @map("piece_count")
+  status           PieceStatus @default(available)
+  label            String?
+  receiptLineId    Int?        @map("receipt_line_id") // null = alta manual
+  invoiceLineId    Int?        @map("invoice_line_id") // venta POS/factura que la consumió
+  salesOrderLineId Int?        @map("sales_order_line_id") // reserva/venta webstore
+  reservedAt       DateTime?   @map("reserved_at")
+  registeredAt     DateTime    @default(now()) @map("registered_at")
+  registeredBy     Int?        @map("registered_by")
+  soldAt           DateTime?   @map("sold_at")
+  disposedAt       DateTime?   @map("disposed_at")
+  disposedReason   String?     @map("disposed_reason")
+  version          Int         @default(0)
+  updatedAt        DateTime    @default(now()) @updatedAt @map("updated_at")
+
+  product        Product              @relation(fields: [productId], references: [productId], onDelete: Restrict)
+  warehouse      Warehouse            @relation(fields: [warehouseId], references: [warehouseId], onDelete: Restrict)
+  presentation   ProductPresentation? @relation(fields: [presentationId], references: [presentationId], onDelete: Restrict)
+  receiptLine    GoodsReceiptLine?    @relation(fields: [receiptLineId], references: [lineId], onDelete: Restrict)
+  invoiceLine    InvoiceLine?         @relation(fields: [invoiceLineId], references: [lineId], onDelete: Restrict)
+  salesOrderLine SalesOrderLine?      @relation(fields: [salesOrderLineId], references: [lineId], onDelete: Restrict)
+
+  @@index([productId, warehouseId, status])
+  @@index([invoiceLineId])
+  @@index([salesOrderLineId])
+  @@index([receiptLineId])
+  @@map("product_pieces")
 }
 
 // Weighted-average valuation state per product+warehouse
@@ -879,10 +931,11 @@ model GoodsReceiptLine {
   pieces         Int?    @map("pieces")
   pieceWeights   Json?   @map("piece_weights")
 
-  receipt      GoodsReceipt         @relation(fields: [receiptId], references: [receiptId], onDelete: Cascade)
-  poLine       PurchaseOrderLine    @relation(fields: [poLineId], references: [lineId])
-  presentation ProductPresentation? @relation(fields: [presentationId], references: [presentationId], onDelete: Restrict)
-  lot          Lot?                 @relation(fields: [lotId], references: [lotId])
+  receipt       GoodsReceipt         @relation(fields: [receiptId], references: [receiptId], onDelete: Cascade)
+  poLine        PurchaseOrderLine    @relation(fields: [poLineId], references: [lineId])
+  presentation  ProductPresentation? @relation(fields: [presentationId], references: [presentationId], onDelete: Restrict)
+  lot           Lot?                 @relation(fields: [lotId], references: [lotId])
+  productPieces ProductPiece[]
 
   @@index([receiptId])
   @@map("goods_receipt_lines")
@@ -1103,9 +1156,10 @@ model SalesOrderLine {
   // Piezas vendidas (catch-weight). pieces IS NOT NULL ⇒ línea catch-weight.
   pieces         Int?    @map("pieces")
 
-  order        SalesOrder           @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
-  product      Product              @relation(fields: [productId], references: [productId])
-  presentation ProductPresentation? @relation(fields: [presentationId], references: [presentationId], onDelete: Restrict)
+  order         SalesOrder           @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  product       Product              @relation(fields: [productId], references: [productId])
+  presentation  ProductPresentation? @relation(fields: [presentationId], references: [presentationId], onDelete: Restrict)
+  productPieces ProductPiece[]
 
   @@index([orderId])
   @@map("sales_order_lines")
@@ -1162,10 +1216,11 @@ model InvoiceLine {
   // baseQuantity en ese caso viene del peso real capturado, no del factor.
   pieces         Int?    @map("pieces")
 
-  invoice      Invoice              @relation(fields: [invoiceId], references: [invoiceId], onDelete: Cascade)
-  product      Product              @relation(fields: [productId], references: [productId])
-  lot          Lot?                 @relation(fields: [lotId], references: [lotId])
-  presentation ProductPresentation? @relation(fields: [presentationId], references: [presentationId], onDelete: Restrict)
+  invoice       Invoice              @relation(fields: [invoiceId], references: [invoiceId], onDelete: Cascade)
+  product       Product              @relation(fields: [productId], references: [productId])
+  lot           Lot?                 @relation(fields: [lotId], references: [lotId])
+  presentation  ProductPresentation? @relation(fields: [presentationId], references: [presentationId], onDelete: Restrict)
+  productPieces ProductPiece[]
 
   @@index([invoiceId])
   @@map("invoice_lines")
