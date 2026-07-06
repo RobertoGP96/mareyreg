@@ -3,9 +3,10 @@ import { nextFolio, DOC_TYPES } from "@/lib/folio";
 import { createAuditLog } from "@/lib/audit";
 import { getBaseCurrency } from "@/lib/currency";
 import { getEffectiveLinePrices, lineKey } from "@/modules/inventory/lib/effective-price";
-import { toBaseQuantity, piecesFor } from "@/modules/inventory/lib/units";
+import { toBaseQuantity, piecesFor, catchWeightBaseQuantity } from "@/modules/inventory/lib/units";
 import { dispatchLines } from "@/modules/sales/lib/dispatch-lines";
 import { getDefaultWebstoreWarehouseId } from "./dispatch-warehouse";
+import { piecePrice } from "./piece-price";
 import { isSkuResolved, resolveSkusBatch } from "./resolve-skus";
 import { normalizePhone } from "./normalize-phone";
 import type { WebstoreOrderPayload } from "./schemas";
@@ -27,6 +28,30 @@ export class UnsupportedCurrencyError extends Error {
   }
 }
 
+/**
+ * Piezas elegidas por el cliente que ya no están disponibles (vendidas en POS
+ * o reservadas por otro pedido entre el carrito y el checkout). Mapea a
+ * 409 pieces_unavailable: la tienda quita esas piezas del carrito y pide
+ * re-elegir — nunca se degrada silenciosamente a awaiting_weighing porque el
+ * cliente vio un precio exacto por una pieza concreta.
+ */
+export class PiecesUnavailableError extends Error {
+  unavailable: Array<{ sku: string; pieceIds: number[] }>;
+  constructor(unavailable: Array<{ sku: string; pieceIds: number[] }>) {
+    super("Algunas piezas ya no están disponibles");
+    this.name = "PiecesUnavailableError";
+    this.unavailable = unavailable;
+  }
+}
+
+/** pieceIds que no corresponden al producto/almacén/presentación de su línea: payload inválido (400), error del integrador. */
+export class InvalidPiecesError extends Error {
+  constructor(sku: string, pieceIds: number[]) {
+    super(`Piezas inválidas para ${sku}: ${pieceIds.join(", ")}`);
+    this.name = "InvalidPiecesError";
+  }
+}
+
 /** Tolerancia de redondeo para comparar montos monetarios (centavos). */
 const PAYMENT_ROUNDING_TOLERANCE = 0.01;
 
@@ -39,10 +64,12 @@ export interface ProcessOrderAttribution {
 
 export interface ProcessOrderLineResult {
   sku: string;
-  /** true si el precio de esta línea es estimado (catch-weight): el total real se ajusta al pesar. */
+  /** true si el precio de esta línea es estimado (catch-weight sin piezas): el total real se ajusta al pesar. */
   priceIsEstimated: boolean;
-  /** Peso nominal estimado (kg) de la línea, solo para líneas catch-weight. */
+  /** Peso nominal estimado (kg) de la línea, solo para líneas catch-weight estimadas. */
   estimatedWeightKg?: number;
+  /** Eco de las piezas asignadas a la línea (catch-weight con pieceIds): el peso ya es real. */
+  pieces?: Array<{ pieceId: number; weightKg: number }>;
 }
 
 export interface ProcessOrderResult {
@@ -108,6 +135,7 @@ export async function processWebstoreOrder(
       productId: number;
       quantity: number;
       presentationId?: number;
+      pieceIds?: number[];
     }> = [];
     for (const line of payload.lines) {
       const overrideProductId = overrides?.[line.sku];
@@ -139,6 +167,7 @@ export async function processWebstoreOrder(
         productId: product.productId,
         quantity: line.quantity,
         presentationId: product.presentationId,
+        pieceIds: line.pieceIds,
       });
     }
     if (unresolvedSkus.length > 0) {
@@ -187,6 +216,15 @@ export async function processWebstoreOrder(
       { customerId: customer.customerId }
     );
 
+    // Batch de las piezas pedidas por el cliente (una sola query). La lectura
+    // valida pertenencia y disponibilidad; el claim atómico (más abajo) es la
+    // barrera real contra carreras.
+    const allRequestedPieceIds = resolvedLines.flatMap((l) => l.pieceIds ?? []);
+    const requestedPieces = allRequestedPieceIds.length
+      ? await tx.productPiece.findMany({ where: { pieceId: { in: allRequestedPieceIds } } })
+      : [];
+    const requestedPieceById = new Map(requestedPieces.map((p) => [p.pieceId, p]));
+
     const priced: Array<{
       sku: string;
       productId: number;
@@ -197,7 +235,14 @@ export async function processWebstoreOrder(
       baseQuantity: number;
       pieces: number | null;
       isCatchWeight: boolean;
+      /** true cuando el peso ya es real (piezas elegidas): no requiere pesaje. */
+      hasRealWeight: boolean;
+      pieceIds?: number[];
+      /** Subtotal de la línea con el MISMO redondeo que vio el cliente en la tienda. */
+      lineSubtotal: number;
     }> = [];
+    const unavailablePieces: Array<{ sku: string; pieceIds: number[] }> = [];
+
     for (const line of resolvedLines) {
       const key = lineKey(line.productId, line.presentationId);
       const price = effectivePrices.get(key);
@@ -207,17 +252,72 @@ export async function processWebstoreOrder(
         ? piecesPerUnitByPresentationId.get(line.presentationId) ?? null
         : null;
 
+      if (!isCatchWeight && line.pieceIds?.length) {
+        throw new InvalidPiecesError(line.sku, line.pieceIds);
+      }
+
       if (isCatchWeight) {
-        // Venta por unidad (pieza/caja) con precio ESTIMADO: precio por kg ×
-        // peso nominal de la presentación (factor), nunca el peso real — ese
-        // solo se conoce al pesar en el ERP (fulfillWebstoreOrder). Requiere
-        // presentación con piecesPerUnit, igual que dispatchLines.
         if (piecesPerUnit == null || price.pricePerBase == null) {
           throw new NeedsReviewError([
             `${line.sku} (producto de peso variable sin presentación Pieza/Caja configurada)`,
           ]);
         }
+
+        if (line.pieceIds?.length) {
+          // Piezas elegidas por el cliente: el peso real sale de los registros
+          // server-side y el precio por pieza usa piecePrice — el mismo
+          // redondeo que mostró el catálogo.
+          const wrong = line.pieceIds.filter((id) => {
+            const pc = requestedPieceById.get(id);
+            return (
+              pc != null &&
+              (pc.productId !== line.productId ||
+                pc.warehouseId !== warehouseId ||
+                pc.pieceCount !== piecesPerUnit)
+            );
+          });
+          if (wrong.length) throw new InvalidPiecesError(line.sku, wrong);
+
+          const notAvailable = line.pieceIds.filter((id) => {
+            const pc = requestedPieceById.get(id);
+            return !pc || pc.status !== "available";
+          });
+          if (notAvailable.length) {
+            unavailablePieces.push({ sku: line.sku, pieceIds: notAvailable });
+            continue;
+          }
+
+          const selected = line.pieceIds.map((id) => requestedPieceById.get(id)!);
+          const totalWeightKg = catchWeightBaseQuantity(
+            selected.reduce((s, p) => s + Number(p.weightKg), 0)
+          );
+          const lineSubtotal = selected.reduce(
+            (s, p) => s + piecePrice(price.pricePerBase!, Number(p.weightKg), baseCurrency.decimalPlaces),
+            0
+          );
+          priced.push({
+            sku: line.sku,
+            productId: line.productId,
+            presentationId: line.presentationId,
+            quantity: line.quantity,
+            unitPrice: price.pricePerBase,
+            unitFactor: price.factor,
+            baseQuantity: totalWeightKg,
+            pieces: selected.reduce((s, p) => s + p.pieceCount, 0),
+            isCatchWeight: true,
+            hasRealWeight: true,
+            pieceIds: line.pieceIds,
+            lineSubtotal,
+          });
+          continue;
+        }
+
+        // Venta por unidad (pieza/caja) con precio ESTIMADO: precio por kg ×
+        // peso nominal de la presentación (factor), nunca el peso real — ese
+        // solo se conoce al pesar en el ERP (fulfillWebstoreOrder). Requiere
+        // presentación con piecesPerUnit, igual que dispatchLines.
         const nominalWeightKg = price.factor; // factor = peso nominal en kg (ver schema ProductPresentation)
+        const baseQuantity = toBaseQuantity(line.quantity, nominalWeightKg);
         priced.push({
           sku: line.sku,
           productId: line.productId,
@@ -225,9 +325,11 @@ export async function processWebstoreOrder(
           quantity: line.quantity,
           unitPrice: price.pricePerBase,
           unitFactor: price.factor,
-          baseQuantity: toBaseQuantity(line.quantity, nominalWeightKg),
+          baseQuantity,
           pieces: piecesFor(line.quantity, piecesPerUnit),
           isCatchWeight: true,
+          hasRealWeight: false,
+          lineSubtotal: piecePrice(price.pricePerBase, baseQuantity, baseCurrency.decimalPlaces),
         });
         continue;
       }
@@ -242,12 +344,43 @@ export async function processWebstoreOrder(
         baseQuantity: toBaseQuantity(line.quantity, price.factor),
         pieces: null,
         isCatchWeight: false,
+        hasRealWeight: false,
+        lineSubtotal: line.quantity * price.finalPrice,
       });
     }
 
-    const hasCatchWeightLines = priced.some((l) => l.isCatchWeight);
+    if (unavailablePieces.length > 0) {
+      throw new PiecesUnavailableError(unavailablePieces);
+    }
 
-    const subtotal = priced.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
+    // Claim atómico available → reserved por línea con piezas: si otra venta
+    // (POS u otro pedido) ganó alguna pieza entre la lectura y este update,
+    // count no coincide y toda la tx se revierte (las piezas parcialmente
+    // reclamadas vuelven solas con el rollback).
+    for (const line of priced) {
+      if (!line.pieceIds?.length) continue;
+      const claim = await tx.productPiece.updateMany({
+        where: {
+          pieceId: { in: line.pieceIds },
+          productId: line.productId,
+          warehouseId,
+          status: "available",
+        },
+        data: { status: "reserved", reservedAt: new Date() },
+      });
+      if (claim.count !== line.pieceIds.length) {
+        throw new PiecesUnavailableError([{ sku: line.sku, pieceIds: line.pieceIds }]);
+      }
+    }
+
+    // Solo las líneas catch-weight SIN peso real (sin piezas elegidas) mandan
+    // el pedido a awaiting_weighing; con piezas el peso ya se conoce y se
+    // factura de inmediato.
+    const hasUnweighedCatchWeightLines = priced.some(
+      (l) => l.isCatchWeight && !l.hasRealWeight
+    );
+
+    const subtotal = priced.reduce((s, l) => s + l.lineSubtotal, 0);
     const orderFolio = await nextFolio(tx, DOC_TYPES.SALES_ORDER);
 
     const order = await tx.salesOrder.create({
@@ -264,34 +397,56 @@ export async function processWebstoreOrder(
       },
     });
 
-    await tx.salesOrderLine.createMany({
-      data: priced.map((l) => ({
-        orderId: order.orderId,
-        productId: l.productId,
-        presentationId: l.presentationId ?? null,
-        quantity: l.quantity,
-        unitPrice: l.unitPrice,
-        discount: 0,
-        fulfilledQty: l.quantity,
-        subtotal: l.quantity * l.unitPrice,
-        // factor/baseQuantity resueltos server-side (ver getEffectiveLinePrices
-        // arriba): 1 y quantity respectivamente cuando la línea no trae
-        // presentación, igual que el comportamiento anterior. En catch-weight
-        // baseQuantity es ESTIMADA (peso nominal); se corrige en
-        // fulfillWebstoreOrder con el peso real.
-        unitFactor: l.unitFactor,
-        baseQuantity: l.baseQuantity,
-        pieces: l.pieces,
-      })),
-    });
+    // Create por línea (no createMany): las líneas con piezas necesitan su
+    // lineId para anclar la reserva (salesOrderLineId) — así fulfill/cancel
+    // encuentran las piezas del pedido y dispatchLines puede consumir piezas
+    // reserved sin poder robar reservas de otros pedidos.
+    const orderLineIds: number[] = [];
+    for (const l of priced) {
+      const createdLine = await tx.salesOrderLine.create({
+        data: {
+          orderId: order.orderId,
+          productId: l.productId,
+          presentationId: l.presentationId ?? null,
+          quantity: l.quantity,
+          unitPrice: l.unitPrice,
+          discount: 0,
+          fulfilledQty: l.quantity,
+          subtotal: l.lineSubtotal,
+          // factor/baseQuantity resueltos server-side (ver getEffectiveLinePrices
+          // arriba): 1 y quantity respectivamente cuando la línea no trae
+          // presentación, igual que el comportamiento anterior. En catch-weight
+          // sin piezas baseQuantity es ESTIMADA (peso nominal) y se corrige en
+          // fulfillWebstoreOrder; con piezas ya es el peso real registrado.
+          unitFactor: l.unitFactor,
+          baseQuantity: l.baseQuantity,
+          pieces: l.pieces,
+        },
+      });
+      orderLineIds.push(createdLine.lineId);
+      if (l.pieceIds?.length) {
+        await tx.productPiece.updateMany({
+          where: { pieceId: { in: l.pieceIds } },
+          data: { salesOrderLineId: createdLine.lineId },
+        });
+      }
+    }
 
     const lineResultsMeta: ProcessOrderLineResult[] = priced.map((l) => ({
       sku: l.sku,
-      priceIsEstimated: l.isCatchWeight,
-      ...(l.isCatchWeight ? { estimatedWeightKg: l.baseQuantity } : {}),
+      priceIsEstimated: l.isCatchWeight && !l.hasRealWeight,
+      ...(l.isCatchWeight && !l.hasRealWeight ? { estimatedWeightKg: l.baseQuantity } : {}),
+      ...(l.pieceIds?.length
+        ? {
+            pieces: l.pieceIds.map((id) => ({
+              pieceId: id,
+              weightKg: Number(requestedPieceById.get(id)!.weightKg),
+            })),
+          }
+        : {}),
     }));
 
-    if (hasCatchWeightLines) {
+    if (hasUnweighedCatchWeightLines) {
       // Al menos una línea de peso variable: NO se crea factura ni se
       // descuenta stock aquí — el pedido queda awaiting_weighing hasta que se
       // pese en el ERP (fulfillWebstoreOrder). Precio/subtotal quedan como
@@ -344,16 +499,25 @@ export async function processWebstoreOrder(
       },
     });
 
+    // Las líneas con piezas viajan con pieceIds + salesOrderLineId: dispatchLines
+    // deriva el peso real de los registros y consume las piezas reservadas por
+    // este mismo pedido (reserved → sold + invoiceLineId). Nota: el subtotal de
+    // InvoiceLine que calcula dispatchLines (peso × precio/kg sin redondear por
+    // pieza) puede diferir centavos del lineSubtotal redondeado; el total
+    // cobrado (Invoice.total) usa SIEMPRE el subtotal redondeado que vio el
+    // cliente.
     await dispatchLines(tx, {
       invoiceId: invoice.invoiceId,
       folio: invoiceFolio,
       warehouseId,
       customerId: customer.customerId,
-      lines: priced.map((l) => ({
+      lines: priced.map((l, idx) => ({
         productId: l.productId,
         presentationId: l.presentationId,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
+        pieceIds: l.pieceIds,
+        salesOrderLineId: l.pieceIds?.length ? orderLineIds[idx] : undefined,
       })),
       allowManualPrice: false,
       movementNotesPrefix: "Venta tienda en línea",

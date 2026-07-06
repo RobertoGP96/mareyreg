@@ -1,10 +1,19 @@
 import { z } from "zod";
 
-export const webstoreOrderLineSchema = z.object({
-  sku: z.string().min(1),
-  quantity: z.number().positive(),
-  unitPrice: z.number().nonnegative(), // informativo; Mareyway calcula el precio real
-});
+export const webstoreOrderLineSchema = z
+  .object({
+    sku: z.string().min(1),
+    quantity: z.number().positive(),
+    unitPrice: z.number().nonnegative(), // informativo; Mareyway calcula el precio real
+    // Piezas registradas (ProductPiece) elegidas por el cliente para líneas
+    // catch-weight: el ERP deriva el peso real de estos registros y factura
+    // de inmediato (sin awaiting_weighing). length debe ser quantity.
+    pieceIds: z.array(z.number().int().positive()).min(1).optional(),
+  })
+  .refine((l) => !l.pieceIds || l.pieceIds.length === l.quantity, {
+    message: "pieceIds debe tener exactamente quantity elementos",
+    path: ["pieceIds"],
+  });
 
 export const webstoreCustomerSchema = z.object({
   email: z.string().email(),
@@ -20,15 +29,27 @@ export const webstorePaymentSchema = z.object({
   reference: z.string().optional(),
 });
 
-export const webstoreOrderPayloadSchema = z.object({
-  externalOrderId: z.string().min(1),
-  currency: z.string().length(3),
-  customer: webstoreCustomerSchema,
-  lines: z.array(webstoreOrderLineSchema).min(1),
-  payment: webstorePaymentSchema.optional(),
-  warehouseId: z.number().int().positive().optional(),
-  notes: z.string().optional(),
-});
+export const webstoreOrderPayloadSchema = z
+  .object({
+    externalOrderId: z.string().min(1),
+    currency: z.string().length(3),
+    customer: webstoreCustomerSchema,
+    lines: z.array(webstoreOrderLineSchema).min(1),
+    payment: webstorePaymentSchema.optional(),
+    warehouseId: z.number().int().positive().optional(),
+    notes: z.string().optional(),
+  })
+  .superRefine((payload, ctx) => {
+    // Dos líneas no pueden reclamar la misma pieza física.
+    const allPieceIds = payload.lines.flatMap((l) => l.pieceIds ?? []);
+    if (new Set(allPieceIds).size !== allPieceIds.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Hay pieceIds duplicados entre las líneas",
+        path: ["lines"],
+      });
+    }
+  });
 
 export type WebstoreOrderPayload = z.infer<typeof webstoreOrderPayloadSchema>;
 

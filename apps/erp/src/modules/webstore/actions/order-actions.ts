@@ -133,29 +133,67 @@ export async function cancelWebstoreOrder(logId: number): Promise<ActionResult<v
     await assertRole("admin", "dispatcher");
 
     await db.$transaction(async (tx) => {
-      // Claim atómico: sólo una llamada concurrente pasa de "processed" a
-      // "cancelled". Si count === 0, alguien más ya la canceló (o nunca
-      // estuvo "processed"), y no se toca nada más.
+      // Claim atómico: sólo una llamada concurrente pasa de "processed" (o
+      // "awaiting_weighing") a "cancelled". Se lee primero el estado para
+      // saber qué rama de reverso aplica; el updateMany condicionado a ESE
+      // estado sigue siendo el compare-and-swap autoritativo.
+      const existing = await tx.webstoreOrderLog.findUnique({ where: { logId } });
+      if (!existing) throw new Error("Orden no encontrada");
+      if (existing.status === "cancelled") {
+        throw new Error("La orden ya fue cancelada o está siendo cancelada");
+      }
+      if (existing.status !== "processed" && existing.status !== "awaiting_weighing") {
+        throw new Error("La orden no está procesada, no se puede cancelar");
+      }
+      const wasAwaitingWeighing = existing.status === "awaiting_weighing";
+
       const claim = await tx.webstoreOrderLog.updateMany({
-        where: { logId, status: "processed" },
+        where: { logId, status: existing.status },
         data: { status: "cancelled" },
       });
       if (claim.count === 0) {
-        const existing = await tx.webstoreOrderLog.findUnique({ where: { logId } });
-        if (!existing) throw new Error("Orden no encontrada");
-        if (existing.status === "cancelled") {
-          throw new Error("La orden ya fue cancelada o está siendo cancelada");
-        }
-        throw new Error("La orden no está procesada, no se puede cancelar");
+        throw new Error("La orden ya fue cancelada o está siendo cancelada");
       }
 
       const log = await tx.webstoreOrderLog.findUniqueOrThrow({
         where: { logId },
         include: {
-          salesOrder: true,
+          salesOrder: { include: { lines: { select: { lineId: true } } } },
           invoice: { include: { lines: true, payments: true } },
         },
       });
+
+      // Pedido awaiting_weighing: no hay factura ni stock descontado — solo
+      // se liberan las piezas reservadas por el cliente y se cancela la orden.
+      if (wasAwaitingWeighing) {
+        if (!log.salesOrder) throw new Error("La orden no tiene factura u orden de venta asociada");
+        const orderLineIds = log.salesOrder.lines.map((l) => l.lineId);
+        await tx.productPiece.updateMany({
+          where: { salesOrderLineId: { in: orderLineIds }, status: "reserved" },
+          data: { status: "available", salesOrderLineId: null, reservedAt: null },
+        });
+        await tx.salesOrder.update({
+          where: { orderId: log.salesOrder.orderId },
+          data: { status: "cancelled" },
+        });
+        await tx.webstoreOrderLog.update({
+          where: { logId },
+          data: {
+            errorMessage: `Orden cancelada manualmente el ${new Date().toISOString()}`,
+          },
+        });
+        await createAuditLog(tx, {
+          action: "cancel",
+          entityType: "WebstoreOrderLog",
+          entityId: logId,
+          module: "webstore",
+          userId,
+          oldValues: { status: "awaiting_weighing" },
+          newValues: { salesOrderId: log.salesOrder.orderId, releasedPieceLines: orderLineIds },
+        });
+        return;
+      }
+
       if (!log.salesOrder || !log.invoice) {
         throw new Error("La orden no tiene factura u orden de venta asociada");
       }
@@ -185,6 +223,25 @@ export async function cancelWebstoreOrder(logId: number): Promise<ActionResult<v
         }),
         userId,
         movementNotesPrefix: "Cancelación orden web",
+      });
+
+      // Liberar las piezas registradas consumidas o reservadas por el pedido:
+      // vuelven a disponibles en la misma tx que reingresa kg+piezas.
+      await tx.productPiece.updateMany({
+        where: {
+          OR: [
+            { invoiceLineId: { in: invoice.lines.map((l) => l.lineId) } },
+            { salesOrderLineId: { in: log.salesOrder.lines.map((l) => l.lineId) } },
+          ],
+          status: { in: ["sold", "reserved"] },
+        },
+        data: {
+          status: "available",
+          invoiceLineId: null,
+          salesOrderLineId: null,
+          soldAt: null,
+          reservedAt: null,
+        },
       });
 
       // Saldo del cliente: reverso exacto de lo que hizo processWebstoreOrder

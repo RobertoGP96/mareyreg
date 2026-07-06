@@ -4,12 +4,16 @@ import { resolveApiKey } from "@/modules/webstore/lib/api-key";
 import { getBaseCurrency } from "@/lib/currency";
 import { getEffectiveLinePrices, lineKey } from "@/modules/inventory/lib/effective-price";
 import { getDefaultWebstoreWarehouseId } from "@/modules/webstore/lib/dispatch-warehouse";
+import { piecePrice } from "@/modules/webstore/lib/piece-price";
 import {
   checkRateLimit,
   getClientIp,
   rateLimitExceededResponseInit,
   WEBSTORE_RATE_LIMITS,
 } from "@/modules/webstore/lib/rate-limit";
+
+/** Máximo de pesajes expuestos por producto en el catálogo. */
+const MAX_PIECES_PER_PRODUCT = 50;
 
 export const runtime = "nodejs";
 
@@ -101,6 +105,34 @@ export async function GET(request: Request): Promise<NextResponse> {
     {}
   );
 
+  // Pesajes disponibles (ProductPiece) de los productos catch-weight en el
+  // almacén de la tienda: el cliente puede elegir la pieza exacta que quiere
+  // y el pedido se factura con su peso real (sin awaiting_weighing).
+  const catchWeightProductIds = products
+    .filter((p) => p.isCatchWeight)
+    .map((p) => p.productId);
+  const availablePieces =
+    warehouseId != null && catchWeightProductIds.length
+      ? await db.productPiece.findMany({
+          where: {
+            productId: { in: catchWeightProductIds },
+            warehouseId,
+            status: "available",
+          },
+          orderBy: [{ weightKg: "asc" }, { pieceId: "asc" }],
+          select: { pieceId: true, productId: true, weightKg: true, pieceCount: true },
+        })
+      : [];
+  const piecesByProductId = new Map<number, typeof availablePieces>();
+  for (const piece of availablePieces) {
+    const list = piecesByProductId.get(piece.productId);
+    if (list) {
+      if (list.length < MAX_PIECES_PER_PRODUCT) list.push(piece);
+    } else {
+      piecesByProductId.set(piece.productId, [piece]);
+    }
+  }
+
   const appliedDiscountIds = Array.from(
     new Set(
       Array.from(prices.values()).flatMap((p) => p.appliedDiscounts.map((d) => d.discountId))
@@ -161,6 +193,20 @@ export async function GET(request: Request): Promise<NextResponse> {
       offer,
       isCatchWeight: p.isCatchWeight,
       pricePerKg,
+      // Pesajes disponibles con precio YA redondeado por el ERP (piecePrice):
+      // la tienda nunca recalcula. null en productos normales; [] cuando el
+      // producto catch-weight no tiene piezas registradas (flujo estimado).
+      pieces: p.isCatchWeight
+        ? (piecesByProductId.get(p.productId) ?? []).map((pz) => ({
+            pieceId: pz.pieceId,
+            weightKg: Number(pz.weightKg),
+            pieceCount: pz.pieceCount,
+            price:
+              pricePerKg != null
+                ? piecePrice(pricePerKg, Number(pz.weightKg), baseCurrency.decimalPlaces)
+                : null,
+          }))
+        : null,
       presentations: p.presentations
         .filter((pr): pr is typeof pr & { sku: string } => pr.sku != null)
         .map((pr) => {

@@ -33,6 +33,7 @@ function toUserMessage(error: unknown, genericMessage: string): string {
       error.message.startsWith("Captura el peso real de") ||
       error.message.startsWith("La cantidad de") ||
       error.message.startsWith("El producto") ||
+      error.message.startsWith("La pieza ") ||
       error.message.startsWith("Stock insuficiente")
     ) {
       return error.message;
@@ -84,7 +85,25 @@ export async function fulfillWebstoreOrder(
         input.weights.map((w) => [w.orderLineId, w.actualWeightKg])
       );
 
+      // Piezas reservadas por el pedido (cliente eligió pesajes en la tienda):
+      // esas líneas ya tienen peso real y NO piden captura — dispatchLines lo
+      // deriva de los registros y consume la reserva (reserved → sold).
+      const reservedPieces = await tx.productPiece.findMany({
+        where: {
+          salesOrderLineId: { in: order.lines.map((l) => l.lineId) },
+          status: "reserved",
+        },
+        select: { pieceId: true, salesOrderLineId: true },
+      });
+      const pieceIdsByLineId = new Map<number, number[]>();
+      for (const piece of reservedPieces) {
+        const list = pieceIdsByLineId.get(piece.salesOrderLineId!) ?? [];
+        list.push(piece.pieceId);
+        pieceIdsByLineId.set(piece.salesOrderLineId!, list);
+      }
+
       for (const line of catchWeightLines) {
+        if (pieceIdsByLineId.has(line.lineId)) continue;
         const weight = weightByLineId.get(line.lineId);
         if (weight == null || !(weight > 0)) {
           throw new Error(`Captura el peso real de ${line.product.name}`);
@@ -111,13 +130,18 @@ export async function fulfillWebstoreOrder(
         folio: invoiceFolio,
         warehouseId: order.warehouseId,
         customerId: order.customerId,
-        lines: order.lines.map((l) => ({
-          productId: l.productId,
-          presentationId: l.presentationId ?? undefined,
-          quantity: Number(l.quantity),
-          unitPrice: Number(l.unitPrice),
-          actualWeightKg: weightByLineId.get(l.lineId),
-        })),
+        lines: order.lines.map((l) => {
+          const pieceIds = pieceIdsByLineId.get(l.lineId);
+          return {
+            productId: l.productId,
+            presentationId: l.presentationId ?? undefined,
+            quantity: Number(l.quantity),
+            unitPrice: Number(l.unitPrice),
+            actualWeightKg: pieceIds ? undefined : weightByLineId.get(l.lineId),
+            pieceIds,
+            salesOrderLineId: pieceIds ? l.lineId : undefined,
+          };
+        }),
         userId,
         allowManualPrice: false,
         movementNotesPrefix: "Venta tienda en línea (pesaje)",

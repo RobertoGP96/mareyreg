@@ -64,6 +64,8 @@ interface CatchWeightLine {
   pieces: number;
   estimatedWeightKg: number;
   pricePerKg: number;
+  /** Piezas elegidas por el cliente en la tienda: el peso ya es real, no se captura. */
+  reservedPieces: Array<{ pieceId: number; weightKg: number; label: string | null }>;
 }
 
 interface LineStatus {
@@ -102,17 +104,26 @@ export function OrderDetailClient({
 
   const cfg = STATUS_MAP[log.status] ?? { status: "pending" as OpsStatus, label: log.status };
   const needsAttention = log.status === "needs_review" || log.status === "error";
-  const canCancel = log.status === "processed";
+  const canCancel = log.status === "processed" || log.status === "awaiting_weighing";
   const isAwaitingWeighing = log.status === "awaiting_weighing";
 
+  const reservedWeightFor = (line: CatchWeightLine) =>
+    line.reservedPieces.reduce((s, p) => s + p.weightKg, 0);
+
   const weighingTotal = catchWeightLines.reduce((sum, line) => {
+    if (line.reservedPieces.length > 0) {
+      return sum + reservedWeightFor(line) * line.pricePerKg;
+    }
     const w = Number(weights[line.orderLineId]);
     const weight = Number.isFinite(w) && w > 0 ? w : line.estimatedWeightKg;
     return sum + weight * line.pricePerKg;
   }, 0);
 
   const handleFulfill = async () => {
-    const parsedWeights = catchWeightLines.map((line) => ({
+    // Las líneas con piezas reservadas no capturan peso: el server lo deriva
+    // de los registros. Solo se validan/envían las líneas sin piezas.
+    const linesNeedingWeight = catchWeightLines.filter((l) => l.reservedPieces.length === 0);
+    const parsedWeights = linesNeedingWeight.map((line) => ({
       orderLineId: line.orderLineId,
       actualWeightKg: Number(weights[line.orderLineId]),
     }));
@@ -240,10 +251,12 @@ export function OrderDetailClient({
         >
           <div className="space-y-3">
             {catchWeightLines.map((line) => {
+              const hasReserved = line.reservedPieces.length > 0;
               const rawWeight = weights[line.orderLineId] ?? "";
               const parsedWeight = Number(rawWeight);
-              const lineTotal =
-                Number.isFinite(parsedWeight) && parsedWeight > 0
+              const lineTotal = hasReserved
+                ? reservedWeightFor(line) * line.pricePerKg
+                : Number.isFinite(parsedWeight) && parsedWeight > 0
                   ? parsedWeight * line.pricePerKg
                   : null;
               return (
@@ -260,24 +273,40 @@ export function OrderDetailClient({
                       ${line.pricePerKg.toFixed(2)} / kg
                     </span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Field label="Peso real (kg)" className="flex-1">
-                      <Input
-                        type="number"
-                        step="0.001"
-                        min="0"
-                        inputMode="decimal"
-                        placeholder={line.estimatedWeightKg.toFixed(3)}
-                        value={rawWeight}
-                        onChange={(e) =>
-                          setWeights((prev) => ({ ...prev, [line.orderLineId]: e.target.value }))
-                        }
-                      />
-                    </Field>
-                    <div className="text-sm font-mono tabular-nums whitespace-nowrap pt-5">
-                      {lineTotal != null ? `$${lineTotal.toFixed(2)}` : "—"}
+                  {hasReserved ? (
+                    <div className="flex items-center justify-between gap-3 text-sm">
+                      <div className="space-y-0.5">
+                        {line.reservedPieces.map((p) => (
+                          <p key={p.pieceId} className="font-mono tabular-nums text-muted-foreground">
+                            Pieza {p.label ?? `#${p.pieceId}`} · {p.weightKg.toFixed(3)} kg
+                            <span className="text-xs"> — elegida por el cliente</span>
+                          </p>
+                        ))}
+                      </div>
+                      <div className="text-sm font-mono tabular-nums whitespace-nowrap">
+                        ${lineTotal!.toFixed(2)}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <Field label="Peso real (kg)" className="flex-1">
+                        <Input
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          inputMode="decimal"
+                          placeholder={line.estimatedWeightKg.toFixed(3)}
+                          value={rawWeight}
+                          onChange={(e) =>
+                            setWeights((prev) => ({ ...prev, [line.orderLineId]: e.target.value }))
+                          }
+                        />
+                      </Field>
+                      <div className="text-sm font-mono tabular-nums whitespace-nowrap pt-5">
+                        {lineTotal != null ? `$${lineTotal.toFixed(2)}` : "—"}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -353,10 +382,20 @@ export function OrderDetailClient({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Cancelar esta orden?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se revertirá el stock y la valuación de los productos vendidos, se anulará cualquier
-              pago registrado y se ajustará el saldo del cliente. La factura{" "}
-              <strong>{log.invoiceFolio}</strong> quedará marcada como cancelada. Esta acción no se
-              puede deshacer.
+              {isAwaitingWeighing ? (
+                <>
+                  El pedido aún no está facturado: se cancelará la orden de venta y las piezas
+                  reservadas por el cliente volverán a estar disponibles. Esta acción no se puede
+                  deshacer.
+                </>
+              ) : (
+                <>
+                  Se revertirá el stock y la valuación de los productos vendidos, se anulará
+                  cualquier pago registrado y se ajustará el saldo del cliente. La factura{" "}
+                  <strong>{log.invoiceFolio}</strong> quedará marcada como cancelada. Esta acción no
+                  se puede deshacer.
+                </>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

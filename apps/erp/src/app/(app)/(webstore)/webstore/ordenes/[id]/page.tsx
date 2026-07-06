@@ -41,6 +41,25 @@ export default async function WebstoreOrderDetailPage({
     ? await db.stockMovement.findMany({ where: { referenceDoc: log.invoice.folio } })
     : [];
 
+  // Piezas reservadas por el cliente en la tienda: esas líneas ya tienen peso
+  // real y el formulario de pesaje las muestra en solo lectura.
+  const orderLineIds = (log.salesOrder?.lines ?? []).map((l) => l.lineId);
+  const reservedPieces = orderLineIds.length
+    ? await db.productPiece.findMany({
+        where: { salesOrderLineId: { in: orderLineIds }, status: "reserved" },
+        select: { pieceId: true, salesOrderLineId: true, weightKg: true, label: true },
+      })
+    : [];
+  const reservedByLineId = new Map<
+    number,
+    Array<{ pieceId: number; weightKg: number; label: string | null }>
+  >();
+  for (const piece of reservedPieces) {
+    const list = reservedByLineId.get(piece.salesOrderLineId!) ?? [];
+    list.push({ pieceId: piece.pieceId, weightKg: Number(piece.weightKg), label: piece.label });
+    reservedByLineId.set(piece.salesOrderLineId!, list);
+  }
+
   const catchWeightLines = (log.salesOrder?.lines ?? [])
     .filter((l) => l.product.isCatchWeight && l.pieces != null)
     .map((l) => ({
@@ -50,6 +69,7 @@ export default async function WebstoreOrderDetailPage({
       pieces: l.pieces as number,
       estimatedWeightKg: Number(l.baseQuantity),
       pricePerKg: Number(l.unitPrice),
+      reservedPieces: reservedByLineId.get(l.lineId) ?? [],
     }));
 
   return (

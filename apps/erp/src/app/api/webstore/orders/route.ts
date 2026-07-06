@@ -6,6 +6,8 @@ import {
   processWebstoreOrder,
   NeedsReviewError,
   UnsupportedCurrencyError,
+  PiecesUnavailableError,
+  InvalidPiecesError,
 } from "@/modules/webstore/lib/process-order";
 import {
   checkRateLimit,
@@ -132,6 +134,37 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json(
         { status: "needs_review", logId: log.logId, unresolvedSkus: error.unresolvedSkus },
         { status: 202 }
+      );
+    }
+
+    if (error instanceof PiecesUnavailableError) {
+      // Conflicto de concurrencia, no error del integrador: alguna pieza
+      // elegida se vendió/reservó entre el carrito y el checkout. La tienda
+      // quita esas piezas del carrito y pide re-elegir; el reintento llega
+      // con un externalOrderId nuevo, así que el log en error no bloquea.
+      await db.webstoreOrderLog.update({
+        where: { logId: log.logId },
+        data: { status: "error", errorMessage: error.message },
+      });
+      return NextResponse.json(
+        {
+          status: "pieces_unavailable",
+          logId: log.logId,
+          unavailable: error.unavailable,
+          error: error.message,
+        },
+        { status: 409 }
+      );
+    }
+
+    if (error instanceof InvalidPiecesError) {
+      await db.webstoreOrderLog.update({
+        where: { logId: log.logId },
+        data: { status: "error", errorMessage: error.message },
+      });
+      return NextResponse.json(
+        { status: "error", logId: log.logId, error: error.message },
+        { status: 400 }
       );
     }
 
