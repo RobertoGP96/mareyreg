@@ -673,6 +673,195 @@ describe("dispatchLines", () => {
       });
     });
 
+    describe("venta desde caja registrada (sourcePieceId)", () => {
+      // Presentación Pieza (suelta): la caja registrada agrupa varias.
+      function piezaPresentation() {
+        return presentation({
+          presentationId: 21,
+          name: "Pieza",
+          factor: 4,
+          piecesPerUnit: 1,
+        });
+      }
+
+      function box(overrides: Partial<Record<string, unknown>> = {}) {
+        return {
+          pieceId: 601,
+          productId: 1,
+          warehouseId: 1,
+          status: "available",
+          pieceCount: 5,
+          weightKg: 40,
+          label: "L-01",
+          salesOrderLineId: null,
+          ...overrides,
+        };
+      }
+
+      function setupBoxSale(boxOverrides: Partial<Record<string, unknown>> = {}) {
+        tx.product.findMany.mockResolvedValue([catchWeightProduct({ name: "Lomo" })]);
+        tx.productPresentation.findMany.mockResolvedValue([piezaPresentation()]);
+        tx.stockLevel.updateMany.mockResolvedValue({ count: 1 });
+        tx.productPiece.findMany.mockResolvedValue([box(boxOverrides)]);
+        getEffectiveLinePrices.mockResolvedValue(
+          new Map([[lineKey(1, 21), effectivePriceResult({ pricePerBase: 1200 })]])
+        );
+      }
+
+      it("venta parcial: descuenta peso y piezas de la caja sin consumirla", async () => {
+        setupBoxSale();
+
+        const result = await dispatchLines(tx as never, {
+          invoiceId: 1,
+          folio: "F-0001",
+          warehouseId: 1,
+          lines: [
+            {
+              productId: 1,
+              presentationId: 21,
+              quantity: 2,
+              unitPrice: 1200,
+              actualWeightKg: 15.5,
+              sourcePieceId: 601,
+            },
+          ],
+          allowManualPrice: true,
+        });
+
+        expect(result.lineResults[0]).toMatchObject({
+          pieces: 2,
+          baseQuantity: 15.5,
+        });
+        expect(tx.productPiece.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ pieceId: 601, status: "available", weightKg: 40 }),
+            data: expect.objectContaining({ weightKg: 24.5, pieceCount: 3 }),
+          })
+        );
+        // Sin merma residual: solo el decremento dual de la venta
+        expect(tx.stockLevel.updateMany).toHaveBeenCalledTimes(1);
+      });
+
+      it("caja agotada: pasa a sold con lo vendido y el residuo se merma solo-kg", async () => {
+        setupBoxSale({ pieceCount: 2, weightKg: 8 });
+
+        await dispatchLines(tx as never, {
+          invoiceId: 1,
+          folio: "F-0001",
+          warehouseId: 1,
+          lines: [
+            {
+              productId: 1,
+              presentationId: 21,
+              quantity: 2,
+              unitPrice: 1200,
+              actualWeightKg: 7.6,
+              sourcePieceId: 601,
+            },
+          ],
+          allowManualPrice: true,
+        });
+
+        expect(tx.productPiece.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ pieceId: 601, weightKg: 8 }),
+            data: expect.objectContaining({
+              status: "sold",
+              invoiceLineId: 100,
+              weightKg: 7.6,
+              pieceCount: 2,
+            }),
+          })
+        );
+        // Decremento dual de la venta + merma residual solo-kg (0.4)
+        expect(tx.stockLevel.updateMany).toHaveBeenCalledTimes(2);
+        expect(applyInventoryExit).toHaveBeenCalledWith(
+          tx,
+          expect.objectContaining({ qty: 0.4 })
+        );
+        expect(tx.stockMovement.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              movementType: "adjustment",
+              quantity: 0.4,
+              pieces: null,
+              notes: expect.stringContaining("Merma residual"),
+            }),
+          })
+        );
+      });
+
+      it("peso vendido mayor al registrado de la caja lanza error", async () => {
+        setupBoxSale({ pieceCount: 2, weightKg: 8 });
+
+        await expect(
+          dispatchLines(tx as never, {
+            invoiceId: 1,
+            folio: "F-0001",
+            warehouseId: 1,
+            lines: [
+              {
+                productId: 1,
+                presentationId: 21,
+                quantity: 2,
+                unitPrice: 1200,
+                actualWeightKg: 9,
+                sourcePieceId: 601,
+              },
+            ],
+            allowManualPrice: true,
+          })
+        ).rejects.toThrow("El peso vendido excede el peso registrado de la caja L-01");
+      });
+
+      it("más piezas que las de la caja lanza error", async () => {
+        setupBoxSale({ pieceCount: 2, weightKg: 8 });
+
+        await expect(
+          dispatchLines(tx as never, {
+            invoiceId: 1,
+            folio: "F-0001",
+            warehouseId: 1,
+            lines: [
+              {
+                productId: 1,
+                presentationId: 21,
+                quantity: 3,
+                unitPrice: 1200,
+                actualWeightKg: 7,
+                sourcePieceId: 601,
+              },
+            ],
+            allowManualPrice: true,
+          })
+        ).rejects.toThrow("no tiene suficientes piezas");
+      });
+
+      it("pieceIds y sourcePieceId en la misma línea lanza error", async () => {
+        setupBoxSale();
+
+        await expect(
+          dispatchLines(tx as never, {
+            invoiceId: 1,
+            folio: "F-0001",
+            warehouseId: 1,
+            lines: [
+              {
+                productId: 1,
+                presentationId: 21,
+                quantity: 1,
+                unitPrice: 1200,
+                actualWeightKg: 4,
+                pieceIds: [601],
+                sourcePieceId: 601,
+              },
+            ],
+            allowManualPrice: true,
+          })
+        ).rejects.toThrow("Hay piezas repetidas en la venta");
+      });
+    });
+
     it("stock: piezas suficientes pero kg insuficientes muestra mensaje dual", async () => {
       tx.product.findMany.mockResolvedValue([catchWeightProduct()]);
       tx.productPresentation.findMany.mockResolvedValue([catchWeightPresentation()]);

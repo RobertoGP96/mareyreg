@@ -109,6 +109,11 @@ interface CartLine {
    * de estos registros al facturar.
    */
   pieceIds: number[] | null;
+  /**
+   * Caja registrada de la que se corta la venta pesada al momento (caso
+   * lomos). null en líneas normales, con piezas elegidas o sin caja de origen.
+   */
+  sourcePieceId: number | null;
 }
 
 function cartLineKey(productId: number, presentationId: number | null): string {
@@ -192,6 +197,8 @@ export function PosClient({
   const [availablePieces, setAvailablePieces] = useState<AvailablePiece[]>([]);
   const [piecesLoading, setPiecesLoading] = useState(false);
   const [selectedPieceIds, setSelectedPieceIds] = useState<number[]>([]);
+  // Caja de origen en modo peso manual ("none" = remanente sin registrar).
+  const [weighingSourcePieceId, setWeighingSourcePieceId] = useState<string>("none");
 
   const selectedCustomer = customers.find((c) => String(c.customerId) === customerId);
   const prevCustomerTypeRef = useRef<string | undefined>(selectedCustomer?.customerType);
@@ -314,6 +321,7 @@ export function PosClient({
           actualWeightKg: null,
           pricePerKg: null,
           pieceIds: null,
+          sourcePieceId: null,
         },
       ]);
     }
@@ -395,6 +403,7 @@ export function PosClient({
     setWeighingMode("manual");
     setAvailablePieces([]);
     setSelectedPieceIds([]);
+    setWeighingSourcePieceId("none");
     setSearch("");
     setPendingProduct(null);
     void loadAvailablePieces(p.productId).then((pieces) => {
@@ -414,6 +423,9 @@ export function PosClient({
     setWeighingMode(line.pieceIds != null ? "pieces" : "manual");
     setAvailablePieces([]);
     setSelectedPieceIds(line.pieceIds ?? []);
+    setWeighingSourcePieceId(
+      line.sourcePieceId != null ? String(line.sourcePieceId) : "none"
+    );
     void loadAvailablePieces(line.productId).then((pieces) => {
       setAvailablePieces(pieces);
     });
@@ -428,6 +440,7 @@ export function PosClient({
     setWeighingMode("manual");
     setAvailablePieces([]);
     setSelectedPieceIds([]);
+    setWeighingSourcePieceId("none");
   };
 
   /** Piezas ya reclamadas por otras líneas del carrito (no seleccionables). */
@@ -464,6 +477,18 @@ export function PosClient({
   );
   const selectedWeightKg = selectedPieces.reduce((s, pc) => s + pc.weightKg, 0);
 
+  // Cajas registradas de las que se puede cortar la venta en modo peso manual
+  // (caso lomos: caja pesada en almacén, la pieza se pesa al vender). Deben
+  // agrupar MÁS piezas que la presentación vendida.
+  const availableBoxes = useMemo(() => {
+    const piecesPerUnit = weighingPresentation?.piecesPerUnit ?? 1;
+    return availablePieces.filter((pc) => pc.pieceCount > piecesPerUnit);
+  }, [availablePieces, weighingPresentation]);
+  const selectedBox =
+    weighingSourcePieceId !== "none"
+      ? availableBoxes.find((pc) => String(pc.pieceId) === weighingSourcePieceId) ?? null
+      : null;
+
   const togglePiece = (pieceId: number) => {
     setSelectedPieceIds((prev) =>
       prev.includes(pieceId) ? prev.filter((id) => id !== pieceId) : [...prev, pieceId]
@@ -484,6 +509,7 @@ export function PosClient({
     let actualWeightKg: number;
     let pieces: number;
     let pieceIds: number[] | null;
+    let sourcePieceId: number | null = null;
 
     if (weighingMode === "pieces") {
       if (!selectedPieces.length) {
@@ -507,6 +533,22 @@ export function PosClient({
       }
       pieces = piecesFor(quantity, presentation.piecesPerUnit);
       pieceIds = null;
+
+      if (selectedBox) {
+        if (pieces > selectedBox.pieceCount) {
+          toast.error(
+            `La caja ${selectedBox.label ?? `#${selectedBox.pieceId}`} no tiene suficientes piezas (${selectedBox.pieceCount} disponibles)`
+          );
+          return;
+        }
+        if (actualWeightKg > selectedBox.weightKg + 0.001) {
+          toast.error(
+            `El peso excede el registrado de la caja ${selectedBox.label ?? `#${selectedBox.pieceId}`} (${selectedBox.weightKg.toFixed(3)} kg)`
+          );
+          return;
+        }
+        sourcePieceId = selectedBox.pieceId;
+      }
     }
 
     // Validación dual de stock: kg y piezas, excluyendo la línea que se está
@@ -548,6 +590,7 @@ export function PosClient({
       actualWeightKg,
       pricePerKg: resolvedPricePerKg,
       pieceIds,
+      sourcePieceId,
     };
 
     if (editingLineKey != null) {
@@ -564,6 +607,12 @@ export function PosClient({
         if ((existing.pieceIds == null) !== (pieceIds == null)) {
           toast.error(
             `Ya hay una línea de ${weighingProduct.name} con otro tipo de pesaje. Edítala desde el carrito.`
+          );
+          return;
+        }
+        if ((existing.sourcePieceId ?? null) !== sourcePieceId) {
+          toast.error(
+            `Ya hay una línea de ${weighingProduct.name} con otra caja de origen. Edítala desde el carrito.`
           );
           return;
         }
@@ -705,6 +754,7 @@ export function PosClient({
         unitPrice: l.unitPrice,
         actualWeightKg: l.actualWeightKg ?? undefined,
         pieceIds: l.pieceIds ?? undefined,
+        sourcePieceId: l.sourcePieceId ?? undefined,
       })),
       immediatePayments,
     });
@@ -1119,6 +1169,29 @@ export function PosClient({
                     autoFocus
                   />
                 </div>
+                {availableBoxes.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Caja de origen</Label>
+                    <Select
+                      value={weighingSourcePieceId}
+                      onValueChange={setWeighingSourcePieceId}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin caja (remanente sin registrar)</SelectItem>
+                        {availableBoxes.map((pc) => (
+                          <SelectItem key={pc.pieceId} value={String(pc.pieceId)}>
+                            {pc.label ?? `#${pc.pieceId}`} · {pc.weightKg.toFixed(3)} kg · {pc.pieceCount} pzas
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      El peso pesado se descuenta de la caja elegida; al agotarse
+                      sus piezas, el residuo se merma automáticamente.
+                    </p>
+                  </div>
+                )}
               </>
             )}
 

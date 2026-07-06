@@ -7,6 +7,7 @@ import {
   catchWeightBaseQuantity,
   formatCatchWeight,
 } from "@/modules/inventory/lib/units";
+import { applyStockLevelDelta } from "@/modules/inventory/lib/stock-level";
 import type { Prisma } from "@/generated/prisma";
 
 type PrismaTx = Prisma.TransactionClient;
@@ -44,6 +45,14 @@ export interface DispatchLineInput {
    * reserved sin poder robar reservas de otros pedidos.
    */
   salesOrderLineId?: number;
+  /**
+   * Caja registrada de la que se corta esta venta (caso lomos: la caja se
+   * pesó completa en almacén y cada pieza se pesa al momento de vender).
+   * Requiere actualWeightKg y es excluyente con pieceIds. El peso vendido se
+   * descuenta de la caja; al agotarse sus piezas, el residuo de peso se
+   * merma automáticamente para mantener el cuadre.
+   */
+  sourcePieceId?: number;
 }
 
 export interface DispatchLineResult {
@@ -141,10 +150,14 @@ export async function dispatchLines(
     { customerId }
   );
 
-  // Batch: piezas registradas referenciadas por las líneas. Se leen para
-  // validar y derivar pesos; el reclamo definitivo (available/reserved → sold)
-  // es un updateMany condicional por pieza al crear cada InvoiceLine.
-  const allPieceIds = lines.flatMap((l) => l.pieceIds ?? []);
+  // Batch: piezas registradas referenciadas por las líneas (elegidas enteras
+  // vía pieceIds o como caja de origen vía sourcePieceId). Se leen para
+  // validar y derivar pesos; el reclamo definitivo es un updateMany
+  // condicional por pieza al crear cada InvoiceLine.
+  const allPieceIds = [
+    ...lines.flatMap((l) => l.pieceIds ?? []),
+    ...lines.map((l) => l.sourcePieceId).filter((id): id is number => id != null),
+  ];
   if (new Set(allPieceIds).size !== allPieceIds.length) {
     throw new Error("Hay piezas repetidas en la venta");
   }
@@ -154,6 +167,18 @@ export async function dispatchLines(
   const piecesById = new Map(referencedPieces.map((p) => [p.pieceId, p]));
   // Piezas a reclamar por índice de línea, resueltas dentro del loop.
   const pieceClaimsByLine = new Map<number, { pieceId: number; weightKg: Prisma.Decimal; label: string | null }[]>();
+  // Cajas de origen a descontar por índice de línea (venta pesada al momento).
+  const boxClaimsByLine = new Map<
+    number,
+    {
+      pieceId: number;
+      weightKg: Prisma.Decimal;
+      pieceCount: number;
+      label: string | null;
+      soldKg: number;
+      soldPieces: number;
+    }
+  >();
 
   for (const line of lines) {
     const product = productById.get(line.productId);
@@ -206,6 +231,11 @@ export async function dispatchLines(
       if (!Number.isInteger(line.quantity) || line.quantity < 1) {
         throw new Error(`La cantidad de ${product.name} debe ser un número entero mayor o igual a 1`);
       }
+      if (line.pieceIds?.length && line.sourcePieceId != null) {
+        throw new Error(
+          `La línea de ${product.name} no puede combinar piezas elegidas con caja de origen`
+        );
+      }
 
       if (line.pieceIds?.length) {
         // Venta por piezas registradas: el peso real sale SIEMPRE de los pesos
@@ -256,12 +286,47 @@ export async function dispatchLines(
           label: p.label,
         })));
       } else {
-        // Fallback de peso manual (stock sin piezas registradas).
+        // Peso manual (stock sin piezas registradas), con caja de origen
+        // opcional: el lomo se pesa al momento de la venta y su peso se
+        // descuenta de la caja registrada para mantener el cuadre.
         if (line.actualWeightKg == null || !(line.actualWeightKg > 0)) {
           throw new Error(`Captura el peso real de ${product.name}`);
         }
         pieces = piecesFor(line.quantity, piecesPerUnit);
         baseQty = catchWeightBaseQuantity(line.actualWeightKg);
+
+        if (line.sourcePieceId != null) {
+          const box = piecesById.get(line.sourcePieceId);
+          if (!box || box.productId !== line.productId || box.warehouseId !== warehouseId) {
+            throw new Error(
+              `La pieza ${box?.label ?? line.sourcePieceId} no corresponde al producto o almacén de la venta`
+            );
+          }
+          if (box.status !== "available") {
+            throw new Error(
+              `La pieza ${box.label ?? box.pieceId} ya no está disponible. Vuelve a seleccionar las piezas.`
+            );
+          }
+          if (box.pieceCount < pieces) {
+            throw new Error(
+              `La caja ${box.label ?? box.pieceId} no tiene suficientes piezas (${box.pieceCount} disponibles)`
+            );
+          }
+          const boxKg = Number(box.weightKg);
+          if (baseQty > boxKg + 0.001) {
+            throw new Error(
+              `El peso vendido excede el peso registrado de la caja ${box.label ?? box.pieceId} (${boxKg} kg). Re-pesa la caja.`
+            );
+          }
+          boxClaimsByLine.set(lineResults.length, {
+            pieceId: box.pieceId,
+            weightKg: box.weightKg,
+            pieceCount: box.pieceCount,
+            label: box.label,
+            soldKg: baseQty,
+            soldPieces: pieces,
+          });
+        }
       }
 
       if (allowManualPrice) {
@@ -471,6 +536,90 @@ export async function dispatchLines(
         pieces: r.pieces,
       },
     });
+
+    // Caja de origen: descuenta el peso pesado al momento; si la caja se
+    // agota, el registro pasa a sold describiendo exactamente lo vendido y el
+    // residuo de peso se merma automáticamente (el físico ya no existe).
+    const boxClaim = boxClaimsByLine.get(i);
+    if (boxClaim) {
+      const boxName = boxClaim.label ?? boxClaim.pieceId;
+      const remainingPieces = boxClaim.pieceCount - boxClaim.soldPieces;
+      const remainingKg =
+        Math.round((Number(boxClaim.weightKg) - boxClaim.soldKg) * 1e8) / 1e8;
+
+      if (remainingPieces > 0) {
+        if (remainingKg <= 0) {
+          throw new Error(
+            `El peso vendido dejaría la caja ${boxName} sin peso pero con piezas. Re-pesa la caja.`
+          );
+        }
+        const claimed = await tx.productPiece.updateMany({
+          where: {
+            pieceId: boxClaim.pieceId,
+            status: "available",
+            weightKg: boxClaim.weightKg,
+          },
+          data: {
+            weightKg: remainingKg,
+            pieceCount: remainingPieces,
+            version: { increment: 1 },
+          },
+        });
+        if (claimed.count !== 1) {
+          throw new Error(
+            `La pieza ${boxName} ya no está disponible. Vuelve a seleccionar las piezas.`
+          );
+        }
+      } else {
+        const claimed = await tx.productPiece.updateMany({
+          where: {
+            pieceId: boxClaim.pieceId,
+            status: "available",
+            weightKg: boxClaim.weightKg,
+          },
+          data: {
+            status: "sold",
+            invoiceLineId: createdLine.lineId,
+            soldAt: new Date(),
+            weightKg: boxClaim.soldKg,
+            pieceCount: boxClaim.soldPieces,
+            version: { increment: 1 },
+          },
+        });
+        if (claimed.count !== 1) {
+          throw new Error(
+            `La pieza ${boxName} ya no está disponible. Vuelve a seleccionar las piezas.`
+          );
+        }
+        if (remainingKg > 0.001) {
+          await applyStockLevelDelta(tx, {
+            productId: r.productId,
+            warehouseId,
+            delta: -remainingKg,
+            allowNegative: false,
+            piecesDelta: 0,
+          });
+          const exit = await applyInventoryExit(tx, {
+            productId: r.productId,
+            warehouseId,
+            qty: remainingKg,
+          });
+          await tx.stockMovement.create({
+            data: {
+              productId: r.productId,
+              warehouseId,
+              quantity: remainingKg,
+              pieces: null,
+              movementType: "adjustment",
+              unitCost: exit.avgCostUsed,
+              referenceDoc: folio,
+              notes: `Merma residual de caja ${boxName} al venderse completa`,
+              createdBy: userId ?? null,
+            },
+          });
+        }
+      }
+    }
 
     const claims = pieceClaimsByLine.get(i);
     if (!claims?.length) continue;

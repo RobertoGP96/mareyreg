@@ -119,7 +119,10 @@ function toUserMessage(error: unknown, genericMessage: string): string {
       error.message.endsWith("no es un producto de peso variable") ||
       // Validaciones de venta por piezas registradas (ProductPiece).
       error.message.startsWith("La pieza ") ||
+      error.message.startsWith("La caja ") ||
+      error.message.startsWith("La línea de ") ||
       error.message.startsWith("El peso capturado de ") ||
+      error.message.startsWith("El peso vendido ") ||
       error.message === "Hay piezas repetidas en la venta"
     ) {
       return error.message;
@@ -143,6 +146,11 @@ export interface InvoiceLineInput {
    * registrados — ver dispatch-lines.ts.
    */
   pieceIds?: number[];
+  /**
+   * Caja registrada de la que se corta la venta pesada al momento
+   * (excluyente con pieceIds) — ver dispatch-lines.ts.
+   */
+  sourcePieceId?: number;
 }
 
 /** Un pago dentro de un cobro (posiblemente multi-moneda, ej. POS). */
