@@ -88,6 +88,44 @@ psql "$DATABASE_URL" -f prisma/sql/webstore-constraints.sql
 - **Sin factura estimada ni ajustes posteriores**: por decisión de producto, no se genera ninguna factura previa con montos estimados — la única `Invoice` del pedido es la que crea `fulfillWebstoreOrder` con el peso real.
 - **UI de la tienda**: precio marcado como "Precio estimado" en detalle de producto, carrito y resumen de checkout cuando el producto/línea es catch-weight; la confirmación de pedido (`/pedido-confirmado?status=awaiting_weighing`) avisa que el total puede variar ligeramente.
 
+### Pesajes individuales (ProductPiece): elegir la pieza exacta
+
+Cuando el ERP tiene piezas registradas (`ProductPiece`, ver `prisma/sql/inventory-pieces.sql`), la tienda muestra los pesajes disponibles y el cliente elige la pieza exacta — el pedido llega con peso real y se factura de inmediato, sin `awaiting_weighing`.
+
+- **`GET /api/webstore/products`** — campo nuevo por producto:
+
+  ```jsonc
+  // solo productos isCatchWeight; null en normales, [] si no hay piezas registradas
+  "pieces": [
+    { "pieceId": 501, "weightKg": 3.2, "pieceCount": 1, "price": 64 }
+  ]
+  ```
+
+  Solo piezas `available` del almacén webstore, orden `weightKg` asc, máx. 50 por producto. `pieceCount` casa con `presentations[].piecesPerUnit` (1 = pieza suelta, N = caja pesada completa). `price` lo redondea el ERP con `piecePrice(pricePerKg, weightKg, decimalPlaces)` (`src/modules/webstore/lib/piece-price.ts`) — **la tienda nunca recalcula**; la misma fórmula se usa al facturar, así el total cobrado coincide centavo a centavo con lo mostrado. La tienda tolera `pieces` ausente (ERP viejo): lo sanea a `[]`/`null` en `getCatalog()`.
+
+- **`POST /api/webstore/orders`** — campo opcional por línea:
+
+  ```jsonc
+  { "sku": "QUESO-PZA", "quantity": 2, "unitPrice": 64, "pieceIds": [501, 502] }
+  ```
+
+  Reglas Zod: `pieceIds.length === quantity`, sin duplicados entre líneas. Semántica:
+  - Línea catch-weight **sin** `pieceIds` → flujo estimado actual (`awaiting_weighing`). Integradores existentes no se rompen.
+  - Línea catch-weight **con** `pieceIds` → claim atómico `available → reserved` dentro de la transacción; si TODAS las líneas catch-weight traen piezas, factura inmediata (`status: "processed"`, piezas `reserved → sold`). Pedido **mixto** (alguna línea sin piezas) → `awaiting_weighing` con las piezas `reserved` ancladas a su `SalesOrderLine`; `fulfillWebstoreOrder` solo pide peso de las líneas sin piezas.
+  - `pieceIds` en línea no catch-weight, de otro producto/almacén o con `pieceCount` distinto a la presentación → `400` payload inválido.
+
+- **Respuesta `409 pieces_unavailable`** (pieza vendida/reservada entre el carrito y el checkout — nunca se degrada a `awaiting_weighing` porque el cliente vio un precio exacto):
+
+  ```jsonc
+  { "status": "pieces_unavailable", "logId": 123, "unavailable": [{ "sku": "QUESO-PZA", "pieceIds": [501] }], "error": "..." }
+  ```
+
+  La tienda quita esas piezas del carrito (`removePieces`), conserva el resto y pide re-elegir. El log queda en `error`; el reintento llega con `externalOrderId` nuevo.
+
+- **Eco en `201`**: las líneas con piezas devuelven `priceIsEstimated: false` y `pieces: [{ pieceId, weightKg }]`.
+- **Cancelación** (`cancelWebstoreOrder`): acepta también pedidos `awaiting_weighing` (libera piezas `reserved`, sin reverso de stock); en pedidos `processed` libera además las piezas `sold` junto con el reverso de stock. No hay TTL de reservas en v1: solo persisten en pedidos mixtos, visibles en la bandeja "Por pesar".
+- **Reservas nunca al carrito**: el carrito vive en localStorage; las piezas se reservan únicamente al `POST /orders`. El conflicto carrito→checkout se resuelve con el 409, no con reservas tempranas.
+
 ## Riesgos / pendientes
 
 - **Sin HMAC de payload**: v1 solo valida Bearer API key + TLS + idempotencia. Si la tienda queda expuesta públicamente sin control de quién le pega al webhook, considerar firma HMAC en v2.
