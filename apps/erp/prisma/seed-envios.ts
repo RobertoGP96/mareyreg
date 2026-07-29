@@ -24,12 +24,15 @@ const DENOMINATIONS: Record<string, number[]> = {
 
 async function main() {
   for (const c of CURRENCIES) {
+    // `kind` sí se reafirma en monedas existentes: es dato canónico y las
+    // monedas creadas antes de introducir el campo quedaron todas en 'cash'.
+    // El resto (nombre, símbolo, decimales) puede haberse ajustado a mano.
     await db.currency.upsert({
       where: { code: c.code },
-      update: {},
+      update: { kind: c.kind },
       create: c,
     });
-    console.log(`✓ moneda ${c.code}`);
+    console.log(`✓ moneda ${c.code} (${c.kind})`);
   }
 
   for (const [code, values] of Object.entries(DENOMINATIONS)) {
