@@ -12,7 +12,6 @@ import { MobileListCard } from "@/components/ui/mobile-list-card";
 import { MobileFilterSheet } from "@/components/ui/mobile-filter-sheet";
 import { ResponsiveListView } from "@/components/ui/responsive-list-view";
 import { Fab } from "@/components/ui/fab";
-import { StatusPill } from "@/components/ui/status-pill";
 import { MetricTile } from "@/components/ui/metric-tile";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -27,7 +26,7 @@ import {
 import { type DataTableColumn } from "@/components/ui/data-table";
 import {
   HandCoins, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2, Bike,
-  CheckCircle2, XCircle, ExternalLink, BadgeDollarSign, Undo2, Image as ImageIcon, Check,
+  CheckCircle2, XCircle, ExternalLink, BadgeDollarSign, Undo2, Image as ImageIcon, Check, Eye,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -54,6 +53,8 @@ import type { CashDeliveryInput } from "../../lib/schemas";
 import { CurrencyChip } from "../shared/currency-chip";
 import { formatAmount } from "../../lib/format";
 import { CashDeliveryForm } from "./cash-delivery-form";
+import { CashDeliveryDetailSheet } from "./cash-delivery-detail-sheet";
+import { DeliveryStatusIcon, CommissionStatusIcon } from "./delivery-status-icons";
 
 type StatusFilter = "all" | "pending" | "delivered" | "cancelled";
 type CommissionFilter = "all" | "pending" | "paid";
@@ -67,20 +68,31 @@ interface Props {
   isAdmin: boolean;
 }
 
-const STATUS_LABELS: Record<"pending" | "delivered" | "cancelled", string> = {
-  pending: "Pendiente",
-  delivered: "Entregada",
-  cancelled: "Cancelada",
-};
-
-function statusPillKey(s: "pending" | "delivered" | "cancelled") {
-  if (s === "delivered") return "completed" as const;
-  if (s === "cancelled") return "cancelled" as const;
-  return "pending" as const;
-}
-
 function hasCommission(d: CashDeliveryRow) {
   return Number(d.commissionAmount) > 0 && d.courierId != null;
+}
+
+function commissionLabel(d: CashDeliveryRow): string | undefined {
+  if (!hasCommission(d)) return undefined;
+  return `${formatAmount(
+    Number(d.commissionAmount),
+    d.commissionCurrencyDecimals ?? 2
+  )} ${d.commissionCurrencyCode ?? ""}`.trim();
+}
+
+// Estado de la entrega + estado de la comisión en un solo par de iconos: dos
+// pills con texto ocupaban dos columnas enteras de la tabla.
+function StatusIcons({ d }: { d: CashDeliveryRow }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <DeliveryStatusIcon status={d.status} />
+      <CommissionStatusIcon
+        status={d.commissionStatus}
+        hasCommission={hasCommission(d)}
+        amountLabel={commissionLabel(d)}
+      />
+    </span>
+  );
 }
 
 function AmountLines({ d, compact }: { d: CashDeliveryRow; compact?: boolean }) {
@@ -120,6 +132,8 @@ export function CashDeliveryListClient({
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editing, setEditing] = useState<CashDeliveryDetail | null>(null);
+  const [detail, setDetail] = useState<CashDeliveryDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [toDelete, setToDelete] = useState<CashDeliveryRow | null>(null);
   const [toMarkDelivered, setToMarkDelivered] = useState<CashDeliveryRow | null>(null);
   const [toCancel, setToCancel] = useState<CashDeliveryRow | null>(null);
@@ -193,12 +207,34 @@ export function CashDeliveryListClient({
   const openEdit = async (d: CashDeliveryRow) => {
     // La lista no trae el desglose (sería un include de 3 niveles sobre 200
     // filas); el detalle se pide al abrir el formulario.
-    const detail = await getCashDeliveryDetail(d.deliveryId);
-    if (!detail.success) {
-      toast.error(detail.error);
+    const r = await getCashDeliveryDetail(d.deliveryId);
+    if (!r.success) {
+      toast.error(r.error);
       return;
     }
-    setEditing(detail.data);
+    setEditing(r.data);
+    setIsFormOpen(true);
+  };
+
+  const openDetail = async (d: CashDeliveryRow) => {
+    setDetailLoading(true);
+    try {
+      const r = await getCashDeliveryDetail(d.deliveryId);
+      if (!r.success) {
+        toast.error(r.error);
+        return;
+      }
+      setDetail(r.data);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  // El detalle ya trae el árbol completo: pasar del sheet al formulario no
+  // necesita otro round-trip.
+  const editFromDetail = (d: CashDeliveryDetail) => {
+    setDetail(null);
+    setEditing(d);
     setIsFormOpen(true);
   };
 
@@ -279,6 +315,9 @@ export function CashDeliveryListClient({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem onClick={() => void openDetail(d)}>
+          <Eye className="h-4 w-4" /> Ver detalle
+        </DropdownMenuItem>
         {d.status === "pending" && (
           <>
             <DropdownMenuItem onClick={() => setToMarkDelivered(d)}>
@@ -348,25 +387,11 @@ export function CashDeliveryListClient({
   );
 
   const renderCommission = (d: CashDeliveryRow) => {
-    if (!hasCommission(d)) {
+    const label = commissionLabel(d);
+    if (!label) {
       return <span className="text-xs text-muted-foreground italic">—</span>;
     }
-    return (
-      <span className="flex items-center justify-end gap-2">
-        <span className="font-mono tabular-nums">
-          {formatAmount(
-            Number(d.commissionAmount),
-            d.commissionCurrencyDecimals ?? 2
-          )}{" "}
-          {d.commissionCurrencyCode}
-        </span>
-        <StatusPill
-          status={d.commissionStatus === "paid" ? "completed" : "pending"}
-          size="sm"
-          label={d.commissionStatus === "paid" ? "Pagada" : "Pendiente"}
-        />
-      </span>
-    );
+    return <span className="font-mono tabular-nums text-sm">{label}</span>;
   };
 
   const columns: DataTableColumn<CashDeliveryRow>[] = [
@@ -432,8 +457,11 @@ export function CashDeliveryListClient({
       key: "status",
       header: "Estado",
       align: "right",
+      width: "w-24",
       cell: (d) => (
-        <StatusPill status={statusPillKey(d.status)} size="sm" label={STATUS_LABELS[d.status]} />
+        <span className="flex justify-end">
+          <StatusIcons d={d} />
+        </span>
       ),
     },
     {
@@ -545,9 +573,11 @@ export function CashDeliveryListClient({
         columns={columns}
         rows={filtered}
         rowKey={(d) => d.deliveryId}
+        onRowClick={(d) => void openDetail(d)}
         mobileCard={(d) => (
           <MobileListCard
             key={d.deliveryId}
+            onClick={() => void openDetail(d)}
             title={
               <span className="flex items-center gap-2 min-w-0">
                 <HandCoins className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -564,13 +594,7 @@ export function CashDeliveryListClient({
                 </span>
               </span>
             }
-            value={
-              <StatusPill
-                status={statusPillKey(d.status)}
-                size="sm"
-                label={STATUS_LABELS[d.status]}
-              />
-            }
+            value={<StatusIcons d={d} />}
             actions={renderActions(d)}
             meta={
               <span className="flex flex-wrap items-center gap-2">
@@ -579,12 +603,10 @@ export function CashDeliveryListClient({
                     <Bike className="h-3 w-3" /> {d.courierName}
                   </span>
                 )}
-                {hasCommission(d) && (
-                  <StatusPill
-                    status={d.commissionStatus === "paid" ? "completed" : "pending"}
-                    size="sm"
-                    label={`Comisión ${d.commissionStatus === "paid" ? "pagada" : "pendiente"}`}
-                  />
+                {commissionLabel(d) && (
+                  <span className="text-[11px] font-mono tabular-nums text-muted-foreground">
+                    Comisión {commissionLabel(d)}
+                  </span>
                 )}
                 {d.reference && <span className="text-[11px] font-mono">{d.reference}</span>}
               </span>
@@ -667,6 +689,18 @@ export function CashDeliveryListClient({
         currencies={currencies}
         denominationsByCurrency={denominationsByCurrency}
         onSubmit={handleSubmit}
+      />
+
+      <CashDeliveryDetailSheet
+        detail={detail}
+        loading={detailLoading}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDetail(null);
+            setDetailLoading(false);
+          }
+        }}
+        onEdit={editFromDetail}
       />
 
       <AlertDialog open={showBulkConfirm} onOpenChange={setShowBulkConfirm}>
