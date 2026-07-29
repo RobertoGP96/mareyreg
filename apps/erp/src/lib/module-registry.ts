@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  Bike,
   Contact,
   Truck,
   Route,
@@ -157,6 +158,7 @@ export const modules: AppModule[] = [
       { name: "Pendientes", href: "/envios/pendientes", icon: Clock },
       { name: "Entregas", href: "/envios/entregas", icon: Send },
       { name: "Destinatarios", href: "/envios/destinatarios", icon: UserRound },
+      { name: "Mensajeros", href: "/envios/mensajeros", icon: Bike },
       { name: "Tasas de cambio", href: "/envios/tasas", icon: LineChart },
       { name: "Monedas", href: "/envios/monedas", icon: CircleDollarSign },
     ],

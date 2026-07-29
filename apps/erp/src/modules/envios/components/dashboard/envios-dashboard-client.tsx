@@ -21,6 +21,7 @@ import {
   ArrowUpRight,
   Plus,
   Activity,
+  Bike,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { confirmOperation } from "../../actions/operation-actions";
@@ -171,6 +172,27 @@ export function EnviosDashboardClient({ data }: Props) {
             value={data.totalAccountsCount}
             icon={Wallet}
             tone="success"
+          />
+        </FadeStaggerItem>
+        <FadeStaggerItem>
+          <MetricTile
+            label="Comisión por pagar"
+            value={data.pendingCommissionsCount}
+            icon={Bike}
+            tone={data.pendingCommissionsCount > 0 ? "warning" : "idle"}
+            hint={
+              data.pendingCommissionByCurrency.length > 0
+                ? data.pendingCommissionByCurrency
+                    .map(
+                      (c) =>
+                        `${c.total.toLocaleString("es-MX", {
+                          minimumFractionDigits: c.decimalPlaces,
+                          maximumFractionDigits: c.decimalPlaces,
+                        })} ${c.code}`
+                    )
+                    .join(" · ")
+                : undefined
+            }
           />
         </FadeStaggerItem>
       </FadeStagger>

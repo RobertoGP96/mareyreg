@@ -13,6 +13,7 @@ export async function getCurrencies(): Promise<CurrencyRow[]> {
     code: r.code,
     name: r.name,
     symbol: r.symbol,
+    kind: r.kind,
     decimalPlaces: r.decimalPlaces,
     active: r.active,
     accountsCount: r._count.accounts,

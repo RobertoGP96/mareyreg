@@ -12,6 +12,7 @@ export async function getDashboardData() {
     recentOps,
     pendingTop,
     flowLast30,
+    pendingCommissions,
   ] = await Promise.all([
     db.currency.findMany({
       where: { active: true },
@@ -42,6 +43,16 @@ export async function getDashboardData() {
       },
       _sum: { amount: true },
     }),
+    db.cashDelivery.groupBy({
+      by: ["commissionCurrencyId"],
+      where: {
+        commissionStatus: "pending",
+        commissionAmount: { gt: 0 },
+        status: { not: "cancelled" },
+      },
+      _sum: { commissionAmount: true },
+      _count: { _all: true },
+    }),
   ]);
 
   const balanceByCurrency = currencies.map((c) => {
@@ -69,8 +80,28 @@ export async function getDashboardData() {
   }
   const flowSeries = Array.from(flowMap.values()).filter((v) => v.inflow > 0 || v.outflow > 0);
 
+  // Comisiones por pagar: se agrupan por moneda sin convertir, porque envios y
+  // el módulo currency usan sistemas de tasa distintos e incompatibles.
+  const pendingCommissionsCount = pendingCommissions.reduce((n, c) => n + c._count._all, 0);
+  const pendingCommissionByCurrency = pendingCommissions.flatMap((c) => {
+    const currency = currencies.find((x) => x.currencyId === c.commissionCurrencyId);
+    if (!currency) return [];
+    return [
+      {
+        currencyId: currency.currencyId,
+        code: currency.code,
+        symbol: currency.symbol,
+        decimalPlaces: currency.decimalPlaces,
+        total: Number(c._sum.commissionAmount ?? 0),
+        count: c._count._all,
+      },
+    ];
+  });
+
   return {
     balanceByCurrency,
+    pendingCommissionsCount,
+    pendingCommissionByCurrency,
     pendingCount,
     activeGroupsCount,
     totalAccountsCount,

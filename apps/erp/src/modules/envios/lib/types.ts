@@ -12,7 +12,7 @@ import type {
 
 export type CurrencyRow = Pick<
   Currency,
-  "currencyId" | "code" | "name" | "symbol" | "decimalPlaces" | "active"
+  "currencyId" | "code" | "name" | "symbol" | "kind" | "decimalPlaces" | "active"
 > & {
   accountsCount: number;
   rulesCount: number;
