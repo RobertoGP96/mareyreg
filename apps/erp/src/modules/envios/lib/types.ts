@@ -1,0 +1,118 @@
+// DTOs serializables (Decimal → number) para pasar de queries a componentes cliente.
+
+import type {
+  Currency,
+  AccountGroup,
+  Account,
+  ExchangeRateRule,
+  Operation,
+  OperationType,
+  OperationStatus,
+} from "@/generated/prisma";
+
+export type CurrencyRow = Pick<
+  Currency,
+  "currencyId" | "code" | "name" | "symbol" | "decimalPlaces" | "active"
+> & {
+  accountsCount: number;
+  rulesCount: number;
+};
+
+export type AccountInGroup = {
+  accountId: number;
+  accountNumber: string;
+  name: string;
+  active: boolean;
+  allowNegativeBalance: boolean;
+  balance: number;
+  currencyId: number;
+  currencyCode: string;
+  currencySymbol: string;
+  currencyDecimals: number;
+};
+
+export type AccountGroupRow = Pick<
+  AccountGroup,
+  "groupId" | "code" | "name" | "description" | "active"
+> & {
+  ownerName: string | null;
+  ownerEmail: string | null;
+  accountsCount: number;
+  balancesByCurrency: Array<{
+    currencyId: number;
+    code: string;
+    symbol: string;
+    decimalPlaces: number;
+    balance: number;
+  }>;
+  accounts: AccountInGroup[];
+};
+
+export type AccountRow = Pick<
+  Account,
+  "accountId" | "groupId" | "userId" | "currencyId" | "accountNumber" | "name" | "active" | "allowNegativeBalance"
+> & {
+  balance: number;
+  groupName: string;
+  groupCode: string;
+  currencyCode: string;
+  currencySymbol: string;
+  currencyDecimals: number;
+  rulesCount: number;
+  ruleNames: string[];
+};
+
+export type ExchangeRateRuleRow = Pick<
+  ExchangeRateRule,
+  "ruleId" | "name" | "baseCurrencyId" | "quoteCurrencyId" | "active"
+> & {
+  baseCurrencyCode: string;
+  quoteCurrencyCode: string;
+  minAmount: number;
+  maxAmount: number | null;
+  minInclusive: boolean;
+  maxInclusive: boolean;
+  rate: number;
+  accountsCount: number;
+};
+
+export type OperationRow = Pick<
+  Operation,
+  | "operationId"
+  | "accountId"
+  | "currencyId"
+  | "type"
+  | "status"
+  | "description"
+  | "reference"
+  | "occurredAt"
+  | "confirmedAt"
+  | "createdAt"
+> & {
+  amount: number;
+  balanceAfter: number;
+  accountName: string;
+  accountNumber: string;
+  groupName: string;
+  currencyCode: string;
+  currencySymbol: string;
+  currencyDecimals: number;
+  exchangeRateRuleId: number | null;
+  exchangeRateRuleName: string | null;
+  rateApplied: number | null;
+  counterAmount: number | null;
+  counterCurrencyId: number | null;
+  counterCurrencyCode: string | null;
+  counterCurrencySymbol: string | null;
+  counterCurrencyDecimals: number | null;
+};
+
+export type {
+  Currency,
+  AccountGroup,
+  Account,
+  ExchangeRateRule,
+  Operation,
+  OperationType,
+  OperationStatus,
+};

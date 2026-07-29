@@ -1,0 +1,355 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const { tx, mocks } = vi.hoisted(() => {
+  const tx = {
+    company: { findUnique: vi.fn() },
+    customer: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+    product: { findMany: vi.fn(), findUnique: vi.fn() },
+    productPresentation: { findMany: vi.fn() },
+    salesOrder: { create: vi.fn() },
+    salesOrderLine: { create: vi.fn() },
+    productPiece: { findMany: vi.fn(), updateMany: vi.fn() },
+    invoice: { create: vi.fn(), update: vi.fn() },
+    invoicePayment: { create: vi.fn() },
+    webstoreOrderLog: { update: vi.fn() },
+  };
+
+  const mocks = {
+    nextFolio: vi.fn(),
+    createAuditLog: vi.fn().mockResolvedValue(undefined),
+    getBaseCurrency: vi.fn(),
+    getEffectiveLinePrices: vi.fn(),
+    getDefaultWebstoreWarehouseId: vi.fn(),
+    resolveSkusBatch: vi.fn(),
+    dispatchLines: vi.fn(),
+  };
+
+  return { tx, mocks };
+});
+
+vi.mock("@/lib/db", () => ({
+  db: {
+    $transaction: (fn: (tx: unknown) => unknown) => fn(tx),
+  },
+}));
+
+vi.mock("@/lib/folio", () => ({
+  nextFolio: mocks.nextFolio,
+  DOC_TYPES: { SALES_ORDER: "SO", INVOICE: "INV" },
+}));
+
+vi.mock("@/lib/audit", () => ({
+  createAuditLog: mocks.createAuditLog,
+}));
+
+vi.mock("@/lib/currency", () => ({
+  getBaseCurrency: mocks.getBaseCurrency,
+}));
+
+vi.mock("@/modules/inventory/lib/effective-price", () => ({
+  getEffectiveLinePrices: mocks.getEffectiveLinePrices,
+  lineKey: (productId: number, presentationId?: number | null) =>
+    `${productId}:${presentationId ?? "base"}`,
+}));
+
+vi.mock("@/modules/sales/lib/dispatch-lines", () => ({
+  dispatchLines: mocks.dispatchLines,
+}));
+
+vi.mock("./dispatch-warehouse", () => ({
+  getDefaultWebstoreWarehouseId: mocks.getDefaultWebstoreWarehouseId,
+}));
+
+vi.mock("./resolve-skus", () => ({
+  isSkuResolved: (p: { isActive: boolean; webstoreEnabled: boolean }) =>
+    p.isActive && p.webstoreEnabled,
+  resolveSkusBatch: mocks.resolveSkusBatch,
+}));
+
+import {
+  processWebstoreOrder,
+  NeedsReviewError,
+  UnsupportedCurrencyError,
+} from "./process-order";
+import type { WebstoreOrderPayload } from "./schemas";
+
+function basePayload(overrides: Partial<WebstoreOrderPayload> = {}): WebstoreOrderPayload {
+  return {
+    externalOrderId: "ext-1",
+    currency: "CUP",
+    customer: {
+      email: "cliente@test.com",
+      name: "Cliente Test",
+      phone: "5551234567",
+    },
+    lines: [{ sku: "SKU-1", quantity: 2, unitPrice: 10 }],
+    ...overrides,
+  } as WebstoreOrderPayload;
+}
+
+describe("processWebstoreOrder", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getBaseCurrency.mockResolvedValue({
+      currencyId: 1,
+      code: "CUP",
+      symbol: "$",
+      decimalPlaces: 0,
+    });
+    tx.customer.findFirst.mockResolvedValue(null);
+    tx.customer.create.mockResolvedValue({ customerId: 99, email: "cliente@test.com" });
+    tx.salesOrder.create.mockResolvedValue({ orderId: 500 });
+    tx.salesOrderLine.create.mockResolvedValue({ lineId: 900 });
+    tx.productPiece.findMany.mockResolvedValue([]);
+    tx.productPiece.updateMany.mockResolvedValue({ count: 0 });
+    tx.webstoreOrderLog.update.mockResolvedValue({});
+    mocks.nextFolio.mockResolvedValue("OV-000001");
+    mocks.getDefaultWebstoreWarehouseId.mockResolvedValue(1);
+  });
+
+  it("procesa un pedido normal (sin catch-weight): crea factura y descuenta stock", async () => {
+    mocks.resolveSkusBatch.mockResolvedValue(
+      new Map([["SKU-1", { productId: 1, sku: "SKU-1", isActive: true, webstoreEnabled: true }]])
+    );
+    tx.product.findMany.mockResolvedValue([{ productId: 1, isCatchWeight: false }]);
+    tx.productPresentation.findMany.mockResolvedValue([]);
+    mocks.getEffectiveLinePrices.mockResolvedValue(
+      new Map([["1:base", { basePrice: 10, finalPrice: 10, appliedDiscounts: [], factor: 1 }]])
+    );
+    tx.invoice.create.mockResolvedValue({ invoiceId: 700 });
+    mocks.dispatchLines.mockResolvedValue({ lineResults: [], priceOverrides: [] });
+
+    const result = await processWebstoreOrder(1, basePayload());
+
+    expect(result.status).toBe("processed");
+    expect(result.invoiceId).toBe(700);
+    expect(mocks.dispatchLines).toHaveBeenCalledTimes(1);
+    expect(tx.webstoreOrderLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "processed", invoiceId: 700 }),
+      })
+    );
+    expect(result.lines).toEqual([{ sku: "SKU-1", priceIsEstimated: false }]);
+  });
+
+  it("pedido con línea catch-weight: crea SalesOrder pero NO factura, y NO llama dispatchLines", async () => {
+    mocks.resolveSkusBatch.mockResolvedValue(
+      new Map([["SKU-QUESO-CAJA", { productId: 2, sku: "SKU-QUESO-CAJA", isActive: true, webstoreEnabled: true, presentationId: 10 }]])
+    );
+    tx.product.findMany.mockResolvedValue([{ productId: 2, isCatchWeight: true }]);
+    tx.productPresentation.findMany.mockResolvedValue([{ presentationId: 10, piecesPerUnit: 5 }]);
+    mocks.getEffectiveLinePrices.mockResolvedValue(
+      new Map([
+        [
+          "2:10",
+          {
+            basePrice: 50,
+            finalPrice: 50,
+            appliedDiscounts: [],
+            factor: 2.5, // peso nominal kg
+            pricePerBase: 20, // precio por kg
+          },
+        ],
+      ])
+    );
+
+    const payload = basePayload({
+      lines: [{ sku: "SKU-QUESO-CAJA", quantity: 3, unitPrice: 50 }],
+    });
+
+    const result = await processWebstoreOrder(1, payload);
+
+    expect(result.status).toBe("awaiting_weighing");
+    expect(result.invoiceId).toBeNull();
+    expect(result.salesOrderId).toBe(500);
+    expect(mocks.dispatchLines).not.toHaveBeenCalled();
+    expect(tx.invoice.create).not.toHaveBeenCalled();
+    expect(tx.webstoreOrderLog.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "awaiting_weighing", salesOrderId: 500 }),
+      })
+    );
+    expect(result.lines[0]).toMatchObject({
+      sku: "SKU-QUESO-CAJA",
+      priceIsEstimated: true,
+    });
+    expect(result.lines[0].estimatedWeightKg).toBeCloseTo(7.5); // 3 × 2.5 kg nominal
+
+    // SalesOrderLine: unitPrice = pricePerBase (por kg), pieces = quantity × piecesPerUnit
+    expect(tx.salesOrderLine.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          productId: 2,
+          unitPrice: 20,
+          pieces: 15,
+          baseQuantity: 7.5,
+        }),
+      })
+    );
+  });
+
+  describe("piezas elegidas por el cliente (pieceIds)", () => {
+    function setupCatchWeightWithPieces() {
+      mocks.resolveSkusBatch.mockResolvedValue(
+        new Map([
+          [
+            "SKU-QUESO-PIEZA",
+            { productId: 2, sku: "SKU-QUESO-PIEZA", isActive: true, webstoreEnabled: true, presentationId: 10 },
+          ],
+        ])
+      );
+      tx.product.findMany.mockResolvedValue([{ productId: 2, isCatchWeight: true }]);
+      tx.productPresentation.findMany.mockResolvedValue([{ presentationId: 10, piecesPerUnit: 1 }]);
+      mocks.getEffectiveLinePrices.mockResolvedValue(
+        new Map([
+          ["2:10", { basePrice: 20, finalPrice: 20, appliedDiscounts: [], factor: 3, pricePerBase: 20 }],
+        ])
+      );
+    }
+
+    it("pedido 100% con piezas: reserva, factura de inmediato y pasa pieceIds a dispatchLines", async () => {
+      setupCatchWeightWithPieces();
+      tx.productPiece.findMany.mockResolvedValue([
+        { pieceId: 501, productId: 2, warehouseId: 1, status: "available", pieceCount: 1, weightKg: 3.2 },
+        { pieceId: 502, productId: 2, warehouseId: 1, status: "available", pieceCount: 1, weightKg: 3.5 },
+      ]);
+      tx.productPiece.updateMany.mockResolvedValue({ count: 2 });
+      tx.invoice.create.mockResolvedValue({ invoiceId: 700 });
+      mocks.dispatchLines.mockResolvedValue({ lineResults: [], priceOverrides: [] });
+
+      const payload = basePayload({
+        lines: [{ sku: "SKU-QUESO-PIEZA", quantity: 2, unitPrice: 64, pieceIds: [501, 502] }],
+      });
+
+      const result = await processWebstoreOrder(1, payload);
+
+      expect(result.status).toBe("processed");
+      expect(result.invoiceId).toBe(700);
+      // Claim atómico available → reserved
+      expect(tx.productPiece.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            pieceId: { in: [501, 502] },
+            status: "available",
+          }),
+          data: expect.objectContaining({ status: "reserved" }),
+        })
+      );
+      // dispatchLines recibe las piezas + la línea que las reservó
+      expect(mocks.dispatchLines).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          lines: [
+            expect.objectContaining({ pieceIds: [501, 502], salesOrderLineId: 900 }),
+          ],
+        })
+      );
+      // Peso real y eco de piezas en el resultado
+      expect(result.lines[0]).toMatchObject({
+        sku: "SKU-QUESO-PIEZA",
+        priceIsEstimated: false,
+        pieces: [
+          { pieceId: 501, weightKg: 3.2 },
+          { pieceId: 502, weightKg: 3.5 },
+        ],
+      });
+      // Subtotal = Σ piecePrice = round(3.2×20) + round(3.5×20) = 64 + 70 (CUP, 0 decimales)
+      expect(tx.invoice.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ total: 134 }) })
+      );
+    });
+
+    it("pieza vendida entre carrito y checkout: lanza PiecesUnavailableError con el detalle", async () => {
+      setupCatchWeightWithPieces();
+      tx.productPiece.findMany.mockResolvedValue([
+        { pieceId: 501, productId: 2, warehouseId: 1, status: "sold", pieceCount: 1, weightKg: 3.2 },
+      ]);
+
+      const payload = basePayload({
+        lines: [{ sku: "SKU-QUESO-PIEZA", quantity: 1, unitPrice: 64, pieceIds: [501] }],
+      });
+
+      await expect(processWebstoreOrder(1, payload)).rejects.toMatchObject({
+        name: "PiecesUnavailableError",
+        unavailable: [{ sku: "SKU-QUESO-PIEZA", pieceIds: [501] }],
+      });
+      expect(mocks.dispatchLines).not.toHaveBeenCalled();
+    });
+
+    it("claim con count menor al esperado (carrera en la tx): lanza PiecesUnavailableError", async () => {
+      setupCatchWeightWithPieces();
+      tx.productPiece.findMany.mockResolvedValue([
+        { pieceId: 501, productId: 2, warehouseId: 1, status: "available", pieceCount: 1, weightKg: 3.2 },
+      ]);
+      tx.productPiece.updateMany.mockResolvedValue({ count: 0 });
+
+      const payload = basePayload({
+        lines: [{ sku: "SKU-QUESO-PIEZA", quantity: 1, unitPrice: 64, pieceIds: [501] }],
+      });
+
+      await expect(processWebstoreOrder(1, payload)).rejects.toMatchObject({
+        name: "PiecesUnavailableError",
+      });
+    });
+
+    it("pieza de otro producto: lanza InvalidPiecesError (payload inválido)", async () => {
+      setupCatchWeightWithPieces();
+      tx.productPiece.findMany.mockResolvedValue([
+        { pieceId: 501, productId: 9, warehouseId: 1, status: "available", pieceCount: 1, weightKg: 3.2 },
+      ]);
+
+      const payload = basePayload({
+        lines: [{ sku: "SKU-QUESO-PIEZA", quantity: 1, unitPrice: 64, pieceIds: [501] }],
+      });
+
+      await expect(processWebstoreOrder(1, payload)).rejects.toMatchObject({
+        name: "InvalidPiecesError",
+      });
+    });
+  });
+
+  it("catch-weight sin presentación piecesPerUnit configurada: manda a needs_review", async () => {
+    mocks.resolveSkusBatch.mockResolvedValue(
+      new Map([["SKU-QUESO-BASE", { productId: 3, sku: "SKU-QUESO-BASE", isActive: true, webstoreEnabled: true }]])
+    );
+    tx.product.findMany.mockResolvedValue([{ productId: 3, isCatchWeight: true }]);
+    tx.productPresentation.findMany.mockResolvedValue([]);
+    mocks.getEffectiveLinePrices.mockResolvedValue(
+      new Map([["3:base", { basePrice: 20, finalPrice: 20, appliedDiscounts: [], factor: 1, pricePerBase: 20 }]])
+    );
+
+    const payload = basePayload({
+      lines: [{ sku: "SKU-QUESO-BASE", quantity: 1, unitPrice: 20 }],
+    });
+
+    await expect(processWebstoreOrder(1, payload)).rejects.toThrow(NeedsReviewError);
+  });
+
+  it("moneda distinta a la base configurada: rechaza con UnsupportedCurrencyError", async () => {
+    const payload = basePayload({ currency: "USD" });
+
+    await expect(processWebstoreOrder(1, payload)).rejects.toThrow(
+      UnsupportedCurrencyError
+    );
+    await expect(processWebstoreOrder(1, payload)).rejects.toThrow(
+      "Moneda no soportada: se recibió USD, se esperaba CUP"
+    );
+  });
+
+  it("moneda igual a la base configurada: no rechaza por moneda", async () => {
+    mocks.resolveSkusBatch.mockResolvedValue(
+      new Map([["SKU-1", { productId: 1, sku: "SKU-1", isActive: true, webstoreEnabled: true }]])
+    );
+    tx.product.findMany.mockResolvedValue([{ productId: 1, isCatchWeight: false }]);
+    tx.productPresentation.findMany.mockResolvedValue([]);
+    mocks.getEffectiveLinePrices.mockResolvedValue(
+      new Map([["1:base", { basePrice: 10, finalPrice: 10, appliedDiscounts: [], factor: 1 }]])
+    );
+    tx.invoice.create.mockResolvedValue({ invoiceId: 700 });
+    mocks.dispatchLines.mockResolvedValue({ lineResults: [], priceOverrides: [] });
+
+    const result = await processWebstoreOrder(1, basePayload({ currency: "CUP" }));
+
+    expect(result.status).toBe("processed");
+  });
+});
