@@ -22,12 +22,15 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { Field, FormDialogHeader } from "@/components/ui/field";
 import { FormSection } from "@/components/ui/form-section";
 import { type DataTableColumn } from "@/components/ui/data-table";
 import {
   CircleDollarSign, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2,
-  Hash, Type, Calculator, ToggleLeft,
+  Hash, Type, Calculator, ToggleLeft, Banknote,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import {
@@ -35,6 +38,7 @@ import {
 } from "../../actions/currency-actions";
 import type { CurrencyRow } from "../../lib/types";
 import { CurrencyChip } from "../shared/currency-chip";
+import { DenominationsSheet } from "./denominations-sheet";
 
 interface Props {
   initialCurrencies: CurrencyRow[];
@@ -46,11 +50,13 @@ export function CurrencyListClient({ initialCurrencies }: Props) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [toEdit, setToEdit] = useState<CurrencyRow | null>(null);
   const [toDelete, setToDelete] = useState<CurrencyRow | null>(null);
+  const [denominationsFor, setDenominationsFor] = useState<CurrencyRow | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
+  const [kind, setKind] = useState<"cash" | "digital">("cash");
   const [decimalPlaces, setDecimalPlaces] = useState("2");
   const [active, setActive] = useState(true);
 
@@ -67,10 +73,11 @@ export function CurrencyListClient({ initialCurrencies }: Props) {
   const totalRules = initialCurrencies.reduce((acc, c) => acc + c.rulesCount, 0);
 
   const resetForm = () => {
-    setCode(""); setName(""); setSymbol(""); setDecimalPlaces("2"); setActive(true);
+    setCode(""); setName(""); setSymbol(""); setKind("cash");
+    setDecimalPlaces("2"); setActive(true);
   };
   const fillEdit = (c: CurrencyRow) => {
-    setCode(c.code); setName(c.name); setSymbol(c.symbol);
+    setCode(c.code); setName(c.name); setSymbol(c.symbol); setKind(c.kind);
     setDecimalPlaces(String(c.decimalPlaces)); setActive(c.active);
     setToEdit(c);
   };
@@ -93,6 +100,7 @@ export function CurrencyListClient({ initialCurrencies }: Props) {
       code: code.trim().toUpperCase(),
       name: name.trim(),
       symbol: symbol.trim(),
+      kind,
       decimalPlaces: Number(decimalPlaces),
       active,
     });
@@ -112,6 +120,7 @@ export function CurrencyListClient({ initialCurrencies }: Props) {
       code: code.trim().toUpperCase(),
       name: name.trim(),
       symbol: symbol.trim(),
+      kind,
       decimalPlaces: Number(decimalPlaces),
       active,
     });
@@ -165,6 +174,15 @@ export function CurrencyListClient({ initialCurrencies }: Props) {
       cell: (c) => <span className="font-mono tabular-nums text-xs text-muted-foreground">{c.decimalPlaces}</span>,
     },
     {
+      key: "kind",
+      header: "Tipo",
+      cell: (c) => (
+        <Badge variant="outline" className="text-[10px]">
+          {c.kind === "digital" ? "Digital" : "Efectivo"}
+        </Badge>
+      ),
+    },
+    {
       key: "accounts",
       header: "Cuentas",
       align: "right",
@@ -193,6 +211,11 @@ export function CurrencyListClient({ initialCurrencies }: Props) {
             <DropdownMenuItem onClick={() => fillEdit(c)}>
               <SquarePen className="h-4 w-4" /> Editar
             </DropdownMenuItem>
+            {c.kind === "cash" && (
+              <DropdownMenuItem onClick={() => setDenominationsFor(c)}>
+                <Banknote className="h-4 w-4" /> Denominaciones
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => handleToggle(c)}>
               <ToggleLeft className="h-4 w-4" /> {c.active ? "Desactivar" : "Activar"}
             </DropdownMenuItem>
@@ -340,6 +363,22 @@ export function CurrencyListClient({ initialCurrencies }: Props) {
                 onChange={(e) => setSymbol(e.target.value)}
               />
             </Field>
+            <Field
+              label="Tipo"
+              icon={Banknote}
+              required
+              hint="El efectivo se desglosa en billetes al registrar entregas; la digital captura el monto directo."
+            >
+              <Select value={kind} onValueChange={(v) => setKind(v as "cash" | "digital")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo de moneda" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Efectivo (con denominaciones)</SelectItem>
+                  <SelectItem value="digital">Digital (sin denominaciones)</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
             <Field label="Decimales" icon={Calculator} hint="Número de decimales para mostrar (0-8).">
               <Input
                 type="number"
@@ -377,6 +416,13 @@ export function CurrencyListClient({ initialCurrencies }: Props) {
           </Button>
         </div>
       </ResponsiveFormDialog>
+
+      <DenominationsSheet
+        currency={denominationsFor}
+        onOpenChange={(o) => {
+          if (!o) setDenominationsFor(null);
+        }}
+      />
 
       <AlertDialog open={!!toDelete} onOpenChange={() => setToDelete(null)}>
         <AlertDialogContent>

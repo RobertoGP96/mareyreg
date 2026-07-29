@@ -36,6 +36,8 @@ model User {
   recipients               Recipient[]
   cashDeliveriesCreated    CashDelivery[] @relation("CashDeliveryCreatedBy")
   cashDeliveriesConfirmed  CashDelivery[] @relation("CashDeliveryConfirmedBy")
+  cashDeliveryCommissionsPaid CashDelivery[]  @relation("CashDeliveryCommissionPaidBy")
+  courierProfile           CourierProfile? @relation("CourierProfileUser")
   webstoreApiKeys          WebstoreApiKey[]
   webstoreOffers           WebstoreOffer[]
   productPriceChanges      ProductPriceHistory[]
@@ -1568,13 +1570,21 @@ enum OperationStatus {
   cancelled
 }
 
+// Efectivo vs digital: solo el efectivo se desglosa en billetes. Una moneda
+// digital (USDT, saldos) captura el monto directo — no tiene denominaciones.
+enum CurrencyKind {
+  cash
+  digital
+}
+
 model Currency {
-  currencyId    Int      @id @default(autoincrement()) @map("id")
-  code          String   @unique
+  currencyId    Int          @id @default(autoincrement()) @map("id")
+  code          String       @unique
   name          String
   symbol        String
-  decimalPlaces Int      @default(2) @map("decimal_places")
-  active        Boolean  @default(true)
+  kind          CurrencyKind @default(cash)
+  decimalPlaces Int          @default(2) @map("decimal_places")
+  active        Boolean      @default(true)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -1583,7 +1593,10 @@ model Currency {
   operationsAsCounter Operation[]        @relation("CounterCurrency")
   rulesAsBase         ExchangeRateRule[] @relation("BaseCurrency")
   rulesAsQuote        ExchangeRateRule[] @relation("QuoteCurrency")
-  cashDeliveries      CashDelivery[]
+  denominations             CurrencyDenomination[]
+  deliveryLines             CashDeliveryLine[] @relation("DeliveryLineCurrency")
+  deliveryCommissions       CashDelivery[]     @relation("DeliveryCommissionCurrency")
+  courierDefaultCommissions CourierProfile[]   @relation("CourierCommissionCurrency")
   globalRatesAsBase   ExchangeRate[]     @relation("GlobalRateBase")
   globalRatesAsQuote  ExchangeRate[]     @relation("GlobalRateQuote")
   companiesAsBase     Company[]
@@ -1748,31 +1761,129 @@ model Recipient {
   @@map("recipients")
 }
 
-model CashDelivery {
-  deliveryId    Int                @id @default(autoincrement()) @map("delivery_id")
-  recipientId   Int                @map("recipient_id")
-  currencyId    Int                @map("currency_id")
-  amount        Decimal            @db.Decimal(20, 8)
-  status        CashDeliveryStatus @default(pending)
-  reference     String?
-  notes         String?
-  occurredAt    DateTime           @default(now()) @map("occurred_at")
-  deliveredAt   DateTime?          @map("delivered_at")
-  cancelledAt   DateTime?          @map("cancelled_at")
-  createdById   Int?               @map("created_by_id")
-  confirmedById Int?               @map("confirmed_by_id")
-  createdAt     DateTime           @default(now()) @map("created_at")
-  updatedAt     DateTime           @default(now()) @updatedAt @map("updated_at")
+enum DeliveryCommissionStatus {
+  pending
+  paid
+}
 
-  recipient   Recipient @relation(fields: [recipientId], references: [recipientId], onDelete: Restrict)
-  currency    Currency  @relation(fields: [currencyId], references: [currencyId], onDelete: Restrict)
-  createdBy   User?     @relation("CashDeliveryCreatedBy", fields: [createdById], references: [userId], onDelete: SetNull)
-  confirmedBy User?     @relation("CashDeliveryConfirmedBy", fields: [confirmedById], references: [userId], onDelete: SetNull)
+// Perfil de mensajero sobre un User existente: quien tiene fila, es mensajero.
+// La comisión y moneda por defecto viven aquí para no ensuciar User; solo
+// pre-llenan el formulario de entrega, el valor efectivo se guarda por entrega.
+model CourierProfile {
+  courierProfileId            Int      @id @default(autoincrement()) @map("courier_profile_id")
+  userId                      Int      @unique @map("user_id")
+  phone                       String?
+  notes                       String?
+  defaultCommission           Decimal? @map("default_commission") @db.Decimal(20, 8)
+  defaultCommissionCurrencyId Int?     @map("default_commission_currency_id")
+  active                      Boolean  @default(true)
+  version                     Int      @default(0)
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  user                      User           @relation("CourierProfileUser", fields: [userId], references: [userId], onDelete: Restrict)
+  defaultCommissionCurrency Currency?      @relation("CourierCommissionCurrency", fields: [defaultCommissionCurrencyId], references: [currencyId], onDelete: Restrict)
+  deliveries                CashDelivery[]
+
+  @@index([active])
+  @@map("courier_profiles")
+}
+
+// Catálogo de billetes/monedas por divisa. Debe llegar hasta la unidad mínima
+// de cada moneda (CUP 1, USD 0.01): el desglose es obligatorio al capturar y un
+// catálogo incompleto haría montos imposibles de registrar.
+model CurrencyDenomination {
+  denominationId Int      @id @default(autoincrement()) @map("denomination_id")
+  currencyId     Int      @map("currency_id")
+  value          Decimal  @db.Decimal(20, 8)
+  label          String?
+  sortOrder      Int      @default(0) @map("sort_order")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  currency  Currency                       @relation(fields: [currencyId], references: [currencyId], onDelete: Restrict)
+  lineItems CashDeliveryLineDenomination[]
+
+  @@unique([currencyId, value])
+  @@index([currencyId, active, sortOrder])
+  @@map("currency_denominations")
+}
+
+model CashDelivery {
+  deliveryId           Int                      @id @default(autoincrement()) @map("delivery_id")
+  recipientId          Int                      @map("recipient_id")
+  status               CashDeliveryStatus       @default(pending)
+  courierId            Int?                     @map("courier_id")
+  commissionAmount     Decimal                  @default(0) @map("commission_amount") @db.Decimal(20, 8)
+  commissionCurrencyId Int?                     @map("commission_currency_id")
+  commissionStatus     DeliveryCommissionStatus @default(pending) @map("commission_status")
+  commissionPaidAt     DateTime?                @map("commission_paid_at")
+  commissionPaidById   Int?                     @map("commission_paid_by_id")
+  photoUrl             String?                  @map("photo_url")
+  reference            String?
+  notes                String?
+  occurredAt           DateTime                 @default(now()) @map("occurred_at")
+  deliveredAt          DateTime?                @map("delivered_at")
+  cancelledAt          DateTime?                @map("cancelled_at")
+  createdById          Int?                     @map("created_by_id")
+  confirmedById        Int?                     @map("confirmed_by_id")
+  version              Int                      @default(0)
+  createdAt            DateTime                 @default(now()) @map("created_at")
+  updatedAt            DateTime                 @default(now()) @updatedAt @map("updated_at")
+
+  recipient          Recipient          @relation(fields: [recipientId], references: [recipientId], onDelete: Restrict)
+  lines              CashDeliveryLine[]
+  courier            CourierProfile?    @relation(fields: [courierId], references: [courierProfileId], onDelete: Restrict)
+  commissionCurrency Currency?          @relation("DeliveryCommissionCurrency", fields: [commissionCurrencyId], references: [currencyId], onDelete: Restrict)
+  createdBy          User?              @relation("CashDeliveryCreatedBy", fields: [createdById], references: [userId], onDelete: SetNull)
+  confirmedBy        User?              @relation("CashDeliveryConfirmedBy", fields: [confirmedById], references: [userId], onDelete: SetNull)
+  commissionPaidBy   User?              @relation("CashDeliveryCommissionPaidBy", fields: [commissionPaidById], references: [userId], onDelete: SetNull)
 
   @@index([recipientId])
   @@index([status, occurredAt])
-  @@index([currencyId])
+  @@index([courierId, commissionStatus])
+  @@index([commissionStatus, occurredAt])
   @@map("cash_deliveries")
+}
+
+// Una línea por moneda dentro de una entrega. `amount` es DERIVADO
+// (Σ unitValue × quantity del desglose) y se recalcula siempre server-side;
+// se desnormaliza para poder filtrar, sumar y ordenar sin joins.
+model CashDeliveryLine {
+  lineId     Int      @id @default(autoincrement()) @map("line_id")
+  deliveryId Int      @map("delivery_id")
+  currencyId Int      @map("currency_id")
+  amount     Decimal  @db.Decimal(20, 8)
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  delivery      CashDelivery                   @relation(fields: [deliveryId], references: [deliveryId], onDelete: Cascade)
+  currency      Currency                       @relation("DeliveryLineCurrency", fields: [currencyId], references: [currencyId], onDelete: Restrict)
+  denominations CashDeliveryLineDenomination[]
+
+  @@unique([deliveryId, currencyId])
+  @@index([currencyId])
+  @@map("cash_delivery_lines")
+}
+
+model CashDeliveryLineDenomination {
+  lineDenominationId Int      @id @default(autoincrement()) @map("line_denomination_id")
+  lineId             Int      @map("line_id")
+  denominationId     Int      @map("denomination_id")
+  quantity           Int
+  // Snapshot del valor del catálogo al escribir: si alguien corrige una
+  // denominación, las entregas históricas siguen cuadrando.
+  unitValue          Decimal  @map("unit_value") @db.Decimal(20, 8)
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  line         CashDeliveryLine     @relation(fields: [lineId], references: [lineId], onDelete: Cascade)
+  denomination CurrencyDenomination @relation(fields: [denominationId], references: [denominationId], onDelete: Restrict)
+
+  @@unique([lineId, denominationId])
+  @@index([denominationId])
+  @@map("cash_delivery_line_denominations")
 }
 
 // Tasa global manual por par (1 base = rate quote). Sistema independiente de

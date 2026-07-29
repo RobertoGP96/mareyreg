@@ -47,6 +47,7 @@ export async function createCurrency(
           code: data.code,
           name: data.name,
           symbol: data.symbol,
+          kind: data.kind,
           decimalPlaces: data.decimalPlaces,
           active: data.active ?? true,
         },
@@ -89,12 +90,27 @@ export async function updateCurrency(
     await db.$transaction(async (tx) => {
       const prev = await tx.currency.findUnique({ where: { currencyId: id } });
       if (!prev) throw new Error("Moneda no encontrada");
+
+      // Una moneda digital no puede tener denominaciones: pasar a digital con
+      // billetes en el catálogo dejaría entregas desglosadas sin sentido.
+      if (input.kind === "digital" && prev.kind !== "digital") {
+        const denominations = await tx.currencyDenomination.count({
+          where: { currencyId: id },
+        });
+        if (denominations > 0) {
+          throw new Error(
+            "La moneda tiene denominaciones registradas. Elimínalas antes de marcarla como digital."
+          );
+        }
+      }
+
       await tx.currency.update({
         where: { currencyId: id },
         data: {
           ...(input.code !== undefined && { code: input.code }),
           ...(input.name !== undefined && { name: input.name.trim() }),
           ...(input.symbol !== undefined && { symbol: input.symbol.trim() }),
+          ...(input.kind !== undefined && { kind: input.kind }),
           ...(input.decimalPlaces !== undefined && { decimalPlaces: input.decimalPlaces }),
           ...(input.active !== undefined && { active: input.active }),
         },
@@ -115,7 +131,10 @@ export async function updateCurrency(
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
     console.error("updateCurrency:", error);
-    return { success: false, error: "Error al actualizar la moneda" };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Error al actualizar la moneda",
+    };
   }
 }
 
