@@ -1,32 +1,19 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import {
-  Check,
-  Search,
-  SearchX,
-  SlidersHorizontal,
-  Star,
-  X,
-} from "lucide-react";
 import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
 import { discountPct, fmt, normalizeText } from "@/lib/format";
 import { useSyncCurrency } from "@/lib/store";
 import { ProductCard } from "@/components/product-card";
+import { ProductGrid, ProductGridCell } from "@/components/product-grid";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CatalogHero } from "@/app/catalogo/catalog-hero";
+import { FilterBar, type SortOption } from "@/app/catalogo/filter-bar";
 
 type SortKey = "rel" | "asc" | "desc" | "discount" | "name";
 
-const SORTS: { key: SortKey; label: string }[] = [
+const SORTS: SortOption[] = [
   { key: "rel", label: "Relevancia" },
   { key: "asc", label: "Precio: menor a mayor" },
   { key: "desc", label: "Precio: mayor a menor" },
@@ -67,7 +54,7 @@ export function CatalogClient({
             .filter((c): c is string => c != null && c.length > 0)
         )
       )
-        // Reservados como chips especiales: una categoría real con ese nombre
+        // Reservados como filtros especiales: una categoría real con ese nombre
         // duplicaría keys y chocaría con los filtros de ofertas/destacados.
         .filter((c) => c !== TODO && c !== OFERTAS && c !== DESTACADOS)
         .sort((a, b) => a.localeCompare(b, "es")),
@@ -192,166 +179,117 @@ export function CatalogClient({
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="grad-header anim-fade-up rounded-b-[22px] px-5 py-[18px] text-white md:mt-6 md:rounded-[22px] md:px-7 md:py-6">
-        <div className="mb-3 text-[17px] font-bold md:text-[19px]">
-          Catálogo
-        </div>
-        <div className="flex items-center gap-2.5 rounded-[13px] border border-white/15 bg-white/10 px-3.5 py-[11px] transition-colors focus-within:border-white/35 focus-within:bg-white/15 md:max-w-xl">
-          <Search className="h-4 w-4 flex-none text-white/60" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar productos…"
-            autoFocus={autoFocus}
-            className="h-auto flex-1 rounded-none border-none bg-transparent p-0 text-sm text-white placeholder:text-white/60 focus-visible:border-transparent focus-visible:ring-0"
-          />
-          {query.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              aria-label="Limpiar búsqueda"
-              className="flex h-5 w-5 flex-none items-center justify-center rounded-full bg-white/15 text-white/70 transition-colors hover:bg-white/25 hover:text-white"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          )}
-        </div>
-      </div>
+      <CatalogHero
+        eyebrow="Selección 2026"
+        title="Catálogo"
+        description="Despensa escogida pieza a pieza. Productos frescos, marcas de confianza y precios claros, sin adornos."
+        value={query}
+        onChange={setQuery}
+        autoFocus={autoFocus}
+      />
 
-      <div className="anim-fade-up no-scrollbar flex gap-2 overflow-x-auto px-5 pt-3.5 pb-2 [animation-delay:60ms] max-md:sticky max-md:top-0 max-md:z-20 max-md:bg-app/95 max-md:backdrop-blur md:flex-wrap md:overflow-visible md:px-0 md:pt-5">
-        {[TODO, DESTACADOS, OFERTAS, ...categories].map((name) => {
-          const active = category === name;
-          return (
-            <button
-              key={name}
-              type="button"
-              onClick={() => setCategory(name)}
-              className={`inline-flex flex-none items-center gap-1 rounded-full border px-[15px] py-2 text-[13px] font-medium transition-colors ${
-                active
-                  ? "border-brand bg-brand text-white"
-                  : "border-line bg-white text-ink-soft hover:border-brand-soft hover:text-brand"
-              }`}
-            >
-              {name === DESTACADOS && (
-                <Star className="h-3 w-3" fill="currentColor" />
-              )}
-              {name}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="anim-fade-up flex items-center justify-between gap-2 px-5 pt-2 pb-1 [animation-delay:100ms] md:px-0">
-        <div aria-live="polite" className="flex-none text-[12.5px] text-muted">
-          {filtered.length} {filtered.length === 1 ? "producto" : "productos"}
-        </div>
-        <div className="flex min-w-0 items-center gap-1.5">
-          <Button
-            size="sm"
-            variant={inStockOnly ? "chip" : "ghost"}
-            onClick={() => setInStockOnly((v) => !v)}
-            aria-pressed={inStockOnly}
+      <FilterBar
+        filters={[TODO, DESTACADOS, OFERTAS, ...categories]}
+        activeFilter={category}
+        onFilterChange={setCategory}
+        count={filtered.length}
+        sort={sort}
+        sortOptions={SORTS}
+        onSortChange={(value) => setSort(value as SortKey)}
+      >
+        <button
+          type="button"
+          onClick={() => setInStockOnly((v) => !v)}
+          aria-pressed={inStockOnly}
+          className={`nav-label transition-colors duration-150 ${
+            inStockOnly
+              ? "font-bold text-navy-900"
+              : "text-slate-400 hover:text-navy-700"
+          }`}
+        >
+          En stock
+        </button>
+        {priceBounds && (
+          <button
+            type="button"
+            onClick={() => setShowPrice((v) => !v)}
+            aria-expanded={showPrice}
+            className={`nav-label transition-colors duration-150 ${
+              showPrice || priceActive
+                ? "font-bold text-navy-900"
+                : "text-slate-400 hover:text-navy-700"
+            }`}
           >
-            {inStockOnly && <Check className="h-3 w-3" />}
-            En stock
-          </Button>
-          {priceBounds && (
-            <Button
-              size="sm"
-              variant={showPrice || priceActive ? "chip" : "ghost"}
-              onClick={() => setShowPrice((v) => !v)}
-              aria-expanded={showPrice}
-              aria-label="Filtro de precio"
-            >
-              <SlidersHorizontal className="h-3 w-3" />
-              Precio
-            </Button>
-          )}
-          <Select
-            value={sort}
-            onValueChange={(v) => setSort(v as SortKey)}
-          >
-            <SelectTrigger
-              aria-label="Ordenar productos"
-              className="min-w-0 max-w-[150px] [&>span]:truncate"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end">
-              {SORTS.map((s) => (
-                <SelectItem key={s.key} value={s.key}>
-                  {s.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+            Precio
+          </button>
+        )}
+      </FilterBar>
 
       {showPrice && priceBounds && (
-        <div className="anim-fade-up mx-5 mt-1.5 rounded-2xl bg-white p-4 shadow-[0_3px_12px_rgba(10,31,63,.06)] md:mx-0 md:max-w-md">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-[12.5px] font-semibold text-navy">Precio</div>
-            <div className="font-mono text-[12px] font-medium tabular-nums text-brand">
-              {fmt(range[0], currency)} – {fmt(range[1], currency)}
+        <div className="border-b border-line px-5 py-6 md:px-10">
+          <div className="max-w-[460px]">
+            <div className="flex items-baseline justify-between gap-4">
+              <span className="eyebrow">Rango de precio</span>
+              <span className="tabular text-[13px] font-bold text-navy-900">
+                {fmt(range[0], currency)} – {fmt(range[1], currency)}
+              </span>
             </div>
-          </div>
-          <Slider
-            min={priceBounds[0]}
-            max={priceBounds[1]}
-            step={priceStep}
-            value={range}
-            onValueChange={(v) => setPriceRange([v[0], v[1]])}
-            aria-label="Rango de precio"
-            className="mt-3.5"
-          />
-          <div className="mt-2 flex items-center justify-between">
-            <div className="text-[11px] text-muted">
-              {fmt(priceBounds[0], currency)} a {fmt(priceBounds[1], currency)}
+            <Slider
+              min={priceBounds[0]}
+              max={priceBounds[1]}
+              step={priceStep}
+              value={range}
+              onValueChange={(v) => setPriceRange([v[0], v[1]])}
+              aria-label="Rango de precio"
+              className="mt-4"
+            />
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <span className="tabular text-[11px] text-slate-400">
+                {fmt(priceBounds[0], currency)} — {fmt(priceBounds[1], currency)}
+              </span>
+              {priceActive && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setPriceRange(null)}
+                >
+                  Restablecer
+                </Button>
+              )}
             </div>
-            {priceActive && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setPriceRange(null)}
-              >
-                Restablecer
-              </Button>
-            )}
           </div>
         </div>
       )}
 
       {filtered.length === 0 ? (
-        <div className="anim-fade-up flex flex-1 flex-col items-center justify-center gap-3 px-5 py-14 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-[18px] bg-chip text-brand">
-            <SearchX className="h-6 w-6" />
-          </div>
-          <div className="text-[15px] font-semibold text-navy">
-            Sin resultados
-          </div>
-          <div className="text-[13px] text-muted">
+        <div className="flex flex-1 flex-col items-center justify-center px-5 py-24 text-center md:px-10">
+          <p className="eyebrow">Sin resultados</p>
+          <p className="font-display mt-4 text-[32px] leading-none text-navy-900">
+            Nada por aquí
+          </p>
+          <p className="mt-4 max-w-[380px] text-[13.5px] leading-[1.65] text-pretty text-slate-500">
             {hasActiveFilters
-              ? "No encontramos productos con esos filtros."
-              : "Aún no hay productos disponibles."}
-          </div>
+              ? "No encontramos productos con esos filtros. Prueba a quitar alguno."
+              : "Aún no hay productos disponibles en el catálogo."}
+          </p>
           {hasActiveFilters && (
-            <Button onClick={clearFilters} className="mt-1">
+            <Button onClick={clearFilters} className="mt-7">
               Limpiar filtros
             </Button>
           )}
         </div>
       ) : (
-        <div className="anim-fade-up grid grid-cols-2 gap-3.5 px-5 pt-2 pb-6 [animation-delay:140ms] md:grid-cols-3 md:gap-5 md:px-0 md:pt-4 lg:grid-cols-4">
+        <ProductGrid className="px-5 pb-16 md:px-10">
           {filtered.map((product, index) => (
-            <ProductCard
-              key={product.sku}
-              product={product}
-              variant="grid"
-              priority={index < 4}
-            />
+            <ProductGridCell key={product.sku}>
+              <ProductCard
+                product={product}
+                variant="grid"
+                priority={index < 4}
+              />
+            </ProductGridCell>
           ))}
-        </div>
+        </ProductGrid>
       )}
     </div>
   );

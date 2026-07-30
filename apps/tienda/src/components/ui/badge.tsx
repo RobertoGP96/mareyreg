@@ -4,10 +4,10 @@ import { cn } from "@/lib/utils";
 type BadgeVariant = "featured" | "discount" | "soldout" | "neutral";
 
 const VARIANTS: Record<BadgeVariant, string> = {
-  featured: "grad-cta text-white",
-  discount: "bg-brand text-white",
-  soldout: "bg-[#6B7A94] text-white",
-  neutral: "bg-chip text-brand",
+  featured: "bg-canvas text-navy-900",
+  discount: "bg-canvas text-danger",
+  soldout: "bg-canvas text-slate-400",
+  neutral: "border border-line text-slate-500",
 };
 
 interface BadgeProps extends React.ComponentProps<"span"> {
@@ -19,7 +19,7 @@ function Badge({ className, variant = "neutral", ...props }: BadgeProps) {
     <span
       data-slot="badge"
       className={cn(
-        "inline-flex items-center gap-1 rounded-md px-2 py-[3px] text-[10px] font-semibold",
+        "inline-flex items-center gap-1 px-[9px] py-[5px] text-[8.5px] font-semibold tracking-[.22em] uppercase",
         VARIANTS[variant],
         className
       )}

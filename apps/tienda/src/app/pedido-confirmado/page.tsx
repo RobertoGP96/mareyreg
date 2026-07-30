@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
+import { ButtonLink } from "@/components/ui/button";
+import { Check } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -18,35 +18,38 @@ export default async function ConfirmationPage({
   const isAwaitingWeighing = status === "awaiting_weighing";
 
   return (
-    <div className="grad-confirm flex flex-1 flex-col items-center justify-center gap-4 p-10 text-center text-white">
-      <div className="anim-fade-up mx-auto flex w-full max-w-md flex-col items-center gap-4">
-        <div className="flex h-[76px] w-[76px] items-center justify-center rounded-full bg-brand-light">
-          <CheckCircle2 className="h-9 w-9" />
-        </div>
-        <div className="text-[21px] font-bold [animation-delay:60ms]">
-          ¡Pedido confirmado!
-        </div>
-        <div className="text-sm leading-[1.5] text-[#A9C4EC] [animation-delay:120ms]">
-          Tu pedido <span className="font-semibold text-white">{orderNo}</span>{" "}
-          está en preparación.
-          <br />
+    <div className="flex flex-1 flex-col items-center justify-center px-5 py-24 text-center md:px-10">
+      <div className="anim-fade-up w-full max-w-[460px]">
+        <p className="eyebrow">Pedido recibido</p>
+        <h1 className="font-display mt-5 text-[42px] leading-none text-navy-900 md:text-[52px]">
+          Gracias por tu compra
+        </h1>
+
+        {orderNo && (
+          <div className="mt-9 flex items-center justify-center gap-2.5 border-y border-line py-4">
+            <Check className="h-5 w-5 flex-none text-ok" strokeWidth={1.6} />
+            <span className="tabular text-[15px] font-semibold text-ink">
+              {orderNo}
+            </span>
+          </div>
+        )}
+
+        <p className="mt-7 text-[13.5px] leading-[1.65] text-pretty text-slate-500">
           {isAwaitingWeighing
-            ? "Tu pedido se pesará al prepararlo; el total puede variar ligeramente."
-            : "Puedes seguirlo desde tu perfil."}
-        </div>
-        <div className="mt-2.5 flex gap-2.5 [animation-delay:180ms]">
-          <Link
+            ? "Tu pedido incluye productos de peso variable: se pesará al prepararlo y el total puede variar ligeramente."
+            : "Tu pedido está en preparación. Puedes seguirlo desde tu perfil."}
+        </p>
+
+        <div className="mt-10 flex flex-col items-center gap-6 sm:flex-row sm:justify-center sm:gap-9">
+          <ButtonLink
             href="/perfil/pedidos"
-            className="rounded-[13px] border border-white/20 bg-white/12 px-[22px] py-[13px] text-sm font-semibold text-white transition-colors hover:bg-white/20"
+            variant="solid"
+            size="lg"
+            className="w-full sm:w-auto"
           >
             Ver pedido
-          </Link>
-          <Link
-            href="/"
-            className="rounded-[13px] bg-white px-[22px] py-[13px] text-sm font-semibold text-navy transition-colors hover:bg-app"
-          >
-            Volver al inicio
-          </Link>
+          </ButtonLink>
+          <ButtonLink href="/">Volver al inicio</ButtonLink>
         </div>
       </div>
     </div>

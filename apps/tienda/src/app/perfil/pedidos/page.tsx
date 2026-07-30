@@ -16,10 +16,16 @@ function formatOrderDate(dateIso: string): string {
   return `${dd}/${mm}/${date.getFullYear()}`;
 }
 
-function statusClasses(status: StoredOrder["status"]): string {
-  return status === "En preparación"
-    ? "bg-ok-bg text-ok"
-    : "bg-[#F5ECDC] text-warn";
+const STATUS_COLOR: Record<StoredOrder["status"], string> = {
+  "En preparación": "text-ok",
+  "En revisión": "text-warn",
+  "Por pesar": "text-warn",
+};
+
+// Los pedidos viven en localStorage: un estado guardado por una versión previa
+// puede no estar en el mapa, así que hay color de reserva.
+function statusColor(status: StoredOrder["status"]): string {
+  return STATUS_COLOR[status] ?? "text-slate-500";
 }
 
 export default function OrdersPage() {
@@ -29,51 +35,42 @@ export default function OrdersPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <ScreenHeader title="Mis pedidos" backHref="/perfil" />
+      <ScreenHeader eyebrow="Mi cuenta" title="Mis pedidos" backHref="/perfil" />
 
       {orders.length === 0 ? (
         <EmptyState
           icon={Package}
+          eyebrow="Historial vacío"
           title="Aún no tienes pedidos"
           description="Cuando compres, podrás seguirlos aquí."
           ctaLabel="Ir al catálogo"
           ctaHref="/catalogo"
         />
       ) : (
-        <div className="flex flex-col gap-3 px-5 py-[18px] md:mx-auto md:w-full md:max-w-2xl">
+        <div className="px-5 pt-8 pb-16 md:px-10">
           {orders.map((order) => (
             <div
               key={order.no}
-              className="rounded-[15px] bg-white px-4 py-[15px] shadow-[0_3px_12px_rgba(10,31,63,.05)] transition-colors hover:bg-app"
+              className="flex items-start justify-between gap-5 border-b border-line-soft py-5 transition-colors duration-150 hover:bg-hover"
             >
-              <div className="flex items-center gap-[13px]">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-chip text-brand">
-                  <Package className="h-[18px] w-[18px]" />
+              <div className="min-w-0">
+                <div className="tabular text-[14px] font-semibold text-ink">
+                  Pedido {order.no}
                 </div>
-                <div className="flex-1">
-                  <div className="text-[13.5px] font-semibold text-navy">
-                    Pedido {order.no}
-                  </div>
-                  <div className="mt-0.5 text-xs text-muted">
-                    {formatOrderDate(order.dateIso)} · {order.itemsCount}{" "}
-                    artículos · {fmt(order.total, currency)}
-                  </div>
+                <div className="tabular mt-1.5 text-[12px] text-slate-400">
+                  {formatOrderDate(order.dateIso)} · {order.itemsCount}{" "}
+                  {order.itemsCount === 1 ? "artículo" : "artículos"}
+                </div>
+              </div>
+              <div className="flex-none text-right">
+                <div className="tabular text-[15px] font-bold text-navy-900">
+                  {fmt(order.total, currency)}
                 </div>
                 <div
-                  className={`rounded-lg px-2.5 py-[5px] text-[11px] font-semibold ${statusClasses(order.status)}`}
+                  className={`nav-label mt-1.5 ${statusColor(order.status)}`}
                 >
                   {order.status}
                 </div>
-              </div>
-              <div className="mt-3.5 flex items-center gap-1.5">
-                <div className="grad-progress h-[5px] flex-1 rounded-[3px]" />
-                <div className="h-[5px] flex-1 rounded-[3px] bg-photo" />
-                <div className="h-[5px] flex-1 rounded-[3px] bg-photo" />
-              </div>
-              <div className="mt-1.5 flex justify-between text-[10.5px] text-muted">
-                <span className="font-semibold text-brand">Preparación</span>
-                <span>En camino</span>
-                <span>Entregado</span>
               </div>
             </div>
           ))}

@@ -6,6 +6,7 @@ export default function NotFound() {
     <div className="flex flex-1 flex-col">
       <EmptyState
         icon={PackageSearch}
+        eyebrow="Error 404"
         title="No encontramos esta página"
         description="El producto o la página que buscas no existe o ya no está disponible."
         ctaLabel="Ir al catálogo"

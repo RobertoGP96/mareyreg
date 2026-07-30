@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import type { MouseEvent } from "react";
-import { Heart, Plus, Star } from "lucide-react";
+import { Heart } from "lucide-react";
 import type { WebstoreProduct } from "@/lib/erp-client";
-import { discountPct, fmt, stockInfo } from "@/lib/format";
+import { discountPct, fmt } from "@/lib/format";
 import { useStore, type CartLine } from "@/lib/store";
 import { ProductImage } from "@/components/product-image";
-import { Badge } from "@/components/ui/badge";
+import { StockLabel } from "@/components/ui/stock-label";
 
 export function baseCartLine(product: WebstoreProduct): CartLine {
   return {
@@ -31,10 +31,10 @@ interface ProductCardProps {
   priority?: boolean;
 }
 
-const IMAGE_HEIGHT: Record<CardVariant, string> = {
-  grid: "h-[110px] md:h-[170px]",
-  carousel: "h-[118px] md:h-[150px]",
-  favorite: "h-[104px] md:h-[150px]",
+const PADDING: Record<CardVariant, string> = {
+  grid: "px-6 pt-[26px] pb-7",
+  carousel: "px-5 pt-5 pb-6",
+  favorite: "px-6 pt-[26px] pb-7",
 };
 
 export function ProductCard({
@@ -46,110 +46,118 @@ export function ProductCard({
   const currency = state.currency;
   const isFav = state.favs.includes(product.sku);
   const soldOut = product.stockAvailable <= 0;
-  const stock = stockInfo(product.stockAvailable);
   const pct = discountPct(product);
 
   const handleFav = (e: MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation();
     toggleFav(product.sku);
   };
 
   const handleAdd = (e: MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation();
     if (soldOut) {
       showToast("Producto agotado");
       return;
     }
     addToCart(baseCartLine(product), 1);
-    showToast(`${product.name} añadido al carrito`);
+    showToast(`${product.name} añadido a la bolsa`);
   };
 
   return (
-    <Link
-      href={`/producto/${encodeURIComponent(product.sku)}`}
-      className={`group flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-[0_3px_12px_rgba(10,31,63,.06)] transition-[transform,box-shadow] duration-200 hover:shadow-[0_10px_28px_rgba(10,31,63,.14)] motion-safe:hover:-translate-y-1 ${
-        variant === "carousel"
-          ? "w-[164px] flex-none snap-start shadow-[0_3px_12px_rgba(10,31,63,.07)] md:w-[210px]"
-          : ""
-      } ${product.featured ? "ring-1 ring-brand-soft/60" : ""}`}
+    <article
+      className={`group relative flex h-full flex-col gap-[18px] transition-colors duration-150 hover:bg-hover ${
+        PADDING[variant]
+      } ${variant === "carousel" ? "w-[230px] flex-none snap-start" : ""}`}
     >
-      <div
-        className={`relative flex flex-none items-center justify-center overflow-hidden bg-photo text-[11px] tracking-[.5px] text-photo-fg ${IMAGE_HEIGHT[variant]}`}
-      >
-        <ProductImage
-          src={product.imageUrl}
-          alt={product.name}
-          sizes="(max-width: 430px) 50vw, (max-width: 768px) 33vw, 280px"
-          priority={priority}
-        />
-        <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
-          {product.featured && (
-            <Badge variant="featured">
-              <Star className="h-2.5 w-2.5" fill="currentColor" />
-              DESTACADO
-            </Badge>
-          )}
-          {soldOut && <Badge variant="soldout">AGOTADO</Badge>}
-          {!soldOut && pct > 0 && <Badge variant="discount">−{pct}%</Badge>}
-        </div>
+      {/* El enlace cubre la celda entera para que toda la card navegue, pero se
+          queda debajo de los controles (favorito, añadir), que llevan z-10. */}
+      <Link
+        href={`/producto/${encodeURIComponent(product.sku)}`}
+        className="absolute inset-0 z-0"
+        aria-label={product.name}
+      />
+
+      <div className="relative aspect-square w-full overflow-hidden bg-surface text-[9px] tracking-[.22em] text-slate-300">
+        <span className="absolute inset-0 flex items-center justify-center">
+          <ProductImage
+            src={product.imageUrl}
+            alt=""
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 320px"
+            priority={priority}
+          />
+        </span>
+        {product.featured && !soldOut && (
+          <span className="absolute top-0 left-0 bg-canvas px-[9px] py-[5px] text-[8.5px] font-semibold tracking-[.22em] text-navy-900 uppercase">
+            Destacado
+          </span>
+        )}
+        {soldOut && (
+          <span className="absolute top-0 left-0 bg-canvas px-[9px] py-[5px] text-[8.5px] font-semibold tracking-[.22em] text-slate-400 uppercase">
+            Agotado
+          </span>
+        )}
+        {!soldOut && pct > 0 && (
+          <span className="absolute top-0 right-0 bg-canvas px-[9px] py-[5px] text-[8.5px] font-semibold tracking-[.22em] text-danger uppercase">
+            −{pct}%
+          </span>
+        )}
         <button
           type="button"
           onClick={handleFav}
           aria-label={isFav ? "Quitar de favoritos" : "Añadir a favoritos"}
-          className={`absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-[9px] bg-white shadow-[0_2px_6px_rgba(10,31,63,.12)] transition-[color,transform] hover:scale-110 active:scale-95 ${
-            isFav ? "text-fav" : "text-muted-2 hover:text-fav"
+          aria-pressed={isFav}
+          className={`absolute right-0 bottom-0 z-10 flex h-9 w-9 items-center justify-center bg-canvas transition-colors duration-150 ${
+            isFav ? "text-danger" : "text-slate-400 hover:text-navy-900"
           }`}
         >
           <Heart
-            className="h-[15px] w-[15px]"
+            className="h-4 w-4"
+            strokeWidth={1.6}
             fill={isFav ? "currentColor" : "none"}
           />
         </button>
       </div>
-      <div
-        className={`flex flex-1 flex-col ${
-          variant === "carousel" ? "px-3 pt-[11px] pb-[13px]" : "px-3 pt-2.5 pb-3"
-        }`}
-      >
-        <div className="mt-[3px] line-clamp-2 min-h-[34px] text-[13px] leading-[1.3] font-medium text-ink">
-          {product.name}
-        </div>
-        {variant === "grid" && (
-          <div
-            className="mt-1 text-[11px] font-medium"
-            style={{ color: stock.color }}
-          >
-            {stock.label}
-          </div>
+
+      <div className="flex flex-col gap-[7px]">
+        {product.category && (
+          <span className="eyebrow truncate">{product.category}</span>
         )}
-        <div className="mt-auto flex items-end justify-between pt-[7px]">
-          <div>
-            <div className="text-[15px] font-bold text-navy">
-              {fmt(product.price, currency)}
-              {product.isCatchWeight && (
-                <span className="text-[11px] font-medium text-muted"> / kg</span>
-              )}
-            </div>
-            {variant === "grid" && product.compareAtPrice != null && (
-              <div className="text-[11px] text-muted-2 line-through">
-                {fmt(product.compareAtPrice, currency)}
-              </div>
+        <h3 className="line-clamp-2 text-[16px] leading-[1.35] font-semibold text-ink">
+          {product.name}
+        </h3>
+        <StockLabel stock={product.stockAvailable} />
+      </div>
+
+      <div className="mt-auto flex items-end justify-between gap-3 border-t border-line-soft pt-[14px]">
+        <div className="min-w-0">
+          <div className="tabular truncate text-[17px] font-bold text-navy-900">
+            {fmt(product.price, currency)}
+            {product.isCatchWeight && (
+              <span className="text-[11px] font-medium text-slate-400">
+                {" "}
+                / kg
+              </span>
             )}
           </div>
-          <button
-            type="button"
-            onClick={handleAdd}
-            aria-label="Añadir al carrito"
-            className={`flex h-7 w-7 items-center justify-center rounded-[9px] text-white transition-[background-color,transform] active:scale-95 ${
-              soldOut ? "bg-disabled" : "bg-brand hover:bg-brand-mid"
-            }`}
-          >
-            <Plus className="h-4 w-4" />
-          </button>
+          {product.compareAtPrice != null && (
+            <div className="tabular mt-0.5 text-[11px] font-medium text-slate-400 line-through">
+              {fmt(product.compareAtPrice, currency)}
+            </div>
+          )}
         </div>
+        <button
+          type="button"
+          onClick={handleAdd}
+          aria-disabled={soldOut}
+          className={`relative z-10 flex-none pb-1 text-[11.5px] font-bold tracking-[.16em] uppercase transition-colors duration-150 ${
+            soldOut
+              ? "cursor-not-allowed text-disabled"
+              : "border-b border-navy-900 text-navy-900 hover:border-navy-700 hover:text-navy-700"
+          }`}
+        >
+          {soldOut ? "Agotado" : "Añadir"}
+        </button>
       </div>
-    </Link>
+    </article>
   );
 }

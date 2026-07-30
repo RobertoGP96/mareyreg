@@ -45,7 +45,7 @@ const ITEMS: NavItem[] = [
   {
     href: "/carrito",
     icon: ShoppingCart,
-    label: "Carrito",
+    label: "Bolsa",
     isActive: (p) => p === "/carrito",
   },
   {
@@ -65,7 +65,7 @@ export function BottomNav() {
   const count = cartCount(state);
 
   return (
-    <nav className="sticky bottom-0 mt-auto flex justify-around rounded-t-[20px] border-t border-[#E2E8F1] bg-white px-2 pt-[11px] pb-[17px] shadow-[0_-4px_16px_rgba(10,31,63,.06)] md:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-canvas md:hidden">
       {ITEMS.map((item) => {
         const active = item.isActive(pathname);
         const Icon = item.icon;
@@ -73,15 +73,15 @@ export function BottomNav() {
           <Link
             key={item.href}
             href={item.href}
-            className={`relative flex flex-col items-center gap-[3px] text-[10.5px] font-semibold transition-colors ${active ? "text-brand" : "text-muted-2"}`}
+            aria-current={active ? "page" : undefined}
+            className={`relative flex flex-col items-center gap-1.5 py-3 pb-[18px] text-[8.5px] tracking-[.16em] uppercase transition-colors duration-150 ${
+              active ? "text-navy-900" : "text-slate-400"
+            }`}
           >
-            <Icon
-              className={`h-[19px] w-[19px] transition-transform ${active ? "scale-110" : ""}`}
-              strokeWidth={active ? 2.4 : 2}
-            />
+            <Icon className="h-4 w-4" strokeWidth={1.6} />
             {item.label}
             {item.href === "/carrito" && count > 0 && (
-              <span className="absolute -top-1 -right-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-[9px] bg-brand-mid px-1 text-[10px] font-bold text-white">
+              <span className="tabular absolute top-2 right-[22%] text-[9px] font-bold text-navy-900">
                 {count}
               </span>
             )}

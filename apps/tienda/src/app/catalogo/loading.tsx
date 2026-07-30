@@ -1,33 +1,42 @@
+import { ProductGrid, ProductGridCell } from "@/components/product-grid";
+
+/** Sin pulso ni brillo: el sistema no anima la espera, solo reserva la retícula. */
 export default function CatalogLoading() {
   return (
     <div className="flex flex-1 flex-col">
-      <div className="grad-header rounded-b-[22px] px-5 py-[18px] md:mt-6 md:rounded-[22px] md:px-7 md:py-6">
-        <div className="mb-3 h-[22px] w-24 rounded-md bg-white/20" />
-        <div className="h-[42px] rounded-[13px] border border-white/15 bg-white/10 md:max-w-xl" />
+      <div className="border-b border-line px-5 pt-[58px] pb-[46px] md:px-10">
+        <div className="mx-auto h-2.5 w-28 bg-surface" />
+        <div className="mx-auto mt-5 h-[52px] w-56 bg-surface md:h-[66px] md:w-72" />
+        <div className="mx-auto mt-6 h-3 w-full max-w-[470px] bg-surface" />
+        <div className="mx-auto mt-9 h-8 w-full max-w-[460px] border-b border-rule" />
       </div>
-      <div className="flex gap-2 overflow-hidden px-5 pt-3.5 pb-2 md:px-0 md:pt-5">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div
-            key={i}
-            className="h-[35px] w-20 flex-none rounded-full bg-white motion-safe:animate-pulse"
-          />
-        ))}
+
+      <div className="border-b border-line px-5 md:px-10">
+        <div className="flex gap-6 overflow-hidden py-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-2.5 w-16 flex-none bg-surface" />
+          ))}
+        </div>
       </div>
-      <div className="grid grid-cols-2 gap-3.5 px-5 pt-4 pb-6 md:grid-cols-3 md:gap-5 md:px-0 lg:grid-cols-4">
+
+      <ProductGrid className="px-5 pb-16 md:px-10">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div
-            key={i}
-            className="overflow-hidden rounded-2xl bg-white shadow-[0_3px_12px_rgba(10,31,63,.06)] motion-safe:animate-pulse"
-          >
-            <div className="h-[110px] bg-photo md:h-[170px]" />
-            <div className="space-y-2 px-3 pt-2.5 pb-3">
-              <div className="h-3.5 w-3/4 rounded bg-photo" />
-              <div className="h-3 w-1/3 rounded bg-photo" />
-              <div className="h-4 w-1/2 rounded bg-photo" />
+          <ProductGridCell key={i}>
+            <div className="flex flex-col gap-[18px] px-6 pt-[26px] pb-7">
+              <div className="aspect-square w-full bg-surface" />
+              <div className="flex flex-col gap-[7px]">
+                <div className="h-2 w-16 bg-surface" />
+                <div className="h-4 w-3/4 bg-surface" />
+                <div className="h-3 w-20 bg-surface" />
+              </div>
+              <div className="mt-auto flex items-end justify-between border-t border-line-soft pt-[14px]">
+                <div className="h-4 w-24 bg-surface" />
+                <div className="h-3 w-14 bg-surface" />
+              </div>
             </div>
-          </div>
+          </ProductGridCell>
         ))}
-      </div>
+      </ProductGrid>
     </div>
   );
 }
