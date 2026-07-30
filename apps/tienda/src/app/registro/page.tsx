@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { syncProfile } from "@/app/actions/customer-actions";
 import { useStore } from "@/lib/store";
-
-const inputClass =
-  "rounded-xl border border-line bg-white p-3.5 text-sm text-ink placeholder:text-muted-2 transition-colors focus:border-brand focus:outline-none";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -46,70 +45,84 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex flex-1 flex-col md:items-center md:justify-center">
-      <div className="grad-header rounded-b-[26px] px-5 pt-[18px] pb-[34px] text-white md:my-10 md:w-full md:max-w-md md:rounded-[26px] md:shadow-[0_12px_32px_rgba(10,31,63,.18)]">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/perfil"
-            aria-label="Volver"
-            className="-ml-1 flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-white/10"
-          >
-            <ArrowLeft className="h-[18px] w-[18px]" />
-          </Link>
-          <div className="text-[17px] font-bold">Crear cuenta</div>
-        </div>
-        <div className="mt-5 text-[23px] leading-[1.25] font-semibold">
-          Bienvenido.
-          <br />
-          <span className="text-brand-soft">Regístrate en un minuto.</span>
-        </div>
-      </div>
+    <div className="flex flex-1 flex-col items-center px-5 py-12 md:px-10 md:py-20">
+      <div className="w-full max-w-[420px]">
+        <Link
+          href="/perfil"
+          className="nav-label -ml-0.5 inline-flex items-center gap-1 text-slate-400 transition-colors duration-150 hover:text-navy-900"
+        >
+          <ChevronLeft className="h-4 w-4" strokeWidth={1.6} />
+          Volver
+        </Link>
 
-      <div className="flex flex-1 flex-col gap-3 px-5 py-[22px] md:w-full md:max-w-md md:flex-none">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Nombre y apellidos"
-          autoComplete="name"
-          className={inputClass}
-        />
-        <input
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          placeholder="Teléfono"
-          type="tel"
-          autoComplete="tel"
-          className={inputClass}
-        />
-        <input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Contraseña"
-          type="password"
-          autoComplete="new-password"
-          className={inputClass}
-        />
-        <div className="text-xs leading-[1.45] text-muted">
-          Al crear tu cuenta aceptas los términos y condiciones de la tienda.
+        <p className="eyebrow mt-10">Bienvenido</p>
+        <h1 className="font-display mt-4 text-[32px] leading-none text-navy-900 md:text-[42px]">
+          Crear cuenta
+        </h1>
+        <p className="mt-5 text-[13.5px] leading-[1.65] text-slate-500">
+          Regístrate en un minuto y guarda tus datos para la próxima compra.
+        </p>
+
+        <div className="mt-10 flex flex-col gap-6 border-t border-line pt-8">
+          <div className="flex flex-col gap-2.5">
+            <label htmlFor="registro-nombre" className="eyebrow">
+              Nombre y apellidos
+            </label>
+            <Input
+              id="registro-nombre"
+              variant="box"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nombre y apellidos"
+              autoComplete="name"
+            />
+          </div>
+          <div className="flex flex-col gap-2.5">
+            <label htmlFor="registro-telefono" className="eyebrow">
+              Teléfono
+            </label>
+            <Input
+              id="registro-telefono"
+              variant="box"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Teléfono"
+              type="tel"
+              autoComplete="tel"
+            />
+          </div>
+          <div className="flex flex-col gap-2.5">
+            <label htmlFor="registro-password" className="eyebrow">
+              Contraseña
+            </label>
+            <Input
+              id="registro-password"
+              variant="box"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Contraseña"
+              type="password"
+              autoComplete="new-password"
+            />
+          </div>
+          <p className="text-[12.5px] leading-[1.65] text-slate-400">
+            Al crear tu cuenta aceptas los términos y condiciones de la tienda.
+          </p>
         </div>
-        <button
-          type="button"
+
+        <Button
+          variant="solid"
+          size="lg"
           onClick={handleRegister}
           disabled={sending}
-          className={`grad-cta mt-1.5 rounded-[13px] p-[15px] text-center text-[15px] font-semibold text-white transition-colors ${
-            sending ? "opacity-60" : "hover:opacity-90"
-          }`}
+          className="mt-8 w-full"
         >
           {sending ? "Creando cuenta…" : "Crear cuenta"}
-        </button>
-        <div className="mt-2 text-center text-[13px] text-muted">
-          ¿Ya tienes cuenta?{" "}
-          <Link
-            href="/login"
-            className="font-semibold text-brand-mid transition-colors hover:text-brand"
-          >
-            Iniciar sesión
-          </Link>
+        </Button>
+
+        <div className="mt-10 flex flex-col items-center gap-4 border-t border-line pt-8">
+          <p className="text-[13px] text-slate-500">¿Ya tienes cuenta?</p>
+          <ButtonLink href="/login">Iniciar sesión</ButtonLink>
         </div>
       </div>
     </div>

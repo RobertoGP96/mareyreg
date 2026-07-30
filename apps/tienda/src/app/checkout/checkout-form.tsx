@@ -1,12 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Banknote,
   CreditCard,
   Loader2,
-  ShoppingCart,
   Store,
   Truck,
   type LucideIcon,
@@ -15,18 +15,16 @@ import { submitOrder } from "@/app/actions/order-actions";
 import { computeTotals, SHIPPING_COST } from "@/lib/cart-totals";
 import { fmt } from "@/lib/format";
 import { cartCount, cartLines, useStore } from "@/lib/store";
-import { EmptyState } from "@/components/empty-state";
-import { ScreenHeader } from "@/components/screen-header";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type Delivery = "domicilio" | "recogida";
 type Payment = "efectivo" | "transferencia";
+type FieldKey = "name" | "phone" | "email" | "address" | "cart";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const inputClass =
-  "rounded-xl border border-line bg-white px-3.5 py-[13px] text-sm text-ink placeholder:text-muted-2 transition-colors focus:border-brand focus:outline-none";
-
-function OptionCard({
+function OptionRow({
   title,
   subtitle,
   active,
@@ -43,26 +41,39 @@ function OptionCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex-1 rounded-[13px] border-[1.5px] px-3.5 py-3 text-left transition-colors ${
-        active
-          ? "border-brand bg-chip"
-          : "border-line bg-white hover:border-brand-mid"
+      aria-pressed={active}
+      className={`flex w-full items-center gap-3.5 border px-4 py-3.5 text-left transition-colors duration-150 ${
+        active ? "border-navy-900" : "border-line hover:border-navy-900"
       }`}
     >
       {Icon && (
         <Icon
-          className={`mb-1.5 h-4 w-4 ${active ? "text-brand" : "text-muted-2"}`}
+          className={`h-4 w-4 flex-none ${
+            active ? "text-navy-900" : "text-slate-400"
+          }`}
+          strokeWidth={1.6}
         />
       )}
-      <div className="text-[13.5px] font-semibold text-navy">{title}</div>
-      <div className="mt-0.5 text-xs text-muted">{subtitle}</div>
+      <span className="min-w-0 flex-1">
+        <span
+          className={`block text-[13.5px] ${
+            active ? "font-bold text-navy-900" : "font-medium text-ink"
+          }`}
+        >
+          {title}
+        </span>
+        <span className="tabular mt-0.5 block text-[12px] text-slate-400">
+          {subtitle}
+        </span>
+      </span>
     </button>
   );
 }
 
 export function CheckoutForm() {
   const router = useRouter();
-  const { state, addOrder, clearCart, setProfile, removePieces, showToast } = useStore();
+  const { state, addOrder, clearCart, setProfile, removePieces, showToast } =
+    useStore();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -72,6 +83,10 @@ export function CheckoutForm() {
   const [payment, setPayment] = useState<Payment>("efectivo");
   const [sending, setSending] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
+  const [error, setError] = useState<{
+    field: FieldKey;
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!state.hydrated || prefilled) return;
@@ -96,29 +111,40 @@ export function CheckoutForm() {
     (line) => line.isCatchWeight && !line.pieces?.length
   );
 
+  const fail = (field: FieldKey, message: string) => {
+    setError({ field, message });
+    showToast(message);
+  };
+
+  const fieldError = (field: FieldKey) =>
+    error?.field === field ? (
+      <p className="mt-1.5 text-[12px] text-danger">{error.message}</p>
+    ) : null;
+
   const handleSubmit = async () => {
     if (sending) return;
     if (!name.trim()) {
-      showToast("Completa tu nombre");
+      fail("name", "Completa tu nombre");
       return;
     }
     if (!phone.trim()) {
-      showToast("Escribe tu teléfono");
+      fail("phone", "Escribe tu teléfono");
       return;
     }
     if (!EMAIL_RE.test(email.trim())) {
-      showToast("Escribe un correo válido");
+      fail("email", "Escribe un correo válido");
       return;
     }
     if (delivery === "domicilio" && !address.trim()) {
-      showToast("Escribe tu dirección de entrega");
+      fail("address", "Escribe tu dirección de entrega");
       return;
     }
     if (lines.length === 0) {
-      showToast("Tu carrito está vacío");
+      fail("cart", "Tu carrito está vacío");
       return;
     }
 
+    setError(null);
     setSending(true);
     try {
       const result = await submitOrder({
@@ -186,78 +212,128 @@ export function CheckoutForm() {
     }
   };
 
+  const header = (
+    <section className="border-b border-line px-5 pt-12 pb-9 md:px-10">
+      <p className="eyebrow">Paso final</p>
+      <h1 className="font-display mt-4 text-[42px] leading-none text-navy-900 md:text-[56px]">
+        Finalizar compra
+      </h1>
+      <Link
+        href="/carrito"
+        className="mt-6 inline-block border-b border-line text-[11.5px] font-medium tracking-[.16em] text-slate-400 uppercase transition-colors duration-150 hover:border-navy-900 hover:text-navy-900"
+      >
+        Volver al carrito
+      </Link>
+    </section>
+  );
+
   if (state.hydrated && lines.length === 0) {
     return (
       <div className="flex flex-1 flex-col">
-        <ScreenHeader title="Finalizar compra" backHref="/carrito" />
-        <EmptyState
-          icon={ShoppingCart}
-          title="Tu carrito está vacío"
-          description="Explora el catálogo y añade productos."
-          ctaLabel="Ir al catálogo"
-          ctaHref="/catalogo"
-        />
+        {header}
+        <div className="flex flex-1 flex-col items-center justify-center px-5 py-24 text-center md:px-10">
+          <p className="eyebrow">Sin artículos</p>
+          <p className="font-display mt-4 text-[32px] leading-none text-navy-900">
+            Tu carrito está vacío
+          </p>
+          <p className="mt-4 max-w-[380px] text-[13.5px] leading-[1.65] text-pretty text-slate-500">
+            Explora el catálogo y añade productos.
+          </p>
+          <Link
+            href="/catalogo"
+            className="mt-7 border-b border-navy-900 pb-1 text-[11.5px] font-bold tracking-[.16em] text-navy-900 uppercase transition-colors duration-150 hover:border-navy-700 hover:text-navy-700"
+          >
+            Ir al catálogo
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex flex-1 flex-col">
-      <ScreenHeader title="Finalizar compra" backHref="/carrito" />
+      {header}
 
-      <div className="flex flex-1 flex-col gap-[18px] px-5 py-[18px] md:mx-auto md:w-full md:max-w-5xl md:flex-row md:items-start md:gap-8 md:px-6 md:py-6">
-        <div className="flex flex-1 flex-col gap-[18px] md:gap-6">
-        <div>
-          <div className="mb-2.5 text-[13.5px] font-semibold text-navy">
-            Datos de contacto
+      <div className="mx-auto w-full max-w-[560px] px-5 pb-20 md:px-10">
+        <section className="py-9">
+          <h2 className="eyebrow">Datos de contacto</h2>
+          <div className="mt-6 flex flex-col gap-5">
+            <div>
+              <label htmlFor="checkout-name" className="eyebrow">
+                Nombre y apellidos
+              </label>
+              <Input
+                id="checkout-name"
+                className="mt-2.5"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nombre y apellidos"
+                autoComplete="name"
+                aria-invalid={error?.field === "name" || undefined}
+              />
+              {fieldError("name")}
+            </div>
+            <div>
+              <label htmlFor="checkout-phone" className="eyebrow">
+                Teléfono
+              </label>
+              <Input
+                id="checkout-phone"
+                className="mt-2.5"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Teléfono"
+                type="tel"
+                autoComplete="tel"
+                aria-invalid={error?.field === "phone" || undefined}
+              />
+              {fieldError("phone")}
+            </div>
+            <div>
+              <label htmlFor="checkout-email" className="eyebrow">
+                Correo electrónico
+              </label>
+              <Input
+                id="checkout-email"
+                className="mt-2.5"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Correo electrónico"
+                type="email"
+                autoComplete="email"
+                aria-invalid={error?.field === "email" || undefined}
+              />
+              {fieldError("email")}
+            </div>
+            <div>
+              <label htmlFor="checkout-address" className="eyebrow">
+                Dirección de entrega
+              </label>
+              <Input
+                id="checkout-address"
+                className="mt-2.5"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Dirección de entrega"
+                autoComplete="street-address"
+                aria-invalid={error?.field === "address" || undefined}
+              />
+              {fieldError("address")}
+            </div>
           </div>
-          <div className="flex flex-col gap-2.5">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nombre y apellidos"
-              autoComplete="name"
-              className={inputClass}
-            />
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Teléfono"
-              type="tel"
-              autoComplete="tel"
-              className={inputClass}
-            />
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Correo electrónico"
-              type="email"
-              autoComplete="email"
-              className={inputClass}
-            />
-            <input
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="Dirección de entrega"
-              autoComplete="street-address"
-              className={inputClass}
-            />
-          </div>
-        </div>
+        </section>
 
-        <div>
-          <div className="mb-2.5 text-[13.5px] font-semibold text-navy">
-            Entrega
-          </div>
-          <div className="flex gap-2.5">
-            <OptionCard
+        <section className="border-t border-line py-9">
+          <h2 className="eyebrow">Entrega</h2>
+          <div className="mt-6 flex flex-col gap-3">
+            <OptionRow
               title="A domicilio"
               subtitle={`${fmt(SHIPPING_COST, currency)} · 24–48 h`}
               active={delivery === "domicilio"}
               onSelect={() => setDelivery("domicilio")}
               icon={Truck}
             />
-            <OptionCard
+            <OptionRow
               title="Recoger en tienda"
               subtitle="Gratis · hoy mismo"
               active={delivery === "recogida"}
@@ -265,21 +341,19 @@ export function CheckoutForm() {
               icon={Store}
             />
           </div>
-        </div>
+        </section>
 
-        <div>
-          <div className="mb-2.5 text-[13.5px] font-semibold text-navy">
-            Pago
-          </div>
-          <div className="flex gap-2.5">
-            <OptionCard
+        <section className="border-t border-line py-9">
+          <h2 className="eyebrow">Pago</h2>
+          <div className="mt-6 flex flex-col gap-3">
+            <OptionRow
               title="Efectivo"
               subtitle="Al recibir"
               active={payment === "efectivo"}
               onSelect={() => setPayment("efectivo")}
               icon={Banknote}
             />
-            <OptionCard
+            <OptionRow
               title="Transferencia"
               subtitle="Datos por SMS"
               active={payment === "transferencia"}
@@ -287,75 +361,74 @@ export function CheckoutForm() {
               icon={CreditCard}
             />
           </div>
-        </div>
-        </div>
+        </section>
 
-        <div className="md:sticky md:top-6 md:w-[360px] md:flex-none">
-        <div className="rounded-[15px] bg-white p-4 shadow-[0_3px_12px_rgba(10,31,63,.05)]">
-          <div className="mb-2.5 text-[13.5px] font-semibold text-navy">
-            Resumen · {itemsCount} artículos
-          </div>
-          <div className="mb-[5px] flex justify-between text-[13px] text-ink-soft">
-            <span>Subtotal</span>
-            <span>{fmt(totals.subtotal, currency)}</span>
-          </div>
-          {totals.discount > 0 && (
-            <div className="mb-[5px] flex justify-between text-[13px] text-ok">
-              <span>Descuento</span>
-              <span>−{fmt(totals.discount, currency)}</span>
+        <section className="border-t border-line py-9">
+          <h2 className="eyebrow">
+            Resumen · {itemsCount}{" "}
+            {itemsCount === 1 ? "artículo" : "artículos"}
+          </h2>
+
+          <dl className="mt-6">
+            <div className="flex items-baseline justify-between gap-4 border-b border-line-soft py-3">
+              <dt className="text-[13px] text-slate-500">Subtotal</dt>
+              <dd className="tabular text-[13px] text-ink">
+                {fmt(totals.subtotal, currency)}
+              </dd>
             </div>
-          )}
-          <div className="mb-[9px] flex justify-between text-[13px] text-ink-soft">
-            <span>Envío</span>
-            <span>{totals.shipping === 0 ? "Gratis" : fmt(totals.shipping, currency)}</span>
-          </div>
-          <div className="flex justify-between border-t border-dashed border-line pt-[9px] text-[15px] font-bold text-navy">
-            <span>Total</span>
-            <span>{fmt(totals.total, currency)}</span>
-          </div>
-          <div className="mt-2.5 text-xs text-muted">
+            {totals.discount > 0 && (
+              <div className="flex items-baseline justify-between gap-4 border-b border-line-soft py-3">
+                <dt className="text-[13px] text-ok">Descuento</dt>
+                <dd className="tabular text-[13px] text-ok">
+                  −{fmt(totals.discount, currency)}
+                </dd>
+              </div>
+            )}
+            <div className="flex items-baseline justify-between gap-4 border-b border-line py-3">
+              <dt className="text-[13px] text-slate-500">Envío</dt>
+              <dd className="tabular text-[13px] text-ink">
+                {totals.shipping === 0
+                  ? "Gratis"
+                  : fmt(totals.shipping, currency)}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-4 pt-5">
+              <dt className="text-[13px] font-semibold text-ink">Total</dt>
+              <dd className="tabular text-[21px] font-bold text-navy-900">
+                {fmt(totals.total, currency)}
+              </dd>
+            </div>
+          </dl>
+
+          <p className="mt-5 text-[12.5px] leading-[1.65] text-slate-500">
             {delivery === "domicilio"
               ? "Entrega estimada: 24–48 horas"
               : "Listo para recoger hoy mismo"}
-          </div>
+          </p>
           {hasEstimatedLines && (
-            <div className="mt-1.5 text-xs font-medium text-brand-mid">
-              Este pedido incluye productos de peso variable: el total se
-              ajusta al peso real al preparar tu pedido.
-            </div>
+            <p className="mt-2 text-[12.5px] leading-[1.65] text-slate-500">
+              Este pedido incluye productos de peso variable: el total se ajusta
+              al peso real al preparar tu pedido.
+            </p>
           )}
-        </div>
 
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={sending}
-          className={`grad-cta mt-3 hidden w-full items-center justify-center gap-2 rounded-[13px] p-[15px] text-center text-[15px] font-semibold text-white transition-colors md:flex ${
-            sending ? "opacity-60" : "hover:opacity-90"
-          }`}
-        >
-          {sending && <Loader2 className="h-4 w-4 animate-spin" />}
-          {sending
-            ? "Enviando…"
-            : `Confirmar pedido · ${fmt(totals.total, currency)}`}
-        </button>
-        </div>
-      </div>
+          {error?.field === "cart" && (
+            <p className="mt-4 text-[12px] text-danger">{error.message}</p>
+          )}
 
-      <div className="border-t border-line-2 bg-white px-5 pt-3.5 pb-6 md:hidden">
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={sending}
-          className={`grad-cta flex w-full items-center justify-center gap-2 rounded-[13px] p-[15px] text-center text-[15px] font-semibold text-white transition-colors ${
-            sending ? "opacity-60" : ""
-          }`}
-        >
-          {sending && <Loader2 className="h-4 w-4 animate-spin" />}
-          {sending
-            ? "Enviando…"
-            : `Confirmar pedido · ${fmt(totals.total, currency)}`}
-        </button>
+          <Button
+            variant="solid"
+            size="lg"
+            onClick={handleSubmit}
+            disabled={sending}
+            className="tabular mt-8 w-full"
+          >
+            {sending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {sending
+              ? "Enviando…"
+              : `Confirmar pedido · ${fmt(totals.total, currency)}`}
+          </Button>
+        </section>
       </div>
     </div>
   );

@@ -1,37 +1,61 @@
-export default function HomeLoading() {
+function CarouselSkeleton() {
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="grad-header rounded-b-[26px] px-5 pt-[22px] pb-[58px] md:mt-6 md:rounded-[26px] md:px-10 md:pt-9 md:pb-[74px]">
-        <div className="h-[14px] w-24 rounded bg-white/15" />
-        <div className="mt-2 h-6 w-40 rounded-md bg-white/25" />
-        <div className="mt-[18px] h-[60px] w-3/4 rounded-md bg-white/10 md:mt-6" />
-        <div className="mt-[18px] h-[46px] rounded-[14px] border border-white/15 bg-white/10 md:mt-6 md:max-w-xl" />
+    <section className="border-b border-line py-12 md:py-16">
+      <div className="px-5 md:px-10">
+        <div className="h-2.5 w-20 bg-surface" />
+        <div className="mt-4 h-[26px] w-44 bg-surface md:h-[32px]" />
       </div>
-      <div className="-mt-[30px] grid grid-cols-4 gap-2.5 px-5 md:-mt-[38px] md:gap-4 md:px-10">
+      <div className="mt-8 flex overflow-hidden px-5 md:px-10">
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="h-[86px] rounded-[14px] bg-white shadow-[0_4px_14px_rgba(10,31,63,.08)] motion-safe:animate-pulse md:h-[72px]"
-          />
-        ))}
-      </div>
-      <div className="px-5 pt-[22px] pb-2 md:px-10 md:pt-8">
-        <div className="h-5 w-32 rounded bg-white motion-safe:animate-pulse" />
-      </div>
-      <div className="flex gap-3.5 overflow-hidden px-5 pt-1.5 pb-5 md:gap-5 md:px-10">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div
-            key={i}
-            className="w-[164px] flex-none overflow-hidden rounded-2xl bg-white shadow-[0_3px_12px_rgba(10,31,63,.07)] motion-safe:animate-pulse md:w-[210px]"
+            className="w-[230px] flex-none border-r border-line-soft px-5 pt-5 pb-6"
           >
-            <div className="h-[118px] bg-photo md:h-[150px]" />
-            <div className="space-y-2 px-3 pt-[11px] pb-[13px]">
-              <div className="h-3.5 w-3/4 rounded bg-photo" />
-              <div className="h-4 w-1/2 rounded bg-photo" />
+            <div className="aspect-square w-full bg-surface" />
+            <div className="mt-[18px] h-2.5 w-16 bg-surface" />
+            <div className="mt-3 h-3.5 w-3/4 bg-surface" />
+            <div className="mt-3 h-3 w-1/2 bg-surface" />
+            <div className="mt-[18px] border-t border-line-soft pt-[14px]">
+              <div className="h-4 w-24 bg-surface" />
             </div>
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+export default function HomeLoading() {
+  return (
+    <div className="flex flex-1 flex-col">
+      <section className="border-b border-line px-5 pt-[58px] pb-[52px] md:px-10 md:pt-[86px] md:pb-[76px]">
+        <div className="mx-auto h-2.5 w-40 bg-surface" />
+        <div className="mx-auto mt-6 h-[42px] w-full max-w-[640px] bg-surface md:h-[66px]" />
+        <div className="mx-auto mt-4 h-[42px] w-full max-w-[420px] bg-surface md:h-[66px]" />
+        <div className="mx-auto mt-6 h-3.5 w-full max-w-[470px] bg-surface" />
+        <div className="mx-auto mt-2.5 h-3.5 w-full max-w-[380px] bg-surface" />
+        <div className="mx-auto mt-9 h-3 w-32 bg-surface" />
+      </section>
+
+      <section className="border-b border-line px-5 py-12 md:px-10 md:py-16">
+        <div className="h-2.5 w-20 bg-surface" />
+        <div className="mt-4 h-[26px] w-56 bg-surface md:h-[32px]" />
+        <div className="mt-8 overflow-hidden">
+          <div className="-mr-px -mb-px grid grid-cols-2 md:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex min-h-[92px] items-end border-r border-b border-line-soft px-5 py-5"
+              >
+                <div className="h-3 w-20 bg-surface" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <CarouselSkeleton />
+      <CarouselSkeleton />
     </div>
   );
 }

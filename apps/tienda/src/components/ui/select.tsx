@@ -18,14 +18,14 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "flex items-center justify-between gap-1.5 rounded-lg bg-chip py-1.5 pr-2 pl-[11px] text-[11.5px] font-medium whitespace-nowrap text-brand transition-colors focus-visible:ring-2 focus-visible:ring-brand-soft/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50",
+        "flex items-center justify-between gap-1.5 text-[11.5px] font-semibold tracking-[.12em] whitespace-nowrap text-navy-900 uppercase transition-colors hover:text-navy-700 disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       {...props}
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <ChevronDown className="h-3.5 w-3.5 flex-none" />
+        <ChevronDown className="h-3.5 w-3.5 flex-none" strokeWidth={1.6} />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
@@ -42,16 +42,14 @@ function SelectContent({
       <SelectPrimitive.Content
         data-slot="select-content"
         position={position}
-        sideOffset={6}
+        sideOffset={8}
         className={cn(
-          "z-50 max-h-[min(24rem,var(--radix-select-content-available-height))] min-w-[10rem] overflow-hidden rounded-xl border border-line bg-white shadow-[0_10px_30px_rgba(10,31,63,.16)]",
+          "z-50 max-h-[min(24rem,var(--radix-select-content-available-height))] min-w-[11rem] overflow-hidden border border-line bg-canvas",
           className
         )}
         {...props}
       >
-        <SelectPrimitive.Viewport className="p-1">
-          {children}
-        </SelectPrimitive.Viewport>
+        <SelectPrimitive.Viewport>{children}</SelectPrimitive.Viewport>
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   );
@@ -66,15 +64,15 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex w-full cursor-pointer items-center rounded-lg py-2 pr-8 pl-3 text-[12.5px] font-medium text-ink-soft outline-none select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-chip data-[highlighted]:text-brand data-[state=checked]:text-brand",
+        "relative flex w-full cursor-pointer items-center border-b border-line-soft py-3 pr-9 pl-4 text-[11.5px] font-medium tracking-[.1em] text-slate-500 uppercase outline-none select-none last:border-b-0 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-hover data-[highlighted]:text-navy-900 data-[state=checked]:font-bold data-[state=checked]:text-navy-900",
         className
       )}
       {...props}
     >
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-      <span className="absolute right-2.5 flex h-3.5 w-3.5 items-center justify-center">
+      <span className="absolute right-3 flex h-3.5 w-3.5 items-center justify-center">
         <SelectPrimitive.ItemIndicator>
-          <Check className="h-3.5 w-3.5" />
+          <Check className="h-3.5 w-3.5" strokeWidth={1.6} />
         </SelectPrimitive.ItemIndicator>
       </span>
     </SelectPrimitive.Item>

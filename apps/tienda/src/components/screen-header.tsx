@@ -1,29 +1,49 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 
 interface ScreenHeaderProps {
   title: string;
+  eyebrow?: string;
   backHref?: string;
   children?: ReactNode;
 }
 
-export function ScreenHeader({ title, backHref, children }: ScreenHeaderProps) {
+export function ScreenHeader({
+  title,
+  eyebrow,
+  backHref,
+  children,
+}: ScreenHeaderProps) {
   return (
-    <div className="grad-header rounded-b-[22px] px-5 py-[18px] text-white md:mt-6 md:rounded-[22px] md:px-7 md:py-6">
-      <div className="flex items-center gap-3">
-        {backHref && (
-          <Link
-            href={backHref}
-            aria-label="Volver"
-            className="-ml-1 flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-white/10"
+    <div className="border-b border-line bg-canvas px-5 pt-10 pb-8 md:px-10">
+      {backHref && (
+        <Link
+          href={backHref}
+          className="nav-label -ml-0.5 inline-flex items-center gap-1 text-slate-400 transition-colors duration-150 hover:text-navy-900"
+        >
+          <ChevronLeft className="h-4 w-4" strokeWidth={1.6} />
+          Volver
+        </Link>
+      )}
+
+      <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between md:gap-8">
+        <div className={backHref ? "mt-5" : undefined}>
+          {eyebrow && <p className="eyebrow">{eyebrow}</p>}
+          <h1
+            className={`font-display text-[32px] leading-none text-navy-900 md:text-[42px] ${
+              eyebrow ? "mt-4" : ""
+            }`}
           >
-            <ArrowLeft className="h-[18px] w-[18px]" />
-          </Link>
+            {title}
+          </h1>
+        </div>
+        {children && (
+          <div className="flex flex-wrap items-center gap-5 md:justify-end">
+            {children}
+          </div>
         )}
-        <div className="text-[17px] font-bold md:text-[19px]">{title}</div>
       </div>
-      {children}
     </div>
   );
 }

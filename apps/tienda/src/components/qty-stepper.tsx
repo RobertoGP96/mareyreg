@@ -11,29 +11,22 @@ interface QtyStepperProps {
 
 export function QtyStepper({ qty, onInc, onDec, size = "sm" }: QtyStepperProps) {
   const isLg = size === "lg";
-  const iconSize = isLg ? "h-[17px] w-[17px]" : "h-[15px] w-[15px]";
-  const btnClass = `flex items-center justify-center rounded-md text-brand-mid transition-[color,transform] hover:text-brand active:scale-90 ${
-    isLg ? "h-6 w-6" : "h-5 w-5"
+  const btnClass = `flex flex-none items-center justify-center text-slate-400 transition-colors duration-150 hover:text-navy-900 ${
+    isLg ? "h-10 w-10" : "h-8 w-8"
   }`;
   return (
-    <div
-      className={`flex items-center bg-app ${
-        isLg
-          ? "gap-3.5 rounded-xl px-3.5 py-2"
-          : "gap-2.5 rounded-[10px] px-2.5 py-[5px]"
-      }`}
-    >
+    <div className="inline-flex items-center border border-line">
       <button
         type="button"
         onClick={onDec}
         aria-label="Disminuir cantidad"
         className={btnClass}
       >
-        <Minus className={iconSize} />
+        <Minus className="h-4 w-4" strokeWidth={1.6} />
       </button>
       <div
-        className={`text-center font-semibold text-navy ${
-          isLg ? "min-w-[22px] text-[15px]" : "min-w-4 text-[13.5px]"
+        className={`tabular text-center font-semibold text-navy-900 ${
+          isLg ? "min-w-[34px] text-[15px]" : "min-w-[26px] text-[13px]"
         }`}
       >
         {qty}
@@ -44,7 +37,7 @@ export function QtyStepper({ qty, onInc, onDec, size = "sm" }: QtyStepperProps) 
         aria-label="Aumentar cantidad"
         className={btnClass}
       >
-        <Plus className={iconSize} />
+        <Plus className="h-4 w-4" strokeWidth={1.6} />
       </button>
     </div>
   );

@@ -1,15 +1,24 @@
 import type { Metadata } from "next";
-import { Space_Grotesk } from "next/font/google";
+import { Instrument_Serif, Manrope } from "next/font/google";
 import "./globals.css";
 import { StoreProvider } from "@/lib/store";
+import { ThemeProvider, THEME_INIT_SCRIPT } from "@/lib/theme";
 import { BottomNav } from "@/components/bottom-nav";
 import { TopNav } from "@/components/top-nav";
 import { Toast } from "@/components/toast";
 import { STORE_NAME } from "@/lib/config";
 
-const spaceGrotesk = Space_Grotesk({
+const instrumentSerif = Instrument_Serif({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: "400",
+  variable: "--font-instrument-serif",
+});
+
+// Manrope es variable (200–800): sin `weight` next/font sirve el eje completo
+// y `font-medium`/`font-bold` no cargan un archivo extra.
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-manrope",
 });
 
 export const metadata: Metadata = {
@@ -21,22 +30,25 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="es">
-      <body
-        className={`${spaceGrotesk.className} min-h-dvh bg-page text-ink antialiased`}
-      >
-        <StoreProvider>
-          <div className="flex min-h-dvh flex-col md:bg-app">
-            <TopNav />
-            <div className="flex flex-1 justify-center">
-              <div className="relative flex min-h-full w-full max-w-[430px] flex-col bg-app shadow-[0_0_40px_rgba(10,31,63,.18)] md:max-w-6xl md:bg-transparent md:px-6 md:pb-12 md:shadow-none">
-                {children}
-                <BottomNav />
-              </div>
+    <html
+      lang="es"
+      className={`${instrumentSerif.variable} ${manrope.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body className="min-h-dvh bg-canvas font-ui text-ink antialiased">
+        <ThemeProvider>
+          <StoreProvider>
+            <div className="flex min-h-dvh flex-col">
+              <TopNav />
+              <main className="flex-1 pb-20 md:pb-0">{children}</main>
+              <BottomNav />
             </div>
-          </div>
-          <Toast />
-        </StoreProvider>
+            <Toast />
+          </StoreProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

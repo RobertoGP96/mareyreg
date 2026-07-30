@@ -34,5 +34,9 @@ export function ProductImage({
       />
     );
   }
-  return <span aria-hidden>{label}</span>;
+  return (
+    <span aria-hidden className="eyebrow">
+      {label}
+    </span>
+  );
 }
