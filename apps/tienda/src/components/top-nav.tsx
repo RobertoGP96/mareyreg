@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Heart, Search, ShoppingCart, X } from "lucide-react";
 import { STORE_NAME } from "@/lib/config";
 import { cartCount, useStore } from "@/lib/store";
-import { NavSearch } from "@/components/nav-search";
+import { NavSearchInline, NavSearchOverlay } from "@/components/nav-search";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { UserMenu } from "@/components/user-menu";
+import { cn } from "@/lib/utils";
 
 const LINKS = [
   { href: "/", label: "Inicio", isActive: (p: string, s: string) => p === "/" && !s },
@@ -23,11 +25,26 @@ const LINKS = [
   },
 ];
 
+const ICON_ACTION =
+  "relative inline-flex h-9 w-9 items-center justify-center text-slate-400 transition-colors duration-150 hover:text-navy-900";
+
+/** El contador se ancla al icono, no al flujo: a 9px y en caja sólida se lee
+ *  como marca sobre el icono y no desplaza el resto de la fila al cambiar. */
+function CountBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="tabular absolute top-0.5 right-0 flex h-[15px] min-w-[15px] items-center justify-center bg-navy-900 px-[3px] text-[9px] leading-none font-bold text-canvas">
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
 export function TopNav() {
   const pathname = usePathname();
   const { state } = useStore();
   const [searchOpen, setSearchOpen] = useState(false);
   const count = cartCount(state);
+  const favCount = state.favs.length;
 
   // `usePathname` ignora el query string, pero "Ofertas" y "Catálogo" son la
   // misma ruta y solo se distinguen por él.
@@ -40,10 +57,10 @@ export function TopNav() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-canvas">
-      <div className="flex h-[78px] items-center gap-8 px-5 md:px-10">
+      <div className="flex h-[78px] items-center gap-6 px-5 md:gap-8 md:px-10">
         <Link
           href="/"
-          className="font-display text-2xl leading-none tracking-[.22em] text-navy-900 transition-colors hover:text-navy-700"
+          className="font-display flex-none text-2xl leading-none tracking-[.16em] text-navy-900 transition-colors hover:text-navy-700"
         >
           {STORE_NAME}
         </Link>
@@ -68,44 +85,51 @@ export function TopNav() {
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-5 md:gap-7">
+        <div className="ml-auto flex items-center gap-2 md:gap-4">
+          <NavSearchInline className="hidden md:block" />
+
           <button
             type="button"
             onClick={() => setSearchOpen((v) => !v)}
             aria-expanded={searchOpen}
             aria-label={searchOpen ? "Cerrar búsqueda" : "Buscar productos"}
-            className="nav-label inline-flex items-center gap-1.5 text-slate-400 transition-colors duration-150 hover:text-navy-900"
+            className={cn(ICON_ACTION, "md:hidden")}
           >
             {searchOpen ? (
               <X className="h-4 w-4" strokeWidth={1.6} />
             ) : (
               <Search className="h-4 w-4" strokeWidth={1.6} />
             )}
-            <span className="hidden md:inline">
-              {searchOpen ? "Cerrar" : "Buscar"}
-            </span>
           </button>
 
-          <ThemeToggle showLabel className="hidden md:inline-flex" />
-          <ThemeToggle className="md:hidden" />
+          <ThemeToggle className={ICON_ACTION} />
 
           <Link
             href="/favoritos"
-            className="nav-label hidden text-slate-400 transition-colors duration-150 hover:text-navy-900 md:inline"
+            aria-label={`Favoritos${favCount > 0 ? ` (${favCount})` : ""}`}
+            className={cn(ICON_ACTION, "hidden md:inline-flex")}
           >
-            Favoritos
+            <Heart className="h-4 w-4" strokeWidth={1.6} />
+            <CountBadge count={favCount} />
           </Link>
 
           <Link
             href="/carrito"
-            className="nav-label font-bold text-navy-900 transition-colors duration-150 hover:text-navy-700"
+            aria-label={`Bolsa${count > 0 ? ` (${count} artículos)` : " vacía"}`}
+            className={cn(ICON_ACTION, "text-navy-900 hover:text-navy-700")}
           >
-            Bolsa ({count})
+            <ShoppingCart className="h-[18px] w-[18px]" strokeWidth={1.6} />
+            <CountBadge count={count} />
           </Link>
+
+          <UserMenu />
         </div>
       </div>
 
-      <NavSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <NavSearchOverlay
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+      />
     </header>
   );
 }

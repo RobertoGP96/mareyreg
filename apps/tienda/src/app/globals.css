@@ -23,6 +23,16 @@
   --c-warn: #9a6a2f;
   --c-danger: #a5455a;
   --c-disabled: #c1c9d8;
+  /* `alert` es el único acento saturado del sistema y se reserva para el estado
+     que debe cortar la lectura de la retícula: agotado. `danger` sigue siendo el
+     matiz discreto para texto (precio tachado, error en línea). */
+  --c-alert: #e11d48;
+  --c-alert-fg: #ffffff;
+  /* La elevación entra solo en las cards de producto y en las capas flotantes
+     (popover, menú). El resto del sistema sigue separando con hairlines. */
+  --sh-card: 0 1px 2px rgba(10, 36, 80, 0.05), 0 10px 26px -14px rgba(10, 36, 80, 0.16);
+  --sh-card-hover: 0 2px 6px rgba(10, 36, 80, 0.07), 0 20px 42px -18px rgba(10, 36, 80, 0.26);
+  --sh-pop: 0 4px 10px rgba(10, 36, 80, 0.07), 0 22px 50px -16px rgba(10, 36, 80, 0.3);
   color-scheme: light;
 }
 
@@ -43,6 +53,14 @@
   --c-warn: #c9a25e;
   --c-danger: #d4818f;
   --c-disabled: #454f5f;
+  --c-alert: #ff4d6d;
+  --c-alert-fg: #14000a;
+  /* Sobre lienzo casi negro una sombra tintada de azul no se lee: en oscuro la
+     elevación pasa a negro puro y sube la opacidad. El canto de la card lo
+     dibuja su borde, no la sombra. */
+  --sh-card: 0 1px 2px rgba(0, 0, 0, 0.6), 0 10px 26px -14px rgba(0, 0, 0, 0.9);
+  --sh-card-hover: 0 2px 6px rgba(0, 0, 0, 0.7), 0 20px 42px -18px rgba(0, 0, 0, 1);
+  --sh-pop: 0 4px 10px rgba(0, 0, 0, 0.7), 0 22px 50px -16px rgba(0, 0, 0, 1);
   color-scheme: dark;
 }
 
@@ -63,9 +81,15 @@
   --color-warn: var(--c-warn);
   --color-danger: var(--c-danger);
   --color-disabled: var(--c-disabled);
+  --color-alert: var(--c-alert);
+  --color-alert-fg: var(--c-alert-fg);
 
-  --font-display: var(--font-instrument-serif), serif;
-  --font-ui: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --shadow-card: var(--sh-card);
+  --shadow-card-hover: var(--sh-card-hover);
+  --shadow-pop: var(--sh-pop);
+
+  --font-display: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-ui: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
 
   /* Radio 0 en todo el sistema: `rounded-*` queda neutralizado por diseño. */
   --radius-xs: 0px;
@@ -122,6 +146,16 @@ input {
 
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Geist es una grotesca, no un display serif: a 42–66px necesita peso y
+     tracking negativo para recuperar la densidad óptica que daba el serif. Va
+     aquí y no en el token porque el namespace `--font-*` de Tailwind solo
+     admite family/feature-settings, y así un `tracking-*` puntual —el lockup de
+     la marca en el header— sigue ganando por estar en la capa de utilidades. */
+  .font-display {
+    font-weight: 600;
+    letter-spacing: -0.03em;
   }
 }
 

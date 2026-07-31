@@ -215,11 +215,7 @@ export default function CartPage() {
                   autoComplete="off"
                   className="flex-1"
                 />
-                <Button
-                  variant="link"
-                  onClick={handleCoupon}
-                  className="flex-none"
-                >
+                <Button onClick={handleCoupon} className="flex-none">
                   Aplicar
                 </Button>
               </div>

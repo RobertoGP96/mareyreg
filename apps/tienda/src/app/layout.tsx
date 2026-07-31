@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, Manrope } from "next/font/google";
+import { Geist } from "next/font/google";
 import "./globals.css";
 import { StoreProvider } from "@/lib/store";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "@/lib/theme";
@@ -8,17 +8,12 @@ import { TopNav } from "@/components/top-nav";
 import { Toast } from "@/components/toast";
 import { STORE_NAME } from "@/lib/config";
 
-const instrumentSerif = Instrument_Serif({
+// Geist es variable (100–900) y cubre display y UI con una sola familia: sin
+// `weight` next/font sirve el eje completo, así que `font-medium`/`font-bold` y
+// los titulares a 600 no cargan ningún archivo extra.
+const geist = Geist({
   subsets: ["latin"],
-  weight: "400",
-  variable: "--font-instrument-serif",
-});
-
-// Manrope es variable (200–800): sin `weight` next/font sirve el eje completo
-// y `font-medium`/`font-bold` no cargan un archivo extra.
-const manrope = Manrope({
-  subsets: ["latin"],
-  variable: "--font-manrope",
+  variable: "--font-geist",
 });
 
 export const metadata: Metadata = {
@@ -32,7 +27,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${instrumentSerif.variable} ${manrope.variable}`}
+      className={geist.variable}
       suppressHydrationWarning
     >
       <head>
