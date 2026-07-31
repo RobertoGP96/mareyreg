@@ -120,6 +120,19 @@ html {
   outline-offset: 2px;
 }
 
+/* Campos que ya marcan el foco en su propio borde: el anillo dibujaría una
+   segunda línea paralela a 2px. Se delega en el borde, no se suprime el foco.
+   Marca tanto el input suelto (variante `box`/`rule`) como el contenedor de un
+   campo compuesto (icono + input + acción dentro de una caja). */
+.field-shell:focus-within {
+  border-color: var(--c-navy-900);
+}
+
+.field-shell:focus-visible,
+.field-shell :where(input, textarea):focus-visible {
+  outline: none;
+}
+
 input {
   outline: none;
 }

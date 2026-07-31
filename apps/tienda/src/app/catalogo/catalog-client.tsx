@@ -30,7 +30,6 @@ interface CatalogClientProps {
   currency: WebstoreCurrency;
   initialCategory: string;
   initialQuery: string;
-  autoFocus: boolean;
   initialOfertas: boolean;
   initialDestacados: boolean;
 }
@@ -40,7 +39,6 @@ export function CatalogClient({
   currency,
   initialCategory,
   initialQuery,
-  autoFocus,
   initialOfertas,
   initialDestacados,
 }: CatalogClientProps) {
@@ -183,9 +181,6 @@ export function CatalogClient({
         eyebrow="Selección 2026"
         title="Catálogo"
         description="Despensa escogida pieza a pieza. Productos frescos, marcas de confianza y precios claros, sin adornos."
-        value={query}
-        onChange={setQuery}
-        autoFocus={autoFocus}
       />
 
       <FilterBar

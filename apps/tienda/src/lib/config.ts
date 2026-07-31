@@ -10,3 +10,15 @@ export const FREE_SHIPPING_TARGET = Number(
 export const SHIPPING_COST = Number(
   process.env.NEXT_PUBLIC_SHIPPING_COST ?? 3200
 );
+
+// Contacto del footer: sin default a propósito. Un teléfono o correo inventado
+// en producción es peor que no mostrar el bloque, así que cada dato se pinta
+// solo si está configurado.
+export const STORE_EMAIL = process.env.NEXT_PUBLIC_STORE_EMAIL ?? "";
+export const STORE_PHONE = process.env.NEXT_PUBLIC_STORE_PHONE ?? "";
+export const STORE_ADDRESS = process.env.NEXT_PUBLIC_STORE_ADDRESS ?? "";
+
+// El botón de Google solo se ofrece si hay client id. La tienda todavía no
+// tiene proveedor OAuth montado (la sesión vive en localStorage), así que este
+// flag es lo que separa "el botón está listo" de "el flujo está conectado".
+export const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";

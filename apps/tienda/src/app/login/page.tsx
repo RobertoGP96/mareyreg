@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { useStore } from "@/lib/store";
+import { AuthDivider, GoogleSignIn } from "@/components/google-sign-in";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -48,7 +49,9 @@ export default function LoginPage() {
           Entra a tu cuenta para seguir tus pedidos y guardar tus datos.
         </p>
 
-        <div className="mt-10 flex flex-col gap-6 border-t border-line pt-8">
+        <div className="mt-10 flex flex-col gap-7 border-t border-line pt-8">
+          <GoogleSignIn />
+          <AuthDivider label="o con tu teléfono" />
           <div className="flex flex-col gap-2.5">
             <label htmlFor="login-telefono" className="eyebrow">
               Teléfono
