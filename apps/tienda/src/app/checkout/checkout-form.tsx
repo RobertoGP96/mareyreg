@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { submitOrder } from "@/app/actions/order-actions";
-import { computeTotals, SHIPPING_COST } from "@/lib/cart-totals";
+import { computeTotals, lineTotal, SHIPPING_COST } from "@/lib/cart-totals";
 import { fmt } from "@/lib/format";
 import { cartCount, cartLines, useStore } from "@/lib/store";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -193,6 +193,25 @@ export function CheckoutForm() {
             : result.data.status === "awaiting_weighing"
               ? "Por pesar"
               : "En revisión",
+        // Copia inmutable de lo comprado: el carrito se vacía justo después y
+        // sin esto la ficha del pedido no podría decir qué se llevó.
+        lines: lines.map((line) => ({
+          sku: line.sku,
+          name: line.name,
+          presentationName: line.presentationName,
+          qty: line.qty,
+          unitPrice: line.unitPrice,
+          total: lineTotal(line),
+          ...(line.isCatchWeight ? { isCatchWeight: true } : {}),
+        })),
+        subtotal: totals.subtotal,
+        shipping: totals.shipping,
+        discount: totals.discount,
+        delivery,
+        payment: payment === "efectivo" ? "Efectivo" : "Transferencia",
+        ...(delivery === "domicilio" && address.trim()
+          ? { address: address.trim() }
+          : {}),
       });
       if (state.profile) {
         setProfile({

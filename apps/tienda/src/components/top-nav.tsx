@@ -3,7 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Heart, Search, ShoppingCart, X } from "lucide-react";
+import {
+  Heart,
+  LayoutGrid,
+  Search,
+  ShoppingCart,
+  Store,
+  Tag,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { STORE_NAME } from "@/lib/config";
 import { cartCount, useStore } from "@/lib/store";
 import { NavSearchInline, NavSearchOverlay } from "@/components/nav-search";
@@ -11,17 +20,33 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 
-const LINKS = [
-  { href: "/", label: "Inicio", isActive: (p: string, s: string) => p === "/" && !s },
+interface NavLink {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  isActive: (pathname: string, section: string) => boolean;
+}
+
+// Mismos glifos que la BottomNav: Inicio y Catálogo aparecen en las dos barras
+// y con iconos distintos se leerían como destinos distintos.
+const LINKS: NavLink[] = [
+  {
+    href: "/",
+    label: "Inicio",
+    icon: Store,
+    isActive: (p, s) => p === "/" && !s,
+  },
   {
     href: "/catalogo",
     label: "Catálogo",
-    isActive: (p: string, s: string) => p === "/catalogo" && s !== "ofertas",
+    icon: LayoutGrid,
+    isActive: (p, s) => p === "/catalogo" && s !== "ofertas",
   },
   {
     href: "/catalogo?ofertas=1",
     label: "Ofertas",
-    isActive: (p: string, s: string) => p === "/catalogo" && s === "ofertas",
+    icon: Tag,
+    isActive: (p, s) => p === "/catalogo" && s === "ofertas",
   },
 ];
 
@@ -68,17 +93,19 @@ export function TopNav() {
         <nav className="hidden items-center gap-7 md:flex">
           {LINKS.map((link) => {
             const active = link.isActive(pathname, section);
+            const Icon = link.icon;
             return (
               <Link
                 key={link.href}
                 href={link.href}
                 aria-current={active ? "page" : undefined}
-                className={`nav-label pb-1 transition-colors duration-150 ${
+                className={`nav-label inline-flex items-center gap-2 pb-1 transition-colors duration-150 ${
                   active
                     ? "border-b border-navy-900 text-navy-900"
                     : "border-b border-transparent text-slate-400 hover:text-navy-700"
                 }`}
               >
+                <Icon className="h-4 w-4 flex-none" strokeWidth={1.6} />
                 {link.label}
               </Link>
             );

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Package } from "lucide-react";
 import { fmt } from "@/lib/format";
 import { useStore, type StoredOrder } from "@/lib/store";
@@ -49,8 +50,9 @@ export default function OrdersPage() {
       ) : (
         <div className="px-5 pt-8 pb-16 md:px-10">
           {orders.map((order) => (
-            <div
+            <Link
               key={order.no}
+              href={`/perfil/pedidos/${encodeURIComponent(order.no)}`}
               className="flex items-start justify-between gap-5 border-b border-line-soft py-5 transition-colors duration-150 hover:bg-hover"
             >
               <div className="min-w-0">
@@ -72,7 +74,7 @@ export default function OrdersPage() {
                   {order.status}
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
