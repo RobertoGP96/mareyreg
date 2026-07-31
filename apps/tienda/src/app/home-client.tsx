@@ -8,9 +8,13 @@ import { discountPct, fmt } from "@/lib/format";
 import { useSyncCurrency } from "@/lib/store";
 import { FREE_SHIPPING_TARGET } from "@/lib/cart-totals";
 import { ProductCarousel } from "@/components/product-carousel";
+import { ButtonLink } from "@/components/ui/button";
 
-const LINK_CTA =
-  "inline-flex items-center gap-2 border-b border-navy-900 pb-1 text-[11.5px] font-bold tracking-[.16em] text-navy-900 uppercase transition-colors duration-150 hover:border-navy-700 hover:text-navy-700";
+// El bloque de oferta es un <Link> que envuelve toda la fila: su CTA no puede
+// ser otro <ButtonLink> anidado, así que replica el aspecto de `soft` en un
+// <span>. El resto de la home sí usa el componente.
+const SOFT_CTA =
+  "inline-flex items-center justify-center gap-2 bg-surface px-5 py-3 text-[11.5px] font-bold tracking-[.16em] text-navy-900 uppercase transition-colors duration-150 group-hover:bg-navy-900 group-hover:text-canvas";
 
 function bestOffer(products: WebstoreProduct[]): WebstoreProduct | null {
   const offers = products.filter((p) => discountPct(p) > 0);
@@ -56,16 +60,13 @@ export function HomeClient({
           Despensa escogida pieza a pieza, marcas de confianza y precios
           claros. Elige con calma y te lo llevamos a casa.
         </p>
-        <div className="mt-9 flex flex-col items-center gap-5 sm:flex-row sm:justify-center sm:gap-10">
-          <Link href="/catalogo" className={LINK_CTA}>
+        <div className="mt-9 flex flex-col items-center gap-4 sm:flex-row sm:justify-center sm:gap-5">
+          <ButtonLink href="/catalogo" variant="solid" size="lg">
             Ver el catálogo
-          </Link>
-          <Link
-            href="/catalogo?focus=1"
-            className="nav-label text-slate-400 transition-colors duration-150 hover:text-navy-900"
-          >
+          </ButtonLink>
+          <ButtonLink href="/catalogo?focus=1" size="lg">
             Buscar productos
-          </Link>
+          </ButtonLink>
         </div>
       </section>
 
@@ -94,7 +95,7 @@ export function HomeClient({
       {offer && (
         <Link
           href="/catalogo?ofertas=1"
-          className="block border-b border-line px-5 py-12 transition-colors duration-150 hover:bg-hover md:px-10 md:py-14"
+          className="group block border-b border-line px-5 py-12 transition-colors duration-150 hover:bg-hover md:px-10 md:py-14"
         >
           <div className="flex flex-col gap-7 md:flex-row md:items-end md:justify-between md:gap-10">
             <div className="min-w-0">
@@ -106,7 +107,7 @@ export function HomeClient({
                 −{discountPct(offer)}% por tiempo limitado
               </p>
             </div>
-            <span className={`${LINK_CTA} flex-none`}>Ver oferta</span>
+            <span className={`${SOFT_CTA} flex-none`}>Ver oferta</span>
           </div>
         </Link>
       )}

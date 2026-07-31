@@ -65,7 +65,7 @@ export function ProductCard({
 
   return (
     <article
-      className={`group relative flex h-full flex-col gap-[18px] transition-colors duration-150 hover:bg-hover ${
+      className={`group relative flex h-full flex-col gap-[18px] border border-line-soft bg-canvas shadow-card transition-[box-shadow,transform,border-color] duration-200 hover:border-line hover:shadow-card-hover motion-safe:hover:-translate-y-0.5 ${
         PADDING[variant]
       } ${variant === "carousel" ? "w-[230px] flex-none snap-start" : ""}`}
     >
@@ -92,7 +92,7 @@ export function ProductCard({
           </span>
         )}
         {soldOut && (
-          <span className="absolute top-0 left-0 bg-canvas px-[9px] py-[5px] text-[8.5px] font-semibold tracking-[.22em] text-slate-400 uppercase">
+          <span className="absolute top-0 left-0 bg-alert px-[9px] py-[5px] text-[8.5px] font-bold tracking-[.22em] text-alert-fg uppercase">
             Agotado
           </span>
         )}
@@ -149,10 +149,10 @@ export function ProductCard({
           type="button"
           onClick={handleAdd}
           aria-disabled={soldOut}
-          className={`relative z-10 flex-none pb-1 text-[11.5px] font-bold tracking-[.16em] uppercase transition-colors duration-150 ${
+          className={`relative z-10 flex-none px-3.5 py-2.5 text-[11.5px] font-bold tracking-[.16em] uppercase transition-colors duration-150 ${
             soldOut
-              ? "cursor-not-allowed text-disabled"
-              : "border-b border-navy-900 text-navy-900 hover:border-navy-700 hover:text-navy-700"
+              ? "cursor-not-allowed bg-surface text-disabled"
+              : "bg-surface text-navy-900 hover:bg-navy-900 hover:text-canvas"
           }`}
         >
           {soldOut ? "Agotado" : "Añadir"}

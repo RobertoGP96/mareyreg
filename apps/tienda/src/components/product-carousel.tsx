@@ -117,13 +117,10 @@ export function ProductCarousel({
 
       <div
         ref={scrollerRef}
-        className="no-scrollbar mt-8 flex snap-x snap-mandatory overflow-x-auto scroll-px-5 px-5 md:scroll-px-10 md:px-10"
+        className="no-scrollbar mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-px-5 px-5 py-2 md:scroll-px-10 md:px-10"
       >
         {products.map((product, index) => (
-          <div
-            key={product.sku}
-            className="flex-none snap-start border-r border-line-soft last:border-r-0"
-          >
+          <div key={product.sku} className="flex flex-none snap-start">
             <ProductCard
               product={product}
               variant="carousel"

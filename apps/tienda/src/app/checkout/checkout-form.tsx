@@ -15,7 +15,7 @@ import { submitOrder } from "@/app/actions/order-actions";
 import { computeTotals, SHIPPING_COST } from "@/lib/cart-totals";
 import { fmt } from "@/lib/format";
 import { cartCount, cartLines, useStore } from "@/lib/store";
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type Delivery = "domicilio" | "recogida";
@@ -239,12 +239,9 @@ export function CheckoutForm() {
           <p className="mt-4 max-w-[380px] text-[13.5px] leading-[1.65] text-pretty text-slate-500">
             Explora el catálogo y añade productos.
           </p>
-          <Link
-            href="/catalogo"
-            className="mt-7 border-b border-navy-900 pb-1 text-[11.5px] font-bold tracking-[.16em] text-navy-900 uppercase transition-colors duration-150 hover:border-navy-700 hover:text-navy-700"
-          >
+          <ButtonLink href="/catalogo" className="mt-7">
             Ir al catálogo
-          </Link>
+          </ButtonLink>
         </div>
       </div>
     );

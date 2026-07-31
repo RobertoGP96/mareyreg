@@ -18,7 +18,7 @@ export function stockText(stock: number): string {
 export function StockLabel({ stock, className }: StockLabelProps) {
   const tone =
     stock <= 0
-      ? "text-danger"
+      ? "font-semibold text-alert"
       : stock <= LOW_STOCK_THRESHOLD
         ? "text-warn"
         : "text-ok";
