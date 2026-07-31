@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Search, X } from "lucide-react";
 import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
 import { discountPct, fmt, normalizeText } from "@/lib/format";
 import { useSyncCurrency } from "@/lib/store";
@@ -160,9 +161,11 @@ export function CatalogClient({
     priceRange,
   ]);
 
+  const activeTerm = query.trim();
+
   const hasActiveFilters =
     category !== TODO ||
-    query.trim() !== "" ||
+    activeTerm !== "" ||
     inStockOnly ||
     sort !== "rel" ||
     priceActive;
@@ -220,6 +223,32 @@ export function CatalogClient({
         )}
       </FilterBar>
 
+      {/* El catálogo ya no tiene buscador propio: el término llega por `?q=`
+          desde el buscador del header. Sin pintarlo, el usuario ve una lista
+          recortada sin saber por qué y sin manera de deshacerlo. */}
+      {activeTerm && (
+        <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4 md:px-10">
+          <p className="flex min-w-0 items-center gap-3">
+            <Search
+              className="h-4 w-4 flex-none text-slate-400"
+              strokeWidth={1.6}
+            />
+            <span className="truncate text-[13px] text-slate-500">
+              Resultados para{" "}
+              <span className="font-semibold text-navy-900">“{activeTerm}”</span>
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            className="nav-label inline-flex flex-none items-center gap-1.5 text-slate-400 transition-colors duration-150 hover:text-navy-900"
+          >
+            Quitar
+            <X className="h-3.5 w-3.5" strokeWidth={1.6} />
+          </button>
+        </div>
+      )}
+
       {showPrice && priceBounds && (
         <div className="border-b border-line px-5 py-6 md:px-10">
           <div className="max-w-[460px]">
@@ -263,9 +292,11 @@ export function CatalogClient({
             Nada por aquí
           </p>
           <p className="mt-4 max-w-[380px] text-[13.5px] leading-[1.65] text-pretty text-slate-500">
-            {hasActiveFilters
-              ? "No encontramos productos con esos filtros. Prueba a quitar alguno."
-              : "Aún no hay productos disponibles en el catálogo."}
+            {activeTerm
+              ? `No encontramos nada para “${activeTerm}”. Prueba con otro término o quita algún filtro.`
+              : hasActiveFilters
+                ? "No encontramos productos con esos filtros. Prueba a quitar alguno."
+                : "Aún no hay productos disponibles en el catálogo."}
           </p>
           {hasActiveFilters && (
             <Button onClick={clearFilters} className="mt-7">
