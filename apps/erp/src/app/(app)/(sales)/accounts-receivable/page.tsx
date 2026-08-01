@@ -4,6 +4,7 @@ import { getAccountsReceivable } from "@/modules/sales/queries/invoice-queries";
 import { getPaymentCurrencyOptions } from "@/modules/sales/queries/payment-currency-queries";
 import { AccountsReceivableRowActions } from "@/modules/sales/components/accounts-receivable-row-actions";
 import { Badge } from "@/components/ui/badge";
+import { PaginatedTableBody } from "@/components/ui/paginated-table-body";
 import Link from "next/link";
 
 const BUCKET_COLORS: Record<string, string> = {
@@ -66,7 +67,7 @@ export default async function AccountsReceivablePage() {
               <th className="px-3 py-2"></th>
             </tr>
           </thead>
-          <tbody>
+          <PaginatedTableBody colSpan={9} itemLabel="facturas">
             {invoices.map((i) => (
               <tr key={i.invoiceId} className="border-t">
                 <td className="px-3 py-2">
@@ -100,7 +101,7 @@ export default async function AccountsReceivablePage() {
                 </td>
               </tr>
             ))}
-          </tbody>
+          </PaginatedTableBody>
         </table>
       </div>
     </div>

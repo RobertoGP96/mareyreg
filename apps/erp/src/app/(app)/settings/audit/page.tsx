@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { AvatarInitials } from "@/components/ui/avatar";
 import { History, Download, Filter } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PaginatedTableBody } from "@/components/ui/paginated-table-body";
 
 export const dynamic = "force-dynamic";
 
@@ -95,7 +96,7 @@ export default async function AuditPage() {
                 )}
               </tr>
             </thead>
-            <tbody>
+            <PaginatedTableBody colSpan={5} itemLabel="eventos">
               {logs.map((log) => {
                 const variant = ACTION_VARIANT[log.action] ?? "secondary";
                 return (
@@ -149,7 +150,7 @@ export default async function AuditPage() {
                   </tr>
                 );
               })}
-            </tbody>
+            </PaginatedTableBody>
           </table>
         )}
       </div>
