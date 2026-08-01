@@ -1,6 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { Search, X } from "lucide-react";
 import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
 import { discountPct, fmt, normalizeText } from "@/lib/format";
 import { useSyncCurrency } from "@/lib/store";
@@ -185,6 +186,8 @@ export function CatalogClient({
       behavior: reduce ? "auto" : "smooth",
     });
   };
+
+  const activeTerm = query.trim();
 
   const hasActiveFilters =
     category !== TODO ||
