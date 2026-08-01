@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { syncProfile } from "@/app/actions/customer-actions";
 import { useStore } from "@/lib/store";
+import { AuthDivider, GoogleSignIn } from "@/components/google-sign-in";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -63,7 +64,9 @@ export default function RegisterPage() {
           Regístrate en un minuto y guarda tus datos para la próxima compra.
         </p>
 
-        <div className="mt-10 flex flex-col gap-6 border-t border-line pt-8">
+        <div className="mt-10 flex flex-col gap-7 border-t border-line pt-8">
+          <GoogleSignIn label="Registrarme con Google" />
+          <AuthDivider label="o con tus datos" />
           <div className="flex flex-col gap-2.5">
             <label htmlFor="registro-nombre" className="eyebrow">
               Nombre y apellidos

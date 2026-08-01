@@ -64,7 +64,7 @@ export function HomeClient({
           <ButtonLink href="/catalogo" variant="solid" size="lg">
             Ver el catálogo
           </ButtonLink>
-          <ButtonLink href="/catalogo?focus=1" size="lg">
+          <ButtonLink href="/catalogo" size="lg">
             Buscar productos
           </ButtonLink>
         </div>

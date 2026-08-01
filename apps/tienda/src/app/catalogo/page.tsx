@@ -28,7 +28,6 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
       currency={catalog.currency}
       initialCategory={firstValue(params.cat)}
       initialQuery={firstValue(params.q)}
-      autoFocus={firstValue(params.focus) === "1"}
       initialOfertas={firstValue(params.ofertas) === "1"}
       initialDestacados={firstValue(params.destacados) === "1"}
     />

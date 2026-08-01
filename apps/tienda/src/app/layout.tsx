@@ -5,6 +5,7 @@ import { StoreProvider } from "@/lib/store";
 import { ThemeProvider, THEME_INIT_SCRIPT } from "@/lib/theme";
 import { BottomNav } from "@/components/bottom-nav";
 import { TopNav } from "@/components/top-nav";
+import { SiteFooter } from "@/components/site-footer";
 import { Toast } from "@/components/toast";
 import { STORE_NAME } from "@/lib/config";
 
@@ -38,7 +39,10 @@ export default function RootLayout({
           <StoreProvider>
             <div className="flex min-h-dvh flex-col">
               <TopNav />
-              <main className="flex-1 pb-20 md:pb-0">{children}</main>
+              {/* El hueco para la BottomNav fija lo reserva el footer, que va
+                  siempre al final del documento. */}
+              <main className="flex-1">{children}</main>
+              <SiteFooter />
               <BottomNav />
             </div>
             <Toast />

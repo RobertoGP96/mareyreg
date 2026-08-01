@@ -46,12 +46,33 @@ export interface StoredProfile {
   erpCustomerId?: number;
 }
 
+export interface StoredOrderLine {
+  sku: string;
+  name: string;
+  presentationName: string | null;
+  qty: number;
+  unitPrice: number;
+  /** Importe ya resuelto: en catch weight con piezas elegidas NO es
+   *  unitPrice × qty, sino la suma de los precios por pieza del ERP. */
+  total: number;
+  isCatchWeight?: boolean;
+}
+
 export interface StoredOrder {
   no: string;
   dateIso: string;
   itemsCount: number;
   total: number;
   status: "En preparación" | "En revisión" | "Por pesar";
+  // Todo lo de abajo es opcional a propósito: los pedidos que ya viven en
+  // localStorage se guardaron sin estos campos y deben seguir abriéndose.
+  lines?: StoredOrderLine[];
+  subtotal?: number;
+  shipping?: number;
+  discount?: number;
+  delivery?: "domicilio" | "recogida";
+  payment?: string;
+  address?: string;
 }
 
 export interface StoreState {

@@ -163,7 +163,7 @@ function SearchInput({
       role="search"
       onSubmit={box.submit}
       className={cn(
-        "flex items-center gap-3 border border-line bg-surface px-4 py-2.5 transition-colors duration-150 focus-within:border-navy-900",
+        "field-shell flex items-center gap-3 border border-line bg-surface px-4 py-2.5 transition-colors duration-150",
         className
       )}
     >
