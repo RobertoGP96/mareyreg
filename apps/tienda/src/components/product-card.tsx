@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import type { MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 import { Heart } from "lucide-react";
 import type { WebstoreProduct } from "@/lib/erp-client";
 import { discountPct, fmt } from "@/lib/format";
 import { useStore, type CartLine } from "@/lib/store";
+import { ProductDetailDrawer } from "@/components/product-detail-drawer";
 import { ProductImage } from "@/components/product-image";
 import { StockLabel } from "@/components/ui/stock-label";
 
@@ -47,6 +48,17 @@ export function ProductCard({
   const isFav = state.favs.includes(product.sku);
   const soldOut = product.stockAvailable <= 0;
   const pct = discountPct(product);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  // En móvil el detalle se abre como hoja inferior en lugar de navegar. El
+  // enlace real se conserva —SEO, compartir, abrir en pestaña nueva— y solo se
+  // intercepta el clic primario sin modificadores, que es el gesto táctil.
+  const handleOpenDetail = (e: MouseEvent<HTMLAnchorElement>) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!window.matchMedia("(max-width: 767px)").matches) return;
+    e.preventDefault();
+    setDetailOpen(true);
+  };
 
   const handleFav = (e: MouseEvent) => {
     e.preventDefault();
@@ -73,6 +85,7 @@ export function ProductCard({
           queda debajo de los controles (favorito, añadir), que llevan z-10. */}
       <Link
         href={`/producto/${encodeURIComponent(product.sku)}`}
+        onClick={handleOpenDetail}
         className="absolute inset-0 z-0"
         aria-label={product.name}
       />
@@ -158,6 +171,12 @@ export function ProductCard({
           {soldOut ? "Agotado" : "Añadir"}
         </button>
       </div>
+
+      <ProductDetailDrawer
+        product={product}
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+      />
     </article>
   );
 }

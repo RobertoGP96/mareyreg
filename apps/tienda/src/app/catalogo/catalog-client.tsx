@@ -1,12 +1,17 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
 import { discountPct, fmt, normalizeText } from "@/lib/format";
 import { useSyncCurrency } from "@/lib/store";
 import { ProductCard } from "@/components/product-card";
 import { ProductGrid, ProductGridCell } from "@/components/product-grid";
 import { Button } from "@/components/ui/button";
+import {
+  DEFAULT_PAGE_SIZE,
+  Pagination,
+  usePagination,
+} from "@/components/ui/pagination";
 import { Slider } from "@/components/ui/slider";
 import { CatalogHero } from "@/app/catalogo/catalog-hero";
 import { FilterBar, type SortOption } from "@/app/catalogo/filter-bar";
@@ -162,6 +167,27 @@ export function CatalogClient({
     priceRange,
   ]);
 
+  const { page, pageCount, pageItems, total, from, to, setPage } = usePagination(
+    filtered,
+    DEFAULT_PAGE_SIZE
+  );
+
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  // Cambiar de página sin volver al inicio de la retícula deja al usuario a
+  // mitad de una lista que ya no es la que estaba leyendo.
+  const goToPage = (next: number) => {
+    setPage(next);
+    const el = gridRef.current;
+    if (!el) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.scrollTo({
+      // El header es sticky (78px): sin holgura la primera fila queda debajo.
+      top: el.getBoundingClientRect().top + window.scrollY - 90,
+      behavior: reduce ? "auto" : "smooth",
+    });
+  };
+
   const hasActiveFilters =
     category !== TODO ||
     query.trim() !== "" ||
@@ -279,17 +305,28 @@ export function CatalogClient({
           )}
         </div>
       ) : (
-        <ProductGrid className="px-5 pb-16 md:px-10">
-          {filtered.map((product, index) => (
-            <ProductGridCell key={product.sku}>
-              <ProductCard
-                product={product}
-                variant="grid"
-                priority={index < 4}
-              />
-            </ProductGridCell>
-          ))}
-        </ProductGrid>
+        <div ref={gridRef} className="px-5 pb-16 md:px-10">
+          <ProductGrid>
+            {pageItems.map((product, index) => (
+              <ProductGridCell key={product.sku}>
+                <ProductCard
+                  product={product}
+                  variant="grid"
+                  priority={page === 1 && index < 4}
+                />
+              </ProductGridCell>
+            ))}
+          </ProductGrid>
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            total={total}
+            from={from}
+            to={to}
+            onPageChange={goToPage}
+            className="mt-12"
+          />
+        </div>
       )}
     </div>
   );
