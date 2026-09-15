@@ -2,71 +2,138 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Minimal Luxe: los nombres de token vienen del sistema de diseño (claro).
-   En oscuro cada token conserva su ROL —navy-900 sigue siendo "marca / precio /
-   estado activo"— aunque el valor se invierta. Nunca escribir un hex en un
-   componente: si falta un matiz, se añade aquí. */
+/* Sistema "SHOP Tienda Web": navy de marca sobre cremas cálidas, dorado como
+   acento y esquinas redondeadas. Cada token conserva su ROL en oscuro —navy-900
+   sigue siendo "titular / precio", navy-700 sigue siendo "CTA / activo"— aunque
+   el valor cambie. Nunca escribir un hex en un componente. */
 :root {
+  /* Marca */
+  --c-navy-950: #071b3c;
   --c-navy-900: #0a2450;
   --c-navy-700: #14386f;
-  --c-ink: #101828;
-  --c-slate-500: #66738c;
-  --c-slate-400: #8894aa;
-  --c-slate-300: #a3adc0;
-  --c-line: #e9edf4;
-  --c-line-soft: #eef1f6;
-  --c-rule: #cdd6e5;
-  --c-surface: #f5f7fa;
+  --c-navy-600: #1d4685;
+  --c-navy-200: #cbd9ee;
+  --c-navy-100: #e3ecf8;
+
+  /* Fondos crema */
+  --c-page: #f6f3ec;
   --c-canvas: #ffffff;
-  --c-hover: #fafbfd;
-  --c-ok: #3d7a54;
-  --c-warn: #9a6a2f;
-  --c-danger: #a5455a;
-  --c-disabled: #c1c9d8;
-  /* `alert` es el único acento saturado del sistema y se reserva para el estado
-     que debe cortar la lectura de la retícula: agotado. `danger` sigue siendo el
-     matiz discreto para texto (precio tachado, error en línea). */
-  --c-alert: #e11d48;
+  --c-surface: #efebe0;
+  --c-hover: #f6f3ec;
+  --c-cream-50: #fbfaf6;
+
+  /* Dorado */
+  --c-gold-600: #c98a1b;
+  --c-gold-500: #e0a32e;
+  --c-gold-100: #fbeed3;
+
+  /* Tintas y líneas */
+  --c-ink: #1e1e1c;
+  --c-slate-500: #5c5c55;
+  --c-slate-400: #8f8f86;
+  --c-slate-300: #b3b3aa;
+  --c-line: #e7e3d8;
+  --c-line-soft: #efebe0;
+  --c-rule: #d9d4c7;
+
+  /* Semánticos */
+  --c-ok: #1f9d5b;
+  --c-ok-soft: #ddf3e6;
+  --c-warn: #c98a1b;
+  --c-danger: #d9442c;
+  --c-danger-soft: #fbe3de;
+  --c-alert: #d9442c;
   --c-alert-fg: #ffffff;
-  /* La elevación entra solo en las cards de producto y en las capas flotantes
-     (popover, menú). El resto del sistema sigue separando con hairlines. */
-  --sh-card: 0 1px 2px rgba(10, 36, 80, 0.05), 0 10px 26px -14px rgba(10, 36, 80, 0.16);
-  --sh-card-hover: 0 2px 6px rgba(10, 36, 80, 0.07), 0 20px 42px -18px rgba(10, 36, 80, 0.26);
-  --sh-pop: 0 4px 10px rgba(10, 36, 80, 0.07), 0 22px 50px -16px rgba(10, 36, 80, 0.3);
+  --c-star: #f2a93b;
+  --c-disabled: #b9b7ae;
+  --c-on-brand: #ffffff;
+  --c-overlay: rgba(10, 36, 80, 0.45);
+
+  /* Logo y footer: fijos en ambos temas, son la identidad de la marca. */
+  --c-brand-tile: #14386f;
+  --c-brand-tile-fg: #e3ecf8;
+  --c-footer: #0a2450;
+  --c-footer-fg: #e3ecf8;
+  --c-footer-muted: #cbd9ee;
+  --c-footer-line: rgba(255, 255, 255, 0.12);
+
+  --sh-card: 0 2px 10px rgba(10, 36, 80, 0.06);
+  --sh-float: 0 8px 24px rgba(10, 36, 80, 0.14);
+  --sh-pop: 0 12px 32px rgba(10, 36, 80, 0.18);
   color-scheme: light;
 }
 
 .dark {
-  --c-navy-900: #dbe6fb;
-  --c-navy-700: #ffffff;
-  --c-ink: #e9edf5;
-  --c-slate-500: #98a3b8;
-  --c-slate-400: #7c8799;
-  --c-slate-300: #646e80;
-  --c-line: #232a36;
-  --c-line-soft: #1c222c;
-  --c-rule: #2f3846;
-  --c-surface: #151a23;
-  --c-canvas: #0b0e14;
-  --c-hover: #12171f;
-  --c-ok: #6fae8a;
-  --c-warn: #c9a25e;
-  --c-danger: #d4818f;
-  --c-disabled: #454f5f;
-  --c-alert: #ff4d6d;
-  --c-alert-fg: #14000a;
-  /* Sobre lienzo casi negro una sombra tintada de azul no se lee: en oscuro la
-     elevación pasa a negro puro y sube la opacidad. El canto de la card lo
-     dibuja su borde, no la sombra. */
-  --sh-card: 0 1px 2px rgba(0, 0, 0, 0.6), 0 10px 26px -14px rgba(0, 0, 0, 0.9);
-  --sh-card-hover: 0 2px 6px rgba(0, 0, 0, 0.7), 0 20px 42px -18px rgba(0, 0, 0, 1);
-  --sh-pop: 0 4px 10px rgba(0, 0, 0, 0.7), 0 22px 50px -16px rgba(0, 0, 0, 1);
+  --c-navy-950: #e9f0fb;
+  --c-navy-900: #e3ecf8;
+  --c-navy-700: #3b6fd3;
+  --c-navy-600: #4f80de;
+  --c-navy-200: #27395c;
+  --c-navy-100: #1b2a45;
+
+  --c-page: #0b1220;
+  --c-canvas: #121a2b;
+  --c-surface: #1b2536;
+  --c-hover: #182131;
+  --c-cream-50: #0f1726;
+
+  --c-gold-600: #e0a32e;
+  --c-gold-500: #e8b44a;
+  --c-gold-100: #3a2d12;
+
+  --c-ink: #eef2f8;
+  --c-slate-500: #a6b0c3;
+  --c-slate-400: #7f8aa0;
+  --c-slate-300: #5c677d;
+  --c-line: #243048;
+  --c-line-soft: #1e293c;
+  --c-rule: #33405a;
+
+  --c-ok: #4cc47f;
+  --c-ok-soft: #14331f;
+  --c-warn: #e0a32e;
+  --c-danger: #f0654e;
+  --c-danger-soft: #3d1a14;
+  --c-alert: #f0654e;
+  --c-alert-fg: #ffffff;
+  --c-star: #f2a93b;
+  --c-disabled: #4a5568;
+  --c-on-brand: #ffffff;
+  --c-overlay: rgba(0, 0, 0, 0.6);
+
+  --c-brand-tile: #14386f;
+  --c-brand-tile-fg: #e3ecf8;
+  --c-footer: #070d1a;
+  --c-footer-fg: #e3ecf8;
+  --c-footer-muted: #9fb0cc;
+  --c-footer-line: rgba(255, 255, 255, 0.1);
+
+  --sh-card: 0 2px 10px rgba(0, 0, 0, 0.45);
+  --sh-float: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --sh-pop: 0 12px 32px rgba(0, 0, 0, 0.7);
   color-scheme: dark;
 }
 
 @theme inline {
+  --color-navy-950: var(--c-navy-950);
   --color-navy-900: var(--c-navy-900);
   --color-navy-700: var(--c-navy-700);
+  --color-navy-600: var(--c-navy-600);
+  --color-navy-200: var(--c-navy-200);
+  --color-navy-100: var(--c-navy-100);
+  --color-tint: var(--c-navy-100);
+  --color-tint-strong: var(--c-navy-200);
+
+  --color-page: var(--c-page);
+  --color-canvas: var(--c-canvas);
+  --color-surface: var(--c-surface);
+  --color-hover: var(--c-hover);
+  --color-cream-50: var(--c-cream-50);
+
+  --color-gold-600: var(--c-gold-600);
+  --color-gold-500: var(--c-gold-500);
+  --color-gold-100: var(--c-gold-100);
+
   --color-ink: var(--c-ink);
   --color-slate-500: var(--c-slate-500);
   --color-slate-400: var(--c-slate-400);
@@ -74,36 +141,45 @@
   --color-line: var(--c-line);
   --color-line-soft: var(--c-line-soft);
   --color-rule: var(--c-rule);
-  --color-surface: var(--c-surface);
-  --color-canvas: var(--c-canvas);
-  --color-hover: var(--c-hover);
+
   --color-ok: var(--c-ok);
+  --color-ok-soft: var(--c-ok-soft);
   --color-warn: var(--c-warn);
   --color-danger: var(--c-danger);
-  --color-disabled: var(--c-disabled);
+  --color-danger-soft: var(--c-danger-soft);
   --color-alert: var(--c-alert);
   --color-alert-fg: var(--c-alert-fg);
+  --color-star: var(--c-star);
+  --color-disabled: var(--c-disabled);
+  --color-on-brand: var(--c-on-brand);
+  --color-overlay: var(--c-overlay);
+
+  --color-brand-tile: var(--c-brand-tile);
+  --color-brand-tile-fg: var(--c-brand-tile-fg);
+  --color-footer: var(--c-footer);
+  --color-footer-fg: var(--c-footer-fg);
+  --color-footer-muted: var(--c-footer-muted);
+  --color-footer-line: var(--c-footer-line);
 
   --shadow-card: var(--sh-card);
-  --shadow-card-hover: var(--sh-card-hover);
+  --shadow-float: var(--sh-float);
   --shadow-pop: var(--sh-pop);
 
-  --font-display: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --font-ui: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-poppins), "Segoe UI", system-ui, sans-serif;
+  --font-ui: var(--font-poppins), "Segoe UI", system-ui, sans-serif;
 
-  /* Radio 0 en todo el sistema: `rounded-*` queda neutralizado por diseño. */
-  --radius-xs: 0px;
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
-  --radius-2xl: 0px;
-  --radius-3xl: 0px;
-  --radius-4xl: 0px;
+  /* Escala de radios del sistema: sm chips/thumbs, md inputs/imagen, lg cards. */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  --radius-2xl: 28px;
+  --radius-3xl: 32px;
+  --radius-4xl: 40px;
 }
 
-/* El tema cambia por clase en <html>; sin transición el salto es brusco,
-   con transición en `*` se arrastra el scroll. Solo colores, solo en la raíz. */
+/* El tema cambia por clase en <html>; solo colores, solo en la raíz. */
 html {
   transition: background-color 200ms ease, color 200ms ease;
 }
@@ -114,18 +190,18 @@ html {
   }
 }
 
-/* La disciplina del sistema: el foco se ve siempre, nunca se suprime. */
+/* El foco se ve siempre, nunca se suprime. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 1px solid var(--c-navy-900);
+  outline: 2px solid var(--c-navy-700);
   outline-offset: 2px;
 }
 
-/* Campos que ya marcan el foco en su propio borde: el anillo dibujaría una
-   segunda línea paralela a 2px. Se delega en el borde, no se suprime el foco.
-   Marca tanto el input suelto (variante `box`/`rule`) como el contenedor de un
-   campo compuesto (icono + input + acción dentro de una caja). */
+/* Campos con borde propio: el foco lo marca el borde más un halo tenue, sin
+   segundo anillo. Sirve tanto para el input suelto como para el contenedor de
+   un campo compuesto (icono + input + acción). */
 .field-shell:focus-within {
-  border-color: var(--c-navy-900);
+  border-color: var(--c-navy-700);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-navy-700) 16%, transparent);
 }
 
 .field-shell:focus-visible,
@@ -133,53 +209,47 @@ html {
   outline: none;
 }
 
-input {
+input,
+textarea {
   outline: none;
 }
 
-/* En la capa `components` a propósito: así una utilidad puntual —`font-bold`
-   sobre un `.nav-label`, `text-navy-900` sobre un `.eyebrow`— sigue ganando.
-   Sin capa, estas reglas quedarían por delante de las utilidades y las
-   anularían en silencio. */
+/* En la capa `components` a propósito: una utilidad puntual —`text-navy-700`
+   sobre un `.eyebrow`— sigue ganando. */
 @layer components {
   .eyebrow {
-    font-size: 9.5px;
+    font-size: 11px;
     line-height: 1;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.36em;
-    color: var(--c-slate-300);
+    letter-spacing: 0.1em;
+    color: var(--c-slate-400);
   }
 
   .nav-label {
-    font-size: 11.5px;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    font-weight: 500;
+    font-size: 13px;
+    line-height: 1.2;
+    font-weight: 600;
   }
 
   .tabular {
     font-variant-numeric: tabular-nums;
   }
 
-  /* Geist es una grotesca, no un display serif: a 42–66px necesita peso y
-     tracking negativo para recuperar la densidad óptica que daba el serif. Va
-     aquí y no en el token porque el namespace `--font-*` de Tailwind solo
-     admite family/feature-settings, y así un `tracking-*` puntual —el lockup de
-     la marca en el header— sigue ganando por estar en la capa de utilidades. */
   .font-display {
-    font-weight: 600;
-    letter-spacing: -0.03em;
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }
 }
 
 @keyframes toastIn {
   from {
     opacity: 0;
-    transform: translate(-50%, 12px);
+    transform: translate(-50%, 10px) scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translate(-50%, 0) scale(1);
   }
 }
 
@@ -194,30 +264,72 @@ input {
   }
 }
 
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes navIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .anim-fade-up {
   animation: fadeUp 0.4s ease both;
 }
 
-/* Transición de ruta — el mismo fade-up, aplicado al contenido de cada vista
-   desde `app/template.tsx`. CSS puro: solo `opacity` y `transform`, las dos
-   propiedades que el compositor anima sin recalcular layout ni repintar.
-
-   `backwards` y no `both` a propósito: con `both` el `transform` del último
-   keyframe queda aplicado para siempre, y un transform distinto de `none`
-   convierte al contenedor en bloque contenedor de sus descendientes
-   `position: fixed`. Sin `will-change` por lo mismo: fijarlo dejaría viva una
-   capa de composición durante toda la vida de la ruta, y el navegador ya
-   promueve por su cuenta mientras la animación corre. */
+/* Transición de ruta desde `app/template.tsx`. `backwards` y no `both`: un
+   `transform` residual convertiría al contenedor en bloque contenedor de sus
+   descendientes `position: fixed` (bottom nav, drawer). */
 .route-transition {
   animation: fadeUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
+.pop-in {
+  animation: popIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.slide-down {
+  animation: slideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* El toast flota sobre la barra inferior flotante en móvil y baja en desktop,
+   donde esa barra no existe. */
 .toast-pop {
   position: fixed;
-  bottom: 96px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
-  animation: toastIn 0.25s ease;
+  animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 768px) {
+  .toast-pop {
+    bottom: 32px;
+  }
 }
 
 @keyframes drawerIn {
@@ -238,24 +350,42 @@ input {
   }
 }
 
-/* Sin `both` ni `forwards`: un `transform` residual convertiría al panel en
-   bloque contenedor de sus descendientes `position: fixed` (mismo motivo que
-   en `.route-transition`). */
 .drawer-panel {
-  animation: drawerIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: drawerIn 0.32s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .drawer-overlay {
   animation: overlayIn 0.2s ease;
 }
 
+/* Barra inferior flotante: entra desde abajo al montar y se esconde al hacer
+   scroll hacia abajo (clase `is-hidden`, la pone el componente). */
+.nav-float {
+  animation: navIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  transition:
+    transform 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.28s ease;
+}
+
+.nav-float.is-hidden {
+  transform: translateY(calc(100% + 28px));
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anim-fade-up,
   .route-transition,
+  .pop-in,
+  .slide-down,
   .toast-pop,
   .drawer-panel,
-  .drawer-overlay {
+  .drawer-overlay,
+  .nav-float {
     animation: none;
+  }
+
+  .nav-float {
+    transition: none;
   }
 }
 

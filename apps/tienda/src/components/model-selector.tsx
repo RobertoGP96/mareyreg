@@ -3,7 +3,7 @@
 import { useId } from "react";
 import type { WebstoreProduct } from "@/lib/erp-client";
 import { hasStock } from "@/lib/model-groups";
-import { ChoiceChips } from "@/components/ui/choice-chips";
+import { ChoiceChips, type ChoiceChipSize } from "@/components/ui/choice-chips";
 
 interface ModelSelectorProps {
   models: WebstoreProduct[];
@@ -11,6 +11,7 @@ interface ModelSelectorProps {
   onSelect: (sku: string) => void;
   /** Etiqueta del eje ("Talla", "Color"). */
   optionLabel: string;
+  size?: ChoiceChipSize;
   className?: string;
 }
 
@@ -20,6 +21,7 @@ export function ModelSelector({
   selectedSku,
   onSelect,
   optionLabel,
+  size = "md",
   className,
 }: ModelSelectorProps) {
   const labelId = useId();
@@ -34,6 +36,7 @@ export function ModelSelector({
         labelledBy={labelId}
         value={selectedSku}
         onChange={onSelect}
+        size={size}
         className="mt-1"
         options={models.map((model) => ({
           value: model.sku,

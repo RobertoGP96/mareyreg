@@ -8,6 +8,8 @@ import { ScreenHeader } from "@/components/screen-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+const LABEL = "mb-1.5 block text-[12px] font-semibold text-slate-500";
+
 export default function DatosPage() {
   const router = useRouter();
   const { state, setProfile, showToast } = useStore();
@@ -74,78 +76,78 @@ export default function DatosPage() {
     <div className="flex flex-1 flex-col">
       <ScreenHeader eyebrow="Mi cuenta" title="Mis datos" backHref="/perfil" />
 
-      <div className="w-full max-w-[520px] px-5 py-10 md:px-10">
-        <p className="eyebrow">Datos personales</p>
-        <div className="mt-6 flex flex-col gap-6">
-          <div className="flex flex-col gap-2.5">
-            <label htmlFor="perfil-nombre" className="eyebrow">
-              Nombre y apellidos
-            </label>
-            <Input
-              id="perfil-nombre"
-              variant="box"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nombre y apellidos"
-              autoComplete="name"
-            />
-          </div>
-          <div className="flex flex-col gap-2.5">
-            <label htmlFor="perfil-telefono" className="eyebrow">
-              Teléfono
-            </label>
-            <Input
-              id="perfil-telefono"
-              variant="box"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Teléfono"
-              type="tel"
-              autoComplete="tel"
-            />
-          </div>
-        </div>
-
-        <div className="mt-10 border-t border-line pt-8">
-          <p className="eyebrow">Contacto y entrega</p>
-          <div className="mt-6 flex flex-col gap-6">
-            <div className="flex flex-col gap-2.5">
-              <label htmlFor="perfil-email" className="eyebrow">
-                Correo electrónico
+      <div className="mx-auto w-full max-w-[720px] px-5 pb-14 md:px-6">
+        <div className="rounded-lg bg-canvas p-5 shadow-card md:p-6">
+          <p className="eyebrow">Datos personales</p>
+          <div className="mt-4 flex flex-col gap-4">
+            <div>
+              <label htmlFor="perfil-nombre" className={LABEL}>
+                Nombre y apellidos
               </label>
               <Input
-                id="perfil-email"
+                id="perfil-nombre"
                 variant="box"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Correo electrónico"
-                type="email"
-                autoComplete="email"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nombre y apellidos"
+                autoComplete="name"
               />
             </div>
-            <div className="flex flex-col gap-2.5">
-              <label htmlFor="perfil-direccion" className="eyebrow">
-                Dirección de entrega
+            <div>
+              <label htmlFor="perfil-telefono" className={LABEL}>
+                Teléfono
               </label>
               <Input
-                id="perfil-direccion"
+                id="perfil-telefono"
                 variant="box"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Dirección de entrega"
-                autoComplete="street-address"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Teléfono"
+                type="tel"
+                autoComplete="tel"
               />
             </div>
           </div>
-        </div>
 
-        <div className="mt-10 border-t border-line pt-8">
+          <div className="mt-6 border-t border-line-soft pt-5">
+            <p className="eyebrow">Contacto y entrega</p>
+            <div className="mt-4 flex flex-col gap-4">
+              <div>
+                <label htmlFor="perfil-email" className={LABEL}>
+                  Correo electrónico
+                </label>
+                <Input
+                  id="perfil-email"
+                  variant="box"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Correo electrónico"
+                  type="email"
+                  autoComplete="email"
+                />
+              </div>
+              <div>
+                <label htmlFor="perfil-direccion" className={LABEL}>
+                  Dirección de entrega
+                </label>
+                <Input
+                  id="perfil-direccion"
+                  variant="box"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Dirección de entrega"
+                  autoComplete="street-address"
+                />
+              </div>
+            </div>
+          </div>
+
           <Button
             variant="solid"
             size="lg"
             onClick={handleSave}
             disabled={sending}
-            className="w-full"
+            className="mt-6 w-full"
           >
             {sending ? "Guardando…" : "Guardar cambios"}
           </Button>

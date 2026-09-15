@@ -7,6 +7,7 @@ import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
 import { useSyncCurrency } from "@/lib/store";
 import { ProductCarousel } from "@/components/product-carousel";
 import { ProductDetail } from "@/components/product-detail";
+import { Button } from "@/components/ui/button";
 
 interface ProductDetailClientProps {
   product: WebstoreProduct;
@@ -43,15 +44,16 @@ export function ProductDetailClient({
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="border-b border-line px-5 py-4 md:px-10">
-        <button
-          type="button"
+      <div className="mx-auto w-full max-w-[1120px] px-5 pt-5 md:px-6">
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={goBack}
-          className="nav-label inline-flex items-center gap-2 text-slate-400 transition-colors duration-150 hover:text-navy-900"
+          className="-ml-1 gap-1.5"
         >
-          <ArrowLeft className="h-4 w-4" strokeWidth={1.6} />
+          <ArrowLeft className="h-4 w-4" strokeWidth={2} />
           Volver
-        </button>
+        </Button>
       </div>
 
       <ProductDetail
@@ -63,12 +65,14 @@ export function ProductDetailClient({
       />
 
       {related.length > 0 && (
-        <ProductCarousel
-          eyebrow="Sugerencias"
-          title="También te puede interesar"
-          products={related}
-          className="border-t border-line py-12 md:py-16"
-        />
+        <div className="mx-auto w-full max-w-[1120px] px-5 pb-12 md:px-6">
+          <ProductCarousel
+            eyebrow="Sugerencias"
+            title="También te puede interesar"
+            products={related}
+            className="border-t border-line pt-10"
+          />
+        </div>
       )}
     </div>
   );

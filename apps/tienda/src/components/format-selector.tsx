@@ -8,7 +8,7 @@ import {
   formatPrice,
   sortedPresentations,
 } from "@/lib/model-groups";
-import { ChoiceChips } from "@/components/ui/choice-chips";
+import { ChoiceChips, type ChoiceChipSize } from "@/components/ui/choice-chips";
 
 interface FormatSelectorProps {
   product: WebstoreProduct;
@@ -16,6 +16,7 @@ interface FormatSelectorProps {
   selectedSku: string;
   onSelect: (sku: string) => void;
   currency: WebstoreCurrency;
+  size?: ChoiceChipSize;
   className?: string;
 }
 
@@ -25,6 +26,7 @@ export function FormatSelector({
   selectedSku,
   onSelect,
   currency,
+  size = "md",
   className,
 }: FormatSelectorProps) {
   const labelId = useId();
@@ -40,6 +42,7 @@ export function FormatSelector({
         labelledBy={labelId}
         value={selectedSku}
         onChange={onSelect}
+        size={size}
         className="mt-1"
         options={presentations.map((pres) => ({
           value: pres.sku,

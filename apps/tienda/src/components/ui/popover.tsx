@@ -74,7 +74,7 @@ function PopoverPanel({
     <div
       data-slot="popover-panel"
       className={cn(
-        "absolute top-full z-50 mt-3 border border-line bg-canvas shadow-pop",
+        "pop-in absolute top-full z-50 mt-2 rounded-lg border border-line bg-canvas shadow-pop",
         ALIGN[align],
         className
       )}

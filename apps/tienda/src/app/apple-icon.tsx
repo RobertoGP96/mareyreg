@@ -4,7 +4,8 @@ export const size = { width: 180, height: 180 };
 export const contentType = "image/png";
 
 // iOS redondea las esquinas por su cuenta y pinta de negro la transparencia,
-// por eso el fondo blanco va a sangre completa (sin esquinas redondeadas propias).
+// por eso el azul de marca va a sangre completa (sin esquinas propias). Mismos
+// colores que la tesela del logo en la cabecera.
 export default function AppleIcon() {
   return new ImageResponse(
     (
@@ -15,15 +16,15 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#ffffff",
+          background: "#14386f",
         }}
       >
         <svg
-          width="116"
-          height="116"
+          width="112"
+          height="112"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#0a2450"
+          stroke="#e3ecf8"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"

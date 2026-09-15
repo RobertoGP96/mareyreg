@@ -22,7 +22,7 @@ export function FavoritesClient({
   return (
     <div className="flex flex-1 flex-col">
       <ScreenHeader eyebrow="Tu selección" title="Favoritos">
-        <span className="tabular text-[13px] text-slate-400">
+        <span className="tabular rounded-full bg-tint px-3 py-1.5 text-[12.5px] font-semibold text-navy-700">
           {favorites.length}{" "}
           {favorites.length === 1 ? "producto" : "productos"}
         </span>
@@ -38,7 +38,7 @@ export function FavoritesClient({
           ctaHref="/catalogo"
         />
       ) : (
-        <ProductGrid className="px-5 pb-16 md:px-10">
+        <ProductGrid className="mx-auto w-full max-w-[1120px] px-5 pb-14 md:px-6">
           {/* Sin agrupar: los favoritos son SKUs de modelo y cada uno es su
               propia card con el nombre completo ("Grupo · Etiqueta"). */}
           {favorites.map((product, index) => (

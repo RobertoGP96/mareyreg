@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useMemo, useState } from "react";
-import { Heart, Minus, Plus, Truck } from "lucide-react";
+import { Heart, Truck } from "lucide-react";
 import type {
   WebstoreCurrency,
   WebstoreProduct,
@@ -22,8 +22,10 @@ import {
   sortedPresentations,
 } from "@/lib/model-groups";
 import { useStore, type CartLine } from "@/lib/store";
+import { cn } from "@/lib/utils";
 import { ModelSelector } from "@/components/model-selector";
 import { ProductImage } from "@/components/product-image";
+import { QtyStepper } from "@/components/qty-stepper";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,10 +51,7 @@ interface ProductDetailProps {
   onAdded?: () => void;
 }
 
-const BLOCK = "mt-7 border-t border-line-soft pt-7";
-
-const STEP_BTN =
-  "flex h-9 w-9 items-center justify-center text-slate-400 transition-colors duration-150 hover:text-navy-900";
+const BLOCK = "mt-6 border-t border-line-soft pt-6";
 
 export function ProductDetail({
   product,
@@ -177,9 +176,12 @@ export function ProductDetail({
 
   const media = (
     <div
-      className={`relative w-full overflow-hidden bg-surface ${
-        isDrawer ? "aspect-[4/3]" : "aspect-square md:sticky md:top-[78px]"
-      }`}
+      className={cn(
+        "relative overflow-hidden bg-surface",
+        isDrawer
+          ? "mx-5 mt-1 aspect-[4/3] rounded-md"
+          : "aspect-square rounded-lg shadow-card md:sticky md:top-[84px]"
+      )}
     >
       <span className="absolute inset-0 flex items-center justify-center">
         <ProductImage
@@ -192,17 +194,17 @@ export function ProductDetail({
         />
       </span>
       {product.featured && !soldOut && (
-        <Badge variant="featured" className="absolute top-0 left-0">
+        <Badge variant="featured" className="absolute top-3 left-3">
           Destacado
         </Badge>
       )}
       {soldOut && (
-        <Badge variant="soldout" className="absolute top-0 left-0">
+        <Badge variant="soldout" className="absolute top-3 left-3">
           Agotado
         </Badge>
       )}
       {!soldOut && pct > 0 && (
-        <Badge variant="discount" className="absolute top-0 right-0">
+        <Badge variant="discount" className="absolute top-3 right-3">
           −{pct}%
         </Badge>
       )}
@@ -211,13 +213,14 @@ export function ProductDetail({
         onClick={() => toggleFav(product.sku)}
         aria-label={isFav ? "Quitar de favoritos" : "Añadir a favoritos"}
         aria-pressed={isFav}
-        className={`absolute right-0 bottom-0 flex h-11 w-11 items-center justify-center bg-canvas transition-colors duration-150 ${
-          isFav ? "text-danger" : "text-slate-400 hover:text-navy-900"
-        }`}
+        className={cn(
+          "absolute right-3 bottom-3 flex h-11 w-11 items-center justify-center rounded-full bg-canvas shadow-card transition-[color,transform] duration-150 motion-safe:active:scale-90",
+          isFav ? "text-danger" : "text-slate-400 hover:text-navy-700"
+        )}
       >
         <Heart
-          className="h-4 w-4"
-          strokeWidth={1.6}
+          className="h-5 w-5"
+          strokeWidth={1.8}
           fill={isFav ? "currentColor" : "none"}
         />
       </button>
@@ -230,19 +233,20 @@ export function ProductDetail({
     <>
       {product.category && <p className="eyebrow">{product.category}</p>}
       <Heading
-        className={`font-display mt-5 leading-[1.1] text-balance text-navy-900 ${
-          isDrawer ? "text-[24px]" : "text-[30px] md:text-[40px]"
-        }`}
+        className={cn(
+          "font-display mt-3 leading-[1.15] text-balance text-navy-900",
+          isDrawer ? "text-[22px]" : "text-[26px] md:text-[32px]"
+        )}
       >
         {displayName(product, false)}
       </Heading>
       {product.modelGroup && (
-        <p className="eyebrow mt-3">
+        <p className="eyebrow mt-2.5">
           {product.modelGroup.optionLabel} · {product.modelGroup.modelLabel}
         </p>
       )}
 
-      <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <div className="mt-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="tabular text-[26px] font-bold text-navy-900">
           {fmt(headlinePrice, currency)}
         </span>
@@ -251,16 +255,18 @@ export function ProductDetail({
             {fmt(compareAt, currency)}
           </span>
         )}
-        <span className="text-[12px] text-slate-400">/ {headlineUnit}</span>
+        <span className="text-[12.5px] font-medium text-slate-400">
+          / {headlineUnit}
+        </span>
       </div>
       {product.isCatchWeight && !usePieceSelection && (
-        <p className="mt-2.5 text-[12px] leading-[1.6] text-slate-400">
+        <p className="mt-2.5 text-[12.5px] leading-[1.6] text-slate-400">
           Precio estimado · el total se ajusta al peso real al preparar tu
           pedido
         </p>
       )}
       {usePieceSelection && (
-        <p className="mt-2.5 text-[12px] leading-[1.6] text-slate-400">
+        <p className="mt-2.5 text-[12.5px] leading-[1.6] text-slate-400">
           Elige tu pieza exacta · pagas por su peso real
         </p>
       )}
@@ -270,11 +276,11 @@ export function ProductDetail({
       {product.offer && (
         <div className={BLOCK}>
           <p className="eyebrow">Oferta</p>
-          <p className="mt-3.5 text-[14px] font-semibold text-ink">
+          <p className="mt-3 text-[14px] font-semibold text-ink">
             {product.offer.name}
           </p>
           {offerEndsAtLabel && (
-            <p className="mt-1.5 text-[12px] text-slate-400">
+            <p className="mt-1.5 text-[12.5px] text-slate-400">
               Termina el {offerEndsAtLabel}
             </p>
           )}
@@ -325,7 +331,7 @@ export function ProductDetail({
             }))}
           />
           {selected?.wholesalePrice != null && (
-            <p className="tabular mt-3.5 text-[12px] text-slate-400">
+            <p className="tabular mt-3 text-[12.5px] text-slate-400">
               Mayoreo: {fmt(selected.wholesalePrice, currency)}
             </p>
           )}
@@ -335,7 +341,7 @@ export function ProductDetail({
       {usePieceSelection && (
         <div className={BLOCK}>
           <p className="eyebrow">Piezas disponibles</p>
-          <div className="mt-4 flex flex-wrap gap-2.5">
+          <div className="mt-4 flex flex-wrap gap-2">
             {matchingPieces.map((p) => {
               const active = selectedPieceIds.includes(p.pieceId);
               return (
@@ -344,14 +350,14 @@ export function ProductDetail({
                   type="button"
                   onClick={() => togglePiece(p.pieceId)}
                   aria-pressed={active}
-                  className={`${CHIP_BASE} ${active ? CHIP_ON : CHIP_OFF}`}
+                  className={cn(CHIP_BASE, active ? CHIP_ON : CHIP_OFF)}
                 >
                   {p.weightKg.toFixed(2)} kg · {fmt(p.price ?? 0, currency)}
                 </button>
               );
             })}
           </div>
-          <p className="mt-3.5 text-[12px] leading-[1.6] text-slate-400">
+          <p className="mt-3 text-[12.5px] leading-[1.6] text-slate-400">
             Selecciona una o varias piezas; cada una se cobra por su peso real.
           </p>
         </div>
@@ -361,27 +367,12 @@ export function ProductDetail({
         <div className={BLOCK}>
           <div className="flex items-center justify-between gap-5">
             <span className="eyebrow">Cantidad</span>
-            <div className="flex items-center border-b border-rule">
-              <button
-                type="button"
-                onClick={() => setQty((q) => Math.max(1, q - 1))}
-                aria-label="Disminuir cantidad"
-                className={STEP_BTN}
-              >
-                <Minus className="h-4 w-4" strokeWidth={1.6} />
-              </button>
-              <span className="tabular w-10 text-center text-[15px] font-semibold text-ink">
-                {qty}
-              </span>
-              <button
-                type="button"
-                onClick={() => setQty((q) => q + 1)}
-                aria-label="Aumentar cantidad"
-                className={STEP_BTN}
-              >
-                <Plus className="h-4 w-4" strokeWidth={1.6} />
-              </button>
-            </div>
+            <QtyStepper
+              size="lg"
+              qty={qty}
+              onInc={() => setQty((q) => q + 1)}
+              onDec={() => setQty((q) => Math.max(1, q - 1))}
+            />
           </div>
         </div>
       )}
@@ -391,7 +382,7 @@ export function ProductDetail({
   const cta = (
     <>
       <div className="flex items-baseline justify-between gap-5">
-        <span className="text-[12px] text-slate-400">
+        <span className="text-[12.5px] text-slate-400">
           Total{" "}
           <span className="tabular">
             {usePieceSelection
@@ -399,17 +390,17 @@ export function ProductDetail({
               : `(${qty} × ${fmt(unitPrice, currency)})`}
           </span>
         </span>
-        <span className="tabular text-[19px] font-bold text-navy-900">
+        <span className="tabular text-[20px] font-bold text-navy-900">
           {fmt(displayTotal, currency)}
         </span>
       </div>
       {product.isCatchWeight && !usePieceSelection && (
-        <p className="mt-2.5 text-[12px] leading-[1.6] text-slate-400">
+        <p className="mt-2.5 text-[12.5px] leading-[1.6] text-slate-400">
           El total se ajusta al peso real al preparar tu pedido
         </p>
       )}
       {usePieceSelection && (
-        <p className="mt-2.5 text-[12px] leading-[1.6] text-slate-400">
+        <p className="mt-2.5 text-[12.5px] leading-[1.6] text-slate-400">
           Precio real por pieza — sin ajustes al preparar tu pedido
         </p>
       )}
@@ -419,9 +410,11 @@ export function ProductDetail({
         size="lg"
         onClick={handleAdd}
         aria-disabled={addDisabled}
-        className={`mt-6 w-full ${
-          addDisabled ? "cursor-not-allowed bg-disabled hover:bg-disabled" : ""
-        }`}
+        className={cn(
+          "mt-5 w-full",
+          addDisabled &&
+            "cursor-not-allowed bg-surface text-disabled hover:bg-surface"
+        )}
       >
         {soldOut || formatSoldOut
           ? "Agotado"
@@ -430,8 +423,8 @@ export function ProductDetail({
             : "Añadir a la bolsa"}
       </Button>
 
-      <p className="tabular mt-4 flex items-center gap-2 text-[12px] text-slate-400">
-        <Truck className="h-4 w-4 flex-none" strokeWidth={1.6} />
+      <p className="tabular mt-4 flex items-center gap-2 text-[12.5px] text-slate-400">
+        <Truck className="h-4 w-4 flex-none" strokeWidth={1.8} />
         Envío gratis en pedidos desde {fmt(FREE_SHIPPING_TARGET, currency)}
       </p>
     </>
@@ -441,10 +434,10 @@ export function ProductDetail({
     return (
       <div className="flex flex-col">
         {media}
-        <div className="flex flex-col px-5 pt-7">{info}</div>
+        <div className="flex flex-col px-5 pt-6">{info}</div>
         {/* Pegado al borde de la hoja: en una lista larga de presentaciones o
             pesajes el CTA quedaría fuera de alcance al final del scroll. */}
-        <div className="sticky bottom-0 mt-7 border-t border-line bg-canvas px-5 pt-5 pb-6">
+        <div className="sticky bottom-0 mt-6 border-t border-line bg-canvas/95 px-5 pt-4 pb-5 backdrop-blur">
           {cta}
         </div>
       </div>
@@ -452,13 +445,15 @@ export function ProductDetail({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2">
-      <div className="border-b border-line md:border-r md:border-b-0">
-        {media}
-      </div>
-      <div className="flex flex-col px-5 py-9 md:px-10 md:py-12">
-        {info}
-        <div className={BLOCK}>{cta}</div>
+    <div className="mx-auto w-full max-w-[1120px] px-5 py-6 md:px-6 md:py-10">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-10 lg:gap-14">
+        {/* La celda se estira a la altura de la fila; la imagen (cuadrada)
+            queda pegada dentro de ella mientras la columna de info hace scroll. */}
+        <div>{media}</div>
+        <div className="flex flex-col rounded-lg bg-canvas p-5 shadow-card md:p-7">
+          {info}
+          <div className={BLOCK}>{cta}</div>
+        </div>
       </div>
     </div>
   );

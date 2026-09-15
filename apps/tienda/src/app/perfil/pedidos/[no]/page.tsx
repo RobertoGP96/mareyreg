@@ -7,11 +7,20 @@ import { useStore, type StoredOrder } from "@/lib/store";
 import { EmptyState } from "@/components/empty-state";
 import { ScreenHeader } from "@/components/screen-header";
 
-const STATUS_COLOR: Record<StoredOrder["status"], string> = {
-  "En preparación": "text-ok",
-  "En revisión": "text-warn",
-  "Por pesar": "text-warn",
+const PILL =
+  "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none";
+
+const STATUS_PILL: Record<StoredOrder["status"], string> = {
+  "En preparación": "bg-tint text-navy-700",
+  "Por pesar": "bg-gold-100 text-gold-600",
+  "En revisión": "bg-surface text-slate-500",
 };
+
+// Los pedidos viven en localStorage: un estado guardado por una versión previa
+// puede no estar en el mapa, así que hay estilo de reserva.
+function statusPillClass(status: StoredOrder["status"]): string {
+  return `${PILL} ${STATUS_PILL[status] ?? "bg-surface text-slate-500"}`;
+}
 
 const STATUS_NOTE: Record<StoredOrder["status"], string> = {
   "En preparación": "Estamos preparando tu pedido para la entrega.",
@@ -31,6 +40,8 @@ function formatOrderDate(dateIso: string): string {
   });
 }
 
+const CARD = "rounded-lg bg-canvas p-4 shadow-card md:p-5";
+
 function SummaryRow({
   label,
   value,
@@ -41,9 +52,13 @@ function SummaryRow({
   tone?: string;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-line-soft py-3">
+    <div className="flex items-baseline justify-between gap-4">
       <dt className={`text-[13px] ${tone ?? "text-slate-500"}`}>{label}</dt>
-      <dd className={`tabular text-[13px] ${tone ?? "text-ink"}`}>{value}</dd>
+      <dd
+        className={`tabular text-right text-[13.5px] font-medium ${tone ?? "text-ink"}`}
+      >
+        {value}
+      </dd>
     </div>
   );
 }
@@ -64,8 +79,11 @@ export default function OrderDetailPage() {
     return (
       <div className="flex flex-1 flex-col">
         <ScreenHeader eyebrow="Mi cuenta" title="Pedido" backHref="/perfil/pedidos" />
-        <div className="px-5 pt-8 md:px-10">
-          <div className="h-4 w-40 bg-surface" />
+        <div className="mx-auto w-full max-w-[720px] px-5 pb-14 md:px-6">
+          <div className={CARD}>
+            <div className="h-4 w-40 rounded-full bg-surface" />
+            <div className="mt-3 h-3 w-24 rounded-full bg-surface" />
+          </div>
         </div>
       </div>
     );
@@ -95,64 +113,70 @@ export default function OrderDetailPage() {
         eyebrow="Mi cuenta"
         title={`Pedido ${order.no}`}
         backHref="/perfil/pedidos"
-      >
-        <span className={`nav-label ${STATUS_COLOR[order.status] ?? "text-slate-500"}`}>
-          {order.status}
-        </span>
-      </ScreenHeader>
+      />
 
-      <div className="px-5 pb-16 md:px-10">
-        <div className="border-b border-line py-7">
-          <p className="tabular text-[13px] text-slate-400">
-            {formatOrderDate(order.dateIso)} · {order.itemsCount}{" "}
-            {order.itemsCount === 1 ? "artículo" : "artículos"}
-          </p>
+      <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-5 pb-14 md:px-6">
+        <div className={CARD}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="tabular text-[14px] font-semibold text-ink">
+                Pedido {order.no}
+              </p>
+              <p className="tabular mt-1 text-[12.5px] text-slate-500">
+                {formatOrderDate(order.dateIso)} · {order.itemsCount}{" "}
+                {order.itemsCount === 1 ? "artículo" : "artículos"}
+              </p>
+            </div>
+            <span className={`${statusPillClass(order.status)} flex-none`}>
+              {order.status}
+            </span>
+          </div>
           {STATUS_NOTE[order.status] && (
-            <p className="mt-3 max-w-[520px] text-[13px] leading-[1.65] text-pretty text-slate-500">
+            <p className="mt-3 border-t border-line-soft pt-3 text-[13px] leading-[1.65] text-pretty text-slate-500">
               {STATUS_NOTE[order.status]}
             </p>
           )}
         </div>
 
-        <section className="border-b border-line py-8">
-          <h2 className="eyebrow">Artículos</h2>
-          {order.lines?.length ? (
-            <div className="mt-5">
-              {order.lines.map((line) => (
-                <div
-                  key={line.sku}
-                  className="flex items-start justify-between gap-5 border-b border-line-soft py-4"
-                >
-                  <div className="min-w-0">
-                    <p className="text-[14px] font-semibold text-ink">
-                      {line.name}
-                    </p>
-                    <p className="tabular mt-1.5 text-[12px] text-slate-400">
-                      {[line.modelLabel, line.presentationName]
-                        .filter(Boolean)
-                        .map((part) => `${part} · `)
-                        .join("")}
-                      {line.qty} × {fmt(line.unitPrice, currency)}
-                      {line.isCatchWeight ? " / kg" : ""}
+        <section>
+          <h2 className="eyebrow mb-2.5">Artículos</h2>
+          <div className="rounded-lg bg-canvas px-4 shadow-card md:px-5">
+            {order.lines?.length ? (
+              <div className="divide-y divide-line-soft">
+                {order.lines.map((line) => (
+                  <div
+                    key={line.sku}
+                    className="flex justify-between gap-4 py-3 text-[13.5px]"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-ink">{line.name}</p>
+                      <p className="tabular mt-1 text-[12.5px] text-slate-500">
+                        {[line.modelLabel, line.presentationName]
+                          .filter(Boolean)
+                          .map((part) => `${part} · `)
+                          .join("")}
+                        {line.qty} × {fmt(line.unitPrice, currency)}
+                        {line.isCatchWeight ? " / kg" : ""}
+                      </p>
+                    </div>
+                    <p className="tabular flex-none font-semibold text-navy-900">
+                      {fmt(line.total, currency)}
                     </p>
                   </div>
-                  <p className="tabular flex-none text-[14px] font-semibold text-navy-900">
-                    {fmt(line.total, currency)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-5 max-w-[520px] text-[13px] leading-[1.65] text-pretty text-slate-500">
-              Este pedido se guardó antes de que la tienda registrara el detalle
-              de los artículos, así que solo conservamos el importe total.
-            </p>
-          )}
+                ))}
+              </div>
+            ) : (
+              <p className="py-4 text-[13px] leading-[1.65] text-pretty text-slate-500">
+                Este pedido se guardó antes de que la tienda registrara el detalle
+                de los artículos, así que solo conservamos el importe total.
+              </p>
+            )}
+          </div>
         </section>
 
-        <section className="border-b border-line py-8">
-          <h2 className="eyebrow">Resumen</h2>
-          <dl className="mt-5 max-w-[420px]">
+        <section>
+          <h2 className="eyebrow mb-2.5">Resumen</h2>
+          <dl className={`${CARD} flex flex-col gap-2.5`}>
             {hasBreakdown && (
               <>
                 <SummaryRow
@@ -176,9 +200,13 @@ export default function OrderDetailPage() {
                 />
               </>
             )}
-            <div className="flex items-baseline justify-between gap-4 pt-4">
+            <div
+              className={`flex items-baseline justify-between gap-4 ${
+                hasBreakdown ? "mt-1 border-t border-line-soft pt-3" : ""
+              }`}
+            >
               <dt className="text-[13px] font-semibold text-ink">Total</dt>
-              <dd className="tabular text-[21px] font-bold text-navy-900">
+              <dd className="tabular text-[20px] font-bold text-navy-900">
                 {fmt(order.total, currency)}
               </dd>
             </div>
@@ -186,9 +214,9 @@ export default function OrderDetailPage() {
         </section>
 
         {(order.delivery || order.payment) && (
-          <section className="py-8">
-            <h2 className="eyebrow">Entrega y pago</h2>
-            <dl className="mt-5 max-w-[420px]">
+          <section>
+            <h2 className="eyebrow mb-2.5">Entrega y pago</h2>
+            <dl className={`${CARD} flex flex-col gap-2.5`}>
               {order.delivery && (
                 <SummaryRow
                   label="Entrega"

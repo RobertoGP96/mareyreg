@@ -6,7 +6,10 @@ export function Toast() {
   const { state } = useStore();
   if (!state.toast) return null;
   return (
-    <div className="toast-pop nav-label z-50 bg-navy-900 px-5 py-3 whitespace-nowrap text-canvas">
+    <div
+      role="status"
+      className="toast-pop z-50 max-w-[calc(100vw-40px)] truncate rounded-full bg-navy-900 px-5 py-3 text-[13px] font-medium whitespace-nowrap text-canvas shadow-float"
+    >
       {state.toast}
     </div>
   );

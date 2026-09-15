@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Banknote,
   CreditCard,
   Loader2,
+  ShoppingBag,
   Store,
   Truck,
   type LucideIcon,
@@ -15,7 +15,10 @@ import { submitOrder } from "@/app/actions/order-actions";
 import { computeTotals, lineTotal, SHIPPING_COST } from "@/lib/cart-totals";
 import { fmt } from "@/lib/format";
 import { cartCount, cartLines, useStore } from "@/lib/store";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/empty-state";
+import { ScreenHeader } from "@/components/screen-header";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 type Delivery = "domicilio" | "recogida";
@@ -23,6 +26,8 @@ type Payment = "efectivo" | "transferencia";
 type FieldKey = "name" | "phone" | "email" | "address" | "cart";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const LABEL_CLASS = "mb-1.5 block text-[12px] font-semibold text-slate-500";
 
 function OptionRow({
   title,
@@ -42,27 +47,30 @@ function OptionRow({
       type="button"
       onClick={onSelect}
       aria-pressed={active}
-      className={`flex w-full items-center gap-3.5 border px-4 py-3.5 text-left transition-colors duration-150 ${
-        active ? "border-navy-900" : "border-line hover:border-navy-900"
-      }`}
+      className={cn(
+        "flex w-full items-center gap-3.5 rounded-md border-[1.5px] px-4 py-3.5 text-left transition-colors duration-150",
+        active
+          ? "border-navy-700 bg-tint"
+          : "border-line bg-canvas hover:border-navy-700"
+      )}
     >
       {Icon && (
-        <Icon
-          className={`h-4 w-4 flex-none ${
-            active ? "text-navy-900" : "text-slate-400"
-          }`}
-          strokeWidth={1.6}
-        />
+        <span
+          className={cn(
+            "flex h-9 w-9 flex-none items-center justify-center rounded-full",
+            active
+              ? "bg-canvas text-navy-700 shadow-card"
+              : "bg-surface text-slate-500"
+          )}
+        >
+          <Icon className="h-4 w-4" strokeWidth={1.8} />
+        </span>
       )}
       <span className="min-w-0 flex-1">
-        <span
-          className={`block text-[13.5px] ${
-            active ? "font-bold text-navy-900" : "font-medium text-ink"
-          }`}
-        >
+        <span className="block text-[14px] font-semibold text-ink">
           {title}
         </span>
-        <span className="tabular mt-0.5 block text-[12px] text-slate-400">
+        <span className="tabular mt-0.5 block text-[12px] text-slate-500">
           {subtitle}
         </span>
       </span>
@@ -120,6 +128,9 @@ export function CheckoutForm() {
     error?.field === field ? (
       <p className="mt-1.5 text-[12px] text-danger">{error.message}</p>
     ) : null;
+
+  const fieldClass = (field: FieldKey) =>
+    cn(error?.field === field && "border-danger");
 
   const handleSubmit = async () => {
     if (sending) return;
@@ -233,36 +244,25 @@ export function CheckoutForm() {
   };
 
   const header = (
-    <section className="border-b border-line px-5 pt-12 pb-9 md:px-10">
-      <p className="eyebrow">Paso final</p>
-      <h1 className="font-display mt-4 text-[42px] leading-none text-navy-900 md:text-[56px]">
-        Finalizar compra
-      </h1>
-      <Link
-        href="/carrito"
-        className="mt-6 inline-block border-b border-line text-[11.5px] font-medium tracking-[.16em] text-slate-400 uppercase transition-colors duration-150 hover:border-navy-900 hover:text-navy-900"
-      >
-        Volver al carrito
-      </Link>
-    </section>
+    <ScreenHeader
+      eyebrow="Paso final"
+      title="Finalizar compra"
+      backHref="/carrito"
+    />
   );
 
   if (state.hydrated && lines.length === 0) {
     return (
       <div className="flex flex-1 flex-col">
         {header}
-        <div className="flex flex-1 flex-col items-center justify-center px-5 py-24 text-center md:px-10">
-          <p className="eyebrow">Sin artículos</p>
-          <p className="font-display mt-4 text-[32px] leading-none text-navy-900">
-            Tu carrito está vacío
-          </p>
-          <p className="mt-4 max-w-[380px] text-[13.5px] leading-[1.65] text-pretty text-slate-500">
-            Explora el catálogo y añade productos.
-          </p>
-          <ButtonLink href="/catalogo" className="mt-7">
-            Ir al catálogo
-          </ButtonLink>
-        </div>
+        <EmptyState
+          icon={ShoppingBag}
+          eyebrow="Sin artículos"
+          title="Tu carrito está vacío"
+          description="Explora el catálogo y añade productos."
+          ctaLabel="Ir al catálogo"
+          ctaHref="/catalogo"
+        />
       </div>
     );
   }
@@ -271,17 +271,21 @@ export function CheckoutForm() {
     <div className="flex flex-1 flex-col">
       {header}
 
-      <div className="mx-auto w-full max-w-[560px] px-5 pb-20 md:px-10">
-        <section className="py-9">
-          <h2 className="eyebrow">Datos de contacto</h2>
-          <div className="mt-6 flex flex-col gap-5">
+      <div className="mx-auto flex w-full max-w-[560px] flex-col gap-5 px-5 pb-16 md:px-6">
+        <section className="rounded-lg bg-canvas p-5 shadow-card md:p-6">
+          <p className="eyebrow">Paso 1</p>
+          <h2 className="mt-1.5 text-[15px] font-semibold text-ink">
+            Datos de contacto
+          </h2>
+          <div className="mt-5 flex flex-col gap-4">
             <div>
-              <label htmlFor="checkout-name" className="eyebrow">
+              <label htmlFor="checkout-name" className={LABEL_CLASS}>
                 Nombre y apellidos
               </label>
               <Input
                 id="checkout-name"
-                className="mt-2.5"
+                variant="box"
+                className={fieldClass("name")}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Nombre y apellidos"
@@ -291,12 +295,13 @@ export function CheckoutForm() {
               {fieldError("name")}
             </div>
             <div>
-              <label htmlFor="checkout-phone" className="eyebrow">
+              <label htmlFor="checkout-phone" className={LABEL_CLASS}>
                 Teléfono
               </label>
               <Input
                 id="checkout-phone"
-                className="mt-2.5"
+                variant="box"
+                className={fieldClass("phone")}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="Teléfono"
@@ -307,12 +312,13 @@ export function CheckoutForm() {
               {fieldError("phone")}
             </div>
             <div>
-              <label htmlFor="checkout-email" className="eyebrow">
+              <label htmlFor="checkout-email" className={LABEL_CLASS}>
                 Correo electrónico
               </label>
               <Input
                 id="checkout-email"
-                className="mt-2.5"
+                variant="box"
+                className={fieldClass("email")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Correo electrónico"
@@ -323,12 +329,13 @@ export function CheckoutForm() {
               {fieldError("email")}
             </div>
             <div>
-              <label htmlFor="checkout-address" className="eyebrow">
+              <label htmlFor="checkout-address" className={LABEL_CLASS}>
                 Dirección de entrega
               </label>
               <Input
                 id="checkout-address"
-                className="mt-2.5"
+                variant="box"
+                className={fieldClass("address")}
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Dirección de entrega"
@@ -340,9 +347,10 @@ export function CheckoutForm() {
           </div>
         </section>
 
-        <section className="border-t border-line py-9">
-          <h2 className="eyebrow">Entrega</h2>
-          <div className="mt-6 flex flex-col gap-3">
+        <section className="rounded-lg bg-canvas p-5 shadow-card md:p-6">
+          <p className="eyebrow">Paso 2</p>
+          <h2 className="mt-1.5 text-[15px] font-semibold text-ink">Entrega</h2>
+          <div className="mt-5 flex flex-col gap-3">
             <OptionRow
               title="A domicilio"
               subtitle={`${fmt(SHIPPING_COST, currency)} · 24–48 h`}
@@ -360,9 +368,10 @@ export function CheckoutForm() {
           </div>
         </section>
 
-        <section className="border-t border-line py-9">
-          <h2 className="eyebrow">Pago</h2>
-          <div className="mt-6 flex flex-col gap-3">
+        <section className="rounded-lg bg-canvas p-5 shadow-card md:p-6">
+          <p className="eyebrow">Paso 3</p>
+          <h2 className="mt-1.5 text-[15px] font-semibold text-ink">Pago</h2>
+          <div className="mt-5 flex flex-col gap-3">
             <OptionRow
               title="Efectivo"
               subtitle="Al recibir"
@@ -380,57 +389,62 @@ export function CheckoutForm() {
           </div>
         </section>
 
-        <section className="border-t border-line py-9">
-          <h2 className="eyebrow">
+        <section className="rounded-lg bg-canvas p-5 shadow-card md:p-6">
+          <p className="eyebrow">Tu pedido</p>
+          <h2 className="mt-1.5 text-[15px] font-semibold text-ink">
             Resumen · {itemsCount}{" "}
             {itemsCount === 1 ? "artículo" : "artículos"}
           </h2>
 
-          <dl className="mt-6">
-            <div className="flex items-baseline justify-between gap-4 border-b border-line-soft py-3">
-              <dt className="text-[13px] text-slate-500">Subtotal</dt>
-              <dd className="tabular text-[13px] text-ink">
+          <dl className="mt-5 flex flex-col gap-2.5">
+            <div className="flex justify-between text-[13.5px]">
+              <dt className="text-slate-500">Subtotal</dt>
+              <dd className="tabular font-medium text-ink">
                 {fmt(totals.subtotal, currency)}
               </dd>
             </div>
             {totals.discount > 0 && (
-              <div className="flex items-baseline justify-between gap-4 border-b border-line-soft py-3">
-                <dt className="text-[13px] text-ok">Descuento</dt>
-                <dd className="tabular text-[13px] text-ok">
+              <div className="flex justify-between text-[13.5px]">
+                <dt className="text-ok">Descuento</dt>
+                <dd className="tabular font-medium text-ok">
                   −{fmt(totals.discount, currency)}
                 </dd>
               </div>
             )}
-            <div className="flex items-baseline justify-between gap-4 border-b border-line py-3">
-              <dt className="text-[13px] text-slate-500">Envío</dt>
-              <dd className="tabular text-[13px] text-ink">
+            <div className="flex justify-between text-[13.5px]">
+              <dt className="text-slate-500">Envío</dt>
+              <dd className="tabular font-medium text-ink">
                 {totals.shipping === 0
                   ? "Gratis"
                   : fmt(totals.shipping, currency)}
               </dd>
             </div>
-            <div className="flex items-baseline justify-between gap-4 pt-5">
-              <dt className="text-[13px] font-semibold text-ink">Total</dt>
-              <dd className="tabular text-[21px] font-bold text-navy-900">
+            <div className="mt-1 flex items-baseline justify-between border-t border-line pt-3 text-[15px] font-semibold">
+              <dt className="text-ink">Total</dt>
+              <dd className="tabular text-[20px] font-bold text-navy-900">
                 {fmt(totals.total, currency)}
               </dd>
             </div>
           </dl>
 
-          <p className="mt-5 text-[12.5px] leading-[1.65] text-slate-500">
-            {delivery === "domicilio"
-              ? "Entrega estimada: 24–48 horas"
-              : "Listo para recoger hoy mismo"}
-          </p>
-          {hasEstimatedLines && (
-            <p className="mt-2 text-[12.5px] leading-[1.65] text-slate-500">
-              Este pedido incluye productos de peso variable: el total se ajusta
-              al peso real al preparar tu pedido.
+          <div className="mt-4 flex flex-col gap-2 text-[12.5px] leading-[1.65] text-slate-500">
+            <p>
+              {delivery === "domicilio"
+                ? "Entrega estimada: 24–48 horas"
+                : "Listo para recoger hoy mismo"}
             </p>
-          )}
+            {hasEstimatedLines && (
+              <p>
+                Este pedido incluye productos de peso variable: el total se
+                ajusta al peso real al preparar tu pedido.
+              </p>
+            )}
+          </div>
 
           {error?.field === "cart" && (
-            <p className="mt-4 text-[12px] text-danger">{error.message}</p>
+            <p className="mt-4 rounded-md bg-danger-soft px-4 py-3 text-[13px] text-danger">
+              {error.message}
+            </p>
           )}
 
           <Button
@@ -438,7 +452,7 @@ export function CheckoutForm() {
             size="lg"
             onClick={handleSubmit}
             disabled={sending}
-            className="tabular mt-8 w-full"
+            className="tabular mt-6 w-full"
           >
             {sending && <Loader2 className="h-4 w-4 animate-spin" />}
             {sending

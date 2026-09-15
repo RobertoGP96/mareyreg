@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { ShoppingBag, X } from "lucide-react";
 import {
   COUPON_CODE,
   computeTotals,
@@ -10,8 +10,10 @@ import {
 } from "@/lib/cart-totals";
 import { fmt } from "@/lib/format";
 import { cartLines, useStore } from "@/lib/store";
+import { EmptyState } from "@/components/empty-state";
 import { ProductImage } from "@/components/product-image";
 import { QtyStepper } from "@/components/qty-stepper";
+import { ScreenHeader } from "@/components/screen-header";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -50,52 +52,23 @@ export default function CartPage() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <section className="border-b border-line px-5 pt-12 pb-9 md:px-10">
-        <p className="eyebrow">Tu selección</p>
-        <h1 className="font-display mt-4 text-[42px] leading-none text-navy-900 md:text-[56px]">
-          Carrito
-        </h1>
-      </section>
+      <ScreenHeader eyebrow="Tu selección" title="Carrito" />
 
       {lines.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center px-5 py-24 text-center md:px-10">
-          <p className="eyebrow">Sin artículos</p>
-          <p className="font-display mt-4 text-[32px] leading-none text-navy-900">
-            Tu carrito está vacío
-          </p>
-          <p className="mt-4 max-w-[380px] text-[13.5px] leading-[1.65] text-pretty text-slate-500">
-            Explora el catálogo y añade productos.
-          </p>
-          <ButtonLink href="/catalogo" className="mt-7">
-            Ir al catálogo
-          </ButtonLink>
-        </div>
+        <EmptyState
+          icon={ShoppingBag}
+          eyebrow="Sin artículos"
+          title="Tu carrito está vacío"
+          description="Explora el catálogo y añade productos."
+          ctaLabel="Ir al catálogo"
+          ctaHref="/catalogo"
+        />
       ) : (
-        <div className="flex flex-1 flex-col lg:flex-row lg:items-start">
-          <div className="flex-1 lg:border-r lg:border-line">
-            <div className="border-b border-line px-5 py-5 md:px-10">
-              <div className="flex items-baseline justify-between gap-4">
-                <span className="text-[12.5px] text-slate-500">
-                  {shippingMessage(totals, currency)}
-                </span>
-                <span className="tabular text-[11px] font-bold text-navy-900">
-                  {totals.shippingPct}%
-                </span>
-              </div>
-              <div className="mt-3 h-0.5 w-full bg-line">
-                <div
-                  className="h-0.5 bg-navy-900 transition-[width] duration-150"
-                  style={{ width: `${totals.shippingPct}%` }}
-                />
-              </div>
-            </div>
-
+        <div className="mx-auto w-full max-w-[1120px] px-5 pb-14 md:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-8">
+          <div className="divide-y divide-line-soft rounded-lg bg-canvas shadow-card">
             {lines.map((line) => (
-              <div
-                key={line.sku}
-                className="flex gap-4 border-b border-line-soft px-5 py-6 md:px-10"
-              >
-                <div className="relative h-[76px] w-[76px] flex-none overflow-hidden bg-surface text-[9px] tracking-[.22em] text-slate-300">
+              <div key={line.sku} className="flex gap-4 p-4 md:p-5">
+                <div className="relative h-[76px] w-[76px] flex-none overflow-hidden rounded-md bg-surface">
                   <span className="absolute inset-0 flex items-center justify-center">
                     <ProductImage
                       src={line.imageUrl}
@@ -126,16 +99,16 @@ export default function CartPage() {
                           onClick={() => removePiece(line.sku, p.pieceId)}
                           aria-label={`Quitar pieza de ${p.weightKg.toFixed(2)} kg`}
                           title="Quitar esta pieza"
-                          className="tabular inline-flex items-center gap-1.5 border border-line px-2 py-1 text-[10.5px] font-medium text-slate-500 transition-colors duration-150 hover:border-danger hover:text-danger"
+                          className="tabular inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-line px-2.5 py-1 text-[11px] font-medium text-slate-500 transition-colors hover:border-danger hover:text-danger"
                         >
                           {p.weightKg.toFixed(2)} kg · {fmt(p.price, currency)}
-                          <X className="h-3.5 w-3.5" strokeWidth={1.6} />
+                          <X className="h-3.5 w-3.5" strokeWidth={2} />
                         </button>
                       ))}
                     </div>
                   ) : (
                     line.isCatchWeight && (
-                      <p className="text-[11.5px] text-slate-400">
+                      <p className="text-[12px] text-slate-400">
                         Precio estimado · se ajusta al peso real
                       </p>
                     )
@@ -145,7 +118,7 @@ export default function CartPage() {
                     <span className="tabular text-[15px] font-bold text-navy-900">
                       {fmt(lineTotal(line), currency)}
                     </span>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       {!line.pieces?.length && (
                         <QtyStepper
                           qty={line.qty}
@@ -157,6 +130,7 @@ export default function CartPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeLine(line.sku)}
+                        className="hover:text-danger"
                       >
                         Quitar
                       </Button>
@@ -167,57 +141,79 @@ export default function CartPage() {
             ))}
           </div>
 
-          <aside className="px-5 py-8 md:px-10 lg:sticky lg:top-[78px] lg:w-[380px] lg:flex-none lg:px-8">
+          <aside className="mt-6 rounded-lg bg-canvas p-5 shadow-card md:p-6 lg:mt-0 lg:sticky lg:top-[84px]">
             <p className="eyebrow">Resumen</p>
 
-            <dl className="mt-6">
-              <div className="flex items-baseline justify-between gap-4 border-b border-line-soft py-3">
-                <dt className="text-[13px] text-slate-500">Subtotal</dt>
-                <dd className="tabular text-[13px] text-ink">
+            <div className="mt-4">
+              <div className="flex items-baseline justify-between gap-4">
+                <span className="text-[12.5px] text-slate-500">
+                  {shippingMessage(totals, currency)}
+                </span>
+                <span className="tabular text-[12px] font-semibold text-navy-900">
+                  {totals.shippingPct}%
+                </span>
+              </div>
+              <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-line">
+                <div
+                  className="h-full rounded-full bg-navy-700 transition-[width] duration-500 motion-reduce:transition-none"
+                  style={{ width: `${totals.shippingPct}%` }}
+                />
+              </div>
+            </div>
+
+            <dl className="mt-5 flex flex-col gap-2.5">
+              <div className="flex justify-between text-[13.5px]">
+                <dt className="text-slate-500">Subtotal</dt>
+                <dd className="tabular font-medium text-ink">
                   {fmt(totals.subtotal, currency)}
                 </dd>
               </div>
               {totals.discount > 0 && (
-                <div className="flex items-baseline justify-between gap-4 border-b border-line-soft py-3">
-                  <dt className="text-[13px] text-ok">
-                    Descuento {COUPON_CODE} (−10%)
-                  </dt>
-                  <dd className="tabular text-[13px] text-ok">
+                <div className="flex justify-between text-[13.5px]">
+                  <dt className="text-ok">Descuento {COUPON_CODE} (−10%)</dt>
+                  <dd className="tabular font-medium text-ok">
                     −{fmt(totals.discount, currency)}
                   </dd>
                 </div>
               )}
-              <div className="flex items-baseline justify-between gap-4 border-b border-line py-3">
-                <dt className="text-[13px] text-slate-500">Envío</dt>
-                <dd className="tabular text-[13px] text-ink">
+              <div className="flex justify-between text-[13.5px]">
+                <dt className="text-slate-500">Envío</dt>
+                <dd className="tabular font-medium text-ink">
                   {totals.shipping === 0
                     ? "Gratis"
                     : fmt(totals.shipping, currency)}
                 </dd>
               </div>
-              <div className="flex items-baseline justify-between gap-4 pt-5">
-                <dt className="text-[13px] font-semibold text-ink">Total</dt>
-                <dd className="tabular text-[21px] font-bold text-navy-900">
+              <div className="mt-1 flex items-baseline justify-between border-t border-line pt-3 text-[15px] font-semibold">
+                <dt className="text-ink">Total</dt>
+                <dd className="tabular text-[20px] font-bold text-navy-900">
                   {fmt(totals.total, currency)}
                 </dd>
               </div>
             </dl>
 
-            <div className="mt-9 border-t border-line pt-7">
-              <label htmlFor="coupon" className="eyebrow">
+            <div className="mt-5">
+              <label
+                htmlFor="coupon"
+                className="mb-1.5 block text-[12px] font-semibold text-slate-500"
+              >
                 Código de descuento
               </label>
-              <div className="mt-3 flex items-end gap-5">
+              <div className="flex gap-2">
                 <Input
                   id="coupon"
-                  variant="rule"
+                  variant="box"
                   value={couponInput}
                   onChange={(e) => setCouponInput(e.target.value)}
                   placeholder={COUPON_CODE}
                   autoComplete="off"
                   className="flex-1"
                 />
-                <Button onClick={handleCoupon} className="flex-none">
+                <Button
+                  variant="soft"
+                  onClick={handleCoupon}
+                  className="flex-none"
+                >
                   Aplicar
                 </Button>
               </div>
@@ -227,7 +223,7 @@ export default function CartPage() {
               href="/checkout"
               variant="solid"
               size="lg"
-              className="mt-9 w-full"
+              className="mt-5 w-full"
             >
               Ir a pagar
             </ButtonLink>
