@@ -128,7 +128,10 @@ export default function OrderDetailPage() {
                       {line.name}
                     </p>
                     <p className="tabular mt-1.5 text-[12px] text-slate-400">
-                      {line.presentationName ? `${line.presentationName} · ` : ""}
+                      {[line.modelLabel, line.presentationName]
+                        .filter(Boolean)
+                        .map((part) => `${part} · `)
+                        .join("")}
                       {line.qty} × {fmt(line.unitPrice, currency)}
                       {line.isCatchWeight ? " / kg" : ""}
                     </p>

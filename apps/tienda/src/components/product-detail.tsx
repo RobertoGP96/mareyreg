@@ -1,24 +1,47 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Heart, Minus, Plus, Truck } from "lucide-react";
 import type {
   WebstoreCurrency,
   WebstoreProduct,
   WebstoreProductPresentation,
 } from "@/lib/erp-client";
-import { discountPct, fmt } from "@/lib/format";
+import { fmt } from "@/lib/format";
 import { FREE_SHIPPING_TARGET } from "@/lib/cart-totals";
+import {
+  basePresentation,
+  cartLineFor,
+  displayName,
+  formatAvailable,
+  formatCompareAtPrice,
+  formatDiscountPct,
+  formatPrice,
+  matchingPieces as matchingPiecesFor,
+  sortedPresentations,
+} from "@/lib/model-groups";
 import { useStore, type CartLine } from "@/lib/store";
+import { ModelSelector } from "@/components/model-selector";
 import { ProductImage } from "@/components/product-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  CHIP_BASE,
+  CHIP_OFF,
+  CHIP_ON,
+  ChoiceChips,
+} from "@/components/ui/choice-chips";
 import { StockLabel } from "@/components/ui/stock-label";
 
 interface ProductDetailProps {
   product: WebstoreProduct;
   currency: WebstoreCurrency;
+  /** Modelos del grupo (incluido `product`). Cambiar de modelo cambia el
+   *  `product` entero; formato, cantidad y piezas se reinician aquí dentro
+   *  (sin remontar: el chip enfocado debe conservar el foco del teclado). */
+  models?: WebstoreProduct[];
+  onSelectModel?: (sku: string) => void;
   /** `page` reparte imagen e info en dos columnas; `drawer` apila en una sola
    *  con el CTA pegado al borde inferior de la hoja. */
   variant?: "page" | "drawer";
@@ -28,70 +51,70 @@ interface ProductDetailProps {
 
 const BLOCK = "mt-7 border-t border-line-soft pt-7";
 
-const CHIP_BASE =
-  "tabular flex-none border px-4 py-2.5 text-[12px] transition-colors duration-150";
-const CHIP_ON = "border-navy-900 font-bold text-navy-900";
-const CHIP_OFF =
-  "border-line text-slate-500 hover:border-navy-900 hover:text-navy-900";
-
 const STEP_BTN =
   "flex h-9 w-9 items-center justify-center text-slate-400 transition-colors duration-150 hover:text-navy-900";
 
 export function ProductDetail({
   product,
   currency,
+  models,
+  onSelectModel,
   variant = "page",
   onAdded,
 }: ProductDetailProps) {
   const router = useRouter();
   const { state, toggleFav, addToCart, showToast } = useStore();
   const isDrawer = variant === "drawer";
+  const presentationLabelId = useId();
 
-  const presentations = useMemo(
-    () =>
-      [...product.presentations].sort(
-        (a, b) => Number(b.isBase) - Number(a.isBase)
-      ),
-    [product.presentations]
-  );
+  const presentations = useMemo(() => sortedPresentations(product), [product]);
   const hasSelector = presentations.length > 1;
+  const hasModels = (models?.length ?? 0) > 1;
 
   const [selected, setSelected] =
     useState<WebstoreProductPresentation | null>(presentations[0] ?? null);
   const [qty, setQty] = useState(1);
   const [selectedPieceIds, setSelectedPieceIds] = useState<number[]>([]);
 
+  // Otro modelo = otro producto: formato, cantidad y piezas vuelven al inicio.
+  const [seenProduct, setSeenProduct] = useState(product);
+  if (seenProduct !== product) {
+    setSeenProduct(product);
+    setSelected(presentations[0] ?? null);
+    setQty(1);
+    setSelectedPieceIds([]);
+  }
+
   const isFav = state.favs.includes(product.sku);
   const soldOut = product.stockAvailable <= 0;
-  const pct = discountPct(product);
+  const formatSoldOut = selected != null && !formatAvailable(product, selected);
+  const pct = formatDiscountPct(product, selected ?? basePresentation(product));
 
   const isBaseSelected = selected == null || selected.isBase;
-  // Catch-weight: el cobro real siempre es por kg, así que el precio de la
-  // presentación que se usa como referencia es el ESTIMADO (precio/kg × peso
-  // nominal), nunca el retailPrice de la presentación.
-  const unitPrice = selected
-    ? product.isCatchWeight && selected.estimatedPrice != null
-      ? selected.estimatedPrice
-      : selected.retailPrice
-    : product.price;
+  // Precio efectivo del formato (descuento y moneda ya aplicados por el ERP);
+  // en catch-weight el cobro real es por kg y la referencia es el ESTIMADO.
+  const unitPrice = selected ? formatPrice(product, selected) : product.price;
   const unitLabel = isBaseSelected ? "unidad" : selected.name.toLowerCase();
   // Precio principal mostrado: por kg en productos de peso variable.
   const showPerKg = product.isCatchWeight && product.pricePerKg != null;
   const headlinePrice = showPerKg ? product.pricePerKg! : unitPrice;
   const headlineUnit = showPerKg ? "kg" : unitLabel;
-  const showCompare = isBaseSelected && product.compareAtPrice != null;
+  // El tachado acompaña al precio principal: por kg cuando el titular es por
+  // kg (no cambia con el formato), si no el del formato elegido.
+  const compareAt = showPerKg
+    ? product.compareAtPrice != null && product.compareAtPrice > headlinePrice
+      ? product.compareAtPrice
+      : null
+    : selected
+      ? formatCompareAtPrice(product, selected)
+      : product.compareAtPrice;
 
-  // Pesajes disponibles que corresponden a la presentación elegida
-  // (pieceCount casa con piecesPerUnit) y con precio ya calculado por el ERP.
-  // Si hay piezas, el cliente elige la exacta y paga su peso real.
-  const matchingPieces = useMemo(() => {
-    if (!product.isCatchWeight || !product.pieces?.length) return [];
-    const piecesPerUnit = selected?.piecesPerUnit ?? null;
-    if (piecesPerUnit == null) return [];
-    return product.pieces.filter(
-      (p) => p.pieceCount === piecesPerUnit && p.price != null
-    );
-  }, [product, selected]);
+  // Pesajes disponibles que corresponden a la presentación elegida. Si hay
+  // piezas, el cliente elige la exacta y paga su peso real.
+  const matchingPieces = useMemo(
+    () => (selected ? matchingPiecesFor(product, selected) : []),
+    [product, selected]
+  );
   const usePieceSelection = matchingPieces.length > 0;
   const selectedPieces = matchingPieces.filter((p) =>
     selectedPieceIds.includes(p.pieceId)
@@ -107,7 +130,10 @@ export function ProductDetail({
   };
 
   const displayTotal = usePieceSelection ? piecesTotal : unitPrice * qty;
-  const addDisabled = soldOut || (usePieceSelection && selectedPieces.length === 0);
+  const addDisabled =
+    soldOut ||
+    formatSoldOut ||
+    (usePieceSelection && selectedPieces.length === 0);
 
   const offerEndsAtLabel =
     product.offer?.endsAt != null
@@ -119,7 +145,7 @@ export function ProductDetail({
       : null;
 
   const handleAdd = () => {
-    if (soldOut) {
+    if (soldOut || formatSoldOut) {
       showToast("Producto agotado");
       return;
     }
@@ -128,17 +154,7 @@ export function ProductDetail({
       return;
     }
     const line: CartLine = {
-      sku: selected?.sku ?? product.sku,
-      productSku: product.sku,
-      name: product.name,
-      presentationName:
-        selected && !selected.isBase ? selected.name : null,
-      unitPrice,
-      qty: 1,
-      imageUrl: product.imageUrl,
-      stockAvailable: product.stockAvailable,
-      isCatchWeight: product.isCatchWeight,
-      ...(product.pricePerKg != null ? { pricePerKg: product.pricePerKg } : {}),
+      ...cartLineFor(product, selected ?? basePresentation(product)),
       ...(usePieceSelection
         ? {
             pieces: selectedPieces.map((p) => ({
@@ -150,7 +166,7 @@ export function ProductDetail({
         : {}),
     };
     addToCart(line, usePieceSelection ? selectedPieces.length : qty);
-    showToast(`${product.name} añadido al carrito`);
+    showToast(`${displayName(product)} añadido al carrito`);
     onAdded?.();
     router.push("/carrito");
   };
@@ -167,8 +183,9 @@ export function ProductDetail({
     >
       <span className="absolute inset-0 flex items-center justify-center">
         <ProductImage
+          key={product.sku}
           src={product.imageUrl}
-          alt={product.name}
+          alt={displayName(product)}
           sizes={isDrawer ? "100vw" : "(min-width: 768px) 50vw, 100vw"}
           label="Foto producto"
           priority={!isDrawer}
@@ -217,16 +234,21 @@ export function ProductDetail({
           isDrawer ? "text-[24px]" : "text-[30px] md:text-[40px]"
         }`}
       >
-        {product.name}
+        {displayName(product, false)}
       </Heading>
+      {product.modelGroup && (
+        <p className="eyebrow mt-3">
+          {product.modelGroup.optionLabel} · {product.modelGroup.modelLabel}
+        </p>
+      )}
 
       <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="tabular text-[26px] font-bold text-navy-900">
           {fmt(headlinePrice, currency)}
         </span>
-        {showCompare && product.compareAtPrice != null && (
+        {compareAt != null && (
           <span className="tabular text-[14px] text-slate-400 line-through">
-            {fmt(product.compareAtPrice, currency)}
+            {fmt(compareAt, currency)}
           </span>
         )}
         <span className="text-[12px] text-slate-400">/ {headlineUnit}</span>
@@ -267,30 +289,41 @@ export function ProductDetail({
         </div>
       )}
 
+      {hasModels && models && (
+        <div className={BLOCK}>
+          <ModelSelector
+            models={models}
+            selectedSku={product.sku}
+            onSelect={(sku) => onSelectModel?.(sku)}
+            optionLabel={product.modelGroup?.optionLabel ?? "Modelo"}
+          />
+        </div>
+      )}
+
       {hasSelector && (
         <div className={BLOCK}>
-          <p className="eyebrow">Presentación</p>
-          <div className="mt-4 flex flex-wrap gap-2.5">
-            {presentations.map((pres) => {
-              const active = selected?.sku === pres.sku;
-              return (
-                <button
-                  key={pres.sku}
-                  type="button"
-                  onClick={() => {
-                    setSelected(pres);
-                    setSelectedPieceIds([]);
-                  }}
-                  aria-pressed={active}
-                  className={`${CHIP_BASE} ${active ? CHIP_ON : CHIP_OFF}`}
-                >
-                  {product.isCatchWeight && pres.estimatedPrice != null
-                    ? `${pres.name} · ≈${fmt(pres.estimatedPrice, currency)}`
-                    : `${pres.name} · ${fmt(pres.retailPrice, currency)}`}
-                </button>
-              );
-            })}
-          </div>
+          <p id={presentationLabelId} className="eyebrow">
+            Presentación
+          </p>
+          <ChoiceChips
+            labelledBy={presentationLabelId}
+            value={selected?.sku ?? null}
+            onChange={(sku) => {
+              const pres = presentations.find((p) => p.sku === sku);
+              if (!pres) return;
+              setSelected(pres);
+              setSelectedPieceIds([]);
+            }}
+            className="mt-3"
+            options={presentations.map((pres) => ({
+              value: pres.sku,
+              label: `${pres.name} · ${product.isCatchWeight ? "≈" : ""}${fmt(
+                formatPrice(product, pres),
+                currency
+              )}`,
+              disabled: !formatAvailable(product, pres),
+            }))}
+          />
           {selected?.wholesalePrice != null && (
             <p className="tabular mt-3.5 text-[12px] text-slate-400">
               Mayoreo: {fmt(selected.wholesalePrice, currency)}
@@ -390,7 +423,7 @@ export function ProductDetail({
           addDisabled ? "cursor-not-allowed bg-disabled hover:bg-disabled" : ""
         }`}
       >
-        {soldOut
+        {soldOut || formatSoldOut
           ? "Agotado"
           : usePieceSelection
             ? "Añadir piezas"

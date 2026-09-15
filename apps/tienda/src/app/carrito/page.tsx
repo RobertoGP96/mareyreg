@@ -106,9 +106,11 @@ export default function CartPage() {
                 </div>
 
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
-                  {line.presentationName && (
+                  {(line.modelLabel || line.presentationName) && (
                     <span className="eyebrow truncate">
-                      {line.presentationName}
+                      {[line.modelLabel, line.presentationName]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
                   )}
                   <h2 className="text-[15px] leading-[1.35] font-semibold text-ink">

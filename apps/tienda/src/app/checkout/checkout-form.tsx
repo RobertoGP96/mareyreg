@@ -203,6 +203,7 @@ export function CheckoutForm() {
           unitPrice: line.unitPrice,
           total: lineTotal(line),
           ...(line.isCatchWeight ? { isCatchWeight: true } : {}),
+          ...(line.modelLabel ? { modelLabel: line.modelLabel } : {}),
         })),
         subtotal: totals.subtotal,
         shipping: totals.shipping,

@@ -1,4 +1,5 @@
 import "server-only";
+import { sanitizeCatalog, type RawCatalogResponse } from "@/lib/catalog-sanitize";
 
 // Cliente hacia la API de webstore del ERP (apps/erp). Contrato documentado
 // en docs/WEBSTORE.md; los tipos reflejan los endpoints reales:
@@ -13,6 +14,7 @@ export interface WebstoreProductPresentation {
   sku: string;
   name: string;
   factor: number;
+  /** Precio de lista crudo (sin descuento ni conversión). Heredado: usar `price`. */
   retailPrice: number;
   wholesalePrice: number | null;
   barcode: string | null;
@@ -25,6 +27,22 @@ export interface WebstoreProductPresentation {
   estimatedPrice: number | null;
   /** Piezas disponibles en stock, solo catch-weight. */
   stockPieces: number | null;
+  /** Precio efectivo del formato (descuentos aplicados, moneda base): el mismo que factura el ERP. */
+  price: number;
+  /** Precio antes del descuento cuando `price` está rebajado; null si no hay descuento. */
+  compareAtPrice: number | null;
+}
+
+/** Pertenencia de un producto a un grupo de modelos (una card con selector en la tienda). */
+export interface WebstoreModelGroup {
+  groupId: number;
+  /** Título de la card ("Camiseta básica"). */
+  name: string;
+  /** Etiqueta del eje: "Modelo", "Talla", "Color". */
+  optionLabel: string;
+  /** Valor del eje para este producto ("M", "Rojo"). */
+  modelLabel: string;
+  sortOrder: number;
 }
 
 export interface WebstoreProductOffer {
@@ -71,6 +89,8 @@ export interface WebstoreProduct {
    * null en productos normales; [] si no hay piezas registradas (flujo estimado).
    */
   pieces: WebstoreProductPiece[] | null;
+  /** Grupo de modelos al que pertenece (null = producto suelto). La tienda agrupa en cliente. */
+  modelGroup: WebstoreModelGroup | null;
 }
 
 /** Moneda base del ERP (getBaseCurrency). Todos los montos del catálogo ya vienen convertidos a esta moneda — la tienda nunca convierte ni conoce tasas de cambio. */
@@ -198,27 +218,13 @@ async function erpFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function getCatalog(): Promise<CatalogResponse> {
-  const raw = await erpFetch<CatalogResponse>("/api/webstore/products", {
+  const raw = await erpFetch<RawCatalogResponse>("/api/webstore/products", {
     // El catálogo cambia con precios/stock; no cachear en el server de la tienda.
     cache: "no-store",
   });
-  // Tolerancia al desfase de deploy tienda/ERP (2 proyectos Vercel, nunca
-  // atómico): un ERP viejo puede mandar productos sin sku (rompe keys de
-  // React y el carrito) o sin createdAt (rompía el sort de "Recién añadidos"
-  // con TypeError en producción). Se sanea aquí, en un solo lugar.
-  return {
-    ...raw,
-    products: (raw.products ?? [])
-      .filter((p) => typeof p.sku === "string" && p.sku.length > 0)
-      .map((p) => {
-        const withCreatedAt = p.createdAt == null ? { ...p, createdAt: "" } : p;
-        // ERP viejo sin registro de pesajes: pieces ausente se sanea a [] en
-        // catch-weight (flujo estimado) y null en productos normales.
-        return withCreatedAt.pieces === undefined
-          ? { ...withCreatedAt, pieces: withCreatedAt.isCatchWeight ? [] : null }
-          : withCreatedAt;
-      }),
-  };
+  // Un ERP desfasado puede omitir campos (sku, createdAt, pieces, modelGroup,
+  // presentations[].price): sanitizeCatalog los normaliza en un solo lugar.
+  return sanitizeCatalog(raw);
 }
 
 /**

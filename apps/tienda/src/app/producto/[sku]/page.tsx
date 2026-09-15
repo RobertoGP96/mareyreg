@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getCatalog, type CatalogResponse } from "@/lib/erp-client";
+import { entryHasCategory, groupCatalog, modelSiblings } from "@/lib/model-groups";
 import { CatalogError } from "@/components/catalog-error";
 import { ProductDetailClient } from "./product-detail-client";
 
@@ -24,18 +25,27 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const product = catalog.products.find((p) => p.sku === decodedSku);
   if (!product) notFound();
 
-  const related = catalog.products
-    .filter(
-      (p) =>
-        p.sku !== product.sku &&
-        p.category != null &&
-        p.category === product.category
-    )
-    .slice(0, 3);
+  const models = modelSiblings(catalog.products, product);
+  const ownSkus = new Set(models.map((m) => m.sku));
+
+  // Sugerencias por entrada (grupo o producto suelto) de la misma categoría,
+  // sin la propia familia; el carrusel vuelve a agrupar los modelos.
+  const related =
+    product.category != null
+      ? groupCatalog(catalog.products)
+          .filter(
+            (entry) =>
+              !entry.models.some((m) => ownSkus.has(m.sku)) &&
+              entryHasCategory(entry, product.category as string)
+          )
+          .slice(0, 3)
+          .flatMap((entry) => entry.models)
+      : [];
 
   return (
     <ProductDetailClient
       product={product}
+      models={models}
       related={related}
       currency={catalog.currency}
     />

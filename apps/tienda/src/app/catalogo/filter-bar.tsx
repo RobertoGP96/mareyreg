@@ -18,6 +18,8 @@ interface FilterBarProps {
   activeFilter: string;
   onFilterChange: (filter: string) => void;
   count: number;
+  /** Sustantivo del contador en singular/plural (por defecto producto/productos). */
+  countLabel?: [singular: string, plural: string];
   sort: string;
   sortOptions: SortOption[];
   onSortChange: (sort: string) => void;
@@ -30,6 +32,7 @@ export function FilterBar({
   activeFilter,
   onFilterChange,
   count,
+  countLabel = ["producto", "productos"],
   sort,
   sortOptions,
   onSortChange,
@@ -64,7 +67,7 @@ export function FilterBar({
             aria-live="polite"
             className="nav-label text-slate-400 max-sm:hidden"
           >
-            {count} {count === 1 ? "producto" : "productos"}
+            {count} {count === 1 ? countLabel[0] : countLabel[1]}
           </span>
           {children}
           <Select value={sort} onValueChange={onSortChange}>

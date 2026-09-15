@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
 import { useSyncCurrency } from "@/lib/store";
@@ -9,21 +10,35 @@ import { ProductDetail } from "@/components/product-detail";
 
 interface ProductDetailClientProps {
   product: WebstoreProduct;
+  /** Modelos del grupo (incluido `product`), ya ordenados. */
+  models: WebstoreProduct[];
   related: WebstoreProduct[];
   currency: WebstoreCurrency;
 }
 
 export function ProductDetailClient({
   product,
+  models,
   related,
   currency,
 }: ProductDetailClientProps) {
   useSyncCurrency(currency);
   const router = useRouter();
+  const [current, setCurrent] = useState(product);
 
   const goBack = () => {
     if (window.history.length > 1) router.back();
     else router.push("/catalogo");
+  };
+
+  // Cambiar de modelo no necesita refetch: todos los modelos ya llegaron con
+  // la página. Solo se actualiza la URL para que compartir/recargar respete
+  // el modelo elegido.
+  const selectModel = (sku: string) => {
+    const next = models.find((m) => m.sku === sku);
+    if (!next) return;
+    setCurrent(next);
+    window.history.replaceState(null, "", `/producto/${encodeURIComponent(sku)}`);
   };
 
   return (
@@ -39,7 +54,13 @@ export function ProductDetailClient({
         </button>
       </div>
 
-      <ProductDetail product={product} currency={currency} variant="page" />
+      <ProductDetail
+        product={current}
+        models={models}
+        onSelectModel={selectModel}
+        currency={currency}
+        variant="page"
+      />
 
       {related.length > 0 && (
         <ProductCarousel

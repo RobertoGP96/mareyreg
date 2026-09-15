@@ -5,6 +5,12 @@ import { Repeat2, Truck } from "lucide-react";
 import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
 import { STORE_NAME } from "@/lib/config";
 import { discountPct, fmt } from "@/lib/format";
+import {
+  entryIsFeatured,
+  entryNewestCreatedAt,
+  groupCatalog,
+  type CatalogEntry,
+} from "@/lib/model-groups";
 import { useSyncCurrency } from "@/lib/store";
 import { FREE_SHIPPING_TARGET } from "@/lib/cart-totals";
 import { ProductCarousel } from "@/components/product-carousel";
@@ -42,12 +48,21 @@ export function HomeClient({
   ).slice(0, 4);
 
   const offer = bestOffer(products);
-  const featured = products.filter((p) => p.featured);
-  const highlighted =
-    featured.length > 0 ? featured.slice(0, 10) : products.slice(0, 8);
-  const newest = [...products]
-    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
-    .slice(0, 8);
+  // Se recorta por entrada (card), no por producto: así un grupo de modelos
+  // nunca llega partido al carrusel ni cuenta como varias cards.
+  const entries = groupCatalog(products);
+  const flatten = (list: CatalogEntry[]) => list.flatMap((e) => e.models);
+  const featured = entries.filter(entryIsFeatured);
+  const highlighted = flatten(
+    featured.length > 0 ? featured.slice(0, 10) : entries.slice(0, 8)
+  );
+  const newest = flatten(
+    [...entries]
+      .sort((a, b) =>
+        entryNewestCreatedAt(b).localeCompare(entryNewestCreatedAt(a))
+      )
+      .slice(0, 8)
+  );
 
   return (
     <div className="flex flex-1 flex-col">

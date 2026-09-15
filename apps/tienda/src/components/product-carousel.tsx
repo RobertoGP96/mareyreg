@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { WebstoreProduct } from "@/lib/erp-client";
+import { groupCatalog } from "@/lib/model-groups";
 import { ProductCard } from "@/components/product-card";
 
 interface ProductCarouselProps {
@@ -34,6 +35,9 @@ export function ProductCarousel({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
+  // Los modelos de un mismo grupo comparten card; agrupar aquí deja la firma
+  // (lista plana de productos) igual para todos los consumidores.
+  const entries = useMemo(() => groupCatalog(products), [products]);
 
   const updateArrows = useCallback(() => {
     const el = scrollerRef.current;
@@ -58,7 +62,7 @@ export function ProductCarousel({
       el.removeEventListener("scroll", updateArrows);
       observer?.disconnect();
     };
-  }, [updateArrows, products.length]);
+  }, [updateArrows, entries.length]);
 
   const scrollByDir = (dir: 1 | -1) => {
     const el = scrollerRef.current;
@@ -72,7 +76,7 @@ export function ProductCarousel({
     });
   };
 
-  if (products.length === 0) return null;
+  if (entries.length === 0) return null;
 
   return (
     <section className={className} aria-label={title}>
@@ -119,10 +123,11 @@ export function ProductCarousel({
         ref={scrollerRef}
         className="no-scrollbar mt-8 flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-px-5 px-5 py-2 md:scroll-px-10 md:px-10"
       >
-        {products.map((product, index) => (
-          <div key={product.sku} className="flex flex-none snap-start">
+        {entries.map((entry, index) => (
+          <div key={entry.key} className="flex flex-none snap-start">
             <ProductCard
-              product={product}
+              product={entry.primary}
+              models={entry.models}
               variant="carousel"
               priority={eagerImages && index < 3}
             />

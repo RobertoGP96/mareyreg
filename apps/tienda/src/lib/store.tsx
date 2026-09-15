@@ -36,6 +36,8 @@ export interface CartLine {
    * peso estimado.
    */
   pieces?: Array<{ pieceId: number; weightKg: number; price: number }>;
+  /** Etiqueta del modelo ("M", "Rojo") cuando el producto pertenece a un grupo. Solo display. */
+  modelLabel?: string | null;
 }
 
 export interface StoredProfile {
@@ -56,6 +58,7 @@ export interface StoredOrderLine {
    *  unitPrice × qty, sino la suma de los precios por pieza del ERP. */
   total: number;
   isCatchWeight?: boolean;
+  modelLabel?: string | null;
 }
 
 export interface StoredOrder {
@@ -92,7 +95,7 @@ type PersistedState = Pick<
   "cart" | "favs" | "profile" | "orders" | "couponApplied" | "currency"
 >;
 
-type Action =
+export type StoreAction =
   | { type: "hydrate"; payload: Partial<PersistedState> }
   | { type: "addToCart"; line: CartLine; qty: number }
   | { type: "incQty"; sku: string }
@@ -109,7 +112,7 @@ type Action =
   | { type: "setToast"; toast: string | null }
   | { type: "setCurrency"; currency: WebstoreCurrency };
 
-const initialState: StoreState = {
+export const initialState: StoreState = {
   hydrated: false,
   cart: {},
   favs: [],
@@ -120,7 +123,8 @@ const initialState: StoreState = {
   currency: DEFAULT_CURRENCY,
 };
 
-function reducer(state: StoreState, action: Action): StoreState {
+// Exportado para probar la identidad de las líneas (por sku) sin montar React.
+export function reducer(state: StoreState, action: StoreAction): StoreState {
   switch (action.type) {
     case "hydrate":
       return { ...state, ...action.payload, hydrated: true };

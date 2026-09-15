@@ -39,6 +39,8 @@ export function FavoritesClient({
         />
       ) : (
         <ProductGrid className="px-5 pb-16 md:px-10">
+          {/* Sin agrupar: los favoritos son SKUs de modelo y cada uno es su
+              propia card con el nombre completo ("Grupo · Etiqueta"). */}
           {favorites.map((product, index) => (
             <ProductGridCell key={product.sku}>
               <ProductCard

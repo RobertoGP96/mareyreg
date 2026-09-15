@@ -3,7 +3,19 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
-import { discountPct, fmt, normalizeText } from "@/lib/format";
+import { fmt, normalizeText } from "@/lib/format";
+import {
+  entryHasCategory,
+  entryHasOffer,
+  entryHasStock,
+  entryIsFeatured,
+  entryMaxDiscountPct,
+  entryMaxPrice,
+  entryMinPrice,
+  entrySearchText,
+  groupCatalog,
+  type PreferModel,
+} from "@/lib/model-groups";
 import { useSyncCurrency } from "@/lib/store";
 import { ProductCard } from "@/components/product-card";
 import { ProductGrid, ProductGridCell } from "@/components/product-grid";
@@ -88,28 +100,39 @@ export function CatalogClient({
     window.history.replaceState(null, "", qs ? `/catalogo?${qs}` : "/catalogo");
   }, [category, query]);
 
-  // Texto de búsqueda normalizado una sola vez por producto, no por tecla.
+  // Una entrada por grupo de modelos o producto suelto. El modelo
+  // preseleccionado sigue al filtro activo (con "Ofertas" se abre en el modelo
+  // rebajado, con "En stock" en uno disponible).
+  const prefer: PreferModel | undefined =
+    category === OFERTAS ? "offer" : inStockOnly ? "stock" : undefined;
+  const entries = useMemo(
+    () => groupCatalog(products, { prefer }),
+    [products, prefer]
+  );
+
+  // Texto de búsqueda normalizado una sola vez por entrada, no por tecla.
   const searchIndex = useMemo(() => {
     const map = new Map<string, string>();
-    for (const p of products) {
-      map.set(p.sku, normalizeText(`${p.name} ${p.category ?? ""}`));
+    for (const entry of entries) {
+      map.set(entry.key, entrySearchText(entry));
     }
     return map;
-  }, [products]);
+  }, [entries]);
 
-  // null cuando todos los productos cuestan lo mismo: no hay nada que filtrar.
+  // null cuando todas las entradas cuestan lo mismo: no hay nada que filtrar.
   const priceBounds = useMemo<[number, number] | null>(() => {
-    if (products.length === 0) return null;
+    if (entries.length === 0) return null;
     let min = Infinity;
     let max = -Infinity;
-    for (const p of products) {
-      if (p.price < min) min = p.price;
-      if (p.price > max) max = p.price;
+    for (const entry of entries) {
+      const price = entryMinPrice(entry);
+      if (price < min) min = price;
+      if (price > max) max = price;
     }
     min = Math.floor(min);
     max = Math.ceil(max);
     return min < max ? [min, max] : null;
-  }, [products]);
+  }, [entries]);
 
   const priceStep = priceBounds
     ? Math.max(1, Math.round((priceBounds[1] - priceBounds[0]) / 100))
@@ -124,39 +147,40 @@ export function CatalogClient({
 
   const filtered = useMemo(() => {
     const term = normalizeText(deferredQuery.trim());
-    const base = products.filter((p) => {
+    const base = entries.filter((entry) => {
       if (category === OFERTAS) {
-        if (p.compareAtPrice == null) return false;
+        if (!entryHasOffer(entry)) return false;
       } else if (category === DESTACADOS) {
-        if (!p.featured) return false;
-      } else if (category !== TODO && p.category !== category) {
+        if (!entryIsFeatured(entry)) return false;
+      } else if (category !== TODO && !entryHasCategory(entry, category)) {
         return false;
       }
-      if (inStockOnly && p.stockAvailable <= 0) return false;
-      if (
-        priceActive &&
-        priceRange != null &&
-        (p.price < priceRange[0] || p.price > priceRange[1])
-      ) {
+      if (inStockOnly && !entryHasStock(entry)) return false;
+      if (priceActive && priceRange != null) {
+        const price = entryMinPrice(entry);
+        if (price < priceRange[0] || price > priceRange[1]) return false;
+      }
+      if (term && !(searchIndex.get(entry.key) ?? "").includes(term)) {
         return false;
       }
-      if (term && !(searchIndex.get(p.sku) ?? "").includes(term)) return false;
       return true;
     });
     switch (sort) {
       case "asc":
-        return [...base].sort((a, b) => a.price - b.price);
+        return [...base].sort((a, b) => entryMinPrice(a) - entryMinPrice(b));
       case "desc":
-        return [...base].sort((a, b) => b.price - a.price);
+        return [...base].sort((a, b) => entryMaxPrice(b) - entryMaxPrice(a));
       case "discount":
-        return [...base].sort((a, b) => discountPct(b) - discountPct(a));
+        return [...base].sort(
+          (a, b) => entryMaxDiscountPct(b) - entryMaxDiscountPct(a)
+        );
       case "name":
         return [...base].sort((a, b) => a.name.localeCompare(b.name, "es"));
       default:
         return base;
     }
   }, [
-    products,
+    entries,
     searchIndex,
     category,
     deferredQuery,
@@ -217,6 +241,7 @@ export function CatalogClient({
         activeFilter={category}
         onFilterChange={setCategory}
         count={filtered.length}
+        countLabel={["artículo", "artículos"]}
         sort={sort}
         sortOptions={SORTS}
         onSortChange={(value) => setSort(value as SortKey)}
@@ -333,10 +358,13 @@ export function CatalogClient({
       ) : (
         <div ref={gridRef} className="px-5 pb-16 md:px-10">
           <ProductGrid>
-            {pageItems.map((product, index) => (
-              <ProductGridCell key={product.sku}>
+            {/* La key incluye el modelo preseleccionado: al cambiar de filtro
+                la card se vuelve a montar con la preselección nueva. */}
+            {pageItems.map((entry, index) => (
+              <ProductGridCell key={`${entry.key}:${entry.primary.sku}`}>
                 <ProductCard
-                  product={product}
+                  product={entry.primary}
+                  models={entry.models}
                   variant="grid"
                   priority={page === 1 && index < 4}
                 />
@@ -350,6 +378,7 @@ export function CatalogClient({
             from={from}
             to={to}
             onPageChange={goToPage}
+            itemLabel="artículos"
             className="mt-12"
           />
         </div>
