@@ -38,7 +38,7 @@ vi.mock("../lib/effective-price", async () => {
   };
 });
 
-import { getMarginReport } from "./margin-report-queries";
+import { getMarginReport, MARGIN_REPORT_ROW_LIMIT } from "./margin-report-queries";
 import { lineKey } from "../lib/effective-price";
 
 const BASE = { currencyId: 1, code: "CUP", symbol: "$", decimalPlaces: 0 };
@@ -114,11 +114,34 @@ describe("getMarginReport", () => {
 
     const full = await getMarginReport();
     expect(full.rows).toHaveLength(2);
+    expect(full.summary.matchedCount).toBe(2);
 
     const onlyWarnings = await getMarginReport({ onlyWarnings: true });
     expect(onlyWarnings.rows).toHaveLength(1);
     expect(onlyWarnings.rows[0].productId).toBe(2);
     expect(onlyWarnings.rows[0].warning).toBe("negative");
+    // matchedCount refleja el filtro (no hay truncado); totalProducts sigue siendo el universo evaluado.
+    expect(onlyWarnings.summary.matchedCount).toBe(1);
+    expect(onlyWarnings.summary.totalProducts).toBe(2);
+  });
+
+  it("limita las filas a MARGIN_REPORT_ROW_LIMIT y expone matchedCount para señalar el truncado", async () => {
+    const total = MARGIN_REPORT_ROW_LIMIT + 1;
+    const ids = Array.from({ length: total }, (_, i) => i + 1);
+    db.product.findMany.mockResolvedValue(
+      ids.map((id) => product({ productId: id, name: "Producto " + id, sku: "SKU-" + id }))
+    );
+    getEffectiveLinePrices.mockResolvedValue(priceResultMap(ids.map((id) => [id, 100])));
+
+    const result = await getMarginReport();
+
+    expect(result.rows).toHaveLength(MARGIN_REPORT_ROW_LIMIT);
+    expect(result.summary.matchedCount).toBe(total);
+    expect(result.summary.totalProducts).toBe(total);
+
+    const custom = await getMarginReport({ limit: 5 });
+    expect(custom.rows).toHaveLength(5);
+    expect(custom.summary.matchedCount).toBe(total);
   });
 
   it("producto sin ProductCost: replacementCostBase y warning son null", async () => {
