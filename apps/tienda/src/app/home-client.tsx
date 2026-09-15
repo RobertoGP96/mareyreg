@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Repeat2, Truck } from "lucide-react";
 import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
@@ -73,24 +74,45 @@ export function HomeClient({
 
   return (
     <div className="flex flex-1 flex-col">
-      <section className="border-b border-line bg-canvas px-5 pt-14 pb-12 text-center md:px-10 md:pt-[72px] md:pb-16">
-        <p className="eyebrow text-[12px] tracking-[.12em] text-gold-600">
-          Bienvenido a {STORE_NAME}
-        </p>
-        <h1 className="font-display mx-auto mt-5 max-w-[760px] text-[34px] leading-[1.05] text-balance text-navy-900 md:text-[52px]">
-          Todo lo que necesitas, en un solo lugar
-        </h1>
-        <p className="mx-auto mt-4 max-w-[470px] text-[14px] leading-[1.65] text-pretty text-slate-500">
-          Despensa escogida pieza a pieza, marcas de confianza y precios
-          claros. Elige con calma y te lo llevamos a casa.
-        </p>
-        <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-3.5">
-          <ButtonLink href="/catalogo" variant="solid" size="lg">
-            Ver el catálogo
-          </ButtonLink>
-          <ButtonLink href="/catalogo" size="lg">
-            Buscar productos
-          </ButtonLink>
+      <section className="relative isolate overflow-hidden border-b border-line bg-canvas">
+        {/* El bodegón es decorativo: `alt` vacío para que no se anuncie. En
+            oscuro baja de opacidad —es una foto de estudio recortada y a plena
+            intensidad quema sobre el lienzo navy. */}
+        <div className="pointer-events-none absolute right-0 bottom-0 h-[236px] w-full md:inset-y-0 md:h-auto md:w-[64%]">
+          <Image
+            src="/hero-despensa.webp"
+            alt=""
+            fill
+            priority
+            sizes="(max-width: 767px) 100vw, 64vw"
+            className="object-contain [object-position:center_bottom] md:[object-position:right_bottom] dark:opacity-45"
+          />
+        </div>
+        {/* La imagen se funde con el lienzo: en vertical bajo el texto en
+            móvil, en horizontal desde el centro hacia la izquierda en desktop. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,transparent_0%,var(--c-canvas)_40%,var(--c-canvas)_100%)] md:bg-[linear-gradient(to_right,var(--c-canvas)_0%,var(--c-canvas)_40%,transparent_78%)]"
+        />
+        <div className="relative px-5 pt-14 pb-[248px] text-center md:px-10 md:py-[104px] md:text-left">
+          <p className="eyebrow text-[12px] tracking-[.12em] text-gold-600">
+            Bienvenido a {STORE_NAME}
+          </p>
+          <h1 className="font-display mx-auto mt-5 max-w-[760px] text-[34px] leading-[1.05] text-balance text-navy-900 md:mx-0 md:max-w-[560px] md:text-[52px]">
+            Todo lo que necesitas, en un solo lugar
+          </h1>
+          <p className="mx-auto mt-4 max-w-[470px] text-[14px] leading-[1.65] text-pretty text-slate-500 md:mx-0">
+            Despensa escogida pieza a pieza, marcas de confianza y precios
+            claros. Elige con calma y te lo llevamos a casa.
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-3.5 md:justify-start">
+            <ButtonLink href="/catalogo" variant="solid" size="lg">
+              Ver el catálogo
+            </ButtonLink>
+            <ButtonLink href="/catalogo" size="lg">
+              Buscar productos
+            </ButtonLink>
+          </div>
         </div>
       </section>
 
