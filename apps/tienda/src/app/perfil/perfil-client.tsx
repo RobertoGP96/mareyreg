@@ -39,13 +39,17 @@ export function PerfilClient() {
 
   return (
     <div className="flex flex-1 flex-col">
+      {/* Con sesión, nombre y teléfono ya van en la tarjeta de identidad de
+          abajo: repetirlos en la cabecera los mostraba dos veces seguidas. */}
       <ScreenHeader
         eyebrow="Mi cuenta"
-        title={profile ? profile.name : "Cliente invitado"}
+        title={profile ? "Tu cuenta" : "Cliente invitado"}
       >
-        <span className="tabular text-[13px] text-slate-400">
-          {profile ? profile.phone : "Inicia sesión o crea tu cuenta"}
-        </span>
+        {!profile && (
+          <span className="text-[13px] text-slate-400">
+            Inicia sesión o crea tu cuenta
+          </span>
+        )}
       </ScreenHeader>
 
       <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6 px-5 pb-14 md:px-6">
