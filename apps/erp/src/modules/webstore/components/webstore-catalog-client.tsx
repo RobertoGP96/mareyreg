@@ -33,6 +33,7 @@ import {
   Pencil,
   History,
   Tag,
+  Layers,
   Loader2,
   Store,
   Star,
@@ -47,9 +48,11 @@ import type {
   CatalogRow,
   CatalogKpis,
 } from "@/modules/webstore/queries/catalog-queries";
+import type { ModelGroupRow } from "@/modules/webstore/queries/model-group-queries";
 import type { ActionResult } from "@/types";
 import { ProductPriceHistoryDialog } from "./product-price-history-dialog";
 import { ProductDiscountsDialog } from "./product-discounts-dialog";
+import { ModelGroupDialog } from "./model-group-dialog";
 
 type EstadoFilter = "all" | "enabled" | "hidden";
 
@@ -57,15 +60,33 @@ interface Props {
   rows: CatalogRow[];
   kpis: CatalogKpis;
   categories: string[];
+  groups: ModelGroupRow[];
+  isAdmin?: boolean;
 }
 
-export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
+export function WebstoreCatalogClient({ rows, kpis, categories, groups, isAdmin = false }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [estadoFilter, setEstadoFilter] = useState<EstadoFilter>("all");
   const [onlyOnSale, setOnlyOnSale] = useState(false);
   const [onlyFeatured, setOnlyFeatured] = useState(false);
+  const [onlyGrouped, setOnlyGrouped] = useState(false);
+
+  const [groupDialogOpen, setGroupDialogOpen] = useState(false);
+  // Se guarda el id, no el objeto: así el dialog lee siempre la `version`
+  // más reciente que llega con router.refresh() (evita STALE_VERSION falsos).
+  const [dialogGroupId, setDialogGroupId] = useState<number | null>(null);
+  const [dialogInitialProduct, setDialogInitialProduct] = useState<CatalogRow | null>(null);
+  const groupById = useMemo(() => new Map(groups.map((g) => [g.groupId, g])), [groups]);
+  const dialogGroup = dialogGroupId != null ? groupById.get(dialogGroupId) ?? null : null;
+
+  // Grupos cuyos modelos ya no están en el catálogo (inactivos o borrados):
+  // sin una fila que los abra quedarían inalcanzables.
+  const orphanGroups = useMemo(() => {
+    const rowIds = new Set(rows.map((r) => r.productId));
+    return groups.filter((g) => !g.members.some((m) => rowIds.has(m.productId)));
+  }, [groups, rows]);
 
   const [priceRow, setPriceRow] = useState<CatalogRow | null>(null);
   const [priceValue, setPriceValue] = useState("");
@@ -80,7 +101,8 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
     (categoryFilter !== "all" ? 1 : 0) +
     (estadoFilter !== "all" ? 1 : 0) +
     (onlyOnSale ? 1 : 0) +
-    (onlyFeatured ? 1 : 0);
+    (onlyFeatured ? 1 : 0) +
+    (onlyGrouped ? 1 : 0);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -88,7 +110,9 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
       if (term) {
         const matches =
           r.name.toLowerCase().includes(term) ||
-          (r.sku?.toLowerCase().includes(term) ?? false);
+          (r.sku?.toLowerCase().includes(term) ?? false) ||
+          (r.modelGroupName?.toLowerCase().includes(term) ?? false) ||
+          (r.modelLabel?.toLowerCase().includes(term) ?? false);
         if (!matches) return false;
       }
       if (categoryFilter !== "all" && r.category !== categoryFilter) return false;
@@ -96,15 +120,79 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
       if (estadoFilter === "hidden" && r.webstoreEnabled) return false;
       if (onlyOnSale && !r.onSale) return false;
       if (onlyFeatured && !r.webstoreFeatured) return false;
+      if (onlyGrouped && r.modelGroupId == null) return false;
       return true;
     });
-  }, [rows, search, categoryFilter, estadoFilter, onlyOnSale, onlyFeatured]);
+  }, [rows, search, categoryFilter, estadoFilter, onlyOnSale, onlyFeatured, onlyGrouped]);
 
   const clearFilters = () => {
     setCategoryFilter("all");
     setEstadoFilter("all");
     setOnlyOnSale(false);
     setOnlyFeatured(false);
+    setOnlyGrouped(false);
+  };
+
+  const openNewGroup = () => {
+    setDialogGroupId(null);
+    setDialogInitialProduct(null);
+    setGroupDialogOpen(true);
+  };
+
+  const openGroup = (groupId: number) => {
+    setDialogGroupId(groupId);
+    setDialogInitialProduct(null);
+    setGroupDialogOpen(true);
+  };
+
+  const groupingIssue = (row: CatalogRow): string | null =>
+    row.isService
+      ? "Los servicios no se agrupan como modelos"
+      : !row.sku
+        ? "Asigna un SKU para agrupar este producto"
+        : null;
+
+  const openGroupFor = (row: CatalogRow) => {
+    if (row.modelGroupId != null && groupById.has(row.modelGroupId)) {
+      openGroup(row.modelGroupId);
+      return;
+    }
+    const issue = groupingIssue(row);
+    if (issue) {
+      toast.error(issue);
+      return;
+    }
+    setDialogGroupId(null);
+    setDialogInitialProduct(row);
+    setGroupDialogOpen(true);
+  };
+
+  const onGroupSaved = () => {
+    setGroupDialogOpen(false);
+    router.refresh();
+  };
+
+  const onGroupStale = () => {
+    setGroupDialogOpen(false);
+    router.refresh();
+  };
+
+  const renderGroupBadge = (row: CatalogRow) => {
+    if (!row.modelGroupName) return null;
+    const text = `${row.modelGroupName} · ${row.modelLabel}`;
+    return (
+      <button
+        type="button"
+        onClick={() => setSearch(row.modelGroupName ?? "")}
+        title={`${text} — filtrar por este grupo`}
+        className="shrink-0 min-w-0 rounded-full focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
+        <Badge variant="info" className="text-[10px] max-w-[12rem]">
+          <Layers aria-hidden />
+          <span className="min-w-0 truncate">{text}</span>
+        </Badge>
+      </button>
+    );
   };
 
   const handle = (res: ActionResult<void>, successMessage = "Guardado") => {
@@ -262,6 +350,24 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
       >
         <Tag className="h-4 w-4" />
       </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className={cn(
+          "size-8",
+          row.modelGroupId != null && "text-[var(--info)]",
+          row.modelGroupId == null && groupingIssue(row) && "text-muted-foreground/50"
+        )}
+        title={
+          groupingIssue(row) ??
+          (row.modelGroupId != null ? "Editar grupo de modelos" : "Agrupar como modelos")
+        }
+        aria-label="Modelos"
+        onClick={() => openGroupFor(row)}
+      >
+        <Layers className="h-4 w-4" />
+      </Button>
     </div>
   );
 
@@ -280,6 +386,7 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
                   {row.presentationCount} present.
                 </Badge>
               )}
+              {renderGroupBadge(row)}
             </div>
             {row.sku && <div className="text-xs text-muted-foreground truncate">{row.sku}</div>}
           </div>
@@ -403,6 +510,7 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
               {row.presentationCount} present.
             </Badge>
           )}
+          {renderGroupBadge(row)}
           <span className="ml-auto font-mono tabular-nums text-xs text-muted-foreground">
             Stock: {row.stockAvailable}
           </span>
@@ -462,14 +570,45 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
         title="Catálogo de tienda"
         description="Gestiona precios, ofertas y visibilidad de los productos en la tienda en línea."
         badge={`${rows.length} productos`}
+        actions={
+          <Button type="button" variant="outline" onClick={openNewGroup}>
+            <Layers className="h-4 w-4" />
+            Nuevo grupo de modelos
+          </Button>
+        }
       />
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <KpiCard label="En tienda" value={kpis.enabled} icon={Tags} accent="brand" size="compact" />
         <KpiCard label="Con oferta" value={kpis.onSale} icon={Tag} accent="success" size="compact" />
         <KpiCard label="Destacados" value={kpis.featured} icon={Tags} accent="warning" size="compact" />
+        <KpiCard label="Con modelos" value={kpis.grouped} icon={Layers} accent="slate" size="compact" />
         <KpiCard label="Mostrando" value={filtered.length} icon={Search} accent="info" size="compact" />
       </div>
+
+      {orphanGroups.length > 0 && (
+        <div className="rounded-xl border border-border bg-card p-3 space-y-2">
+          <p className="text-sm font-medium text-foreground">Grupos sin productos activos</p>
+          <p className="text-xs text-muted-foreground">
+            Sus modelos están inactivos o fueron eliminados. Ábrelos para reasignar productos o
+            eliminarlos.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {orphanGroups.map((g) => (
+              <Button
+                key={g.groupId}
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => openGroup(g.groupId)}
+              >
+                <Layers className="h-4 w-4" />
+                <span className="max-w-[14rem] truncate">{g.name}</span>
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <ResponsiveListView<CatalogRow>
         columns={columns}
@@ -519,6 +658,12 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
                 <div className="flex items-center gap-3">
                   <Switch checked={onlyFeatured} onCheckedChange={setOnlyFeatured} aria-label="Destacado" />
                   <span className="text-sm text-muted-foreground">{onlyFeatured ? "Sí" : "No"}</span>
+                </div>
+              </Field>
+              <Field label="Con modelos">
+                <div className="flex items-center gap-3">
+                  <Switch checked={onlyGrouped} onCheckedChange={setOnlyGrouped} aria-label="Con modelos" />
+                  <span className="text-sm text-muted-foreground">{onlyGrouped ? "Sí" : "No"}</span>
                 </div>
               </Field>
             </MobileFilterSheet>
@@ -574,6 +719,17 @@ export function WebstoreCatalogClient({ rows, kpis, categories }: Props) {
         productId={discountsProductId}
         productName={discountsProductName}
         onOpenChange={(o) => !o && setDiscountsProductId(null)}
+      />
+
+      <ModelGroupDialog
+        open={groupDialogOpen}
+        group={dialogGroup}
+        initialProduct={dialogInitialProduct}
+        rows={rows}
+        isAdmin={isAdmin}
+        onOpenChange={setGroupDialogOpen}
+        onSaved={onGroupSaved}
+        onStale={onGroupStale}
       />
     </div>
   );

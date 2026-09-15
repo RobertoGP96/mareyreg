@@ -18,12 +18,20 @@ export interface CatalogRow {
   discountCount: number;
   stockAvailable: number;
   presentationCount: number;
+  modelGroupId: number | null;
+  modelGroupName: string | null;
+  modelLabel: string | null;
+  unit: string;
+  isCatchWeight: boolean;
+  isService: boolean;
 }
 
 export interface CatalogKpis {
   enabled: number;
   onSale: number;
   featured: number;
+  /** Productos habilitados que pertenecen a un grupo de modelos. */
+  grouped: number;
 }
 
 export interface WebstoreCatalogResult {
@@ -44,6 +52,7 @@ export async function getWebstoreCatalogWithKpis(): Promise<WebstoreCatalogResul
     where: { isActive: true },
     include: {
       stockLevels: { select: { currentQuantity: true } },
+      modelGroup: { select: { groupId: true, name: true } },
       _count: {
         select: {
           discounts: { where: { isActive: true } },
@@ -80,6 +89,12 @@ export async function getWebstoreCatalogWithKpis(): Promise<WebstoreCatalogResul
       discountCount: p._count.discounts,
       stockAvailable,
       presentationCount: p._count.presentations,
+      modelGroupId: p.modelGroup?.groupId ?? null,
+      modelGroupName: p.modelGroup?.name ?? null,
+      modelLabel: p.modelLabel,
+      unit: p.unit,
+      isCatchWeight: p.isCatchWeight,
+      isService: p.isService,
     };
   });
 
@@ -88,6 +103,7 @@ export async function getWebstoreCatalogWithKpis(): Promise<WebstoreCatalogResul
     enabled: enabledRows.length,
     onSale: enabledRows.filter((r) => r.onSale).length,
     featured: enabledRows.filter((r) => r.webstoreFeatured).length,
+    grouped: enabledRows.filter((r) => r.modelGroupId != null).length,
   };
 
   return { rows, kpis };

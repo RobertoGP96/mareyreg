@@ -244,6 +244,26 @@ export async function updateProduct(
         }
       }
 
+      // Los modelos de un grupo de la tienda comparten card (y sufijo de
+      // unidad): cambiar unit/isCatchWeight de uno solo rompería el grupo.
+      // Sin SKU o como servicio el producto deja de ser publicable como
+      // modelo (reglas de model-group-rules.ts), incluso en un grupo de uno.
+      if (prev?.modelGroupId != null) {
+        const losesSku = data.sku !== undefined && !data.sku;
+        const becomesService = data.isService === true && !prev.isService;
+        if (losesSku || becomesService) throw new Error("MODEL_GROUP_MEMBER_RULES");
+
+        const unitDiffers = data.unit !== undefined && data.unit !== prev.unit;
+        const catchWeightDiffers =
+          data.isCatchWeight !== undefined && data.isCatchWeight !== prev.isCatchWeight;
+        if (unitDiffers || catchWeightDiffers) {
+          const siblings = await tx.product.count({
+            where: { modelGroupId: prev.modelGroupId, productId: { not: id } },
+          });
+          if (siblings > 0) throw new Error("MODEL_GROUP_LOCKED");
+        }
+      }
+
       const currencyChanged =
         data.saleCurrencyId !== undefined &&
         (prev?.saleCurrencyId ?? null) !== (data.saleCurrencyId ?? null);
@@ -416,6 +436,20 @@ export async function updateProduct(
       return {
         success: false,
         error: "Los productos de peso variable no permiten stock negativo",
+      };
+    }
+    if (error instanceof Error && error.message === "MODEL_GROUP_LOCKED") {
+      return {
+        success: false,
+        error:
+          "Este dato lo comparten los modelos del grupo; saca el producto del grupo para cambiarlo",
+      };
+    }
+    if (error instanceof Error && error.message === "MODEL_GROUP_MEMBER_RULES") {
+      return {
+        success: false,
+        error:
+          "Un modelo de la tienda necesita SKU y no puede ser un servicio; saca el producto del grupo para cambiarlo",
       };
     }
     if (error instanceof Error && error.message === "CATCH_WEIGHT_HAS_PIECE_MOVEMENTS") {
