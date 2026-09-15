@@ -7,8 +7,10 @@ import { ChevronLeft } from "lucide-react";
 import { syncProfile } from "@/app/actions/customer-actions";
 import { useStore } from "@/lib/store";
 import { AuthDivider, GoogleSignIn } from "@/components/google-sign-in";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+
+const LABEL = "mb-1.5 block text-[12px] font-semibold text-slate-500";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -46,29 +48,29 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex flex-1 flex-col items-center px-5 py-12 md:px-10 md:py-20">
-      <div className="w-full max-w-[420px]">
-        <Link
-          href="/perfil"
-          className="nav-label -ml-0.5 inline-flex items-center gap-1 text-slate-400 transition-colors duration-150 hover:text-navy-900"
-        >
-          <ChevronLeft className="h-4 w-4" strokeWidth={1.6} />
-          Volver
-        </Link>
+    <div className="mx-auto w-full max-w-[420px] px-5 py-8 md:px-6 md:py-12">
+      <Link
+        href="/perfil"
+        className="nav-label -ml-1 inline-flex items-center gap-0.5 text-slate-500 transition-colors duration-150 hover:text-navy-700"
+      >
+        <ChevronLeft className="h-4 w-4" strokeWidth={2} />
+        Volver
+      </Link>
 
-        <p className="eyebrow mt-10">Bienvenido</p>
-        <h1 className="font-display mt-4 text-[32px] leading-none text-navy-900 md:text-[42px]">
+      <div className="mt-4 rounded-lg bg-canvas p-6 shadow-card md:p-8">
+        <p className="eyebrow">Bienvenido</p>
+        <h1 className="font-display mt-2 text-[26px] leading-[1.05] text-navy-900 md:text-[30px]">
           Crear cuenta
         </h1>
-        <p className="mt-5 text-[13.5px] leading-[1.65] text-slate-500">
+        <p className="mt-3 text-[13.5px] leading-[1.65] text-pretty text-slate-500">
           Regístrate en un minuto y guarda tus datos para la próxima compra.
         </p>
 
-        <div className="mt-10 flex flex-col gap-7 border-t border-line pt-8">
+        <div className="mt-6 flex flex-col gap-4">
           <GoogleSignIn label="Registrarme con Google" />
           <AuthDivider label="o con tus datos" />
-          <div className="flex flex-col gap-2.5">
-            <label htmlFor="registro-nombre" className="eyebrow">
+          <div>
+            <label htmlFor="registro-nombre" className={LABEL}>
               Nombre y apellidos
             </label>
             <Input
@@ -80,8 +82,8 @@ export default function RegisterPage() {
               autoComplete="name"
             />
           </div>
-          <div className="flex flex-col gap-2.5">
-            <label htmlFor="registro-telefono" className="eyebrow">
+          <div>
+            <label htmlFor="registro-telefono" className={LABEL}>
               Teléfono
             </label>
             <Input
@@ -94,8 +96,8 @@ export default function RegisterPage() {
               autoComplete="tel"
             />
           </div>
-          <div className="flex flex-col gap-2.5">
-            <label htmlFor="registro-password" className="eyebrow">
+          <div>
+            <label htmlFor="registro-password" className={LABEL}>
               Contraseña
             </label>
             <Input
@@ -108,7 +110,7 @@ export default function RegisterPage() {
               autoComplete="new-password"
             />
           </div>
-          <p className="text-[12.5px] leading-[1.65] text-slate-400">
+          <p className="text-[12.5px] leading-[1.65] text-pretty text-slate-400">
             Al crear tu cuenta aceptas los términos y condiciones de la tienda.
           </p>
         </div>
@@ -118,16 +120,21 @@ export default function RegisterPage() {
           size="lg"
           onClick={handleRegister}
           disabled={sending}
-          className="mt-8 w-full"
+          className="mt-2 w-full"
         >
           {sending ? "Creando cuenta…" : "Crear cuenta"}
         </Button>
-
-        <div className="mt-10 flex flex-col items-center gap-4 border-t border-line pt-8">
-          <p className="text-[13px] text-slate-500">¿Ya tienes cuenta?</p>
-          <ButtonLink href="/login">Iniciar sesión</ButtonLink>
-        </div>
       </div>
+
+      <p className="mt-6 text-center text-[13px] text-slate-500">
+        ¿Ya tienes cuenta?{" "}
+        <Link
+          href="/login"
+          className="font-semibold text-navy-700 transition-colors duration-150 hover:text-navy-600"
+        >
+          Iniciar sesión
+        </Link>
+      </p>
     </div>
   );
 }

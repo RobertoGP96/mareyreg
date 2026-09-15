@@ -18,13 +18,13 @@ export function stockText(stock: number): string {
 export function StockLabel({ stock, className }: StockLabelProps) {
   const tone =
     stock <= 0
-      ? "font-semibold text-alert"
+      ? "font-semibold text-danger"
       : stock <= LOW_STOCK_THRESHOLD
-        ? "text-warn"
-        : "text-ok";
+        ? "font-medium text-gold-600"
+        : "font-medium text-ok";
 
   return (
-    <span className={cn("text-[11.5px] tracking-[.04em]", tone, className)}>
+    <span className={cn("text-[12px] leading-none", tone, className)}>
       {stockText(stock)}
     </span>
   );
