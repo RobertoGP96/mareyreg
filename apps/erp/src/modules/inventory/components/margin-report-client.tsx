@@ -7,6 +7,7 @@ import { MobileListCard } from "@/components/ui/mobile-list-card";
 import { MobileFilterSheet } from "@/components/ui/mobile-filter-sheet";
 import { ResponsiveListView } from "@/components/ui/responsive-list-view";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -26,6 +27,7 @@ import {
   CircleDollarSign,
   Warehouse as WarehouseIcon,
   ShieldAlert,
+  Info,
 } from "lucide-react";
 import { formatAmount } from "@/lib/format";
 import type {
@@ -88,6 +90,7 @@ export function MarginReportClient({
   };
 
   const activeFilterCount = (selectedWarehouseId != null ? 1 : 0) + (onlyWarnings ? 1 : 0);
+  const isTruncated = rows.length < summary.matchedCount;
 
   const filterControls = (
     <>
@@ -197,6 +200,16 @@ export function MarginReportClient({
         badge={`${summary.totalProducts} productos`}
       />
 
+      {isTruncated && (
+        <Alert role="status">
+          <Info />
+          <AlertDescription>
+            Mostrando {rows.length} de {summary.matchedCount} productos; usa los filtros para
+            acotar.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           label="Margen negativo"
@@ -241,8 +254,14 @@ export function MarginReportClient({
               <div className="space-y-4">{filterControls}</div>
             </MobileFilterSheet>
           </div>
-          <Badge variant="outline" className="ml-auto">
-            {rows.length}
+          <Badge variant={isTruncated ? "warning" : "outline"} className="ml-auto">
+            {isTruncated ? (
+              <>
+                {rows.length} de {summary.matchedCount}
+              </>
+            ) : (
+              rows.length
+            )}
           </Badge>
         </div>
 

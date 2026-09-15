@@ -3,11 +3,14 @@ import { getBaseCurrency, getRateToBase } from "@/lib/currency";
 import { getEffectiveLinePrices, lineKey } from "../lib/effective-price";
 import { LOW_MARGIN_THRESHOLD_PCT, type MarginWarning } from "../lib/margin";
 
+/** Máximo de filas que devuelve el reporte cuando no se indica limit. */
+export const MARGIN_REPORT_ROW_LIMIT = 200;
+
 export interface MarginReportOptions {
   warehouseId?: number;
   /** Si es true, solo incluye filas con warning (negative/low). */
   onlyWarnings?: boolean;
-  /** Máximo de filas a devolver, ordenadas por peor margen primero. Default 200. */
+  /** Máximo de filas a devolver, ordenadas por peor margen primero. Default MARGIN_REPORT_ROW_LIMIT. */
   limit?: number;
 }
 
@@ -33,6 +36,8 @@ export interface MarginReportRow {
 
 export interface MarginReportSummary {
   totalProducts: number;
+  /** Filas que cumplen los filtros antes de aplicar limit; si supera rows.length, el reporte está truncado. */
+  matchedCount: number;
   negativeCount: number;
   lowCount: number;
   avgReplacementMarginPct: number | null;
@@ -65,7 +70,7 @@ function computeWarning(replacementMarginPct: number | null): MarginWarning {
 export async function getMarginReport(
   options: MarginReportOptions = {}
 ): Promise<MarginReportResult> {
-  const limit = options.limit ?? 200;
+  const limit = options.limit ?? MARGIN_REPORT_ROW_LIMIT;
   const base = await getBaseCurrency(db);
 
   const products = await db.product.findMany({
@@ -84,7 +89,16 @@ export async function getMarginReport(
   });
   const productsWithPrice = products.filter((p) => p.salePrice != null);
   if (productsWithPrice.length === 0) {
-    return { rows: [], summary: { totalProducts: 0, negativeCount: 0, lowCount: 0, avgReplacementMarginPct: null } };
+    return {
+      rows: [],
+      summary: {
+        totalProducts: 0,
+        matchedCount: 0,
+        negativeCount: 0,
+        lowCount: 0,
+        avgReplacementMarginPct: null,
+      },
+    };
   }
   const productIds = productsWithPrice.map((p) => p.productId);
 
@@ -207,6 +221,7 @@ export async function getMarginReport(
     rows: sorted.slice(0, limit),
     summary: {
       totalProducts: rows.length,
+      matchedCount: filtered.length,
       negativeCount,
       lowCount,
       avgReplacementMarginPct,
