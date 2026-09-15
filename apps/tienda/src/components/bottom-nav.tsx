@@ -111,7 +111,7 @@ export function BottomNav() {
     <>
       {/* La barra es fija y flota sobre el contenido: el hueco lo reserva este
           espaciador, que solo existe cuando la barra se muestra. */}
-      <div className="h-[96px] md:hidden" aria-hidden />
+      <div className="h-[82px] md:hidden" aria-hidden />
       <nav
         aria-label="Navegación principal"
         className={cn(
@@ -124,12 +124,12 @@ export function BottomNav() {
           className="relative grid grid-cols-5 rounded-full border border-line/80 bg-canvas/85 shadow-float backdrop-blur-xl"
           style={{ padding: PAD }}
         >
-          {/* Indicador deslizante: una sola píldora que viaja entre pestañas
-              en lugar de encender y apagar fondos por ítem. */}
+          {/* Indicador deslizante: una sola píldora azul que viaja entre
+              pestañas en lugar de encender y apagar fondos por ítem. */}
           <span
             aria-hidden
             className={cn(
-              "absolute rounded-full bg-tint transition-[left,opacity] duration-[380ms] motion-reduce:transition-none",
+              "absolute rounded-full bg-navy-700 transition-[left,opacity] duration-[380ms] motion-reduce:transition-none",
               activeIndex < 0 && "opacity-0"
             )}
             style={{
@@ -147,16 +147,20 @@ export function BottomNav() {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-label={item.label}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative z-10 flex flex-col items-center gap-1 rounded-full py-2 text-[10px] font-semibold transition-colors duration-200",
-                  active ? "text-navy-700" : "text-slate-400 hover:text-navy-700"
+                  // Solo icono: el color viaja con la misma curva que la píldora
+                  // para que el blanco no aparezca antes de que llegue el azul.
+                  "relative z-10 flex items-center justify-center rounded-full py-2.5 transition-colors duration-[380ms] motion-reduce:transition-none",
+                  active ? "text-on-brand" : "text-slate-400 hover:text-navy-700"
                 )}
+                style={{ transitionTimingFunction: EASE }}
               >
                 <span
                   className={cn(
                     "relative flex h-6 w-6 items-center justify-center transition-transform duration-[380ms] motion-reduce:transition-none",
-                    active && "-translate-y-px scale-110"
+                    active && "scale-110"
                   )}
                   style={{ transitionTimingFunction: EASE }}
                 >
@@ -170,7 +174,6 @@ export function BottomNav() {
                     </span>
                   )}
                 </span>
-                {item.label}
               </Link>
             );
           })}
