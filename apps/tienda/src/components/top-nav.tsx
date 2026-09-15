@@ -13,8 +13,8 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { STORE_NAME } from "@/lib/config";
 import { cartCount, useStore } from "@/lib/store";
+import { BrandLogo } from "@/components/brand-logo";
 import { NavSearchInline, NavSearchOverlay } from "@/components/nav-search";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
@@ -50,15 +50,16 @@ const LINKS: NavLink[] = [
   },
 ];
 
-const ICON_ACTION =
-  "relative inline-flex h-9 w-9 items-center justify-center text-slate-400 transition-colors duration-150 hover:text-navy-900";
+/** Acción de icono del header: círculo de 36px que se tiñe al hover. */
+export const ICON_ACTION =
+  "relative inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition-colors duration-150 hover:bg-hover hover:text-navy-700";
 
-/** El contador se ancla al icono, no al flujo: a 9px y en caja sólida se lee
- *  como marca sobre el icono y no desplaza el resto de la fila al cambiar. */
+/** El contador se ancla al icono, no al flujo: en píldora sólida con un anillo
+ *  del color del fondo se lee como marca sobre el icono y no desplaza la fila. */
 function CountBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="tabular absolute top-0.5 right-0 flex h-[15px] min-w-[15px] items-center justify-center bg-navy-900 px-[3px] text-[9px] leading-none font-bold text-canvas">
+    <span className="tabular absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-navy-700 px-1 text-[9.5px] leading-none font-bold text-on-brand ring-2 ring-canvas">
       {count > 99 ? "99+" : count}
     </span>
   );
@@ -81,16 +82,11 @@ export function TopNav() {
   }, [pathname]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-canvas">
-      <div className="flex h-[78px] items-center gap-6 px-5 md:gap-8 md:px-10">
-        <Link
-          href="/"
-          className="font-display flex-none text-2xl leading-none tracking-[.16em] text-navy-900 transition-colors hover:text-navy-700"
-        >
-          {STORE_NAME}
-        </Link>
+    <header className="sticky top-0 z-40 border-b border-line bg-canvas/90 backdrop-blur-md">
+      <div className="mx-auto flex h-16 w-full max-w-[1200px] items-center gap-5 px-5 md:h-[68px] md:gap-7 md:px-6">
+        <BrandLogo />
 
-        <nav className="hidden items-center gap-7 md:flex">
+        <nav className="hidden items-center gap-6 md:flex">
           {LINKS.map((link) => {
             const active = link.isActive(pathname, section);
             const Icon = link.icon;
@@ -99,20 +95,21 @@ export function TopNav() {
                 key={link.href}
                 href={link.href}
                 aria-current={active ? "page" : undefined}
-                className={`nav-label inline-flex items-center gap-2 pb-1 transition-colors duration-150 ${
+                className={cn(
+                  "nav-label inline-flex items-center gap-1.5 border-b-2 pt-1 pb-1 transition-colors duration-150",
                   active
-                    ? "border-b border-navy-900 text-navy-900"
-                    : "border-b border-transparent text-slate-400 hover:text-navy-700"
-                }`}
+                    ? "border-navy-700 font-bold text-navy-700"
+                    : "border-transparent font-medium text-slate-500 hover:text-navy-700"
+                )}
               >
-                <Icon className="h-4 w-4 flex-none" strokeWidth={1.6} />
+                <Icon className="h-[15px] w-[15px] flex-none" strokeWidth={1.9} />
                 {link.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2 md:gap-4">
+        <div className="ml-auto flex items-center gap-1 md:gap-2">
           <NavSearchInline className="hidden md:block" />
 
           <button
@@ -120,12 +117,16 @@ export function TopNav() {
             onClick={() => setSearchOpen((v) => !v)}
             aria-expanded={searchOpen}
             aria-label={searchOpen ? "Cerrar búsqueda" : "Buscar productos"}
-            className={cn(ICON_ACTION, "md:hidden")}
+            className={cn(
+              ICON_ACTION,
+              "md:hidden",
+              searchOpen && "bg-tint text-navy-700"
+            )}
           >
             {searchOpen ? (
-              <X className="h-4 w-4" strokeWidth={1.6} />
+              <X className="h-[18px] w-[18px]" strokeWidth={1.9} />
             ) : (
-              <Search className="h-4 w-4" strokeWidth={1.6} />
+              <Search className="h-[18px] w-[18px]" strokeWidth={1.9} />
             )}
           </button>
 
@@ -136,16 +137,16 @@ export function TopNav() {
             aria-label={`Favoritos${favCount > 0 ? ` (${favCount})` : ""}`}
             className={cn(ICON_ACTION, "hidden md:inline-flex")}
           >
-            <Heart className="h-4 w-4" strokeWidth={1.6} />
+            <Heart className="h-[18px] w-[18px]" strokeWidth={1.9} />
             <CountBadge count={favCount} />
           </Link>
 
           <Link
             href="/carrito"
             aria-label={`Bolsa${count > 0 ? ` (${count} artículos)` : " vacía"}`}
-            className={cn(ICON_ACTION, "text-navy-900 hover:text-navy-700")}
+            className={cn(ICON_ACTION, "text-navy-700 hover:bg-tint")}
           >
-            <ShoppingCart className="h-[18px] w-[18px]" strokeWidth={1.6} />
+            <ShoppingCart className="h-[18px] w-[18px]" strokeWidth={1.9} />
             <CountBadge count={count} />
           </Link>
 

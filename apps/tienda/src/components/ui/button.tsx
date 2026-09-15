@@ -2,39 +2,36 @@ import * as React from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-/** `soft` es la acción por defecto del sistema: caja con relleno tenue que al
- *  hover invierte a navy. `solid` nace ya invertido y se reserva para el CTA
- *  primario de una pantalla (pagar, confirmar) — la jerarquía entre ambos es el
- *  contraste en reposo, no la forma. */
+/** `soft` es la acción secundaria del sistema: píldora con tinte azul tenue.
+ *  `solid` es el CTA primario de una pantalla (pagar, confirmar, añadir) en
+ *  navy pleno. `outline` y `ghost` son acciones terciarias. */
 type ButtonVariant = "soft" | "solid" | "outline" | "ghost";
 type ButtonSize = "default" | "sm" | "lg";
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  soft: "bg-surface text-navy-900 font-bold tracking-[.16em] uppercase hover:bg-navy-900 hover:text-canvas disabled:bg-surface disabled:text-disabled",
+  soft: "bg-tint text-navy-900 hover:bg-tint-strong disabled:bg-surface disabled:text-disabled",
   solid:
-    "bg-navy-900 text-canvas font-bold tracking-[.16em] uppercase hover:bg-navy-700 disabled:bg-disabled",
+    "bg-navy-700 text-on-brand hover:bg-navy-600 disabled:bg-surface disabled:text-disabled",
   outline:
-    "border border-line text-navy-900 tracking-[.16em] uppercase font-medium hover:border-navy-900",
-  ghost:
-    "text-slate-400 tracking-[.16em] uppercase font-medium hover:text-navy-900",
+    "border-[1.5px] border-line bg-transparent text-navy-700 hover:border-tint-strong hover:bg-tint disabled:text-disabled",
+  ghost: "text-slate-500 hover:text-navy-700 disabled:text-disabled",
 };
 
 const SIZES: Record<ButtonSize, string> = {
-  sm: "text-[10.5px]",
-  default: "text-[11.5px]",
-  lg: "text-[12.5px]",
+  sm: "text-[13px]",
+  default: "text-[14px]",
+  lg: "text-[15px]",
 };
 
-/** Solo las variantes con caja llevan padding: `ghost` es texto puro y un
- *  padding lo despegaría de la línea base de su fila. */
+/** Solo las variantes con caja llevan padding: `ghost` es texto puro. */
 const BOX_PADDING: Record<ButtonSize, string> = {
-  sm: "px-3 py-2",
-  default: "px-5 py-3",
-  lg: "px-7 py-4",
+  sm: "px-4 py-2",
+  default: "px-[22px] py-3",
+  lg: "px-[30px] py-3.5",
 };
 
 const BASE =
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap transition-colors duration-150 disabled:pointer-events-none";
+  "inline-flex items-center justify-center gap-2 rounded-full font-semibold leading-[1.2] whitespace-nowrap transition-[background-color,color,border-color,transform] duration-150 motion-safe:active:scale-[.98] disabled:pointer-events-none";
 
 function buttonClasses(
   variant: ButtonVariant = "soft",

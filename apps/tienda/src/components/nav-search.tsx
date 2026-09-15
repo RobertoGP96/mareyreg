@@ -40,7 +40,7 @@ function HighlightedName({ name, term }: { name: string; term: string }) {
   return (
     <>
       {before}
-      <span className="font-bold text-navy-900">{match}</span>
+      <span className="font-bold text-navy-700">{match}</span>
       {after}
     </>
   );
@@ -163,11 +163,11 @@ function SearchInput({
       role="search"
       onSubmit={box.submit}
       className={cn(
-        "field-shell flex items-center gap-3 border border-line bg-surface px-4 py-2.5 transition-colors duration-150",
+        "field-shell flex items-center gap-2.5 rounded-full border-[1.5px] border-line bg-page px-4 py-2 transition-[border-color,box-shadow,width] duration-200",
         className
       )}
     >
-      <Search className="h-4 w-4 flex-none text-slate-400" strokeWidth={1.6} />
+      <Search className="h-4 w-4 flex-none text-slate-400" strokeWidth={1.9} />
       <input
         ref={inputRef}
         value={box.query}
@@ -192,8 +192,8 @@ function SearchInput({
       />
       {box.status === "loading" ? (
         <Loader2
-          className="h-4 w-4 flex-none text-slate-400 motion-safe:animate-spin"
-          strokeWidth={1.6}
+          className="h-4 w-4 flex-none text-navy-700 motion-safe:animate-spin"
+          strokeWidth={2}
         />
       ) : (
         box.query.length > 0 && (
@@ -201,9 +201,9 @@ function SearchInput({
             type="button"
             onClick={() => box.setQuery("")}
             aria-label="Limpiar búsqueda"
-            className="flex-none text-slate-400 transition-colors hover:text-navy-900"
+            className="-mr-1 flex h-6 w-6 flex-none items-center justify-center rounded-full text-slate-400 transition-colors duration-150 hover:bg-surface hover:text-navy-900"
           >
-            <X className="h-4 w-4" strokeWidth={1.6} />
+            <X className="h-3.5 w-3.5" strokeWidth={2} />
           </button>
         )
       )}
@@ -217,13 +217,13 @@ function SearchResults({ box, onDone }: { box: SearchBox; onDone: () => void }) 
   return (
     <div id={`${box.optionPrefix}-list`}>
       {status === "loading" && (
-        <div className="space-y-px">
+        <div className="space-y-1 motion-safe:animate-pulse">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="flex items-center gap-4 py-3">
-              <div className="h-11 w-11 flex-none bg-surface" />
+            <div key={i} className="flex items-center gap-3.5 px-2.5 py-2.5">
+              <div className="h-12 w-12 flex-none rounded-sm bg-surface" />
               <div className="min-w-0 flex-1 space-y-2">
-                <div className="h-3 w-3/4 bg-surface" />
-                <div className="h-2.5 w-2/5 bg-surface" />
+                <div className="h-3 w-3/4 rounded-full bg-surface" />
+                <div className="h-2.5 w-2/5 rounded-full bg-surface" />
               </div>
             </div>
           ))}
@@ -231,14 +231,14 @@ function SearchResults({ box, onDone }: { box: SearchBox; onDone: () => void }) 
       )}
 
       {status === "error" && (
-        <p className="flex items-center gap-2.5 py-4 text-[13px] text-slate-500">
-          <SearchX className="h-4 w-4 flex-none text-alert" strokeWidth={1.6} />
+        <p className="flex items-center gap-2.5 px-2.5 py-4 text-[13px] text-slate-500">
+          <SearchX className="h-4 w-4 flex-none text-danger" strokeWidth={1.9} />
           No se pudo buscar. Intenta de nuevo.
         </p>
       )}
 
       {status === "success" && results.length === 0 && (
-        <div className="py-6 text-center">
+        <div className="px-2.5 py-6 text-center">
           <p className="text-[14px] font-semibold text-ink">
             Sin resultados para “{term}”
           </p>
@@ -253,7 +253,7 @@ function SearchResults({ box, onDone }: { box: SearchBox; onDone: () => void }) 
           <div
             role="listbox"
             aria-label="Resultados de búsqueda"
-            className="max-h-[min(60vh,420px)] overflow-y-auto border-t border-line-soft"
+            className="max-h-[min(60vh,420px)] space-y-0.5 overflow-y-auto"
           >
             {results.map((r, i) => (
               <Link
@@ -264,19 +264,20 @@ function SearchResults({ box, onDone }: { box: SearchBox; onDone: () => void }) 
                 href={`/producto/${encodeURIComponent(r.sku)}`}
                 onClick={onDone}
                 onMouseEnter={() => box.setActiveIndex(i)}
-                className={`flex items-center gap-4 border-b border-line-soft py-3 transition-colors duration-150 ${
-                  i === activeIndex ? "bg-hover" : ""
-                }`}
+                className={cn(
+                  "flex items-center gap-3.5 rounded-md px-2.5 py-2.5 transition-colors duration-150",
+                  i === activeIndex && "bg-hover"
+                )}
               >
-                <span className="relative flex h-11 w-11 flex-none items-center justify-center overflow-hidden bg-surface">
-                  <ProductImage src={r.imageUrl} alt={r.name} sizes="44px" />
+                <span className="relative flex h-12 w-12 flex-none items-center justify-center overflow-hidden rounded-sm bg-surface">
+                  <ProductImage src={r.imageUrl} alt={r.name} sizes="48px" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14px] font-semibold text-ink">
                     <HighlightedName name={r.name} term={term} />
                   </span>
                   {r.category && (
-                    <span className="eyebrow mt-1 block truncate">
+                    <span className="eyebrow mt-1.5 block truncate">
                       {r.category}
                     </span>
                   )}
@@ -291,7 +292,7 @@ function SearchResults({ box, onDone }: { box: SearchBox; onDone: () => void }) 
                     </span>
                   )}
                   {r.stockAvailable <= 0 && (
-                    <span className="block text-[11px] font-semibold text-alert">
+                    <span className="block text-[11px] font-semibold text-danger">
                       Agotado
                     </span>
                   )}
@@ -302,8 +303,9 @@ function SearchResults({ box, onDone }: { box: SearchBox; onDone: () => void }) 
           <ButtonLink
             href={`/catalogo?q=${encodeURIComponent(term)}`}
             onClick={onDone}
+            variant="solid"
             size="sm"
-            className="mt-5 w-full"
+            className="mt-2 w-full"
           >
             Ver todos
             {response && response.total > results.length
@@ -338,11 +340,11 @@ export function NavSearchInline({ className }: { className?: string }) {
         <SearchInput
           box={box}
           placeholder="Buscar productos"
-          className="w-[210px] transition-[width] duration-200 focus-within:w-[300px] lg:w-[260px] lg:focus-within:w-[340px]"
+          className="w-[220px] focus-within:w-[320px] lg:w-[260px] lg:focus-within:w-[360px]"
         />
       </div>
       {showPanel && (
-        <PopoverPanel align="end" className="w-[400px] px-5 pt-4 pb-5">
+        <PopoverPanel align="end" className="w-[420px] p-3">
           <SearchResults box={box} onDone={() => setFocused(false)} />
         </PopoverPanel>
       )}
@@ -369,10 +371,10 @@ export function NavSearchOverlay({
   if (!open) return null;
 
   return (
-    <div className="absolute inset-x-0 top-full border-b border-line bg-canvas px-5 pt-5 pb-6 shadow-pop">
+    <div className="slide-down absolute inset-x-0 top-full rounded-b-[24px] border-b border-line bg-canvas px-4 pt-3 pb-5 shadow-pop">
       <SearchInput box={box} inputRef={inputRef} placeholder="Buscar productos" />
       {box.hasTerm && (
-        <div className="mt-5">
+        <div className="mt-3">
           <SearchResults box={box} onDone={onClose} />
         </div>
       )}

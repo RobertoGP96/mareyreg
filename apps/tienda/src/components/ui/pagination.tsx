@@ -76,8 +76,13 @@ function pageWindow(page: number, pageCount: number): PageItem[] {
   return items;
 }
 
-const ARROW =
-  "inline-flex size-9 items-center justify-center border border-line text-navy-900 transition-colors duration-150 hover:border-navy-900 disabled:pointer-events-none disabled:border-line disabled:text-disabled";
+const PILL =
+  "inline-flex size-9 items-center justify-center rounded-full border-[1.5px] transition-colors duration-150";
+
+const ARROW = cn(
+  PILL,
+  "border-line bg-canvas text-navy-900 hover:border-navy-700 hover:text-navy-700 disabled:pointer-events-none disabled:opacity-40"
+);
 
 type PaginationProps = {
   page: number;
@@ -113,11 +118,12 @@ export function Pagination({
         className
       )}
     >
-      <p className="tabular text-[11.5px] text-slate-400">
-        <span className="font-bold text-navy-900">
+      <p className="tabular text-[12.5px] text-slate-400">
+        <span className="font-semibold text-navy-900">
           {from}–{to}
         </span>{" "}
-        de <span className="font-bold text-navy-900">{total}</span> {itemLabel}
+        de <span className="font-semibold text-navy-900">{total}</span>{" "}
+        {itemLabel}
       </p>
 
       <div className="flex items-center gap-1.5">
@@ -128,7 +134,7 @@ export function Pagination({
           onClick={() => go(page - 1)}
           aria-label="Página anterior"
         >
-          <ChevronLeft className="size-4" />
+          <ChevronLeft className="size-4" strokeWidth={2} />
         </button>
 
         <div className="hidden items-center gap-1.5 sm:flex">
@@ -137,7 +143,7 @@ export function Pagination({
               <span
                 key={`gap-${i}`}
                 aria-hidden
-                className="px-0.5 text-[11.5px] text-slate-400"
+                className="px-0.5 text-[12.5px] text-slate-400"
               >
                 …
               </span>
@@ -149,10 +155,11 @@ export function Pagination({
                 aria-label={`Página ${item}`}
                 aria-current={item === page ? "page" : undefined}
                 className={cn(
-                  "tabular inline-flex size-9 items-center justify-center border text-[11.5px] font-medium transition-colors duration-150",
+                  PILL,
+                  "tabular text-[13px] font-medium",
                   item === page
-                    ? "border-navy-900 bg-navy-900 font-bold text-canvas"
-                    : "border-line text-navy-900 hover:border-navy-900"
+                    ? "border-navy-700 bg-navy-700 font-semibold text-on-brand"
+                    : "border-line bg-canvas text-navy-900 hover:border-navy-700 hover:text-navy-700"
                 )}
               >
                 {item}
@@ -161,8 +168,8 @@ export function Pagination({
           )}
         </div>
 
-        <span className="tabular px-1 text-[11.5px] text-slate-400 sm:hidden">
-          {page} / {pageCount}
+        <span className="tabular px-2 text-[13px] font-semibold text-slate-500 sm:hidden">
+          {page} de {pageCount}
         </span>
 
         <button
@@ -172,7 +179,7 @@ export function Pagination({
           onClick={() => go(page + 1)}
           aria-label="Página siguiente"
         >
-          <ChevronRight className="size-4" />
+          <ChevronRight className="size-4" strokeWidth={2} />
         </button>
       </div>
     </nav>

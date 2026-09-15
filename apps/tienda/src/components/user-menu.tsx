@@ -16,7 +16,7 @@ import { Popover, PopoverPanel } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 const ITEM =
-  "flex items-center gap-3 px-4 py-3 text-[13px] text-slate-500 transition-colors duration-150 hover:bg-hover hover:text-navy-900";
+  "flex items-center gap-3 rounded-sm px-3 py-2.5 text-[13px] font-medium text-slate-500 transition-colors duration-150 hover:bg-hover hover:text-navy-700";
 
 interface MenuLink {
   href: string;
@@ -64,29 +64,33 @@ export function UserMenu() {
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={profile ? `Cuenta de ${profile.name}` : "Tu cuenta"}
-        className="nav-label inline-flex items-center gap-1.5 text-slate-400 transition-colors duration-150 hover:text-navy-900 aria-expanded:text-navy-900"
+        className={cn(
+          "nav-label inline-flex h-9 min-w-9 items-center justify-center gap-1.5 rounded-full px-2 text-slate-500 transition-colors duration-150 hover:bg-hover hover:text-navy-700 aria-expanded:bg-tint aria-expanded:text-navy-700",
+          firstName && "lg:px-3"
+        )}
       >
-        <UserRound className="h-4 w-4 flex-none" strokeWidth={1.6} />
+        <UserRound className="h-[18px] w-[18px] flex-none" strokeWidth={1.9} />
         {firstName && (
           <span className="hidden max-w-[92px] truncate lg:inline">
             {firstName}
           </span>
         )}
         <ChevronDown
-          className={`hidden h-3.5 w-3.5 flex-none transition-transform duration-150 md:block ${
-            open ? "rotate-180" : ""
-          }`}
-          strokeWidth={1.6}
+          className={cn(
+            "hidden h-3.5 w-3.5 flex-none transition-transform duration-200 md:block",
+            open && "rotate-180"
+          )}
+          strokeWidth={2}
         />
       </button>
 
       {open && (
-        <PopoverPanel align="end" role="menu" className="w-[248px]">
-          <div className="border-b border-line-soft px-4 py-4">
+        <PopoverPanel align="end" role="menu" className="w-[256px] p-2">
+          <div className="mb-1 rounded-md bg-page px-3.5 py-3">
             <p className="truncate text-[14px] font-semibold text-ink">
               {profile ? profile.name : "Cliente invitado"}
             </p>
-            <p className="tabular mt-1 truncate text-[12px] text-slate-400">
+            <p className="tabular mt-0.5 truncate text-[12px] text-slate-400">
               {profile ? profile.phone : "Inicia sesión o crea tu cuenta"}
             </p>
           </div>
@@ -99,24 +103,26 @@ export function UserMenu() {
                 href={link.href}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className={`${ITEM} border-b border-line-soft`}
+                className={ITEM}
               >
-                <Icon className="h-4 w-4 flex-none" strokeWidth={1.6} />
+                <Icon className="h-4 w-4 flex-none" strokeWidth={1.9} />
                 {link.label}
               </Link>
             );
           })}
 
           {profile && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={handleSignOut}
-              className={cn(ITEM, "w-full text-left hover:text-alert")}
-            >
-              <LogOut className="h-4 w-4 flex-none" strokeWidth={1.6} />
-              Cerrar sesión
-            </button>
+            <div className="mt-1 border-t border-line-soft pt-1">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleSignOut}
+                className={cn(ITEM, "w-full text-left hover:text-danger")}
+              >
+                <LogOut className="h-4 w-4 flex-none" strokeWidth={1.9} />
+                Cerrar sesión
+              </button>
+            </div>
           )}
         </PopoverPanel>
       )}

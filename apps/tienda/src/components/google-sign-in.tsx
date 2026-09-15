@@ -63,7 +63,7 @@ export function GoogleSignIn({
     <button
       type="button"
       onClick={handleClick}
-      className="inline-flex w-full items-center justify-center gap-3 border border-line bg-canvas px-5 py-3.5 text-[12.5px] font-semibold tracking-[.06em] text-ink transition-colors duration-150 hover:border-navy-900"
+      className="inline-flex w-full items-center justify-center gap-3 rounded-full border-[1.5px] border-line bg-canvas px-5 py-3 text-[14px] font-semibold text-ink transition-colors duration-150 hover:border-navy-700"
     >
       <GoogleMark />
       {label}

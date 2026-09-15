@@ -1,10 +1,11 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Search, SearchX, X } from "lucide-react";
 import type { WebstoreCurrency, WebstoreProduct } from "@/lib/erp-client";
 import { discountPct, fmt, normalizeText } from "@/lib/format";
 import { useSyncCurrency } from "@/lib/store";
+import { cn } from "@/lib/utils";
 import { ProductCard } from "@/components/product-card";
 import { ProductGrid, ProductGridCell } from "@/components/product-grid";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,13 @@ import {
 } from "@/components/ui/pagination";
 import { Slider } from "@/components/ui/slider";
 import { CatalogHero } from "@/app/catalogo/catalog-hero";
-import { FilterBar, type SortOption } from "@/app/catalogo/filter-bar";
+import {
+  CHIP_BASE,
+  CHIP_OFF,
+  CHIP_SOFT_ON,
+  FilterBar,
+  type SortOption,
+} from "@/app/catalogo/filter-bar";
 
 type SortKey = "rel" | "asc" | "desc" | "discount" | "name";
 
@@ -181,8 +188,8 @@ export function CatalogClient({
     if (!el) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({
-      // El header es sticky (78px): sin holgura la primera fila queda debajo.
-      top: el.getBoundingClientRect().top + window.scrollY - 90,
+      // El header es sticky (64/68px): sin holgura la primera fila queda debajo.
+      top: el.getBoundingClientRect().top + window.scrollY - 84,
       behavior: reduce ? "auto" : "smooth",
     });
   };
@@ -212,72 +219,67 @@ export function CatalogClient({
         description="Despensa escogida pieza a pieza. Productos frescos, marcas de confianza y precios claros, sin adornos."
       />
 
-      <FilterBar
-        filters={[TODO, DESTACADOS, OFERTAS, ...categories]}
-        activeFilter={category}
-        onFilterChange={setCategory}
-        count={filtered.length}
-        sort={sort}
-        sortOptions={SORTS}
-        onSortChange={(value) => setSort(value as SortKey)}
-      >
-        <button
-          type="button"
-          onClick={() => setInStockOnly((v) => !v)}
-          aria-pressed={inStockOnly}
-          className={`nav-label transition-colors duration-150 ${
-            inStockOnly
-              ? "font-bold text-navy-900"
-              : "text-slate-400 hover:text-navy-700"
-          }`}
+      <div className="mx-auto flex w-full max-w-[1120px] flex-1 flex-col gap-6 px-5 py-6 md:px-6 md:py-8">
+        <FilterBar
+          filters={[TODO, DESTACADOS, OFERTAS, ...categories]}
+          activeFilter={category}
+          onFilterChange={setCategory}
+          count={filtered.length}
+          sort={sort}
+          sortOptions={SORTS}
+          onSortChange={(value) => setSort(value as SortKey)}
         >
-          En stock
-        </button>
-        {priceBounds && (
           <button
             type="button"
-            onClick={() => setShowPrice((v) => !v)}
-            aria-expanded={showPrice}
-            className={`nav-label transition-colors duration-150 ${
-              showPrice || priceActive
-                ? "font-bold text-navy-900"
-                : "text-slate-400 hover:text-navy-700"
-            }`}
+            onClick={() => setInStockOnly((v) => !v)}
+            aria-pressed={inStockOnly}
+            className={cn(CHIP_BASE, inStockOnly ? CHIP_SOFT_ON : CHIP_OFF)}
           >
-            Precio
+            En stock
           </button>
+          {priceBounds && (
+            <button
+              type="button"
+              onClick={() => setShowPrice((v) => !v)}
+              aria-expanded={showPrice}
+              className={cn(
+                CHIP_BASE,
+                showPrice || priceActive ? CHIP_SOFT_ON : CHIP_OFF
+              )}
+            >
+              Precio
+            </button>
+          )}
+        </FilterBar>
+
+        {/* El catálogo ya no tiene buscador propio: el término llega por `?q=`
+            desde el buscador del header. Sin pintarlo, el usuario ve una lista
+            recortada sin saber por qué y sin manera de deshacerlo. */}
+        {activeTerm && (
+          <div className="flex items-center justify-between gap-3 rounded-md bg-tint px-4 py-3">
+            <p className="flex min-w-0 items-center gap-2.5 text-[13px] text-navy-700">
+              <Search className="h-4 w-4 flex-none" strokeWidth={1.8} />
+              <span className="truncate">
+                Resultados para{" "}
+                <span className="font-semibold text-navy-900">
+                  “{activeTerm}”
+                </span>
+              </span>
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setQuery("")}
+              className="flex-none gap-1.5"
+            >
+              Quitar
+              <X className="h-3.5 w-3.5" strokeWidth={2} />
+            </Button>
+          </div>
         )}
-      </FilterBar>
 
-      {/* El catálogo ya no tiene buscador propio: el término llega por `?q=`
-          desde el buscador del header. Sin pintarlo, el usuario ve una lista
-          recortada sin saber por qué y sin manera de deshacerlo. */}
-      {activeTerm && (
-        <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4 md:px-10">
-          <p className="flex min-w-0 items-center gap-3">
-            <Search
-              className="h-4 w-4 flex-none text-slate-400"
-              strokeWidth={1.6}
-            />
-            <span className="truncate text-[13px] text-slate-500">
-              Resultados para{" "}
-              <span className="font-semibold text-navy-900">“{activeTerm}”</span>
-            </span>
-          </p>
-          <button
-            type="button"
-            onClick={() => setQuery("")}
-            className="nav-label inline-flex flex-none items-center gap-1.5 text-slate-400 transition-colors duration-150 hover:text-navy-900"
-          >
-            Quitar
-            <X className="h-3.5 w-3.5" strokeWidth={1.6} />
-          </button>
-        </div>
-      )}
-
-      {showPrice && priceBounds && (
-        <div className="border-b border-line px-5 py-6 md:px-10">
-          <div className="max-w-[460px]">
+        {showPrice && priceBounds && (
+          <div className="max-w-[460px] rounded-lg bg-canvas p-5 shadow-card">
             <div className="flex items-baseline justify-between gap-4">
               <span className="eyebrow">Rango de precio</span>
               <span className="tabular text-[13px] font-bold text-navy-900">
@@ -294,7 +296,7 @@ export function CatalogClient({
               className="mt-4"
             />
             <div className="mt-3 flex items-center justify-between gap-4">
-              <span className="tabular text-[11px] text-slate-400">
+              <span className="tabular text-[12px] text-slate-400">
                 {fmt(priceBounds[0], currency)} — {fmt(priceBounds[1], currency)}
               </span>
               {priceActive && (
@@ -308,52 +310,58 @@ export function CatalogClient({
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {filtered.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center px-5 py-24 text-center md:px-10">
-          <p className="eyebrow">Sin resultados</p>
-          <p className="font-display mt-4 text-[32px] leading-none text-navy-900">
-            Nada por aquí
-          </p>
-          <p className="mt-4 max-w-[380px] text-[13.5px] leading-[1.65] text-pretty text-slate-500">
-            {activeTerm
-              ? `No encontramos nada para “${activeTerm}”. Prueba con otro término o quita algún filtro.`
-              : hasActiveFilters
-                ? "No encontramos productos con esos filtros. Prueba a quitar alguno."
-                : "Aún no hay productos disponibles en el catálogo."}
-          </p>
-          {hasActiveFilters && (
-            <Button onClick={clearFilters} className="mt-7">
-              Limpiar filtros
-            </Button>
-          )}
-        </div>
-      ) : (
-        <div ref={gridRef} className="px-5 pb-16 md:px-10">
-          <ProductGrid>
-            {pageItems.map((product, index) => (
-              <ProductGridCell key={product.sku}>
-                <ProductCard
-                  product={product}
-                  variant="grid"
-                  priority={page === 1 && index < 4}
-                />
-              </ProductGridCell>
-            ))}
-          </ProductGrid>
-          <Pagination
-            page={page}
-            pageCount={pageCount}
-            total={total}
-            from={from}
-            to={to}
-            onPageChange={goToPage}
-            className="mt-12"
-          />
-        </div>
-      )}
+        {filtered.length === 0 ? (
+          <div className="anim-fade-up flex flex-1 flex-col items-center justify-center px-5 py-20 text-center">
+            <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-tint">
+              <SearchX
+                className="h-[22px] w-[22px] text-navy-700"
+                strokeWidth={1.8}
+              />
+            </span>
+            <p className="eyebrow mt-5">Sin resultados</p>
+            <p className="font-display mt-3.5 text-[22px] leading-tight text-navy-900">
+              Nada por aquí
+            </p>
+            <p className="mt-3 max-w-[380px] text-[13.5px] leading-[1.65] text-pretty text-slate-500">
+              {activeTerm
+                ? `No encontramos nada para “${activeTerm}”. Prueba con otro término o quita algún filtro.`
+                : hasActiveFilters
+                  ? "No encontramos productos con esos filtros. Prueba a quitar alguno."
+                  : "Aún no hay productos disponibles en el catálogo."}
+            </p>
+            {hasActiveFilters && (
+              <Button onClick={clearFilters} className="mt-6">
+                Limpiar filtros
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div ref={gridRef}>
+            <ProductGrid>
+              {pageItems.map((product, index) => (
+                <ProductGridCell key={product.sku}>
+                  <ProductCard
+                    product={product}
+                    variant="grid"
+                    priority={page === 1 && index < 4}
+                  />
+                </ProductGridCell>
+              ))}
+            </ProductGrid>
+            <Pagination
+              page={page}
+              pageCount={pageCount}
+              total={total}
+              from={from}
+              to={to}
+              onPageChange={goToPage}
+              className="mt-10"
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
