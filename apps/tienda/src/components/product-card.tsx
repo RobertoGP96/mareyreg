@@ -135,13 +135,15 @@ export function ProductCard({
         variant === "carousel" && `${CAROUSEL_CARD_WIDTH} flex-none snap-start`
       )}
     >
-      {/* El enlace cubre la celda entera para que toda la card navegue, pero se
-          queda debajo de los controles (favorito, selectores, añadir), que
-          llevan z-10. */}
+      {/* El enlace cubre la celda entera para que toda la card navegue. Va por
+          encima de la foto y el texto (z-[1]: el contenedor de la foto es
+          `relative` y con z-0 lo tapaba, dejando el clic sin efecto) pero
+          debajo de los controles (favorito, selectores, añadir), que llevan
+          z-10. */}
       <Link
         href={`/producto/${encodeURIComponent(selected.sku)}`}
         onClick={handleOpenDetail}
-        className="absolute inset-0 z-0 rounded-lg"
+        className="absolute inset-0 z-[1] rounded-lg"
         aria-label={displayName(selected)}
       />
 
