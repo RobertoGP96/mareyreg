@@ -40,6 +40,7 @@ model User {
   courierProfile           CourierProfile? @relation("CourierProfileUser")
   webstoreApiKeys          WebstoreApiKey[]
   webstoreOffers           WebstoreOffer[]
+  webstoreModelGroups      WebstoreModelGroup[]
   productPriceChanges      ProductPriceHistory[]
   presentationPriceChanges PresentationPriceHistory[]
   discountHistory          DiscountHistory[]
@@ -484,6 +485,13 @@ model Product {
   webstoreEnabled   Boolean         @default(false) @map("webstore_enabled")
   webstoreFeatured  Boolean         @default(false) @map("webstore_featured")
   webstoreSortOrder Int?            @map("webstore_sort_order")
+  // Pertenencia a un grupo de modelos de la tienda (null = producto suelto).
+  // Cada modelo sigue siendo un Product completo; el grupo solo agrupa la card.
+  // modelGroupId y modelLabel van SIEMPRE juntos (CHECK e índice único parcial
+  // por etiqueta en prisma/sql/webstore-model-groups.sql).
+  modelGroupId    Int?            @map("model_group_id")
+  modelLabel      String?         @map("model_label")
+  modelSortOrder  Int             @default(0) @map("model_sort_order")
   imageUrl        String?         @map("image_url")
   supplierId      Int?            @map("supplier_id")
   reorderPoint    Decimal?        @map("reorder_point")
@@ -522,11 +530,13 @@ model Product {
   presentations      ProductPresentation[]
   cost               ProductCost?
   productPieces      ProductPiece[]
+  modelGroup         WebstoreModelGroup? @relation(fields: [modelGroupId], references: [groupId], onDelete: Restrict)
 
   @@index([category])
   @@index([isActive])
   @@index([supplierId])
   @@index([webstoreEnabled, webstoreFeatured, webstoreSortOrder])
+  @@index([modelGroupId, modelSortOrder])
   @@map("products")
 }
 
@@ -1976,6 +1986,28 @@ model WebstoreOffer {
 
   @@index([isActive])
   @@map("webstore_offers")
+}
+
+// Grupo de modelos de la tienda: agrupa Products (cada uno con su SKU, stock,
+// precio y foto propios) bajo UNA card con selector de modelo. Solo afecta al
+// catálogo web; el grupo nunca se vende ni tiene stock. Product.name de cada
+// modelo sigue siendo el nombre interno completo ("Camiseta básica M") para
+// POS/facturas; `name` es el título de la card. CHECKs en
+// prisma/sql/webstore-model-groups.sql.
+model WebstoreModelGroup {
+  groupId     Int      @id @default(autoincrement()) @map("group_id")
+  name        String
+  // Etiqueta del eje que ve el cliente: "Modelo", "Talla", "Color".
+  optionLabel String   @default("Modelo") @map("option_label")
+  version     Int      @default(0)
+  createdBy   Int?     @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  creator  User?     @relation(fields: [createdBy], references: [userId], onDelete: SetNull)
+  products Product[]
+
+  @@map("webstore_model_groups")
 }
 
 model WebstoreOrderLog {

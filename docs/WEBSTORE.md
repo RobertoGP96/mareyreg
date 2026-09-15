@@ -19,6 +19,7 @@ Plan completo de diseño: `C:/Users/usuario/.claude/plans/necesito-crear-un-modu
 | 9 | Esta documentación | ✅ |
 | 10 | Ofertas (`WebstoreOffer` + materialización en `Discount`), badge/filtro "Ofertas" en la tienda, endpoint `POST /api/webstore/customers` y sincronización de perfil desde la tienda | ✅ |
 | 11 (catch-weight) | Venta de productos de peso variable desde la tienda: precio/factura estimados por unidad, pesaje real y facturación en el ERP (`fulfillWebstoreOrder`) | ✅ |
+| 12 (modelos y formatos) | Grupos de modelos (`WebstoreModelGroup` + `Product.modelGroupId/modelLabel`), campo `modelGroup` y precio efectivo por presentación en el catálogo, selector de modelo y formato en la card de la tienda | ✅ |
 | — | Hardening (rate limiting del webhook, comparación automática precio-tienda-vs-Mareyway, HMAC de payload) | ⏳ v2 |
 
 ## Decisiones clave
@@ -66,7 +67,10 @@ psql "$DATABASE_URL" -f prisma/sql/webstore-constraints.sql
    isCatchWeight: boolean
    pricePerKg: number | null // solo si isCatchWeight
    createdAt: string // ISO 8601, fecha de alta del producto — alimenta "Recién añadidos" en la tienda
+   modelGroup: { groupId: number; name: string; optionLabel: string; modelLabel: string; sortOrder: number } | null // ver "Modelos y formatos"
    ```
+
+   Cada `presentations[]` incluye además `price` (precio efectivo de esa presentación: descuentos aplicados y convertido a moneda base — el mismo número que factura el ERP) y `compareAtPrice` (precio antes del descuento, o `null`). `retailPrice`/`wholesalePrice` se conservan como precio de lista crudo por compatibilidad; para mostrar precios usar siempre `price`. La presentación **base siempre viaja** aunque no tenga SKU propio: en ese caso su `sku` es el del producto (que `resolveSkusBatch` resuelve a la base).
 
    El catálogo **solo incluye productos con `sku` no nulo**: el `sku` es el identificador de producto en todo el contrato (keys del catálogo, líneas de orden), así que un producto sin SKU no se publica aunque tenga `webstoreEnabled=true`.
 
@@ -125,6 +129,27 @@ Cuando el ERP tiene piezas registradas (`ProductPiece`, ver `prisma/sql/inventor
 - **Eco en `201`**: las líneas con piezas devuelven `priceIsEstimated: false` y `pieces: [{ pieceId, weightKg }]`.
 - **Cancelación** (`cancelWebstoreOrder`): acepta también pedidos `awaiting_weighing` (libera piezas `reserved`, sin reverso de stock); en pedidos `processed` libera además las piezas `sold` junto con el reverso de stock. No hay TTL de reservas en v1: solo persisten en pedidos mixtos, visibles en la bandeja "Por pesar".
 - **Reservas nunca al carrito**: el carrito vive en localStorage; las piezas se reservan únicamente al `POST /orders`. El conflicto carrito→checkout se resuelve con el 409, no con reservas tempranas.
+
+## Modelos y formatos en la tienda
+
+Un mismo artículo puede tener varios **modelos** (talla, color, versión) y venderse en varios **formatos** (unidad, caja). La card de la tienda muestra un selector para cada eje.
+
+- **Modelo = `Product` completo.** Cada modelo tiene su propio SKU, stock por almacén, precio efectivo, foto, presentaciones y ofertas. El ERP solo agrupa: `WebstoreModelGroup` (`webstore_model_groups`: `name` = título de la card, `optionLabel` = "Modelo"/"Talla"/"Color") y en `Product` los campos `modelGroupId`, `modelLabel` ("M", "Rojo") y `modelSortOrder`. Un producto pertenece como máximo a un grupo; la etiqueta es única por grupo (índice parcial en `prisma/sql/webstore-model-groups.sql`). Convención: `Product.name` sigue siendo el nombre interno completo ("Camiseta básica M") para POS, facturas y kardex; la tienda usa `modelGroup.name` + `modelLabel`.
+- **Gestión**: solo desde `/webstore/catalogo` (acción "Modelos" por fila o "Nuevo grupo de modelos"). Reglas server-side: sin servicios, misma unidad y mismo tipo de peso (catch-weight) dentro del grupo, SKU obligatorio, etiqueta única.
+- **Formato = `ProductPresentation`** (ya existente, se gestiona en `/products` › Presentaciones). El catálogo expone `presentations[].price` efectivo para que la tienda muestre el precio que realmente factura el ERP.
+- **`GET /api/webstore/products`** — el catálogo **no agrupa ni pagina**: sigue una fila por modelo/SKU con un campo aditivo:
+
+  ```jsonc
+  { "sku": "CAM-BAS-M", "name": "Camiseta básica M", "price": 950, "stockAvailable": 12, "imageUrl": "…/cam-m.jpg",
+    "modelGroup": { "groupId": 7, "name": "Camiseta básica", "optionLabel": "Talla", "modelLabel": "M", "sortOrder": 1 },
+    "presentations": [
+      { "sku": "CAM-BAS-M", "name": "unidad", "factor": 1, "isBase": true, "price": 950, "compareAtPrice": null, "retailPrice": 950, "…": "…" },
+      { "sku": "CAM-BAS-M-CAJA", "name": "Caja 12", "factor": 12, "isBase": false, "price": 10800, "compareAtPrice": 11400, "retailPrice": 11400, "…": "…" }
+    ] }
+  ```
+
+  Reglas para el consumidor: agrupar por `modelGroup.groupId` (un grupo con una sola fila publicable se muestra como producto suelto); ordenar modelos por `sortOrder` asc y luego `modelLabel` (orden numérico natural); `modelGroup: null` en productos sueltos. Un formato está disponible si `stockAvailable >= factor`. Si algún día el endpoint pagina (`page/limit`), deberá paginar por `COALESCE(model_group_id, product_id)` para no partir un grupo entre páginas. La tienda tolera `modelGroup` y `presentations[].price` ausentes (ERP viejo): sin agrupación y `price = retailPrice`.
+- **`POST /api/webstore/orders` no cambia**: la línea lleva el `sku` del modelo elegido (base) o de su presentación. Integradores existentes no se rompen.
 
 ## Riesgos / pendientes
 

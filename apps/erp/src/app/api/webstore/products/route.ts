@@ -2,18 +2,20 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { resolveApiKey } from "@/modules/webstore/lib/api-key";
 import { getBaseCurrency } from "@/lib/currency";
-import { getEffectiveLinePrices, lineKey } from "@/modules/inventory/lib/effective-price";
+import { getEffectiveLinePrices } from "@/modules/inventory/lib/effective-price";
 import { getDefaultWebstoreWarehouseId } from "@/modules/webstore/lib/dispatch-warehouse";
-import { piecePrice } from "@/modules/webstore/lib/piece-price";
+import {
+  catalogPriceLines,
+  groupPiecesByProduct,
+  toCatalogProduct,
+  type WebstoreOfferPayload,
+} from "@/modules/webstore/lib/catalog-mappers";
 import {
   checkRateLimit,
   getClientIp,
   rateLimitExceededResponseInit,
   WEBSTORE_RATE_LIMITS,
 } from "@/modules/webstore/lib/rate-limit";
-
-/** Máximo de pesajes expuestos por producto en el catálogo. */
-const MAX_PIECES_PER_PRODUCT = 50;
 
 export const runtime = "nodejs";
 
@@ -67,7 +69,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const baseCurrency = await getBaseCurrency(db);
   const warehouseId = await getDefaultWebstoreWarehouseId(db);
 
-  const products = await db.product.findMany({
+  const rows = await db.product.findMany({
     // sku no-null: el contrato de la tienda tipa sku como string (es la key de
     // React y el identificador de las líneas de orden) — un producto sin SKU
     // no puede venderse en línea y duplicaría keys en el catálogo.
@@ -91,19 +93,16 @@ export async function GET(request: Request): Promise<NextResponse> {
         },
         orderBy: { sortOrder: "asc" },
       },
+      modelGroup: { select: { groupId: true, name: true, optionLabel: true } },
     },
     orderBy: [{ webstoreFeatured: "desc" }, { webstoreSortOrder: "asc" }, { name: "asc" }],
   });
+  const products = rows.filter((p): p is typeof p & { sku: string } => p.sku != null);
 
   // getEffectiveLinePrices (no getEffectivePrices) porque solo esta variante
-  // resuelve pricePerBase (precio por kg) para productos catch-weight — el
-  // resto del catálogo usa basePrice/finalPrice de la presentación base
-  // (line sin presentationId), igual comportamiento que antes.
-  const prices = await getEffectiveLinePrices(
-    db,
-    products.map((p) => ({ productId: p.productId, quantity: 1 })),
-    {}
-  );
+  // resuelve pricePerBase (precio por kg) para catch-weight y el precio de
+  // cada presentación no-base — el mismo número que factura process-order.
+  const prices = await getEffectiveLinePrices(db, catalogPriceLines(products), {});
 
   // Pesajes disponibles (ProductPiece) de los productos catch-weight en el
   // almacén de la tienda: el cliente puede elegir la pieza exacta que quiere
@@ -123,15 +122,7 @@ export async function GET(request: Request): Promise<NextResponse> {
           select: { pieceId: true, productId: true, weightKg: true, pieceCount: true },
         })
       : [];
-  const piecesByProductId = new Map<number, typeof availablePieces>();
-  for (const piece of availablePieces) {
-    const list = piecesByProductId.get(piece.productId);
-    if (list) {
-      if (list.length < MAX_PIECES_PER_PRODUCT) list.push(piece);
-    } else {
-      piecesByProductId.set(piece.productId, [piece]);
-    }
-  }
+  const piecesByProductId = groupPiecesByProduct(availablePieces);
 
   const appliedDiscountIds = Array.from(
     new Set(
@@ -147,7 +138,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         },
       })
     : [];
-  const offerByDiscountId = new Map(
+  const offerByDiscountId = new Map<number, WebstoreOfferPayload>(
     discountsWithOffer
       .filter((d) => d.offer != null)
       .map((d) => [
@@ -161,76 +152,17 @@ export async function GET(request: Request): Promise<NextResponse> {
       ])
   );
 
-  const catalog = products.map((p) => {
-    const price = prices.get(lineKey(p.productId)) ?? {
-      basePrice: 0,
-      finalPrice: 0,
-      appliedDiscounts: [],
-      factor: 1,
-      pricePerBase: undefined,
-    };
-    const appliedDiscountId = price.appliedDiscounts[0]?.discountId;
-    const offer = appliedDiscountId != null ? offerByDiscountId.get(appliedDiscountId) ?? null : null;
-    // Mismo almacén que usa processWebstoreOrder para despachar (ver
-    // getDefaultWebstoreWarehouseId): así el stock mostrado nunca diverge
-    // del stock realmente disponible para el despacho de esta orden.
-    const stockAvailable = p.stockLevels.reduce((sum, s) => sum + Number(s.currentQuantity), 0);
-    const stockPieces = p.stockLevels.reduce((sum, s) => sum + (s.currentPieces ?? 0), 0);
-    // Precio por kg (solo productos catch-weight): fuente de verdad para
-    // estimatedPrice de las presentaciones Pieza/Caja de este producto.
-    const pricePerKg = p.isCatchWeight ? price.pricePerBase ?? null : null;
-    return {
-      sku: p.sku,
-      name: p.name,
-      description: p.description,
-      category: p.category,
-      price: price.finalPrice,
-      compareAtPrice: price.finalPrice < price.basePrice ? price.basePrice : null,
-      featured: p.webstoreFeatured,
-      stockAvailable,
-      imageUrl: p.imageUrl,
-      createdAt: p.createdAt.toISOString(),
-      offer,
-      isCatchWeight: p.isCatchWeight,
-      pricePerKg,
-      // Pesajes disponibles con precio YA redondeado por el ERP (piecePrice):
-      // la tienda nunca recalcula. null en productos normales; [] cuando el
-      // producto catch-weight no tiene piezas registradas (flujo estimado).
-      pieces: p.isCatchWeight
-        ? (piecesByProductId.get(p.productId) ?? []).map((pz) => ({
-            pieceId: pz.pieceId,
-            weightKg: Number(pz.weightKg),
-            pieceCount: pz.pieceCount,
-            price:
-              pricePerKg != null
-                ? piecePrice(pricePerKg, Number(pz.weightKg), baseCurrency.decimalPlaces)
-                : null,
-          }))
-        : null,
-      presentations: p.presentations
-        .filter((pr): pr is typeof pr & { sku: string } => pr.sku != null)
-        .map((pr) => {
-          const nominalWeightKg = p.isCatchWeight ? Number(pr.factor) : null;
-          const estimatedPrice =
-            p.isCatchWeight && pricePerKg != null && nominalWeightKg != null
-              ? pricePerKg * nominalWeightKg
-              : null;
-          return {
-            sku: pr.sku,
-            name: pr.name,
-            factor: Number(pr.factor),
-            retailPrice: Number(pr.retailPrice),
-            wholesalePrice: pr.wholesalePrice != null ? Number(pr.wholesalePrice) : null,
-            barcode: pr.barcode,
-            isBase: pr.isBase,
-            piecesPerUnit: pr.piecesPerUnit,
-            nominalWeightKg,
-            estimatedPrice,
-            stockPieces: p.isCatchWeight ? stockPieces : null,
-          };
-        }),
-    };
-  });
+  // Mismo almacén que usa processWebstoreOrder para despachar (ver
+  // getDefaultWebstoreWarehouseId): así el stock mostrado nunca diverge
+  // del stock realmente disponible para el despacho de esta orden.
+  const catalog = products.map((p) =>
+    toCatalogProduct(p, {
+      prices,
+      offerByDiscountId,
+      piecesByProductId,
+      decimalPlaces: baseCurrency.decimalPlaces,
+    })
+  );
 
   return NextResponse.json({
     currency: {
