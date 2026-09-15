@@ -52,3 +52,6 @@ drizzle/meta
 .turbo
 
 .env*.local
+
+# Claude Code (permisos locales por máquina)
+.claude/settings.local.json
