@@ -30,9 +30,15 @@ Las URLs anteriores (`/envios/entregas`, `/envios/destinatarios`, `/envios/mensa
 
 ## Aplicar a la DB
 
+Mientras la tabla `cash_delivery_photos` no exista, `/entregas` falla con `P2021 The table public.cash_delivery_photos does not exist`. El paso 1 la crea.
+
 ```bash
 # desde apps/erp
+# 1. Schema. Si `db push` falla por red (P1001, puerto 5432 bloqueado), el DDL
+#    equivalente e idempotente se aplica por WebSocket:
 pnpm db:generate && pnpm db:push
+#    o bien:
+node scripts/apply-sql.mjs prisma/sql/entregas-photos-ddl.sql
 
 # CHECKs, funciones y CONSTRAINT TRIGGERs de entregas (antes envios-cash-delivery.sql)
 node scripts/apply-sql.mjs prisma/sql/entregas-constraints.sql
@@ -69,7 +75,7 @@ Los triggers diferidos requieren transacciones interactivas reales: `db.ts` usa 
 ## Archivos clave
 
 - Schema: [apps/erp/prisma/schema.prisma](../apps/erp/prisma/schema.prisma) (sección `ENTREGAS MODULE`).
-- SQL: [entregas-constraints.sql](../apps/erp/prisma/sql/entregas-constraints.sql), [entregas-photos.sql](../apps/erp/prisma/sql/entregas-photos.sql).
+- SQL: [entregas-photos-ddl.sql](../apps/erp/prisma/sql/entregas-photos-ddl.sql) (equivale a `db push`), [entregas-constraints.sql](../apps/erp/prisma/sql/entregas-constraints.sql), [entregas-photos.sql](../apps/erp/prisma/sql/entregas-photos.sql).
 - Seed: [prisma/seed-entregas.ts](../apps/erp/prisma/seed-entregas.ts).
 - Módulo: `apps/erp/src/modules/entregas/`
   - `lib/schemas.ts` — Zod (entrega, líneas, fotos, destinatario, mensajero).
