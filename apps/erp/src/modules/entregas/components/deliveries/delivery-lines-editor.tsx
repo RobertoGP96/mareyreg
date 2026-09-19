@@ -6,9 +6,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
-import { formatAmount } from "../../lib/format";
-import type { CurrencyRow } from "../../lib/types";
-import type { ActiveDenomination } from "../../queries/currency-denomination-queries";
+import { formatAmount } from "@/lib/format";
+import type { CurrencyOption } from "../../lib/types";
+import type { ActiveDenomination } from "../../queries/catalog-queries";
 import {
   DenominationBreakdownEditor,
   computeBreakdownTotal,
@@ -26,13 +26,13 @@ export type DeliveryLineDraft = {
 interface Props {
   lines: DeliveryLineDraft[];
   onChange: (next: DeliveryLineDraft[]) => void;
-  currencies: CurrencyRow[];
+  currencies: CurrencyOption[];
   denominationsByCurrency: Record<number, ActiveDenomination[]>;
 }
 
 export function lineAmount(
   line: DeliveryLineDraft,
-  currencies: CurrencyRow[],
+  currencies: CurrencyOption[],
   denominationsByCurrency: Record<number, ActiveDenomination[]>
 ): number {
   const currency = currencies.find((c) => c.currencyId === line.currencyId);

@@ -23,6 +23,7 @@ import {
   BarChart3,
   KeyRound,
   CreditCard,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 import { getAllNavigationRoutes } from "./module-registry";
@@ -68,6 +69,9 @@ const ROUTE_LABELS: Record<string, string> = {
   contracts: "Contratos",
   discounts: "Descuentos",
   envios: "Envios",
+  entregas: "Entregas",
+  destinatarios: "Destinatarios",
+  mensajeros: "Mensajeros",
   inventory: "Inventario",
   payments: "Pagos",
   webstore: "Tienda web",
@@ -94,6 +98,7 @@ const ROUTE_ICONS: Record<string, LucideIcon> = {
   customers: Users,
   discounts: Tags,
   envios: CircleDollarSign,
+  entregas: Send,
   inventory: LayoutDashboard,
   invoices: Receipt,
   "pacas-clientes": Users,

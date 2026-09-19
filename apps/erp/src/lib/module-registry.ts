@@ -156,11 +156,20 @@ export const modules: AppModule[] = [
       { name: "Cuentas", href: "/envios/cuentas", icon: Wallet },
       { name: "Operaciones", href: "/envios/operaciones", icon: ArrowRightLeft },
       { name: "Pendientes", href: "/envios/pendientes", icon: Clock },
-      { name: "Entregas", href: "/envios/entregas", icon: Send },
-      { name: "Destinatarios", href: "/envios/destinatarios", icon: UserRound },
-      { name: "Mensajeros", href: "/envios/mensajeros", icon: Bike },
       { name: "Tasas de cambio", href: "/envios/tasas", icon: LineChart },
       { name: "Monedas", href: "/envios/monedas", icon: CircleDollarSign },
+    ],
+  },
+  {
+    id: "entregas",
+    label: "Entregas",
+    icon: Send,
+    enabled: true,
+    badge: "Nuevo",
+    routes: [
+      { name: "Entregas", href: "/entregas", icon: HandCoins },
+      { name: "Destinatarios", href: "/entregas/destinatarios", icon: UserRound },
+      { name: "Mensajeros", href: "/entregas/mensajeros", icon: Bike },
     ],
   },
   {

@@ -13,8 +13,8 @@ function isAuthError(error: unknown): boolean {
 }
 
 const revalidateCouriers = () => {
-  revalidatePath("/envios/mensajeros");
-  revalidatePath("/envios/entregas");
+  revalidatePath("/entregas/mensajeros");
+  revalidatePath("/entregas");
 };
 
 function commissionData(data: CourierProfileInput) {
@@ -63,7 +63,7 @@ export async function createCourierProfile(
         action: "create",
         entityType: "CourierProfile",
         entityId: profile.courierProfileId,
-        module: "envios",
+        module: "entregas",
         userId,
         newValues: data,
       });
@@ -114,7 +114,7 @@ export async function updateCourierProfile(
         action: "update",
         entityType: "CourierProfile",
         entityId: id,
-        module: "envios",
+        module: "entregas",
         userId,
         oldValues: prev,
         newValues: data,
@@ -148,7 +148,7 @@ export async function toggleCourierActive(id: number): Promise<ActionResult<void
         action: "update",
         entityType: "CourierProfile",
         entityId: id,
-        module: "envios",
+        module: "entregas",
         userId,
         oldValues: { active: prev.active },
         newValues: { active: !prev.active },
@@ -182,7 +182,7 @@ export async function deleteCourierProfile(id: number): Promise<ActionResult<voi
         action: "delete",
         entityType: "CourierProfile",
         entityId: id,
-        module: "envios",
+        module: "entregas",
         userId,
         oldValues: prev,
       });

@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import {
   DELIVERY_PHOTO_ACCEPTED_MIME,
   DELIVERY_PHOTO_MAX_BYTES,
-} from "@/modules/envios/lib/schemas";
+} from "@/modules/entregas/lib/schemas";
 
 export const runtime = "nodejs";
 

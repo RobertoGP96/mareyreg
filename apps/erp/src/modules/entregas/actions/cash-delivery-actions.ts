@@ -1,16 +1,23 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types";
 import { createAuditLog, requireCurrentUserId } from "@/lib/audit";
 import { assertRole } from "@/lib/auth-guard";
-import { cashDeliverySchema, type CashDeliveryInput } from "../lib/schemas";
+import {
+  cashDeliverySchema,
+  deliveryPhotosSchema,
+  type CashDeliveryInput,
+  type DeliveryPhotoInput,
+} from "../lib/schemas";
 import {
   describeDeliveryDbError,
   resolveDeliveryLines,
   type ResolvedDeliveryLine,
 } from "../lib/delivery-lines";
+import { appendPhotos, syncPhotos } from "../lib/delivery-photos";
+import { deleteBlobsQuietly } from "../lib/blob";
+import { revalidateDeliveries } from "../lib/revalidate";
 
 const AUTH_ERROR_MESSAGE = "Debes iniciar sesión para realizar esta acción.";
 const STALE_ERROR_MESSAGE =
@@ -20,14 +27,6 @@ function isAuthError(error: unknown): boolean {
   return error instanceof Error && error.message === "No autenticado";
 }
 
-// CashDelivery afecta su propio listado, el dashboard (entregas y comisiones
-// pendientes) y el reporte por mensajero.
-const revalidateCashDeliveries = () => {
-  revalidatePath("/envios/entregas");
-  revalidatePath("/envios/dashboard");
-  revalidatePath("/envios/mensajeros");
-};
-
 function parseOccurredAt(value: string | null | undefined): Date | undefined {
   if (!value) return undefined;
   const d = new Date(value);
@@ -36,6 +35,7 @@ function parseOccurredAt(value: string | null | undefined): Date | undefined {
 
 const DELIVERY_TREE_INCLUDE = {
   lines: { include: { denominations: true } },
+  photos: true,
 } as const;
 
 type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
@@ -101,7 +101,6 @@ export async function createCashDelivery(
           commissionAmount: data.commissionAmount.toString(),
           commissionCurrencyId: data.commissionCurrencyId ?? null,
           commissionStatus: "pending",
-          photoUrl: data.photoUrl?.trim() || null,
           reference: data.reference?.trim() || null,
           notes: data.notes?.trim() || null,
           occurredAt: parseOccurredAt(data.occurredAt),
@@ -110,12 +109,13 @@ export async function createCashDelivery(
       });
 
       await writeLines(tx, delivery.deliveryId, lines);
+      await appendPhotos(tx, delivery.deliveryId, data.photos, userId);
 
       await createAuditLog(tx, {
         action: "create",
         entityType: "CashDelivery",
         entityId: delivery.deliveryId,
-        module: "envios",
+        module: "entregas",
         userId,
         newValues: { ...data, lines },
       });
@@ -123,7 +123,7 @@ export async function createCashDelivery(
       return delivery;
     });
 
-    revalidateCashDeliveries();
+    revalidateDeliveries(created.deliveryId);
     return { success: true, data: { deliveryId: created.deliveryId } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -150,7 +150,7 @@ export async function updateCashDelivery(
     const data = parsed.data;
     const userId = await requireCurrentUserId();
 
-    await db.$transaction(async (tx) => {
+    const { removedUrls } = await db.$transaction(async (tx) => {
       const prev = await tx.cashDelivery.findUnique({
         where: { deliveryId: id },
         include: DELIVERY_TREE_INCLUDE,
@@ -165,6 +165,8 @@ export async function updateCashDelivery(
 
       // Subir la versión ANTES de borrar nada: si otro editor ya guardó, este
       // pierde la carrera sin haber destruido sus líneas.
+      // La galería pasa a ser la única verdad de las fotos: la foto única del
+      // modelo anterior (photoUrl) llega dentro de `photos` si se conservó.
       const claimed = await tx.cashDelivery.updateMany({
         where: { deliveryId: id, version: prev.version, status: "pending" },
         data: {
@@ -172,7 +174,7 @@ export async function updateCashDelivery(
           courierId: data.courierId ?? null,
           commissionAmount: data.commissionAmount.toString(),
           commissionCurrencyId: data.commissionCurrencyId ?? null,
-          photoUrl: data.photoUrl?.trim() || null,
+          photoUrl: null,
           reference: data.reference?.trim() || null,
           notes: data.notes?.trim() || null,
           occurredAt: parseOccurredAt(data.occurredAt) ?? prev.occurredAt,
@@ -184,19 +186,28 @@ export async function updateCashDelivery(
       await tx.cashDeliveryLineDenomination.deleteMany({ where: { line: { deliveryId: id } } });
       await tx.cashDeliveryLine.deleteMany({ where: { deliveryId: id } });
       await writeLines(tx, id, lines);
+      const synced = await syncPhotos(tx, id, data.photos, userId);
 
       await createAuditLog(tx, {
         action: "update",
         entityType: "CashDelivery",
         entityId: id,
-        module: "envios",
+        module: "entregas",
         userId,
         oldValues: prev,
         newValues: { ...data, lines },
       });
+
+      // Si el usuario quitó la foto del modelo anterior, su binario también sobra.
+      const legacyRemoved =
+        prev.photoUrl && !data.photos.some((p) => p.url.trim() === prev.photoUrl?.trim())
+          ? [prev.photoUrl]
+          : [];
+      return { removedUrls: [...synced.removedUrls, ...legacyRemoved] };
     });
 
-    revalidateCashDeliveries();
+    await deleteBlobsQuietly(removedUrls);
+    revalidateDeliveries(id);
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -211,11 +222,22 @@ export async function updateCashDelivery(
   }
 }
 
+/**
+ * Confirma la entrega. Las fotos opcionales (comprobante firmado, foto del
+ * lugar) se agregan a la galería como evidencia de la entrega.
+ */
 export async function markCashDeliveryDelivered(
   id: number,
-  photoUrl?: string | null
+  photos: DeliveryPhotoInput[] = []
 ): Promise<ActionResult<void>> {
   try {
+    const parsedPhotos = deliveryPhotosSchema.safeParse(photos);
+    if (!parsedPhotos.success) {
+      return {
+        success: false,
+        error: parsedPhotos.error.issues[0]?.message ?? "Fotos inválidas",
+      };
+    }
     const userId = await requireCurrentUserId();
     await db.$transaction(async (tx) => {
       const prev = await tx.cashDelivery.findUnique({ where: { deliveryId: id } });
@@ -229,23 +251,24 @@ export async function markCashDeliveryDelivered(
           status: "delivered",
           deliveredAt: new Date(),
           confirmedById: userId,
-          ...(photoUrl !== undefined && { photoUrl: photoUrl?.trim() || null }),
           version: { increment: 1 },
         },
       });
       if (claimed.count === 0) throw new Error(STALE_ERROR_MESSAGE);
 
+      const added = await appendPhotos(tx, id, parsedPhotos.data, userId);
+
       await createAuditLog(tx, {
         action: "update",
         entityType: "CashDelivery",
         entityId: id,
-        module: "envios",
+        module: "entregas",
         userId,
         oldValues: { status: prev.status },
-        newValues: { status: "delivered" },
+        newValues: { status: "delivered", photosAdded: added },
       });
     });
-    revalidateCashDeliveries();
+    revalidateDeliveries(id);
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -290,7 +313,7 @@ export async function cancelCashDelivery(id: number): Promise<ActionResult<void>
         action: "update",
         entityType: "CashDelivery",
         entityId: id,
-        module: "envios",
+        module: "entregas",
         userId,
         oldValues: { status: prev.status },
         newValues: { status: "cancelled" },
@@ -301,7 +324,7 @@ export async function cancelCashDelivery(id: number): Promise<ActionResult<void>
           action: "commission_reverted",
           entityType: "CashDelivery",
           entityId: id,
-          module: "envios",
+          module: "entregas",
           userId,
           oldValues: {
             commissionStatus: "paid",
@@ -312,7 +335,7 @@ export async function cancelCashDelivery(id: number): Promise<ActionResult<void>
         });
       }
     });
-    revalidateCashDeliveries();
+    revalidateDeliveries(id);
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -327,8 +350,8 @@ export async function cancelCashDelivery(id: number): Promise<ActionResult<void>
 export async function deleteCashDelivery(id: number): Promise<ActionResult<void>> {
   try {
     const userId = await requireCurrentUserId();
-    await db.$transaction(async (tx) => {
-      // El árbol completo va al audit antes de borrar: las líneas y su desglose
+    const photoUrls = await db.$transaction(async (tx) => {
+      // El árbol completo va al audit antes de borrar: líneas, desglose y fotos
       // se van en cascada y esta es la única traza que queda.
       const prev = await tx.cashDelivery.findUnique({
         where: { deliveryId: id },
@@ -343,12 +366,14 @@ export async function deleteCashDelivery(id: number): Promise<ActionResult<void>
         action: "delete",
         entityType: "CashDelivery",
         entityId: id,
-        module: "envios",
+        module: "entregas",
         userId,
         oldValues: prev,
       });
+      return [...prev.photos.map((p) => p.url), ...(prev.photoUrl ? [prev.photoUrl] : [])];
     });
-    revalidateCashDeliveries();
+    await deleteBlobsQuietly(photoUrls);
+    revalidateDeliveries(id);
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -398,13 +423,13 @@ export async function markDeliveryCommissionPaid(id: number): Promise<ActionResu
         action: "commission_paid",
         entityType: "CashDelivery",
         entityId: id,
-        module: "envios",
+        module: "entregas",
         userId,
         oldValues: { commissionStatus: "pending" },
         newValues: { commissionStatus: "paid" },
       });
     });
-    revalidateCashDeliveries();
+    revalidateDeliveries(id);
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -438,13 +463,13 @@ export async function markDeliveryCommissionPending(id: number): Promise<ActionR
         action: "commission_reverted",
         entityType: "CashDelivery",
         entityId: id,
-        module: "envios",
+        module: "entregas",
         userId,
         oldValues: { commissionStatus: "paid" },
         newValues: { commissionStatus: "pending", reason: "manual" },
       });
     });
-    revalidateCashDeliveries();
+    revalidateDeliveries(id);
     return { success: true, data: undefined };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };
@@ -475,7 +500,7 @@ export async function bulkMarkCommissionPaid(
       else failed.push({ id, error: result.error });
     }
 
-    revalidateCashDeliveries();
+    revalidateDeliveries();
     return { success: true, data: { paid, failed } };
   } catch (error) {
     if (isAuthError(error)) return { success: false, error: AUTH_ERROR_MESSAGE };

@@ -15,8 +15,8 @@ function isAuthError(error: unknown): boolean {
 // Recipient afecta su propio listado y las entregas que lo referencian; no
 // aparece en el dashboard ni en otras rutas del modulo.
 const revalidateRecipients = () => {
-  revalidatePath("/envios/destinatarios");
-  revalidatePath("/envios/entregas");
+  revalidatePath("/entregas/destinatarios");
+  revalidatePath("/entregas");
 };
 
 function normalizeMapUrl(value: string | null | undefined): string | null {
@@ -51,7 +51,7 @@ export async function createRecipient(
         action: "create",
         entityType: "Recipient",
         entityId: r.recipientId,
-        module: "envios",
+        module: "entregas",
         userId,
         newValues: data,
       });
@@ -90,7 +90,7 @@ export async function updateRecipient(
         action: "update",
         entityType: "Recipient",
         entityId: id,
-        module: "envios",
+        module: "entregas",
         userId,
         oldValues: prev,
         newValues: input,
@@ -122,7 +122,7 @@ export async function toggleRecipientActive(
         action: "update",
         entityType: "Recipient",
         entityId: id,
-        module: "envios",
+        module: "entregas",
         userId,
         oldValues: { active: prev.active },
         newValues: { active: updated.active },
@@ -155,7 +155,7 @@ export async function deleteRecipient(id: number): Promise<ActionResult<void>> {
         action: "delete",
         entityType: "Recipient",
         entityId: id,
-        module: "envios",
+        module: "entregas",
         userId,
         oldValues: prev,
       });

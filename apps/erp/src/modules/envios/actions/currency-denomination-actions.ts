@@ -24,7 +24,7 @@ function isUniqueViolation(error: unknown): boolean {
 
 const revalidateDenominations = () => {
   revalidatePath("/envios/monedas");
-  revalidatePath("/envios/entregas");
+  revalidatePath("/entregas");
 };
 
 export async function createCurrencyDenomination(

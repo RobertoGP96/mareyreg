@@ -1,10 +1,10 @@
 -- =============================================
--- ENVIOS - Constraints de entregas de efectivo
+-- ENTREGAS - Constraints de entregas de efectivo
 -- (multi-línea + desglose por denominaciones + comisión del mensajero)
 --
 -- Aplicar manualmente tras `prisma db push`. `db push` no maneja CHECK,
 -- funciones ni triggers. Idempotente.
---   psql "$DATABASE_URL" -f prisma/sql/envios-cash-delivery.sql
+--   psql "$DATABASE_URL" -f prisma/sql/entregas-constraints.sql
 -- =============================================
 
 -- ---------------------------------------------

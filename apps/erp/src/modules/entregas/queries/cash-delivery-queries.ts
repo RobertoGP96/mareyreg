@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import type {
   CashDeliveryStatus,
   DeliveryCommissionStatus,
+  DeliveryPhotoKind,
   Prisma,
 } from "@/generated/prisma";
 
@@ -13,6 +14,17 @@ export type CashDeliveryLineRow = {
   currencyDecimals: number;
   amount: string;
   denominationCount: number;
+};
+
+export type CashDeliveryPhotoRow = {
+  photoId: number;
+  url: string;
+  kind: DeliveryPhotoKind;
+  caption: string | null;
+  sortOrder: number;
+  uploadedById: number | null;
+  uploadedByName: string | null;
+  createdAt: Date;
 };
 
 export type CashDeliveryRow = {
@@ -32,7 +44,8 @@ export type CashDeliveryRow = {
   commissionCurrencyDecimals: number | null;
   commissionStatus: DeliveryCommissionStatus;
   commissionPaidAt: Date | null;
-  photoUrl: string | null;
+  photosCount: number;
+  coverPhotoUrl: string | null;
   status: CashDeliveryStatus;
   reference: string | null;
   notes: string | null;
@@ -55,9 +68,17 @@ export type ListCashDeliveriesArgs = {
   search?: string;
 };
 
-// El desglose completo NO se carga aquí: un include de 3 niveles sobre el
-// listado multiplica filas. Solo el detalle (getCashDeliveryById) lo trae.
+// El desglose y la galería completos NO se cargan aquí: un include de 3
+// niveles sobre el listado multiplica filas. Solo el detalle los trae.
 const LIST_TAKE = 200;
+
+const RECIPIENT_SELECT = {
+  select: { recipientId: true, fullName: true, phone: true, address: true, mapUrl: true },
+} as const;
+
+const CURRENCY_SELECT = {
+  select: { currencyId: true, code: true, symbol: true, decimalPlaces: true },
+} as const;
 
 export async function listCashDeliveries(
   args: ListCashDeliveriesArgs = {}
@@ -88,22 +109,18 @@ export async function listCashDeliveries(
     where,
     orderBy: [{ occurredAt: "desc" }, { deliveryId: "desc" }],
     include: {
-      recipient: {
-        select: { recipientId: true, fullName: true, phone: true, address: true, mapUrl: true },
-      },
+      recipient: RECIPIENT_SELECT,
       lines: {
         orderBy: { sortOrder: "asc" },
         include: {
-          currency: {
-            select: { currencyId: true, code: true, symbol: true, decimalPlaces: true },
-          },
+          currency: CURRENCY_SELECT,
           _count: { select: { denominations: true } },
         },
       },
+      photos: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+      _count: { select: { photos: true } },
       courier: { select: { courierProfileId: true, user: { select: { fullName: true } } } },
-      commissionCurrency: {
-        select: { currencyId: true, code: true, symbol: true, decimalPlaces: true },
-      },
+      commissionCurrency: CURRENCY_SELECT,
     },
     take: LIST_TAKE,
   });
@@ -111,7 +128,7 @@ export async function listCashDeliveries(
   return rows.map(toDeliveryRow);
 }
 
-function toDeliveryRow(r: {
+type DeliveryRowSource = {
   deliveryId: number;
   recipient: {
     recipientId: number;
@@ -126,6 +143,9 @@ function toDeliveryRow(r: {
     currency: { currencyId: number; code: string; symbol: string; decimalPlaces: number };
     _count: { denominations: number };
   }[];
+  photos: { url: string }[];
+  _count: { photos: number };
+  photoUrl: string | null;
   courier: { courierProfileId: number; user: { fullName: string } } | null;
   commissionAmount: Prisma.Decimal;
   commissionCurrency: {
@@ -136,7 +156,6 @@ function toDeliveryRow(r: {
   } | null;
   commissionStatus: DeliveryCommissionStatus;
   commissionPaidAt: Date | null;
-  photoUrl: string | null;
   status: CashDeliveryStatus;
   reference: string | null;
   notes: string | null;
@@ -146,7 +165,18 @@ function toDeliveryRow(r: {
   createdById: number | null;
   confirmedById: number | null;
   version: number;
-}): CashDeliveryRow {
+};
+
+// `photoUrl` es el respaldo de las entregas anteriores a la galería: cuenta
+// como una foto solo mientras la entrega no tenga filas en cash_delivery_photos.
+function legacyPhoto(r: { photos: { url: string }[]; photoUrl: string | null }): string | null {
+  if (r.photos.length > 0) return null;
+  const trimmed = r.photoUrl?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function toDeliveryRow(r: DeliveryRowSource): CashDeliveryRow {
+  const legacy = legacyPhoto(r);
   return {
     deliveryId: r.deliveryId,
     recipientId: r.recipient.recipientId,
@@ -172,7 +202,8 @@ function toDeliveryRow(r: {
     commissionCurrencyDecimals: r.commissionCurrency?.decimalPlaces ?? null,
     commissionStatus: r.commissionStatus,
     commissionPaidAt: r.commissionPaidAt,
-    photoUrl: r.photoUrl,
+    photosCount: r._count.photos > 0 ? r._count.photos : legacy ? 1 : 0,
+    coverPhotoUrl: r.photos[0]?.url ?? legacy,
     status: r.status,
     reference: r.reference,
     notes: r.notes,
@@ -193,21 +224,23 @@ export type CashDeliveryDetailLine = CashDeliveryLineRow & {
 // `lines` como intersección de arrays y el acceso a `denominations` no resuelve.
 export type CashDeliveryDetail = Omit<CashDeliveryRow, "lines"> & {
   lines: CashDeliveryDetailLine[];
+  photos: CashDeliveryPhotoRow[];
+  /** Foto única del modelo anterior; solo si la galería está vacía. */
+  legacyPhotoUrl: string | null;
+  createdByName: string | null;
+  confirmedByName: string | null;
+  commissionPaidByName: string | null;
 };
 
 export async function getCashDeliveryById(id: number): Promise<CashDeliveryDetail | null> {
   const r = await db.cashDelivery.findUnique({
     where: { deliveryId: id },
     include: {
-      recipient: {
-        select: { recipientId: true, fullName: true, phone: true, address: true, mapUrl: true },
-      },
+      recipient: RECIPIENT_SELECT,
       lines: {
         orderBy: { sortOrder: "asc" },
         include: {
-          currency: {
-            select: { currencyId: true, code: true, symbol: true, decimalPlaces: true },
-          },
+          currency: CURRENCY_SELECT,
           _count: { select: { denominations: true } },
           denominations: {
             orderBy: { denominationId: "asc" },
@@ -215,10 +248,16 @@ export async function getCashDeliveryById(id: number): Promise<CashDeliveryDetai
           },
         },
       },
-      courier: { select: { courierProfileId: true, user: { select: { fullName: true } } } },
-      commissionCurrency: {
-        select: { currencyId: true, code: true, symbol: true, decimalPlaces: true },
+      photos: {
+        orderBy: [{ sortOrder: "asc" }, { photoId: "asc" }],
+        include: { uploadedBy: { select: { fullName: true } } },
       },
+      _count: { select: { photos: true } },
+      courier: { select: { courierProfileId: true, user: { select: { fullName: true } } } },
+      commissionCurrency: CURRENCY_SELECT,
+      createdBy: { select: { fullName: true } },
+      confirmedBy: { select: { fullName: true } },
+      commissionPaidBy: { select: { fullName: true } },
     },
   });
   if (!r) return null;
@@ -234,6 +273,20 @@ export async function getCashDeliveryById(id: number): Promise<CashDeliveryDetai
         quantity: d.quantity,
       })),
     })),
+    photos: r.photos.map((p) => ({
+      photoId: p.photoId,
+      url: p.url,
+      kind: p.kind,
+      caption: p.caption,
+      sortOrder: p.sortOrder,
+      uploadedById: p.uploadedById,
+      uploadedByName: p.uploadedBy?.fullName ?? null,
+      createdAt: p.createdAt,
+    })),
+    legacyPhotoUrl: legacyPhoto(r),
+    createdByName: r.createdBy?.fullName ?? null,
+    confirmedByName: r.confirmedBy?.fullName ?? null,
+    commissionPaidByName: r.commissionPaidBy?.fullName ?? null,
   };
 }
 
@@ -247,16 +300,18 @@ export type CommissionSummaryRow = {
   pendingCount: number;
 };
 
+const PENDING_COMMISSION_WHERE = {
+  commissionStatus: "pending",
+  commissionAmount: { gt: 0 },
+  courierId: { not: null },
+  status: { not: "cancelled" },
+} satisfies Prisma.CashDeliveryWhereInput;
+
 /** Comisiones pendientes agrupadas por mensajero y moneda (sin conversión FX). */
 export async function getDeliveryCommissionSummary(): Promise<CommissionSummaryRow[]> {
   const grouped = await db.cashDelivery.groupBy({
     by: ["courierId", "commissionCurrencyId"],
-    where: {
-      commissionStatus: "pending",
-      commissionAmount: { gt: 0 },
-      courierId: { not: null },
-      status: { not: "cancelled" },
-    },
+    where: PENDING_COMMISSION_WHERE,
     _sum: { commissionAmount: true },
     _count: { _all: true },
   });
@@ -293,6 +348,45 @@ export async function getDeliveryCommissionSummary(): Promise<CommissionSummaryR
         currencyDecimals: currency.decimalPlaces,
         pendingAmount: (g._sum.commissionAmount ?? 0).toString(),
         pendingCount: g._count._all,
+      },
+    ];
+  });
+}
+
+export type PendingCommissionByCurrency = {
+  currencyId: number;
+  code: string;
+  symbol: string;
+  decimalPlaces: number;
+  total: string;
+  count: number;
+};
+
+/** Total de comisiones por pagar por moneda, para el KPI del listado. */
+export async function getPendingCommissionByCurrency(): Promise<PendingCommissionByCurrency[]> {
+  const grouped = await db.cashDelivery.groupBy({
+    by: ["commissionCurrencyId"],
+    where: PENDING_COMMISSION_WHERE,
+    _sum: { commissionAmount: true },
+    _count: { _all: true },
+  });
+  const currencyIds = grouped.map((g) => g.commissionCurrencyId!).filter(Boolean);
+  if (currencyIds.length === 0) return [];
+
+  const currencies = await db.currency.findMany({
+    where: { currencyId: { in: currencyIds } },
+    select: { currencyId: true, code: true, symbol: true, decimalPlaces: true },
+  });
+  const byId = new Map(currencies.map((c) => [c.currencyId, c]));
+
+  return grouped.flatMap((g) => {
+    const currency = g.commissionCurrencyId ? byId.get(g.commissionCurrencyId) : undefined;
+    if (!currency) return [];
+    return [
+      {
+        ...currency,
+        total: (g._sum.commissionAmount ?? 0).toString(),
+        count: g._count._all,
       },
     ];
   });

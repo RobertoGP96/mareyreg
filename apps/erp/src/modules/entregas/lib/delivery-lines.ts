@@ -40,7 +40,7 @@ const DB_ERROR_MESSAGES: Record<string, string> = {
   err_delivery_without_lines: "La entrega debe tener al menos un monto.",
 };
 
-// Traduce los errores de los triggers de envios-cash-delivery.sql a español.
+// Traduce los errores de los triggers de entregas-constraints.sql a español.
 // Sin esto el usuario vería el mensaje crudo de Postgres.
 export function describeDeliveryDbError(error: unknown, fallback: string): string {
   const raw = error instanceof Error ? error.message : String(error ?? "");

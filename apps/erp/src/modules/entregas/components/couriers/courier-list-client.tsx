@@ -40,13 +40,13 @@ import {
 } from "../../actions/courier-actions";
 import type { CourierRow } from "../../queries/courier-queries";
 import type { CommissionSummaryRow } from "../../queries/cash-delivery-queries";
-import type { CurrencyRow } from "../../lib/types";
-import { formatAmount } from "../../lib/format";
+import type { CurrencyOption } from "../../lib/types";
+import { formatAmount } from "@/lib/format";
 
 interface Props {
   couriers: CourierRow[];
   assignableUsers: { userId: number; fullName: string; email: string }[];
-  currencies: CurrencyRow[];
+  currencies: CurrencyOption[];
   commissionSummary: CommissionSummaryRow[];
 }
 

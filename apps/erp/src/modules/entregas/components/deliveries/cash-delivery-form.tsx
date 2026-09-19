@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { upload } from "@vercel/blob/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,14 +14,20 @@ import {
   HandCoins, CircleDollarSign, FileText, Hash, Loader2, Bike, Camera,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
-import type { CurrencyRow } from "../../lib/types";
+import type { CurrencyOption } from "../../lib/types";
 import type { RecipientPickerOption } from "../../queries/recipient-queries";
 import type { CourierPickerOption } from "../../queries/courier-queries";
-import type { ActiveDenomination } from "../../queries/currency-denomination-queries";
+import type { ActiveDenomination } from "../../queries/catalog-queries";
 import type { CashDeliveryDetail } from "../../queries/cash-delivery-queries";
-import type { CashDeliveryInput } from "../../lib/schemas";
+import type { CashDeliveryInput, DeliveryPhotoInput } from "../../lib/schemas";
 import { RecipientPicker } from "./recipient-picker";
-import { DeliveryPhotoField } from "./delivery-photo-field";
+import { DeliveryPhotosField } from "./delivery-photos-field";
+import {
+  draftFromExisting,
+  draftFromLegacyUrl,
+  materializePhotoDrafts,
+  type PhotoDraft,
+} from "./photo-draft";
 import { DeliveryLinesEditor, lineAmount, type DeliveryLineDraft } from "./delivery-lines-editor";
 
 interface Props {
@@ -31,7 +36,7 @@ interface Props {
   editing: CashDeliveryDetail | null;
   recipients: RecipientPickerOption[];
   couriers: CourierPickerOption[];
-  currencies: CurrencyRow[];
+  currencies: CurrencyOption[];
   denominationsByCurrency: Record<number, ActiveDenomination[]>;
   onSubmit: (input: CashDeliveryInput) => Promise<boolean>;
 }
@@ -56,8 +61,7 @@ export function CashDeliveryForm({
   // Una vez que el usuario toca la comisión, elegir otro mensajero ya no la
   // sobreescribe: pisar lo tecleado sería peor que no pre-llenar.
   const [commissionTouched, setCommissionTouched] = useState(false);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<PhotoDraft[]>([]);
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -84,7 +88,12 @@ export function CashDeliveryForm({
       setCommissionCurrencyId(
         editing.commissionCurrencyId ? String(editing.commissionCurrencyId) : ""
       );
-      setPhotoUrl(editing.photoUrl);
+      // La foto del modelo anterior entra al borrador como una foto más: al
+      // guardar se convierte en fila de la galería.
+      setPhotos([
+        ...(editing.legacyPhotoUrl ? [draftFromLegacyUrl(editing.legacyPhotoUrl)] : []),
+        ...editing.photos.map(draftFromExisting),
+      ]);
       setReference(editing.reference ?? "");
       setNotes(editing.notes ?? "");
       setCommissionTouched(true);
@@ -98,12 +107,11 @@ export function CashDeliveryForm({
       setCourierId("none");
       setCommissionAmount("");
       setCommissionCurrencyId("");
-      setPhotoUrl(null);
+      setPhotos([]);
       setReference("");
       setNotes("");
       setCommissionTouched(false);
     }
-    setPhotoFile(null);
   }, [open, editing, activeCurrencies]);
 
   const handleCourierChange = (value: string) => {
@@ -147,23 +155,16 @@ export function CashDeliveryForm({
     }
     setSubmitting(true);
     try {
-      let uploadedUrl = photoUrl;
-      if (photoFile) {
-        setUploading(true);
-        try {
-          const safeName = photoFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-          const blob = await upload(`deliveries/${Date.now()}-${safeName}`, photoFile, {
-            access: "public",
-            handleUploadUrl: "/api/deliveries/upload",
-          });
-          uploadedUrl = blob.url;
-        } catch (e) {
-          console.error("delivery photo upload:", e);
-          toast.error("No se pudo subir la foto");
-          return;
-        } finally {
-          setUploading(false);
-        }
+      let uploadedPhotos: DeliveryPhotoInput[];
+      setUploading(true);
+      try {
+        uploadedPhotos = await materializePhotoDrafts(photos);
+      } catch (e) {
+        console.error("delivery photo upload:", e);
+        toast.error("No se pudieron subir las fotos");
+        return;
+      } finally {
+        setUploading(false);
       }
 
       const commission = Number(commissionAmount || 0);
@@ -184,7 +185,7 @@ export function CashDeliveryForm({
         commissionAmount: commission,
         commissionCurrencyId:
           commission > 0 && commissionCurrencyId ? Number(commissionCurrencyId) : null,
-        photoUrl: uploadedUrl,
+        photos: uploadedPhotos,
         reference: reference.trim() || null,
         notes: notes.trim() || null,
       });
@@ -282,16 +283,17 @@ export function CashDeliveryForm({
           </div>
         </FormSection>
 
-        <FormSection icon={FileText} title="Detalles">
-          <Field label="Foto del comprobante" icon={Camera} hint="Opcional. JPG, PNG o WebP, máx. 5 MB.">
-            <DeliveryPhotoField
-              file={photoFile}
-              existingUrl={photoUrl}
-              onFileChange={setPhotoFile}
-              onRemoveExisting={() => setPhotoUrl(null)}
-              disabled={submitting}
-            />
+        <FormSection icon={Camera} title="Fotos">
+          <Field
+            label="Galería de la entrega"
+            icon={Camera}
+            hint="Opcional. Comprobante, identificación u otras. JPG, PNG o WebP, máx. 5 MB cada una."
+          >
+            <DeliveryPhotosField value={photos} onChange={setPhotos} disabled={submitting} />
           </Field>
+        </FormSection>
+
+        <FormSection icon={FileText} title="Detalles">
           <Field label="Referencia" icon={Hash} hint="Folio, comprobante, ticket…">
             <Input
               placeholder="REF-001"
@@ -320,7 +322,7 @@ export function CashDeliveryForm({
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {submitting
             ? uploading
-              ? "Subiendo foto…"
+              ? "Subiendo fotos…"
               : "Guardando…"
             : editing
               ? "Actualizar"

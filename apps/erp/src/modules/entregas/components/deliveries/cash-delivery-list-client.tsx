@@ -27,13 +27,13 @@ import { type DataTableColumn } from "@/components/ui/data-table";
 import {
   HandCoins, Plus, Search, MoreHorizontal, SquarePen, Trash2, Loader2, Bike,
   CheckCircle2, XCircle, ExternalLink, BadgeDollarSign, Undo2, Image as ImageIcon, Check, Eye,
+  Maximize2,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
   createCashDelivery,
   updateCashDelivery,
-  markCashDeliveryDelivered,
   cancelCashDelivery,
   deleteCashDelivery,
   markDeliveryCommissionPaid,
@@ -44,16 +44,18 @@ import { getCashDeliveryDetail } from "../../actions/cash-delivery-detail-action
 import type {
   CashDeliveryDetail,
   CashDeliveryRow,
+  PendingCommissionByCurrency,
 } from "../../queries/cash-delivery-queries";
 import type { RecipientPickerOption } from "../../queries/recipient-queries";
 import type { CourierPickerOption } from "../../queries/courier-queries";
-import type { ActiveDenomination } from "../../queries/currency-denomination-queries";
-import type { CurrencyRow } from "../../lib/types";
+import type { ActiveDenomination } from "../../queries/catalog-queries";
+import type { CurrencyOption } from "../../lib/types";
 import type { CashDeliveryInput } from "../../lib/schemas";
-import { CurrencyChip } from "../shared/currency-chip";
-import { formatAmount } from "../../lib/format";
+import { CurrencyChip } from "@/modules/envios/components/shared/currency-chip";
+import { formatAmount } from "@/lib/format";
 import { CashDeliveryForm } from "./cash-delivery-form";
 import { CashDeliveryDetailSheet } from "./cash-delivery-detail-sheet";
+import { MarkDeliveredDialog } from "./mark-delivered-dialog";
 import { DeliveryStatusIcon, CommissionStatusIcon } from "./delivery-status-icons";
 
 type StatusFilter = "all" | "pending" | "delivered" | "cancelled";
@@ -63,8 +65,9 @@ interface Props {
   initialDeliveries: CashDeliveryRow[];
   recipients: RecipientPickerOption[];
   couriers: CourierPickerOption[];
-  currencies: CurrencyRow[];
+  currencies: CurrencyOption[];
   denominationsByCurrency: Record<number, ActiveDenomination[]>;
+  commissionByCurrency: PendingCommissionByCurrency[];
   isAdmin: boolean;
 }
 
@@ -120,6 +123,7 @@ export function CashDeliveryListClient({
   couriers,
   currencies,
   denominationsByCurrency,
+  commissionByCurrency,
   isAdmin,
 }: Props) {
   const router = useRouter();
@@ -316,7 +320,10 @@ export function CashDeliveryListClient({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuItem onClick={() => void openDetail(d)}>
-          <Eye className="h-4 w-4" /> Ver detalle
+          <Eye className="h-4 w-4" /> Vista rápida
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push(`/entregas/${d.deliveryId}`)}>
+          <Maximize2 className="h-4 w-4" /> Página completa
         </DropdownMenuItem>
         {d.status === "pending" && (
           <>
@@ -360,11 +367,9 @@ export function CashDeliveryListClient({
             <Undo2 className="h-4 w-4" /> Revertir comisión
           </DropdownMenuItem>
         )}
-        {d.photoUrl && (
-          <DropdownMenuItem
-            onClick={() => window.open(d.photoUrl!, "_blank", "noopener,noreferrer")}
-          >
-            <ImageIcon className="h-4 w-4" /> Ver foto
+        {d.photosCount > 0 && (
+          <DropdownMenuItem onClick={() => router.push(`/entregas/${d.deliveryId}`)}>
+            <ImageIcon className="h-4 w-4" /> Ver fotos ({d.photosCount})
           </DropdownMenuItem>
         )}
         {d.recipientMapUrl && (
@@ -565,7 +570,14 @@ export function CashDeliveryListClient({
           label="Comisión por pagar"
           value={commissionPendingCount}
           icon={Bike}
-          tone="warning"
+          tone={commissionPendingCount > 0 ? "warning" : "idle"}
+          hint={
+            commissionByCurrency.length > 0
+              ? commissionByCurrency
+                  .map((c) => `${formatAmount(Number(c.total), c.decimalPlaces)} ${c.code}`)
+                  .join(" · ")
+              : undefined
+          }
         />
       </div>
 
@@ -609,6 +621,11 @@ export function CashDeliveryListClient({
                   </span>
                 )}
                 {d.reference && <span className="text-[11px] font-mono">{d.reference}</span>}
+                {d.photosCount > 0 && (
+                  <span className="text-[11px] text-muted-foreground flex items-center gap-1 tabular-nums">
+                    <ImageIcon className="h-3 w-3" /> {d.photosCount}
+                  </span>
+                )}
               </span>
             }
           />
@@ -721,40 +738,11 @@ export function CashDeliveryListClient({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!toMarkDelivered} onOpenChange={() => setToMarkDelivered(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Marcar como entregada?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Confirma que se entregaron{" "}
-              <span className="font-mono tabular-nums">
-                {toMarkDelivered?.lines
-                  .map(
-                    (l) =>
-                      `${formatAmount(Number(l.amount), l.currencyDecimals)} ${l.currencyCode}`
-                  )
-                  .join(" + ")}
-              </span>{" "}
-              a {toMarkDelivered?.recipientName}. Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() =>
-                runAction(
-                  () => markCashDeliveryDelivered(toMarkDelivered!.deliveryId),
-                  "Entrega confirmada",
-                  () => setToMarkDelivered(null)
-                )
-              }
-              disabled={submitting}
-            >
-              {submitting ? "Confirmando…" : "Confirmar entrega"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <MarkDeliveredDialog
+        delivery={toMarkDelivered}
+        onOpenChange={(o) => !o && setToMarkDelivered(null)}
+        onConfirmed={() => router.refresh()}
+      />
 
       <AlertDialog open={!!toCancel} onOpenChange={() => setToCancel(null)}>
         <AlertDialogContent>

@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatAmount } from "../../lib/format";
-import type { ActiveDenomination } from "../../queries/currency-denomination-queries";
+import { formatAmount } from "@/lib/format";
+import type { ActiveDenomination } from "../../queries/catalog-queries";
 
 export type BreakdownEntry = { denominationId: number; quantity: number };
 
