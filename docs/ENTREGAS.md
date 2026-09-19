@@ -30,27 +30,26 @@ Las URLs anteriores (`/envios/entregas`, `/envios/destinatarios`, `/envios/mensa
 
 ## Aplicar a la DB
 
-Mientras la tabla `cash_delivery_photos` no exista, `/entregas` falla con `P2021 The table public.cash_delivery_photos does not exist`. El paso 1 la crea.
+Mientras la tabla `cash_delivery_photos` no exista, `/entregas` falla con `P2021 The table public.cash_delivery_photos does not exist`.
+
+Dos comandos desde la **raíz** del repo (PowerShell 5.1 no acepta `&&`; van por separado):
 
 ```bash
-# desde apps/erp
-# 1. Schema. Si `db push` falla por red (P1001, puerto 5432 bloqueado), el DDL
-#    equivalente e idempotente se aplica por WebSocket:
-pnpm db:generate && pnpm db:push
-#    o bien:
-node scripts/apply-sql.mjs prisma/sql/entregas-photos-ddl.sql
-
-# CHECKs, funciones y CONSTRAINT TRIGGERs de entregas (antes envios-cash-delivery.sql)
-node scripts/apply-sql.mjs prisma/sql/entregas-constraints.sql
-
-# CHECKs de la galería + backfill de photo_url → cash_delivery_photos
-node scripts/apply-sql.mjs prisma/sql/entregas-photos.sql
-
-# Permiso del módulo (admins + quien tenga envios)
-pnpm dlx tsx prisma/seed-entregas.ts
+pnpm db:push
 ```
 
-`psql "$DATABASE_URL" -f …` es equivalente a `apply-sql.mjs`. Todos los scripts son idempotentes.
+```bash
+pnpm db:entregas
+```
+
+`pnpm db:entregas` aplica en orden, por WebSocket y sin `psql` ni `tsx`:
+
+1. `entregas-photos-ddl.sql` — equivalente exacto de `db push` para la galería (por si `db push` falla con P1001 por el puerto 5432; si `db push` ya corrió, no hace nada).
+2. `entregas-constraints.sql` — CHECKs, funciones y CONSTRAINT TRIGGERs de entregas (antes `envios-cash-delivery.sql`).
+3. `entregas-photos.sql` — CHECKs de la galería + backfill de `photo_url` → `cash_delivery_photos`.
+4. `entregas-permissions.sql` — permiso `entregas` a admins y a quien tenga `envios`.
+
+Todos son idempotentes. Para un archivo suelto: `pnpm db:sql prisma/sql/<archivo>.sql` (ruta relativa a `apps/erp`). No usar `pnpm dlx tsx`: en pnpm 10 se queda esperando un prompt interactivo de aprobación de builds.
 
 ### Migración histórica a entregas multi-línea (ya aplicada)
 
@@ -75,8 +74,7 @@ Los triggers diferidos requieren transacciones interactivas reales: `db.ts` usa 
 ## Archivos clave
 
 - Schema: [apps/erp/prisma/schema.prisma](../apps/erp/prisma/schema.prisma) (sección `ENTREGAS MODULE`).
-- SQL: [entregas-photos-ddl.sql](../apps/erp/prisma/sql/entregas-photos-ddl.sql) (equivale a `db push`), [entregas-constraints.sql](../apps/erp/prisma/sql/entregas-constraints.sql), [entregas-photos.sql](../apps/erp/prisma/sql/entregas-photos.sql).
-- Seed: [prisma/seed-entregas.ts](../apps/erp/prisma/seed-entregas.ts).
+- SQL: [entregas-photos-ddl.sql](../apps/erp/prisma/sql/entregas-photos-ddl.sql) (equivale a `db push`), [entregas-constraints.sql](../apps/erp/prisma/sql/entregas-constraints.sql), [entregas-photos.sql](../apps/erp/prisma/sql/entregas-photos.sql), [entregas-permissions.sql](../apps/erp/prisma/sql/entregas-permissions.sql). Se aplican juntos con `pnpm db:entregas`.
 - Módulo: `apps/erp/src/modules/entregas/`
   - `lib/schemas.ts` — Zod (entrega, líneas, fotos, destinatario, mensajero).
   - `lib/delivery-lines.ts` — `resolveDeliveryLines` (+ tests).

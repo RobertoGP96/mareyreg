@@ -8,10 +8,9 @@
 -- está bloqueado; el driver serverless de Neon (WebSocket/443) sí conecta.
 -- Si `pnpm db:push` funciona en tu red, usa eso y IGNORA este archivo.
 --
--- Orden:
---   node scripts/apply-sql.mjs prisma/sql/entregas-photos-ddl.sql   (este)
---   node scripts/apply-sql.mjs prisma/sql/entregas-constraints.sql
---   node scripts/apply-sql.mjs prisma/sql/entregas-photos.sql
+-- Orden (todo junto con `pnpm db:entregas` desde la raíz):
+--   entregas-photos-ddl.sql (este) → entregas-constraints.sql →
+--   entregas-photos.sql → entregas-permissions.sql
 --
 -- Idempotente: se puede volver a correr sin efecto.
 -- =============================================

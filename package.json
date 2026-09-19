@@ -10,7 +10,9 @@
     "test": "turbo run test",
     "db:push": "pnpm --filter erp db:push",
     "db:generate": "pnpm --filter erp db:generate",
-    "db:studio": "pnpm --filter erp db:studio"
+    "db:studio": "pnpm --filter erp db:studio",
+    "db:sql": "pnpm --filter erp db:sql",
+    "db:entregas": "pnpm --filter erp db:entregas"
   },
   "devDependencies": {
     "turbo": "^2.5.0"
