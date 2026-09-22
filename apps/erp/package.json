@@ -14,7 +14,7 @@
     "db:studio": "prisma studio",
     "db:pull": "prisma db pull",
     "db:sql": "node scripts/apply-sql.mjs",
-    "db:entregas": "node scripts/apply-sql.mjs prisma/sql/entregas-photos-ddl.sql prisma/sql/entregas-constraints.sql prisma/sql/entregas-photos.sql prisma/sql/entregas-permissions.sql",
+    "db:entregas": "node scripts/apply-sql.mjs prisma/sql/entregas-photos-ddl.sql prisma/sql/entregas-constraints.sql prisma/sql/entregas-photos.sql prisma/sql/entregas-permissions.sql prisma/sql/entregas-providers.sql",
     "postinstall": "prisma generate && node scripts/copy-pdf-worker.mjs",
     "test": "vitest run",
     "test:watch": "vitest",

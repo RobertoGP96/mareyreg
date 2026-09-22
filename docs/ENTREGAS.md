@@ -11,6 +11,7 @@ Plan de la extracción: `C:/Users/TrolPC/.claude/plans/entregas-modulo-mensajeri
 | `/entregas` | Listado con KPIs (pendientes, entregadas, canceladas, comisión por pagar por moneda), filtros, vista rápida en sheet, alta/edición, marcar entregada con fotos, marcado masivo de comisiones. |
 | `/entregas/[id]` | Página completa: destinatario (teléfono, dirección, mapa), montos con desglose de billetes, mensajero y comisión, cronología (quién registró, confirmó, pagó), referencia y notas, y galería editable. |
 | `/entregas/destinatarios` | CRUD de quien recibe el efectivo (nombre, teléfono, dirección, URL de mapa). |
+| `/entregas/proveedores` | CRUD de quien envía el efectivo (`DeliveryProvider`, solo nombre y activo). Opcional en la entrega; también se crea inline desde el formulario. |
 | `/entregas/mensajeros` | Perfil de mensajero sobre un `User`, comisión y moneda por defecto, comisión pendiente acumulada por moneda. |
 
 Las URLs anteriores (`/envios/entregas`, `/envios/destinatarios`, `/envios/mensajeros`) redirigen a las nuevas.
@@ -18,6 +19,7 @@ Las URLs anteriores (`/envios/entregas`, `/envios/destinatarios`, `/envios/mensa
 ## Decisiones clave
 
 - **Modelos conservan su nombre** (`CashDelivery`, `CashDeliveryLine`, `CashDeliveryLineDenomination`, `Recipient`, `CourierProfile`): mover código no obliga a renombrar tablas. Viven en la sección `ENTREGAS MODULE` del schema.
+- **Proveedor = catálogo propio del módulo** (`DeliveryProvider`, tabla `delivery_providers`): solo nombre + `active`, sin reutilizar el `Supplier` de compras (otro directorio, otro significado). `CashDelivery.providerId` es opcional (`Restrict` al borrar); las entregas anteriores quedan sin proveedor. El picker del formulario crea el proveedor al momento (`createDeliveryProvider`) igual que el de destinatarios.
 - **Permiso propio `entregas`**. Admin pasa siempre; `prisma/seed-entregas.ts` se lo otorga a admins y a todo usuario que tuviera `envios`.
 - **Dependencia con envios**: solo el catálogo `Currency` / `CurrencyDenomination` (leído por `queries/catalog-queries.ts`) y el componente `CurrencyChip`. Nada más cruza módulos.
 - **Entrega multi-línea**: una `CashDelivery` tiene N `CashDeliveryLine` (una por moneda). El `amount` de cada línea es **derivado** de Σ(`unitValue` × `quantity`) del desglose y se recalcula siempre server-side en `resolveDeliveryLines`; el cliente nunca envía montos ni valores de billete. Moneda digital (USDT) captura monto directo, sin desglose.
@@ -48,6 +50,7 @@ pnpm db:entregas
 2. `entregas-constraints.sql` — CHECKs, funciones y CONSTRAINT TRIGGERs de entregas (antes `envios-cash-delivery.sql`).
 3. `entregas-photos.sql` — CHECKs de la galería + backfill de `photo_url` → `cash_delivery_photos`.
 4. `entregas-permissions.sql` — permiso `entregas` a admins y a quien tenga `envios`.
+5. `entregas-providers.sql` — tabla `delivery_providers` + columna `cash_deliveries.provider_id` (equivalente de `db push`) y CHECK de nombre no vacío.
 
 Todos son idempotentes. Para un archivo suelto: `pnpm db:sql prisma/sql/<archivo>.sql` (ruta relativa a `apps/erp`). No usar `pnpm dlx tsx`: en pnpm 10 se queda esperando un prompt interactivo de aprobación de builds.
 
@@ -74,12 +77,12 @@ Los triggers diferidos requieren transacciones interactivas reales: `db.ts` usa 
 ## Archivos clave
 
 - Schema: [apps/erp/prisma/schema.prisma](../apps/erp/prisma/schema.prisma) (sección `ENTREGAS MODULE`).
-- SQL: [entregas-photos-ddl.sql](../apps/erp/prisma/sql/entregas-photos-ddl.sql) (equivale a `db push`), [entregas-constraints.sql](../apps/erp/prisma/sql/entregas-constraints.sql), [entregas-photos.sql](../apps/erp/prisma/sql/entregas-photos.sql), [entregas-permissions.sql](../apps/erp/prisma/sql/entregas-permissions.sql). Se aplican juntos con `pnpm db:entregas`.
+- SQL: [entregas-photos-ddl.sql](../apps/erp/prisma/sql/entregas-photos-ddl.sql) (equivale a `db push`), [entregas-constraints.sql](../apps/erp/prisma/sql/entregas-constraints.sql), [entregas-photos.sql](../apps/erp/prisma/sql/entregas-photos.sql), [entregas-permissions.sql](../apps/erp/prisma/sql/entregas-permissions.sql), [entregas-providers.sql](../apps/erp/prisma/sql/entregas-providers.sql). Se aplican juntos con `pnpm db:entregas`.
 - Módulo: `apps/erp/src/modules/entregas/`
-  - `lib/schemas.ts` — Zod (entrega, líneas, fotos, destinatario, mensajero).
+  - `lib/schemas.ts` — Zod (entrega, líneas, fotos, destinatario, proveedor, mensajero).
   - `lib/delivery-lines.ts` — `resolveDeliveryLines` (+ tests).
   - `lib/delivery-photos.ts` — `appendPhotos` / `syncPhotos`.
-  - `actions/cash-delivery-actions.ts`, `actions/delivery-photo-actions.ts`, `actions/recipient-actions.ts`, `actions/courier-actions.ts`.
+  - `actions/cash-delivery-actions.ts`, `actions/delivery-photo-actions.ts`, `actions/recipient-actions.ts`, `actions/provider-actions.ts`, `actions/courier-actions.ts`.
   - `components/deliveries/delivery-detail-view.tsx` — vista compartida por el sheet y la página.
 - Rutas: `apps/erp/src/app/(app)/(entregas)/`.
 - Upload: [src/app/api/deliveries/upload/route.ts](../apps/erp/src/app/api/deliveries/upload/route.ts).

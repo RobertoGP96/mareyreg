@@ -31,6 +31,7 @@ import {
 } from "../../actions/delivery-photo-actions";
 import type { CashDeliveryDetail } from "../../queries/cash-delivery-queries";
 import type { RecipientPickerOption } from "../../queries/recipient-queries";
+import type { ProviderPickerOption } from "../../queries/provider-queries";
 import type { CourierPickerOption } from "../../queries/courier-queries";
 import type { ActiveDenomination } from "../../queries/catalog-queries";
 import type { CurrencyOption } from "../../lib/types";
@@ -49,6 +50,7 @@ const STATUS_LABEL: Record<CashDeliveryDetail["status"], string> = {
 interface Props {
   detail: CashDeliveryDetail;
   recipients: RecipientPickerOption[];
+  providers: ProviderPickerOption[];
   couriers: CourierPickerOption[];
   currencies: CurrencyOption[];
   denominationsByCurrency: Record<number, ActiveDenomination[]>;
@@ -59,6 +61,7 @@ interface Props {
 export function DeliveryDetailClient({
   detail,
   recipients,
+  providers,
   couriers,
   currencies,
   denominationsByCurrency,
@@ -247,6 +250,7 @@ export function DeliveryDetailClient({
         onOpenChange={setIsFormOpen}
         editing={detail}
         recipients={recipients}
+        providers={providers}
         couriers={couriers}
         currencies={currencies}
         denominationsByCurrency={denominationsByCurrency}

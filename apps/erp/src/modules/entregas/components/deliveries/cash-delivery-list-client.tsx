@@ -47,6 +47,7 @@ import type {
   PendingCommissionByCurrency,
 } from "../../queries/cash-delivery-queries";
 import type { RecipientPickerOption } from "../../queries/recipient-queries";
+import type { ProviderPickerOption } from "../../queries/provider-queries";
 import type { CourierPickerOption } from "../../queries/courier-queries";
 import type { ActiveDenomination } from "../../queries/catalog-queries";
 import type { CurrencyOption } from "../../lib/types";
@@ -64,6 +65,7 @@ type CommissionFilter = "all" | "pending" | "paid";
 interface Props {
   initialDeliveries: CashDeliveryRow[];
   recipients: RecipientPickerOption[];
+  providers: ProviderPickerOption[];
   couriers: CourierPickerOption[];
   currencies: CurrencyOption[];
   denominationsByCurrency: Record<number, ActiveDenomination[]>;
@@ -120,6 +122,7 @@ function AmountLines({ d, compact }: { d: CashDeliveryRow; compact?: boolean }) 
 export function CashDeliveryListClient({
   initialDeliveries,
   recipients,
+  providers,
   couriers,
   currencies,
   denominationsByCurrency,
@@ -160,6 +163,7 @@ export function CashDeliveryListClient({
       if (!q) return true;
       return (
         d.recipientName.toLowerCase().includes(q) ||
+        (d.providerName ?? "").toLowerCase().includes(q) ||
         (d.courierName ?? "").toLowerCase().includes(q) ||
         (d.reference ?? "").toLowerCase().includes(q) ||
         (d.notes ?? "").toLowerCase().includes(q)
@@ -421,6 +425,9 @@ export function CashDeliveryListClient({
           <span className="font-medium text-foreground truncate">{d.recipientName}</span>
           {d.recipientPhone && (
             <span className="text-xs text-muted-foreground truncate">{d.recipientPhone}</span>
+          )}
+          {d.providerName && (
+            <span className="text-xs text-muted-foreground truncate">De: {d.providerName}</span>
           )}
         </div>
       ),
@@ -702,6 +709,7 @@ export function CashDeliveryListClient({
         }}
         editing={editing}
         recipients={recipients}
+        providers={providers}
         couriers={couriers}
         currencies={currencies}
         denominationsByCurrency={denominationsByCurrency}

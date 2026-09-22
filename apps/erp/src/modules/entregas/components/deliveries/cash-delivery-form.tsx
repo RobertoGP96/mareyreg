@@ -11,16 +11,18 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  HandCoins, CircleDollarSign, FileText, Hash, Loader2, Bike, Camera,
+  HandCoins, CircleDollarSign, FileText, Hash, Loader2, Bike, Camera, Building2,
 } from "lucide-react";
 import { toast } from "@/lib/toast";
 import type { CurrencyOption } from "../../lib/types";
 import type { RecipientPickerOption } from "../../queries/recipient-queries";
+import type { ProviderPickerOption } from "../../queries/provider-queries";
 import type { CourierPickerOption } from "../../queries/courier-queries";
 import type { ActiveDenomination } from "../../queries/catalog-queries";
 import type { CashDeliveryDetail } from "../../queries/cash-delivery-queries";
 import type { CashDeliveryInput, DeliveryPhotoInput } from "../../lib/schemas";
 import { RecipientPicker } from "./recipient-picker";
+import { ProviderPicker } from "./provider-picker";
 import { DeliveryPhotosField } from "./delivery-photos-field";
 import {
   draftFromExisting,
@@ -35,6 +37,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   editing: CashDeliveryDetail | null;
   recipients: RecipientPickerOption[];
+  providers: ProviderPickerOption[];
   couriers: CourierPickerOption[];
   currencies: CurrencyOption[];
   denominationsByCurrency: Record<number, ActiveDenomination[]>;
@@ -46,6 +49,7 @@ export function CashDeliveryForm({
   onOpenChange,
   editing,
   recipients,
+  providers,
   couriers,
   currencies,
   denominationsByCurrency,
@@ -54,6 +58,7 @@ export function CashDeliveryForm({
   const activeCurrencies = useMemo(() => currencies.filter((c) => c.active), [currencies]);
 
   const [recipientId, setRecipientId] = useState<number | null>(null);
+  const [providerId, setProviderId] = useState<number | null>(null);
   const [lines, setLines] = useState<DeliveryLineDraft[]>([]);
   const [courierId, setCourierId] = useState<string>("none");
   const [commissionAmount, setCommissionAmount] = useState("");
@@ -71,6 +76,7 @@ export function CashDeliveryForm({
     if (!open) return;
     if (editing) {
       setRecipientId(editing.recipientId);
+      setProviderId(editing.providerId);
       setLines(
         editing.lines.map((l) => ({
           currencyId: l.currencyId,
@@ -99,6 +105,7 @@ export function CashDeliveryForm({
       setCommissionTouched(true);
     } else {
       setRecipientId(null);
+      setProviderId(null);
       setLines(
         activeCurrencies[0]
           ? [{ currencyId: activeCurrencies[0].currencyId, breakdown: [], amount: "" }]
@@ -170,6 +177,7 @@ export function CashDeliveryForm({
       const commission = Number(commissionAmount || 0);
       const ok = await onSubmit({
         recipientId: recipientId!,
+        providerId,
         lines: lines.map((l) => {
           const isDigital =
             currencies.find((c) => c.currencyId === l.currencyId)?.kind === "digital";
@@ -215,6 +223,16 @@ export function CashDeliveryForm({
               recipients={recipients}
               value={recipientId}
               onChange={(r) => setRecipientId(r ? r.recipientId : null)}
+            />
+          </Field>
+        </FormSection>
+
+        <FormSection icon={Building2} title="Proveedor">
+          <Field label="Proveedor" icon={Building2} hint="Opcional. De quién proviene el efectivo.">
+            <ProviderPicker
+              providers={providers}
+              value={providerId}
+              onChange={(p) => setProviderId(p ? p.providerId : null)}
             />
           </Field>
         </FormSection>

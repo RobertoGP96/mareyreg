@@ -71,6 +71,16 @@ async function assertCourierUsable(tx: Tx, courierId: number | null | undefined)
   if (!courier.active) throw new Error("El mensajero está desactivado");
 }
 
+async function assertProviderUsable(tx: Tx, providerId: number | null | undefined) {
+  if (providerId == null) return;
+  const provider = await tx.deliveryProvider.findUnique({
+    where: { providerId },
+    select: { active: true },
+  });
+  if (!provider) throw new Error("Proveedor no encontrado");
+  if (!provider.active) throw new Error("El proveedor está desactivado");
+}
+
 export async function createCashDelivery(
   input: CashDeliveryInput
 ): Promise<ActionResult<{ deliveryId: number }>> {
@@ -90,12 +100,14 @@ export async function createCashDelivery(
       if (!recipient) throw new Error("Destinatario no encontrado");
       if (!recipient.active) throw new Error("El destinatario está desactivado");
 
+      await assertProviderUsable(tx, data.providerId);
       await assertCourierUsable(tx, data.courierId);
       const lines = await resolveDeliveryLines(tx, data.lines);
 
       const delivery = await tx.cashDelivery.create({
         data: {
           recipientId: data.recipientId,
+          providerId: data.providerId ?? null,
           status: "pending",
           courierId: data.courierId ?? null,
           commissionAmount: data.commissionAmount.toString(),
@@ -160,6 +172,7 @@ export async function updateCashDelivery(
         throw new Error("Solo se pueden editar entregas pendientes");
       }
 
+      await assertProviderUsable(tx, data.providerId);
       await assertCourierUsable(tx, data.courierId);
       const lines = await resolveDeliveryLines(tx, data.lines);
 
@@ -171,6 +184,7 @@ export async function updateCashDelivery(
         where: { deliveryId: id, version: prev.version, status: "pending" },
         data: {
           recipientId: data.recipientId,
+          providerId: data.providerId ?? null,
           courierId: data.courierId ?? null,
           commissionAmount: data.commissionAmount.toString(),
           commissionCurrencyId: data.commissionCurrencyId ?? null,

@@ -169,6 +169,7 @@ export const modules: AppModule[] = [
     routes: [
       { name: "Entregas", href: "/entregas", icon: HandCoins },
       { name: "Destinatarios", href: "/entregas/destinatarios", icon: UserRound },
+      { name: "Proveedores", href: "/entregas/proveedores", icon: Building2 },
       { name: "Mensajeros", href: "/entregas/mensajeros", icon: Bike },
     ],
   },

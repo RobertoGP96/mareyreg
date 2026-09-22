@@ -17,6 +17,12 @@ export const recipientSchema = z.object({
 });
 export type RecipientInput = z.infer<typeof recipientSchema>;
 
+export const deliveryProviderSchema = z.object({
+  name: z.string().trim().min(2, "Nombre mínimo 2 caracteres").max(120),
+  active: z.boolean().optional(),
+});
+export type DeliveryProviderInput = z.infer<typeof deliveryProviderSchema>;
+
 export const DELIVERY_PHOTO_ACCEPTED_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
 export const DELIVERY_PHOTO_ACCEPT_ATTR = DELIVERY_PHOTO_ACCEPTED_MIME.join(",");
 export const DELIVERY_PHOTO_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -70,6 +76,7 @@ export type CashDeliveryLineInput = z.infer<typeof cashDeliveryLineSchema>;
 export const cashDeliverySchema = z
   .object({
     recipientId: z.coerce.number().int().positive("Selecciona un destinatario"),
+    providerId: z.coerce.number().int().positive().nullish(),
     courierId: z.coerce.number().int().positive().nullish(),
     commissionAmount: z.coerce.number().min(0, "La comisión no puede ser negativa").default(0),
     commissionCurrencyId: z.coerce.number().int().positive().nullish(),

@@ -34,6 +34,8 @@ export type CashDeliveryRow = {
   recipientPhone: string | null;
   recipientAddress: string | null;
   recipientMapUrl: string | null;
+  providerId: number | null;
+  providerName: string | null;
   lines: CashDeliveryLineRow[];
   courierId: number | null;
   courierName: string | null;
@@ -60,6 +62,7 @@ export type CashDeliveryRow = {
 export type ListCashDeliveriesArgs = {
   status?: CashDeliveryStatus;
   recipientId?: number;
+  providerId?: number;
   currencyId?: number;
   courierId?: number;
   commissionStatus?: DeliveryCommissionStatus;
@@ -76,6 +79,10 @@ const RECIPIENT_SELECT = {
   select: { recipientId: true, fullName: true, phone: true, address: true, mapUrl: true },
 } as const;
 
+const PROVIDER_SELECT = {
+  select: { providerId: true, name: true },
+} as const;
+
 const CURRENCY_SELECT = {
   select: { currencyId: true, code: true, symbol: true, decimalPlaces: true },
 } as const;
@@ -86,6 +93,7 @@ export async function listCashDeliveries(
   const where: Prisma.CashDeliveryWhereInput = {};
   if (args.status) where.status = args.status;
   if (args.recipientId) where.recipientId = args.recipientId;
+  if (args.providerId) where.providerId = args.providerId;
   if (args.courierId) where.courierId = args.courierId;
   if (args.commissionStatus) where.commissionStatus = args.commissionStatus;
   if (args.currencyId) where.lines = { some: { currencyId: args.currencyId } };
@@ -101,6 +109,7 @@ export async function listCashDeliveries(
       { reference: { contains: q, mode: "insensitive" } },
       { notes: { contains: q, mode: "insensitive" } },
       { recipient: { fullName: { contains: q, mode: "insensitive" } } },
+      { provider: { name: { contains: q, mode: "insensitive" } } },
       { courier: { user: { fullName: { contains: q, mode: "insensitive" } } } },
     ];
   }
@@ -110,6 +119,7 @@ export async function listCashDeliveries(
     orderBy: [{ occurredAt: "desc" }, { deliveryId: "desc" }],
     include: {
       recipient: RECIPIENT_SELECT,
+      provider: PROVIDER_SELECT,
       lines: {
         orderBy: { sortOrder: "asc" },
         include: {
@@ -137,6 +147,7 @@ type DeliveryRowSource = {
     address: string | null;
     mapUrl: string | null;
   };
+  provider: { providerId: number; name: string } | null;
   lines: {
     lineId: number;
     amount: Prisma.Decimal;
@@ -184,6 +195,8 @@ function toDeliveryRow(r: DeliveryRowSource): CashDeliveryRow {
     recipientPhone: r.recipient.phone,
     recipientAddress: r.recipient.address,
     recipientMapUrl: r.recipient.mapUrl,
+    providerId: r.provider?.providerId ?? null,
+    providerName: r.provider?.name ?? null,
     lines: r.lines.map((l) => ({
       lineId: l.lineId,
       currencyId: l.currency.currencyId,
@@ -237,6 +250,7 @@ export async function getCashDeliveryById(id: number): Promise<CashDeliveryDetai
     where: { deliveryId: id },
     include: {
       recipient: RECIPIENT_SELECT,
+      provider: PROVIDER_SELECT,
       lines: {
         orderBy: { sortOrder: "asc" },
         include: {

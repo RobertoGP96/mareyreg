@@ -7,6 +7,7 @@ import {
   getPendingCommissionByCurrency,
 } from "@/modules/entregas/queries/cash-delivery-queries";
 import { searchRecipientsForPicker } from "@/modules/entregas/queries/recipient-queries";
+import { getProviderPickerOptions } from "@/modules/entregas/queries/provider-queries";
 import { getCourierPickerOptions } from "@/modules/entregas/queries/courier-queries";
 import {
   getCurrencyOptions,
@@ -17,6 +18,7 @@ export default async function EntregasPage() {
   const [
     deliveries,
     recipients,
+    providers,
     currencies,
     couriers,
     denominationsByCurrency,
@@ -25,6 +27,7 @@ export default async function EntregasPage() {
   ] = await Promise.all([
     listCashDeliveries(),
     searchRecipientsForPicker(""),
+    getProviderPickerOptions(),
     getCurrencyOptions(),
     getCourierPickerOptions(),
     getActiveDenominationsByCurrency(),
@@ -37,6 +40,7 @@ export default async function EntregasPage() {
       <CashDeliveryListClient
         initialDeliveries={deliveries}
         recipients={recipients}
+        providers={providers}
         couriers={couriers}
         currencies={currencies}
         denominationsByCurrency={denominationsByCurrency}

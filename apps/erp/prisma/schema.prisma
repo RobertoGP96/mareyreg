@@ -1779,6 +1779,21 @@ model Recipient {
   @@map("recipients")
 }
 
+// Quien envía u origina el efectivo de una entrega. Catálogo mínimo por
+// diseño: solo nombre; `active` lo retira del picker sin romper el historial.
+model DeliveryProvider {
+  providerId Int      @id @default(autoincrement()) @map("provider_id")
+  name       String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  deliveries CashDelivery[]
+
+  @@index([active, name])
+  @@map("delivery_providers")
+}
+
 enum DeliveryCommissionStatus {
   pending
   paid
@@ -1831,6 +1846,7 @@ model CurrencyDenomination {
 model CashDelivery {
   deliveryId           Int                      @id @default(autoincrement()) @map("delivery_id")
   recipientId          Int                      @map("recipient_id")
+  providerId           Int?                     @map("provider_id")
   status               CashDeliveryStatus       @default(pending)
   courierId            Int?                     @map("courier_id")
   commissionAmount     Decimal                  @default(0) @map("commission_amount") @db.Decimal(20, 8)
@@ -1854,6 +1870,7 @@ model CashDelivery {
   updatedAt            DateTime                 @default(now()) @updatedAt @map("updated_at")
 
   recipient          Recipient          @relation(fields: [recipientId], references: [recipientId], onDelete: Restrict)
+  provider           DeliveryProvider?  @relation(fields: [providerId], references: [providerId], onDelete: Restrict)
   lines              CashDeliveryLine[]
   photos             CashDeliveryPhoto[]
   courier            CourierProfile?    @relation(fields: [courierId], references: [courierProfileId], onDelete: Restrict)
@@ -1863,6 +1880,7 @@ model CashDelivery {
   commissionPaidBy   User?              @relation("CashDeliveryCommissionPaidBy", fields: [commissionPaidById], references: [userId], onDelete: SetNull)
 
   @@index([recipientId])
+  @@index([providerId])
   @@index([status, occurredAt])
   @@index([courierId, commissionStatus])
   @@index([commissionStatus, occurredAt])

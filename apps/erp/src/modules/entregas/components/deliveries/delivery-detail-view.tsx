@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import {
-  BadgeCheck, Bike, Clock, CheckCircle2, ExternalLink, FileText, Hash, MapPin, Phone, UserRound, XCircle,
+  BadgeCheck, Bike, Building2, Clock, CheckCircle2, ExternalLink, FileText, Hash, MapPin, Phone, UserRound, XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatAmount } from "@/lib/format";
@@ -113,6 +113,14 @@ function RecipientCard({ detail }: { detail: CashDeliveryDetail }) {
         >
           <ExternalLink className="h-3 w-3" /> Abrir mapa
         </Button>
+      )}
+      {detail.providerName && (
+        <p className="mt-2 flex items-center gap-1.5 border-t border-border pt-2 text-xs text-muted-foreground">
+          <Building2 className="h-3 w-3 shrink-0" />
+          <span>
+            Proveedor: <span className="font-medium text-foreground">{detail.providerName}</span>
+          </span>
+        </p>
       )}
     </Card>
   );
