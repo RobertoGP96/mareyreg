@@ -71,6 +71,8 @@ interface Props {
   denominationsByCurrency: Record<number, ActiveDenomination[]>;
   commissionByCurrency: PendingCommissionByCurrency[];
   isAdmin: boolean;
+  /** Admin o despachador: pueden editar y eliminar entregas en cualquier estado. */
+  canManage: boolean;
 }
 
 function hasCommission(d: CashDeliveryRow) {
@@ -128,6 +130,7 @@ export function CashDeliveryListClient({
   denominationsByCurrency,
   commissionByCurrency,
   isAdmin,
+  canManage,
 }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -334,9 +337,6 @@ export function CashDeliveryListClient({
             <DropdownMenuItem onClick={() => setToMarkDelivered(d)}>
               <CheckCircle2 className="h-4 w-4" /> Marcar entregada
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => void openEdit(d)}>
-              <SquarePen className="h-4 w-4" /> Editar
-            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => setToCancel(d)}
               className="text-destructive focus:text-destructive"
@@ -344,6 +344,11 @@ export function CashDeliveryListClient({
               <XCircle className="h-4 w-4" /> Cancelar
             </DropdownMenuItem>
           </>
+        )}
+        {canManage && (
+          <DropdownMenuItem onClick={() => void openEdit(d)}>
+            <SquarePen className="h-4 w-4" /> Editar
+          </DropdownMenuItem>
         )}
         {hasCommission(d) && d.commissionStatus === "pending" && d.status !== "cancelled" && (
           <DropdownMenuItem
@@ -383,7 +388,7 @@ export function CashDeliveryListClient({
             <ExternalLink className="h-4 w-4" /> Abrir mapa
           </DropdownMenuItem>
         )}
-        {d.status !== "delivered" && (
+        {canManage && (
           <DropdownMenuItem
             onClick={() => setToDelete(d)}
             className="text-destructive focus:text-destructive"
@@ -725,7 +730,7 @@ export function CashDeliveryListClient({
             setDetailLoading(false);
           }
         }}
-        onEdit={editFromDetail}
+        onEdit={canManage ? editFromDetail : undefined}
       />
 
       <AlertDialog open={showBulkConfirm} onOpenChange={setShowBulkConfirm}>
@@ -786,8 +791,7 @@ export function CashDeliveryListClient({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar entrega?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará permanentemente este registro con todos sus montos y desglose. Las
-              entregas confirmadas no pueden eliminarse.
+              Se eliminará permanentemente este registro con todos sus montos y desglose.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

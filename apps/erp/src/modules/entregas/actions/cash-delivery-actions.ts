@@ -161,6 +161,9 @@ export async function updateCashDelivery(
     }
     const data = parsed.data;
     const userId = await requireCurrentUserId();
+    // Editar o eliminar entregas en cualquier estado es de admin y despachador;
+    // viewer solo consulta.
+    await assertRole("dispatcher");
 
     const { removedUrls } = await db.$transaction(async (tx) => {
       const prev = await tx.cashDelivery.findUnique({
@@ -168,9 +171,6 @@ export async function updateCashDelivery(
         include: DELIVERY_TREE_INCLUDE,
       });
       if (!prev) throw new Error("Entrega no encontrada");
-      if (prev.status !== "pending") {
-        throw new Error("Solo se pueden editar entregas pendientes");
-      }
 
       await assertProviderUsable(tx, data.providerId);
       await assertCourierUsable(tx, data.courierId);
@@ -181,7 +181,7 @@ export async function updateCashDelivery(
       // La galería pasa a ser la única verdad de las fotos: la foto única del
       // modelo anterior (photoUrl) llega dentro de `photos` si se conservó.
       const claimed = await tx.cashDelivery.updateMany({
-        where: { deliveryId: id, version: prev.version, status: "pending" },
+        where: { deliveryId: id, version: prev.version },
         data: {
           recipientId: data.recipientId,
           providerId: data.providerId ?? null,
@@ -364,6 +364,7 @@ export async function cancelCashDelivery(id: number): Promise<ActionResult<void>
 export async function deleteCashDelivery(id: number): Promise<ActionResult<void>> {
   try {
     const userId = await requireCurrentUserId();
+    await assertRole("dispatcher");
     const photoUrls = await db.$transaction(async (tx) => {
       // El árbol completo va al audit antes de borrar: líneas, desglose y fotos
       // se van en cascada y esta es la única traza que queda.
@@ -372,9 +373,6 @@ export async function deleteCashDelivery(id: number): Promise<ActionResult<void>
         include: DELIVERY_TREE_INCLUDE,
       });
       if (!prev) throw new Error("Entrega no encontrada");
-      if (prev.status === "delivered") {
-        throw new Error("No se pueden eliminar entregas ya confirmadas");
-      }
       await tx.cashDelivery.delete({ where: { deliveryId: id } });
       await createAuditLog(tx, {
         action: "delete",

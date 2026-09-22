@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { auth } from "@/lib/auth";
+import { canManageDeliveries } from "@/modules/entregas/lib/permissions";
 import { CashDeliveryListClient } from "@/modules/entregas/components/deliveries/cash-delivery-list-client";
 import {
   listCashDeliveries,
@@ -46,6 +47,7 @@ export default async function EntregasPage() {
         denominationsByCurrency={denominationsByCurrency}
         commissionByCurrency={commissionByCurrency}
         isAdmin={session?.user?.role === "admin"}
+        canManage={canManageDeliveries(session?.user?.role)}
       />
     </div>
   );

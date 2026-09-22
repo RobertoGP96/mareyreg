@@ -61,7 +61,7 @@ export function CashDeliveryDetailSheet({ detail, loading, onOpenChange, onEdit 
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cerrar
           </Button>
-          {detail && onEdit && detail.status === "pending" && (
+          {detail && onEdit && (
             <Button type="button" variant="brand" onClick={() => onEdit(detail)}>
               <SquarePen className="h-4 w-4" /> Editar
             </Button>

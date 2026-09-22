@@ -55,6 +55,8 @@ interface Props {
   currencies: CurrencyOption[];
   denominationsByCurrency: Record<number, ActiveDenomination[]>;
   isAdmin: boolean;
+  /** Admin o despachador: pueden editar y eliminar entregas en cualquier estado. */
+  canManage: boolean;
   currentUserId: number | null;
 }
 
@@ -66,6 +68,7 @@ export function DeliveryDetailClient({
   currencies,
   denominationsByCurrency,
   isAdmin,
+  canManage,
   currentUserId,
 }: Props) {
   const router = useRouter();
@@ -160,7 +163,7 @@ export function DeliveryDetailClient({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        {isPending && (
+        {canManage && (
           <DropdownMenuItem onClick={() => setIsFormOpen(true)}>
             <SquarePen className="h-4 w-4" /> Editar
           </DropdownMenuItem>
@@ -196,7 +199,7 @@ export function DeliveryDetailClient({
             <ExternalLink className="h-4 w-4" /> Abrir mapa
           </DropdownMenuItem>
         )}
-        {(isPending || detail.status !== "delivered") && <DropdownMenuSeparator />}
+        {(isPending || canManage) && <DropdownMenuSeparator />}
         {isPending && (
           <DropdownMenuItem
             onClick={() => setConfirmCancel(true)}
@@ -205,7 +208,7 @@ export function DeliveryDetailClient({
             <XCircle className="h-4 w-4" /> Cancelar entrega
           </DropdownMenuItem>
         )}
-        {detail.status !== "delivered" && (
+        {canManage && (
           <DropdownMenuItem
             onClick={() => setConfirmDelete(true)}
             className="text-destructive focus:text-destructive"
@@ -297,8 +300,7 @@ export function DeliveryDetailClient({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar entrega?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará permanentemente este registro con sus montos, desglose y fotos. Las
-              entregas confirmadas no pueden eliminarse.
+              Se eliminará permanentemente este registro con sus montos, desglose y fotos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

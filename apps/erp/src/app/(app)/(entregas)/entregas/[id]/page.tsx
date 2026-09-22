@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { canManageDeliveries } from "@/modules/entregas/lib/permissions";
 import { DeliveryDetailClient } from "@/modules/entregas/components/deliveries/delivery-detail-client";
 import { getCashDeliveryById } from "@/modules/entregas/queries/cash-delivery-queries";
 import { searchRecipientsForPicker } from "@/modules/entregas/queries/recipient-queries";
@@ -46,6 +47,7 @@ export default async function EntregaDetallePage({ params }: Props) {
         currencies={currencies}
         denominationsByCurrency={denominationsByCurrency}
         isAdmin={session?.user?.role === "admin"}
+        canManage={canManageDeliveries(session?.user?.role)}
         currentUserId={currentUserId}
       />
     </div>
