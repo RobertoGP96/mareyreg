@@ -4,6 +4,7 @@ import Google from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { authConfig } from "./auth.config";
+import { mergeEffectiveModules } from "@/modules/auth/lib/effective-modules";
 
 const googleClientId = process.env.AUTH_GOOGLE_ID || process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret =
@@ -37,12 +38,20 @@ const providers = [
 
       if (!passwordMatch) return null;
 
+      const roleModules = await db.roleModulePermission.findMany({
+        where: { role: user.role },
+        select: { moduleId: true },
+      });
+
       return {
         id: String(user.userId),
         email: user.email,
         name: user.fullName,
         role: user.role,
-        modules: user.modulePermissions.map((p) => p.moduleId),
+        modules: mergeEffectiveModules(
+          user.modulePermissions.map((p) => p.moduleId),
+          roleModules.map((r) => r.moduleId)
+        ),
       };
     },
   }),

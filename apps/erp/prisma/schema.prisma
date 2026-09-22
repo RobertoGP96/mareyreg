@@ -86,6 +86,16 @@ model UserModulePermission {
   @@map("user_module_permissions")
 }
 
+// Módulos que un rol concede por defecto a todos sus miembros. Se une con
+// user_module_permissions al iniciar sesión; admin pasa siempre por rol.
+model RoleModulePermission {
+  role     UserRole
+  moduleId String   @map("module_id")
+
+  @@id([role, moduleId])
+  @@map("role_module_permissions")
+}
+
 model AuditLog {
   logId      Int      @id @default(autoincrement()) @map("log_id")
   userId     Int?     @map("user_id")

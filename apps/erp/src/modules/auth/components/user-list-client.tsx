@@ -58,21 +58,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/lib/toast";
 import { createUser, updateUser, deleteUser } from "../actions/auth-actions";
 import { getEnabledModules } from "@/lib/module-registry";
-
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Administrador",
-  dispatcher: "Despachador",
-  viewer: "Observador",
-};
-
-const ROLE_VARIANT: Record<
-  string,
-  "brand" | "info" | "secondary"
-> = {
-  admin: "brand",
-  dispatcher: "info",
-  viewer: "secondary",
-};
+import { mergeEffectiveModules } from "../lib/effective-modules";
+import {
+  ROLE_LABELS,
+  ROLE_VARIANT,
+  isSystemRole,
+  type SystemRole,
+} from "../lib/roles";
 
 const enabledModules = getEnabledModules();
 
@@ -100,19 +92,32 @@ interface UserItem {
 
 interface Props {
   users: UserItem[];
+  /** Módulos que cada rol concede por defecto (ver /settings/roles). */
+  roleModules: Record<SystemRole, string[]>;
 }
 
-export function UserListClient({ users }: Props) {
+export function UserListClient({ users, roleModules }: Props) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<UserItem | null>(null);
   const [userToEdit, setUserToEdit] = useState<UserItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createRole, setCreateRole] = useState<SystemRole>("viewer");
+  const [editRole, setEditRole] = useState<SystemRole>("viewer");
   const [createModules, setCreateModules] = useState<string[]>(
     enabledModules.map((m) => m.id)
   );
   const [editModules, setEditModules] = useState<string[]>([]);
+
+  const grantedByRole = (role: SystemRole) => roleModules[role] ?? [];
+
+  const moduleHint = (role: SystemRole) => {
+    if (role === "admin") return "No aplica para administradores.";
+    const n = grantedByRole(role).length;
+    if (n === 0) return "El rol no concede módulos por defecto.";
+    return `${n} módulo${n === 1 ? "" : "s"} vienen del rol ${ROLE_LABELS[role]}; el resto se asigna aquí.`;
+  };
 
   const filtered = users.filter(
     (u) =>
@@ -144,12 +149,13 @@ export function UserListClient({ users }: Props) {
       fullName: fd.get("fullName") as string,
       email: fd.get("email") as string,
       password: fd.get("password") as string,
-      role: fd.get("role") as "admin" | "dispatcher" | "viewer",
+      role: createRole,
       modules: createModules,
     });
     setIsSubmitting(false);
     if (result.success) {
       setIsCreateOpen(false);
+      setCreateRole("viewer");
       setCreateModules(enabledModules.map((m) => m.id));
       toast.success("Usuario creado");
       router.refresh();
@@ -165,7 +171,7 @@ export function UserListClient({ users }: Props) {
     const result = await updateUser(userToEdit.userId, {
       fullName: fd.get("fullName") as string,
       email: fd.get("email") as string,
-      role: fd.get("role") as "admin" | "dispatcher" | "viewer",
+      role: editRole,
       ...(password ? { password } : {}),
       modules: editModules,
     });
@@ -191,6 +197,7 @@ export function UserListClient({ users }: Props) {
 
   const openEdit = (user: UserItem) => {
     setUserToEdit(user);
+    setEditRole(isSystemRole(user.role) ? user.role : "viewer");
     setEditModules(user.modulePermissions.map((p) => p.moduleId));
   };
 
@@ -200,11 +207,15 @@ export function UserListClient({ users }: Props) {
         <span className="text-[12px] font-medium text-foreground">Todos</span>
       );
     }
-    if (user.modulePermissions.length === 0) {
+    const effective = mergeEffectiveModules(
+      user.modulePermissions.map((p) => p.moduleId),
+      isSystemRole(user.role) ? grantedByRole(user.role) : []
+    );
+    if (effective.length === 0) {
       return <span className="text-[12px] text-muted-foreground">—</span>;
     }
-    const labels = user.modulePermissions
-      .map((p) => enabledModules.find((m) => m.id === p.moduleId)?.label)
+    const labels = effective
+      .map((id) => enabledModules.find((m) => m.id === id)?.label)
       .filter(Boolean);
     return (
       <span className="text-[12px] text-muted-foreground">
@@ -275,7 +286,9 @@ export function UserListClient({ users }: Props) {
               </thead>
               <tbody>
                 {filtered.map((user) => {
-                  const variant = ROLE_VARIANT[user.role] ?? "secondary";
+                  const variant = isSystemRole(user.role)
+                    ? ROLE_VARIANT[user.role]
+                    : "secondary";
                   return (
                     <tr
                       key={user.userId}
@@ -297,7 +310,9 @@ export function UserListClient({ users }: Props) {
                       <td className="px-4 py-3">
                         <Badge variant={variant}>
                           <ShieldCheck className="size-3" />
-                          {ROLE_LABELS[user.role] ?? user.role}
+                          {isSystemRole(user.role)
+                            ? ROLE_LABELS[user.role]
+                            : user.role}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 max-w-[220px]">
@@ -375,7 +390,10 @@ export function UserListClient({ users }: Props) {
               </Field>
             </div>
             <Field label="Rol" icon={ShieldCheck} required>
-              <Select name="role" defaultValue="viewer">
+              <Select
+                value={createRole}
+                onValueChange={(v) => isSystemRole(v) && setCreateRole(v)}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -389,24 +407,33 @@ export function UserListClient({ users }: Props) {
             <Field
               label="Módulos permitidos"
               icon={KeyRound}
-              hint="No aplica para administradores."
+              hint={moduleHint(createRole)}
             >
               <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
-                {enabledModules.map((mod) => (
-                  <div key={mod.id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`create-${mod.id}`}
-                      checked={createModules.includes(mod.id)}
-                      onCheckedChange={() => toggleCreateModule(mod.id)}
-                    />
-                    <label
-                      htmlFor={`create-${mod.id}`}
-                      className="text-sm font-medium cursor-pointer select-none"
-                    >
-                      {mod.label}
-                    </label>
-                  </div>
-                ))}
+                {enabledModules.map((mod) => {
+                  const byRole = grantedByRole(createRole).includes(mod.id);
+                  return (
+                    <div key={mod.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`create-${mod.id}`}
+                        checked={byRole || createModules.includes(mod.id)}
+                        disabled={byRole || createRole === "admin"}
+                        onCheckedChange={() => toggleCreateModule(mod.id)}
+                      />
+                      <label
+                        htmlFor={`create-${mod.id}`}
+                        className="text-sm font-medium cursor-pointer select-none"
+                      >
+                        {mod.label}
+                      </label>
+                      {byRole && (
+                        <span className="text-[11px] text-muted-foreground">
+                          por rol
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </Field>
             <div className="flex justify-end gap-2 pt-4 border-t border-border">
@@ -465,7 +492,10 @@ export function UserListClient({ users }: Props) {
               </Field>
             </div>
             <Field label="Rol" icon={ShieldCheck} required>
-              <Select name="role" defaultValue={userToEdit?.role}>
+              <Select
+                value={editRole}
+                onValueChange={(v) => isSystemRole(v) && setEditRole(v)}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -476,23 +506,36 @@ export function UserListClient({ users }: Props) {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="Módulos permitidos" icon={KeyRound}>
+            <Field
+              label="Módulos permitidos"
+              icon={KeyRound}
+              hint={moduleHint(editRole)}
+            >
               <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
-                {enabledModules.map((mod) => (
-                  <div key={mod.id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`edit-${mod.id}`}
-                      checked={editModules.includes(mod.id)}
-                      onCheckedChange={() => toggleEditModule(mod.id)}
-                    />
-                    <label
-                      htmlFor={`edit-${mod.id}`}
-                      className="text-sm font-medium cursor-pointer select-none"
-                    >
-                      {mod.label}
-                    </label>
-                  </div>
-                ))}
+                {enabledModules.map((mod) => {
+                  const byRole = grantedByRole(editRole).includes(mod.id);
+                  return (
+                    <div key={mod.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`edit-${mod.id}`}
+                        checked={byRole || editModules.includes(mod.id)}
+                        disabled={byRole || editRole === "admin"}
+                        onCheckedChange={() => toggleEditModule(mod.id)}
+                      />
+                      <label
+                        htmlFor={`edit-${mod.id}`}
+                        className="text-sm font-medium cursor-pointer select-none"
+                      >
+                        {mod.label}
+                      </label>
+                      {byRole && (
+                        <span className="text-[11px] text-muted-foreground">
+                          por rol
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </Field>
             <div className="flex justify-end gap-2 pt-4 border-t border-border">
